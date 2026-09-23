@@ -13,6 +13,7 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and i
 - **Time-series chart** — shanten per yaku across turns; toggle series from the legend.
 - **Rewindable history tree** — jump back to any turn and try a different discard. New branches are added and old ones are kept, so you can compare lines of play on the same wall.
 - **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives).
+- **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
 
 Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in Phase 1.
 
@@ -57,8 +58,6 @@ Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep
 ```sh
 cd web && npm run dev
 ```
-
-Open `http://localhost:5173/?mock=1` to use the built-in mock backend instead (dev only).
 
 ### Layout
 

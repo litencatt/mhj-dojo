@@ -10,13 +10,8 @@
   --danger-bg: #fee2e2;
   --success-bg: #dcfce7;
   --tile-bg: #fffdf5;
-  --tile-fg: #1a1d23;
   --tile-border: #c9c2a8;
-  --tile-red: #dc2626;
-  --tile-m: #b91c1c;
-  --tile-p: #1d4ed8;
-  --tile-s: #15803d;
-  --tile-z: #3f3f46;
+  --tile-back: #3f7d5c;
   --row-best-bg: #fef3c7;
   --chart-grid: #e5e7eb;
 }
@@ -34,13 +29,8 @@
     --danger-bg: #3a1414;
     --success-bg: #123420;
     --tile-bg: #f4efe0;
-    --tile-fg: #1a1d23;
     --tile-border: #8a8264;
-    --tile-red: #ef4444;
-    --tile-m: #dc2626;
-    --tile-p: #3b82f6;
-    --tile-s: #22c55e;
-    --tile-z: #52525b;
+    --tile-back: #2f6b4c;
     --row-best-bg: #3a3110;
     --chart-grid: #2c313a;
   }
@@ -187,64 +177,40 @@ section {
 }
 
 /* ---- Tiles ---- */
+/* Ivory body with a darker back edge for depth; the face is an SVG (TileFace). */
 .tile {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
-  background: var(--tile-bg);
-  color: var(--tile-fg);
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #fffef8 0%, var(--tile-bg) 100%);
   border: 1px solid var(--tile-border);
-  border-radius: 6px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
-  font-weight: 700;
-  line-height: 1;
-  padding: 0;
+  border-radius: 5px;
+  box-shadow: 0 2px 0 var(--tile-back), 0 3px 3px rgba(0, 0, 0, 0.18);
+  padding: 2px;
   font-family: inherit;
 }
+.tile-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .tile-md {
-  width: 34px;
-  height: 46px;
-  font-size: 1.05rem;
+  width: 36px;
+  height: 48px;
 }
 .tile-sm {
-  width: 24px;
-  height: 33px;
-  font-size: 0.8rem;
+  width: 26px;
+  height: 35px;
+  padding: 1.5px;
 }
 .tile-xs {
   width: 18px;
   height: 24px;
-  font-size: 0.6rem;
-}
-.tile-main {
-  display: block;
-}
-.tile-sub {
-  display: block;
-  font-size: 0.55em;
-  opacity: 0.75;
-}
-.tile-xs .tile-sub {
-  display: none;
-}
-.tile-suit-m .tile-main { color: var(--tile-m); }
-.tile-suit-p .tile-main { color: var(--tile-p); }
-.tile-suit-s .tile-main { color: var(--tile-s); }
-.tile-suit-z .tile-main { color: var(--tile-z); }
-.tile-red .tile-main,
-.tile-red .tile-sub {
-  color: var(--tile-red) !important;
-}
-.tile-red-dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--tile-red);
+  padding: 1px;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--tile-back);
 }
 .tile-dimmed {
   opacity: 0.35;
