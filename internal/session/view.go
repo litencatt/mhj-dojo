@@ -35,6 +35,16 @@ func strPtr(t *tile.Tile) *string {
 
 func intPtr(v int) *int { return &v }
 
+// doraKinds returns the dora kind each indicator points to (next tile, wrapping
+// within the suit or wind/dragon group), without red notation.
+func doraKinds(indicators []tile.Tile) []string {
+	out := make([]string, len(indicators))
+	for i, ind := range indicators {
+		out[i] = tile.DoraFromIndicator(ind.Kind).String()
+	}
+	return out
+}
+
 func (s *Session) state() State {
 	cur := s.nodes[s.current]
 	path := s.path(cur)
@@ -64,8 +74,17 @@ func (s *Session) state() State {
 		Hand:           tile.Strings(cur.hand),
 		Discards:       append([]string{}, discards...),
 		DoraIndicators: tile.Strings(dora),
-		ByDiscard:      map[string][]YakuRow{},
-		Win:            cur.win,
+		Dora:           doraKinds(dora),
+		// Ura dora are revealed only once the game has ended.
+		UraDoraIndicators: []string{},
+		UraDora:           []string{},
+		ByDiscard:         map[string][]YakuRow{},
+		Win:               cur.win,
+	}
+	if cur.status != StatusPlaying {
+		ura := s.wall.UraDoraIndicators()
+		st.UraDoraIndicators = tile.Strings(ura)
+		st.UraDora = doraKinds(ura)
 	}
 	drawsTaken := cur.turn
 	if d, ok := s.drawn(cur); ok {

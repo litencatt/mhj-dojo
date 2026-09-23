@@ -342,3 +342,37 @@ func TestDiscardCannotReachTsumoChild(t *testing.T) {
 		t.Fatalf("moved to node %d", v.NodeID)
 	}
 }
+
+// Dora are always shown; ura dora stay hidden until the game ends.
+func TestDoraAndUraDora(t *testing.T) {
+	st := NewStore()
+	s := mustCreate(t, st, 3, 1)
+	w := wall.New(3)
+	ind, ura := w.DoraIndicators()[0], w.UraDoraIndicators()[0]
+
+	v := s.State()
+	if len(v.Dora) != 1 || v.Dora[0] != tile.DoraFromIndicator(ind.Kind).String() {
+		t.Fatalf("dora %v for indicator %v", v.Dora, ind)
+	}
+	if len(v.UraDoraIndicators) != 0 || len(v.UraDora) != 0 {
+		t.Fatalf("ura dora revealed while playing: %v %v", v.UraDoraIndicators, v.UraDora)
+	}
+	if _, err := s.Discard(*v.Drawn); err != nil {
+		t.Fatal(err)
+	}
+	v = s.State()
+	if v.Status != StatusExhausted {
+		t.Fatalf("status %s", v.Status)
+	}
+	if len(v.UraDoraIndicators) != 1 || v.UraDoraIndicators[0] != ura.String() ||
+		len(v.UraDora) != 1 || v.UraDora[0] != tile.DoraFromIndicator(ura.Kind).String() {
+		t.Fatalf("ura dora at the end: %v %v (want %v)", v.UraDoraIndicators, v.UraDora, ura)
+	}
+	// Going back to a playing node hides them again.
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
+	if v = s.State(); len(v.UraDoraIndicators) != 0 {
+		t.Fatalf("ura dora after goto: %v", v.UraDoraIndicators)
+	}
+}

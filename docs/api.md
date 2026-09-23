@@ -66,6 +66,10 @@ Body: `{"node_id": 3}` – moves the current node. Returns the `State`.
   "drawn": "5s",               // null unless status == playing
   "discards": ["9z", "..."],   // path discards, in order
   "dora_indicators": ["3z"],
+  "dora": ["4z"],              // dora kind each indicator points to (no red notation)
+  "ura_dora_indicators": [],     // the tiles below the dora indicators; [] until status != playing
+  "ura_dora": [],                // kinds pointed to by ura_dora_indicators (Phase 1 has no riichi,
+                                 // so ura dora are shown only and never scored)
   "wall_remaining": 115,       // draws left in the live wall (not max_turns)
   "can_tsumo": false,          // hand + drawn is a complete hand
 

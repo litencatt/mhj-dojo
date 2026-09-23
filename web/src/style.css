@@ -154,7 +154,18 @@ h2 {
 }
 .dora-indicators {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+.dora-arrow,
+.dora-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* A face-down tile shows its coloured back. */
+.tile.tile-back {
+  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  border-color: var(--tile-back);
 }
 
 .error-banner {

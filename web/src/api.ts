@@ -68,6 +68,9 @@ export interface State {
   drawn: Tile | null;
   discards: Tile[];
   dora_indicators: Tile[];
+  dora: Tile[]; // dora kinds pointed to by the indicators
+  ura_dora_indicators: Tile[]; // [] until the game ends
+  ura_dora: Tile[];
   wall_remaining: number;
   can_tsumo: boolean;
   analysis: YakuRow[];

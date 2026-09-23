@@ -68,6 +68,10 @@ func TestDrawBounds(t *testing.T) {
 	if d0 != all[HandSize] || w.DoraIndicators()[0] != all[Size-DeadWallSize+doraIndicatorPos] {
 		t.Fatal("unexpected wall layout")
 	}
+	// The ura-dora indicator is the tile below the dora indicator.
+	if u := w.UraDoraIndicators(); len(u) != 1 || u[0] != all[Size-DeadWallSize+doraIndicatorPos+1] {
+		t.Fatalf("ura-dora indicators %v", u)
+	}
 }
 
 func TestFromTilesValidates(t *testing.T) {
