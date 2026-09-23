@@ -1,4 +1,4 @@
-import { tileFace, parseTile } from '../tiles';
+import { TileFace } from './TileFace';
 
 export interface TileProps {
   tile: string;
@@ -12,13 +12,10 @@ export interface TileProps {
   onHoverEnd?: () => void;
 }
 
-/** Renders a single mahjong tile face (SVG/CSS only, no image assets). */
+/** Renders a single mahjong tile: an ivory body (CSS) with an SVG face. */
 export function Tile(props: TileProps) {
   const { tile, size = 'md', interactive = false, selected = false, dimmed = false, label, onClick, onHoverStart, onHoverEnd } = props;
-  const { suit, red } = parseTile(tile);
-  const face = tileFace(tile);
-  const classes = ['tile', `tile-${size}`, `tile-suit-${suit}`];
-  if (red) classes.push('tile-red');
+  const classes = ['tile', `tile-${size}`];
   if (selected) classes.push('tile-selected');
   if (dimmed) classes.push('tile-dimmed');
   if (interactive) classes.push('tile-interactive');
@@ -32,13 +29,7 @@ export function Tile(props: TileProps) {
     'aria-label': label ?? tile,
   };
 
-  const content = (
-    <>
-      <span class="tile-main">{face.main}</span>
-      {face.sub && <span class="tile-sub">{face.sub}</span>}
-      {red && <span class="tile-red-dot" aria-hidden="true" />}
-    </>
-  );
+  const content = <TileFace tile={tile} />;
 
   if (interactive) {
     return (
