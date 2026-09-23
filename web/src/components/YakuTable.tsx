@@ -1,4 +1,3 @@
-import { useState } from 'preact/hooks';
 import type { YakuRow } from '../api';
 import { Tile } from './Tile';
 
@@ -23,38 +22,18 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
   return { text: d < 0 ? `${d}` : `+${d}`, cls: d < 0 ? 'delta-improve' : d > 0 ? 'delta-worse' : 'delta-flat' };
 }
 
-/** Row with the lowest shanten (ties: wider ukeire), or null if none is possible. */
-function bestRow(rows: YakuRow[]): YakuRow | null {
-  let best: YakuRow | null = null;
-  for (const r of rows) {
-    if (r.shanten === null) continue;
-    if (
-      best === null ||
-      r.shanten < (best.shanten as number) ||
-      (r.shanten === best.shanten && r.ukeire_total > best.ukeire_total)
-    ) {
-      best = r;
-    }
-  }
-  return best;
-}
-
 /** 役別向聴テーブル: shows either the current-node analysis, or (while previewing a
  * discard) that candidate's resulting analysis with deltas vs the current node.
- * Yakuman rows sit in a collapsible 役満 group (collapsed by default). */
+ * Yakuman rows follow the others under a 役満 heading row. */
 export function YakuTable(props: YakuTableProps) {
   const { rows, baseline, previewTile } = props;
-  const [yakumanOpen, setYakumanOpen] = useState(false);
   const finiteShanten = rows
     .filter((r) => !r.yakuman)
     .map((r) => r.shanten)
     .filter((s): s is number => s !== null);
   const minShanten = finiteShanten.length > 0 ? Math.min(...finiteShanten) : null;
 
-  const yakumanRows = rows.filter((r) => r.yakuman);
-  const bestYakuman = bestRow(yakumanRows);
-  const baseBestYakuman = baseline ? bestRow(baseline.filter((r) => r.yakuman)) : null;
-  const yakumanDelta = baseline ? deltaLabel(bestYakuman?.shanten ?? null, baseBestYakuman?.shanten ?? null) : null;
+  const hasYakuman = rows.some((r) => r.yakuman);
 
   function renderRow(row: YakuRow, i: number) {
     const base = baseline ? baseline[i] : null;
@@ -109,34 +88,14 @@ export function YakuTable(props: YakuTableProps) {
             </tr>
           </thead>
           <tbody>{rows.map((row, i) => (row.yakuman ? null : renderRow(row, i)))}</tbody>
-          {yakumanRows.length > 0 && (
+          {hasYakuman && (
             <tbody class="yakuman-group">
-              <tr class="yakuman-summary">
-                <th scope="row" colSpan={4}>
-                  <button
-                    type="button"
-                    class="yakuman-toggle"
-                    aria-expanded={yakumanOpen}
-                    onClick={() => setYakumanOpen((v) => !v)}
-                  >
-                    <span class="yakuman-caret" aria-hidden="true">
-                      {yakumanOpen ? '▾' : '▸'}
-                    </span>
-                    役満
-                    <span class="yakuman-best">
-                      {bestYakuman ? (
-                        <>
-                          最短 {bestYakuman.name} {shantenLabel(bestYakuman.shanten)}
-                        </>
-                      ) : (
-                        '不可'
-                      )}
-                      {yakumanDelta && <span class={`delta ${yakumanDelta.cls}`}>{yakumanDelta.text}</span>}
-                    </span>
-                  </button>
+              <tr class="yakuman-heading">
+                <th scope="colgroup" colSpan={4}>
+                  役満
                 </th>
               </tr>
-              {yakumanOpen && rows.map((row, i) => (row.yakuman ? renderRow(row, i) : null))}
+              {rows.map((row, i) => (row.yakuman ? renderRow(row, i) : null))}
             </tbody>
           )}
         </table>
