@@ -93,10 +93,10 @@ var windKeys = [4]struct{ key, name string }{
 
 // Evaluate detects the yaku of a complete 14-tile closed tsumo hand, choosing
 // the reading with the most han (a yakuman reading always wins). ok is false
-// if the tiles are not complete.
+// if the tiles are not complete or do not contain ctx.WinTile.
 func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 	c := tile.CountsOf(tiles)
-	if len(tiles) != 14 || !IsComplete(c) {
+	if len(tiles) != 14 || c[ctx.WinTile] == 0 || !IsComplete(c) {
 		return Win{}, false
 	}
 	win.Dora = countDora(tiles, ctx.DoraIndicators)
@@ -124,8 +124,8 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		ys = append(ys, yChiitoitsu)
 		consider(ys, yakumanWide(c, false))
 	}
-	for _, d := range Decompose(c) {
-		consider(evalDecomp(c, d, ctx), append(yakumanWide(c, true), yakumanDecomp(d)...))
+	for _, r := range Readings(c, ctx.WinTile) {
+		consider(evalReading(c, r, ctx), append(yakumanWide(c, true), yakumanDecomp(r.Decomposition)...))
 	}
 	if bestYakumanHan > 0 {
 		win.Yaku = bestYakuman
@@ -270,11 +270,25 @@ func onlyYaochu(c tile.Counts) bool {
 	return true
 }
 
-func isValuePair(k tile.Kind, ctx Context) bool {
+// IsValuePair reports whether a pair of k is a value pair (dragon, round
+// wind or seat wind), which rules out pinfu and, from Phase 2, adds fu.
+func (ctx Context) IsValuePair(k tile.Kind) bool {
 	return k >= tile.Haku || k == ctx.RoundWind || k == ctx.SeatWind
 }
 
-func evalDecomp(c tile.Counts, d Decomposition, ctx Context) []Yaku {
+// IsPinfu reports whether r is a pinfu reading: four sequences, a non-value
+// pair and a two-sided wait.
+func IsPinfu(r Reading, ctx Context) bool {
+	for _, m := range r.Melds {
+		if m.Type != Seq {
+			return false
+		}
+	}
+	return r.Wait == Ryanmen && !ctx.IsValuePair(r.Pair)
+}
+
+func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
+	d := &r.Decomposition
 	ys := []Yaku{yTsumo}
 	ys = append(ys, handWide(c)...)
 
@@ -289,14 +303,8 @@ func evalDecomp(c tile.Counts, d Decomposition, ctx Context) []Yaku {
 		}
 	}
 
-	// pinfu: four sequences, non-value pair, some two-sided reading of the winning tile.
-	if seqs == 4 && !isValuePair(d.Pair, ctx) {
-		for _, m := range d.Melds {
-			if IsRyanmen(m, ctx.WinTile) {
-				ys = append(ys, yPinfu)
-				break
-			}
-		}
+	if IsPinfu(r, ctx) {
+		ys = append(ys, yPinfu)
 	}
 	peikou := 0
 	for _, n := range seqCount {

@@ -444,8 +444,8 @@ func PinfuWaits(c tile.Counts) []tile.Kind {
 			continue
 		}
 		c[t]++
-		for _, d := range yaku.Decompose(c) {
-			if isPinfuReading(d, t, ctx) {
+		for _, r := range yaku.Readings(c, t) {
+			if yaku.IsPinfu(r, ctx) {
 				set[t] = true
 				break
 			}
@@ -453,20 +453,6 @@ func PinfuWaits(c tile.Counts) []tile.Kind {
 		c[t]--
 	}
 	return kindsOf(&set)
-}
-
-func isPinfuReading(d yaku.Decomposition, win tile.Kind, ctx yaku.Context) bool {
-	if d.Pair >= tile.Haku || d.Pair == ctx.RoundWind || d.Pair == ctx.SeatWind {
-		return false
-	}
-	ryanmen := false
-	for _, m := range d.Melds {
-		if m.Type != yaku.Seq {
-			return false
-		}
-		ryanmen = ryanmen || yaku.IsRyanmen(m, win)
-	}
-	return ryanmen
 }
 
 func kindsOf(set *[tile.NumKinds]bool) []tile.Kind {

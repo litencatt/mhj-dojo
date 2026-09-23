@@ -2,7 +2,11 @@
 // closed tsumo win. Fu and points are out of scope.
 package yaku
 
-import "github.com/litencatt/mhj2/internal/tile"
+import (
+	"slices"
+
+	"github.com/litencatt/mhj2/internal/tile"
+)
 
 // GroupType is the shape of a group.
 type GroupType uint8
@@ -127,11 +131,55 @@ func IsComplete(c tile.Counts) bool {
 	return c.Total() == 14 && (IsChiitoitsu(c) || IsKokushi(c) || len(Decompose(c)) > 0)
 }
 
-// IsRyanmen reports whether winning on k completes seq with a two-sided wait.
-func IsRyanmen(seq Meld, k tile.Kind) bool {
-	if seq.Type != Seq {
-		return false
+// Wait is the shape the winning tile completed.
+type Wait uint8
+
+// Wait shapes.
+const (
+	Ryanmen Wait = iota // two-sided sequence wait (23 waiting on 1 or 4)
+	Kanchan             // closed wait (13 waiting on 2)
+	Penchan             // edge wait (12 waiting on 3, 89 waiting on 7)
+	Shanpon             // one of two pairs becomes a triplet
+	Tanki               // single-tile wait on the pair
+)
+
+// Reading is one way to read a complete hand: a decomposition plus the group
+// the winning tile completed. Yaku and fu depend on the whole reading, and a
+// hand may be read several ways.
+type Reading struct {
+	Decomposition
+	WinGroup int // index into Melds, or -1 when the winning tile completed the pair
+	Wait     Wait
+}
+
+// Readings returns every reading of a 14-tile hand won on win. Identical
+// melds in one decomposition yield a single reading.
+func Readings(c tile.Counts, win tile.Kind) []Reading {
+	var out []Reading
+	for _, d := range Decompose(c) {
+		if d.Pair == win {
+			out = append(out, Reading{Decomposition: d, WinGroup: -1, Wait: Tanki})
+		}
+		for i, m := range d.Melds {
+			if !m.Contains(win) || slices.Contains(d.Melds[:i], m) {
+				continue
+			}
+			out = append(out, Reading{Decomposition: d, WinGroup: i, Wait: waitOf(m, win)})
+		}
 	}
-	start := seq.Kind.Num()
-	return (k == seq.Kind && start <= 6) || (k == seq.Kind+2 && start >= 2)
+	return out
+}
+
+// waitOf classifies the wait of meld m completed by win.
+func waitOf(m Meld, win tile.Kind) Wait {
+	switch {
+	case m.Type == Trip:
+		return Shanpon
+	case win == m.Kind+1:
+		return Kanchan
+	case (win == m.Kind && m.Kind.Num() == 7) || (win == m.Kind+2 && m.Kind.Num() == 1):
+		return Penchan
+	default:
+		return Ryanmen
+	}
 }

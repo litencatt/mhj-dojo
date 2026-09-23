@@ -181,13 +181,42 @@ func TestAllTripletReadingIsNotChanta(t *testing.T) {
 		"111m999m111p999p11s": "tsumo,honroutou,toitoi,sanankou",
 	} {
 		c := tile.MustCounts(hand)
-		ds := Decompose(c)
-		if len(ds) != 1 {
-			t.Fatalf("%s: %d readings", hand, len(ds))
+		rs := Readings(c, tile.MakeKind(tile.Man, 1))
+		if len(rs) != 1 {
+			t.Fatalf("%s: %d readings", hand, len(rs))
 		}
-		got := keys(Win{Yaku: order(evalDecomp(c, ds[0], east()))})
+		got := keys(Win{Yaku: order(evalReading(c, rs[0], east()))})
 		if got != want {
 			t.Errorf("%s: got [%s], want [%s]", hand, got, want)
+		}
+	}
+}
+
+func TestReadings(t *testing.T) {
+	waitNames := [...]string{Ryanmen: "ryanmen", Kanchan: "kanchan", Penchan: "penchan", Shanpon: "shanpon", Tanki: "tanki"}
+	cases := []struct {
+		hand, win string
+		want      []string // wait of each reading, in Readings order
+	}{
+		{"234m567m345p678s22s", "4m", []string{"ryanmen"}},
+		{"123m567m345p678s22s", "3m", []string{"penchan"}},
+		// sorted melds: 567m (ryanmen) before 789m (penchan)
+		{"567m789m345p678s22s", "7m", []string{"ryanmen", "penchan"}},
+		{"123m567m345p678s22s", "2s", []string{"tanki"}},
+		{"111m567m345p678s22s", "1m", []string{"shanpon"}},
+		// the two identical 234m give a single reading
+		{"223344m567p678s55s", "3m", []string{"kanchan"}},
+		// 1m completes the pair (tanki) or 123m from 23m (ryanmen)
+		{"11123m456p789s999s", "1m", []string{"tanki", "ryanmen"}},
+	}
+	for _, tc := range cases {
+		wt, _ := tile.Parse(tc.win)
+		var got []string
+		for _, r := range Readings(tile.MustCounts(tc.hand), wt.Kind) {
+			got = append(got, waitNames[r.Wait])
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Readings(%s, %s) = %v, want %v", tc.hand, tc.win, got, tc.want)
 		}
 	}
 }
