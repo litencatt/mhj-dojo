@@ -74,7 +74,6 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 16px;
-  margin-bottom: 12px;
 }
 
 .new-game-form {
@@ -146,27 +145,45 @@ h2 {
   border: 1px solid var(--danger);
   border-radius: 8px;
   padding: 10px 14px;
-  margin-bottom: 12px;
 }
 
-.app-main {
+/* Two columns: header, hand, chart and tree stack on the left; the yaku table
+   fills the right column. A single column on narrow screens puts the yaku
+   table right after the hand. */
+.app {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "header yaku"
+    "hand   yaku"
+    "chart  yaku"
+    "tree   yaku";
+  grid-template-rows: auto auto auto 1fr;
+  column-gap: 16px;
+  row-gap: 12px;
   align-items: start;
 }
-@media (max-width: 900px) {
-  .app-main {
-    grid-template-columns: 1fr;
-  }
-}
-
-.column-left,
-.column-right {
+.area-header { grid-area: header; }
+.area-hand { grid-area: hand; }
+.area-yaku { grid-area: yaku; }
+.area-chart { grid-area: chart; }
+.area-tree { grid-area: tree; }
+.area-header,
+.area-hand,
+.area-yaku,
+.area-chart,
+.area-tree {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "header" "hand" "yaku" "chart" "tree";
+    grid-template-rows: none;
+  }
 }
 
 section {
@@ -269,8 +286,15 @@ section {
 .yaku-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 620px;
   font-size: 0.85rem;
+}
+.yaku-table thead th {
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .yaku-table {
+    min-width: 520px; /* scroll sideways rather than squeezing the ukeire column */
+  }
 }
 .yaku-table th,
 .yaku-table td {
@@ -318,7 +342,6 @@ section {
   flex-wrap: wrap;
   align-content: flex-start;
   gap: 4px 6px;
-  max-width: 320px;
   max-height: 78px; /* ~2 rows of xs tile + count; more scrolls vertically */
   overflow-y: auto;
 }
