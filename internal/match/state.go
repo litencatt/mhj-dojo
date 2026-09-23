@@ -8,13 +8,12 @@ import (
 	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yaku"
-	"github.com/litencatt/mhj2/internal/yakushanten"
 )
 
 // State is the JSON view of a game for the human (docs/api.md).
 type State struct {
 	GameID            string                       `json:"game_id"`
-	Seed              int64                        `json:"seed"`
+	Seed              *int64                       `json:"seed"` // null until the end unless you chose it
 	You               int                          `json:"you"`
 	Dealer            int                          `json:"dealer"`
 	RoundWind         string                       `json:"round_wind"`
@@ -85,7 +84,6 @@ func (m *Match) state() State {
 	v := r.ViewFor(Human)
 	st := State{
 		GameID:            m.id,
-		Seed:              v.Seed,
 		You:               Human,
 		Dealer:            v.Dealer,
 		RoundWind:         v.RoundWind.String(),
@@ -100,6 +98,10 @@ func (m *Match) state() State {
 		Legal:             r.LegalFor(Human),
 		Events:            []Event{},
 		ByDiscard:         map[string][]session.YakuRow{},
+	}
+	if m.seedKnown || v.Phase == game.PhaseEnded {
+		seed := v.Seed
+		st.Seed = &seed
 	}
 	if v.UraIndicators != nil {
 		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
@@ -135,15 +137,13 @@ func (m *Match) state() State {
 
 	me := v.Seats[Human]
 	visible := r.Visible(Human)
-	res := m.analyze(tile.CountsOf(me.Hand))
-	st.Analysis = session.Rows(res, &visible, m.han)
-	m.record(len(me.River), res)
+	st.Analysis = session.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
 	if me.Drawn != nil && v.Phase == game.PhaseDiscard && v.Actor == Human {
 		all := append(slices.Clone(me.Hand), *me.Drawn)
 		c := tile.CountsOf(all)
 		for _, t := range all {
 			key := t.String()
-			if _, done := st.ByDiscard[key]; done {
+			if _, done := st.ByDiscard[key]; done || !slices.Contains(st.Legal.Discards, key) {
 				continue
 			}
 			c[t.Kind]--
@@ -156,13 +156,16 @@ func (m *Match) state() State {
 	return st
 }
 
-// record keeps the human's row shanten for the hand after turn discards.
-func (m *Match) record(turn int, res []yakushanten.Result) {
+// recordHand keeps the human's row shanten for the current 13-tile hand,
+// keyed by the number of discards made (the start of the round is 0).
+func (m *Match) recordHand() {
+	me := m.game.Round.ViewFor(Human).Seats[Human]
+	turn := len(me.River)
 	if _, ok := m.history[turn]; ok {
 		return
 	}
 	h := session.HistoryEntry{NodeID: turn, Turn: turn, Shanten: map[string]*int{}}
-	for _, r := range res {
+	for _, r := range m.analyze(tile.CountsOf(me.Hand)) {
 		h.Shanten[r.Key] = session.ShantenOf(r)
 	}
 	m.history[turn] = h

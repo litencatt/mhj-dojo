@@ -53,10 +53,13 @@ func (st *Store) Create(seed *int64) *Match {
 	}
 	r := game.New(s)
 	m := &Match{
-		analyzer: yakushanten.NewAnalyzerFor(yakushanten.Winds{Round: tile.East, Seat: r.SeatWind(Human)}),
-		history:  map[int]session.HistoryEntry{},
+		analyzer:  yakushanten.NewAnalyzerFor(yakushanten.Winds{Round: tile.East, Seat: r.SeatWind(Human)}),
+		history:   map[int]session.HistoryEntry{},
+		seedKnown: seed != nil || st.DefaultSeed != nil,
 	}
 	m.game = game.Start(r, Human, cpu.New())
+	m.game.OnHumanDiscard = m.recordHand
+	m.recordHand()
 	m.id = st.games.Add(m)
 	return m
 }
@@ -82,6 +85,9 @@ type Match struct {
 	// history holds the human's per-yaku shanten after each own discard,
 	// keyed by the number of discards so far.
 	history map[int]session.HistoryEntry
+	// seedKnown is set when the player chose the seed. A random seed is
+	// revealed only at the end: it rebuilds the whole wall.
+	seedKnown bool
 }
 
 // ID returns the game id.

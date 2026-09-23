@@ -17,6 +17,9 @@ type Game struct {
 	Round *Round
 	Human int
 	cpu   Decider
+	// OnHumanDiscard, when set, runs after each of the human's discards,
+	// including the ones played for them in riichi.
+	OnHumanDiscard func()
 	// Fallbacks counts CPU moves that were illegal and replaced; it must
 	// stay 0 (the self-play tests check it).
 	Fallbacks int
@@ -40,6 +43,9 @@ func (g *Game) Act(a Action) error {
 	a.Seat = g.Human
 	if err := g.Round.Apply(a); err != nil {
 		return err
+	}
+	if a.Type == Discard || a.Type == Riichi {
+		g.humanDiscarded()
 	}
 	g.run()
 	return nil
@@ -70,6 +76,7 @@ func (g *Game) run() {
 				return
 			}
 			g.mustApply(Action{Seat: seat, Type: Discard, Tile: legal.Discards[0]})
+			g.humanDiscarded()
 			continue
 		}
 		a := g.cpu.Decide(r.ViewFor(seat), legal)
@@ -80,6 +87,12 @@ func (g *Game) run() {
 			g.Fallbacks++
 			g.mustApply(fallback(seat, legal))
 		}
+	}
+}
+
+func (g *Game) humanDiscarded() {
+	if g.OnHumanDiscard != nil {
+		g.OnHumanDiscard()
 	}
 }
 

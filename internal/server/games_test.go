@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func nextMove(st match.State) string {
 func TestGamePlaysToTheEnd(t *testing.T) {
 	c := newClient(t, session.NewStore())
 	st, raw := c.game("POST", "/api/games", `{"seed":42}`)
-	if st.Seed != 42 || st.Dealer != 2 || st.You != 0 || st.Actor != 0 || st.Seats[0].Wind != "3z" {
+	if st.Seed == nil || *st.Seed != 42 || st.Dealer != 2 || st.You != 0 || st.Actor != 0 || st.Seats[0].Wind != "3z" {
 		t.Fatalf("new game: seed %d dealer %d actor %d wind %s", st.Seed, st.Dealer, st.Actor, st.Seats[0].Wind)
 	}
 	path := "/api/games/" + st.GameID
@@ -82,7 +83,7 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
 	t.Logf("result %s, action p95 %v over %d moves", st.Result.Kind, p95, len(took))
-	if !testing.Short() && p95 > 200*time.Millisecond {
+	if !testing.Short() && !raceEnabled && p95 > 200*time.Millisecond {
 		t.Errorf("action p95 %v, want < 200ms", p95)
 	}
 }
@@ -124,6 +125,58 @@ func TestGameErrors(t *testing.T) {
 	if len(st.ByDiscard) != len(st.Legal.Discards) {
 		t.Fatalf("by_discard %d entries for %d discards", len(st.ByDiscard), len(st.Legal.Discards))
 	}
+}
+
+// A random seed rebuilds the whole wall, so it is hidden until the end.
+func TestRandomSeedHiddenUntilTheEnd(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	st, raw := c.game("POST", "/api/games", ``)
+	if st.Seed != nil || raw["seed"] != nil {
+		t.Fatalf("random seed exposed: %v", raw["seed"])
+	}
+	path := "/api/games/" + st.GameID
+	for steps := 0; st.Result == nil; steps++ {
+		if steps > 100 {
+			t.Fatal("game does not end")
+		}
+		st, _ = c.game("POST", path+"/action", nextMove(st))
+	}
+	if st.Seed == nil {
+		t.Fatal("seed not revealed at the end")
+	}
+}
+
+// Riichi discards made for you still land in the history, and by_discard
+// only offers the tiles you may discard.
+func TestRiichiHistoryAndByDiscard(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	// Playing the last legal tile, seed 67 is the first seed whose hand reaches
+	// riichi; later seeds are only a safety net if the engine changes.
+	for seed := 67; seed < 200; seed++ {
+		st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+`}`)
+		path := "/api/games/" + st.GameID
+		riichi := false
+		for st.Result == nil {
+			if len(st.ByDiscard) != 0 && len(st.ByDiscard) != len(st.Legal.Discards) {
+				t.Fatalf("seed %d: by_discard %d entries, %d legal discards", seed, len(st.ByDiscard), len(st.Legal.Discards))
+			}
+			move := nextMove(st)
+			if !riichi && len(st.Legal.Riichi) > 0 && !st.Legal.Tsumo {
+				move = `{"type":"riichi","tile":"` + st.Legal.Riichi[0] + `"}`
+				riichi = true
+			}
+			st, _ = c.game("POST", path+"/action", move)
+		}
+		if !riichi {
+			continue
+		}
+		turns := len(st.Seats[0].River)
+		if last := st.History[len(st.History)-1].Turn; last != turns || len(st.History) != turns+1 {
+			t.Fatalf("seed %d: history has %d entries up to turn %d, want 0..%d", seed, len(st.History), last, turns)
+		}
+		return
+	}
+	t.Fatal("no seed reached riichi")
 }
 
 // A seed with the human as a non-dealer: the CPUs move first, and those
