@@ -40,8 +40,7 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
 /** 役別向聴テーブル: shows either the current-node analysis, or (while previewing a
  * discard) that candidate's resulting analysis with deltas vs the current node.
  * A filter bar narrows and sorts the rows by the current values, so rows do not
- * jump while previewing. The normal row always comes first; yakuman rows follow
- * the others under a 役満 heading row. */
+ * jump while previewing. The normal row always comes first. */
 export function YakuTable(props: YakuTableProps) {
   const { rows, baseline, previewTile, onMinimize } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
@@ -62,8 +61,8 @@ export function YakuTable(props: YakuTableProps) {
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
   const base = new Map((baseline ?? []).map((r) => [r.key, r]));
-  const { regular, yakuman, total } = applyYakuFilter(current, filter);
-  const visibleCount = regular.length + yakuman.length;
+  const { keys, total } = applyYakuFilter(current, filter);
+  const visibleCount = keys.length;
 
   const finiteShanten = rows
     .filter((r) => !r.yakuman)
@@ -76,9 +75,8 @@ export function YakuTable(props: YakuTableProps) {
     if (!row) return null;
     const delta = baseline ? deltaLabel(row.shanten, base.get(key)?.shanten ?? null) : null;
     const isBest = !row.yakuman && row.shanten !== null && row.shanten === minShanten;
-    const cls = [isBest ? 'row-best' : '', row.yakuman ? 'row-yakuman' : ''].filter(Boolean).join(' ');
     return (
-      <tr key={row.key} class={cls}>
+      <tr key={row.key} class={isBest ? 'row-best' : undefined}>
         <th scope="row" class="yaku-name-cell">
           <span
             class="yaku-name"
@@ -209,18 +207,8 @@ export function YakuTable(props: YakuTableProps) {
           </thead>
           <tbody>
             {renderRow('normal')}
-            {regular.map(renderRow)}
+            {keys.map(renderRow)}
           </tbody>
-          {yakuman.length > 0 && (
-            <tbody class="yakuman-group">
-              <tr class="yakuman-heading">
-                <th scope="colgroup" colSpan={5}>
-                  役満
-                </th>
-              </tr>
-              {yakuman.map(renderRow)}
-            </tbody>
-          )}
         </table>
         {visibleCount === 0 && (
           <p class="yaku-filter-empty">
