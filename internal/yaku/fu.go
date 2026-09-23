@@ -33,7 +33,7 @@ func Fu(r Reading, ctx Context) int {
 		if m.Kind.IsYaochu() {
 			v *= 2
 		}
-		if !(ctx.Ron && i == r.WinGroup) { // concealed triplet
+		if !r.ronCompleted(i, ctx) { // concealed triplet
 			v *= 2
 		}
 		fu += v

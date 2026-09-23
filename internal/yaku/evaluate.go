@@ -347,12 +347,17 @@ func IsPinfu(r Reading, ctx Context) bool {
 	return r.Wait == Ryanmen && !ctx.IsValuePair(r.Pair)
 }
 
-// concealedTrips counts the concealed triplets of a reading. A triplet the
-// winning tile completed on a ron counts as open.
+// ronCompleted reports whether meld i was completed by the winning tile on a
+// ron; such a triplet counts as open.
+func (r Reading) ronCompleted(i int, ctx Context) bool {
+	return ctx.Ron && i == r.WinGroup
+}
+
+// concealedTrips counts the concealed triplets of a reading.
 func concealedTrips(r Reading, ctx Context) int {
 	n := 0
 	for i, m := range r.Melds {
-		if m.Type == Trip && !(ctx.Ron && i == r.WinGroup) {
+		if m.Type == Trip && !r.ronCompleted(i, ctx) {
 			n++
 		}
 	}
