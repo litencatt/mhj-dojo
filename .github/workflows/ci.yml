@@ -40,8 +40,22 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.mod
       - run: go vet ./...
-      - run: go test -race -count=1 ./...
+      # Full-size oracle and property tests; too slow to also run under -race.
+      - run: go test -count=1 ./...
       - run: go build -o bin/mhj2 ./cmd/mhj2
+
+  go-test-race:
+    name: Go test (race)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.mod
+      # -short shrinks the CPU-bound random/oracle loops; the race detector
+      # only adds value for the session/server concurrency paths.
+      - run: go test -race -short -count=1 ./...
 
   govulncheck:
     name: Go vulnerability check

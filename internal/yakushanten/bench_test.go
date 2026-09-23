@@ -44,7 +44,13 @@ func BenchmarkAnalyzeAllDiscards(b *testing.B) {
 	}
 }
 
+// p95Limit is the per-move budget from the plan: every discard candidate x every row.
+const p95Limit = 100 * time.Millisecond
+
 func TestAnalyzeAllDiscardsP95(t *testing.T) {
+	if raceEnabled {
+		t.Skip("timing is not meaningful under the race detector")
+	}
 	r := rand.New(rand.NewPCG(9, 10))
 	n := 200
 	if testing.Short() {

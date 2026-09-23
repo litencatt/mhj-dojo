@@ -33,7 +33,10 @@ func quadHand(r *rand.Rand) tile.Counts {
 func TestNormalMatchesClassicRandom(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	e := NewEngine()
-	const n = 100_000
+	n := 100_000
+	if testing.Short() {
+		n = 10_000
+	}
 	for i := 0; i < n; i++ {
 		c := randomHand(r, 13)
 		dp := e.Evaluate(&c, &NormalTarget).Dist - 1
@@ -225,7 +228,11 @@ func addRandom(r *rand.Rand, c *tile.Counts) {
 func TestNormalMatchesBruteForce(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
 	e := NewEngine()
-	for i := 0; i < 400; i++ {
+	n := 400
+	if testing.Short() {
+		n = 50
+	}
+	for i := 0; i < n; i++ {
 		var c tile.Counts
 		switch i % 3 {
 		case 0:
