@@ -79,6 +79,10 @@ export function GameApp() {
     history.replaceState(null, '', url);
   }, [state?.game_id, state?.seed]);
 
+  useEffect(() => {
+    document.title = 'mhj2 - CPU対戦';
+  }, []);
+
   function act(type: ActionType, tile?: string) {
     if (!state) return;
     void request(() => api.gameAction(state.game_id, type, tile));
@@ -101,7 +105,7 @@ export function GameApp() {
   const baselineRows = previewTile && state ? state.analysis : null;
   // The tree may be minimized from practice mode, but game mode has no tree tab.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app game-app has-dock' : 'app game-app';
+  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
 
   return (
     <div class={appClass}>
@@ -186,8 +190,10 @@ export function GameApp() {
                 discards={[]}
                 disabled={busy || !myTurn}
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
+                onlyDrawn={me.riichi}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
-                onPreview={setPreviewTile}
+                // Preview only tiles the server analysed, so the title never outruns the table.
+                onPreview={(t) => setPreviewTile(t && state.by_discard[t] ? t : null)}
               />
               <ActionBar
                 state={state}
@@ -222,7 +228,7 @@ export function GameApp() {
             />
           </div>
           <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary onMinimize={() => minimize('gloss')} />
+            <Glossary mode="game" onMinimize={() => minimize('gloss')} />
           </div>
         </div>
       )}

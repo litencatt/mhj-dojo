@@ -78,6 +78,10 @@ export function App() {
     history.replaceState(null, '', url);
   }, [state?.session_id]);
 
+  useEffect(() => {
+    document.title = 'mhj2 - 麻雀練習';
+  }, []);
+
   function handleNewGame(e: Event) {
     e.preventDefault();
     const seed = seedInput.trim() === '' ? undefined : Number(seedInput);
@@ -212,7 +216,8 @@ export function App() {
                 discards={state.discards}
                 disabled={busy || state.status !== 'playing'}
                 onDiscard={handleDiscard}
-                onPreview={setPreviewTile}
+                // Preview only tiles the server analysed, so the title never outruns the table.
+                onPreview={(t) => setPreviewTile(t && state.by_discard[t] ? t : null)}
               />
               {state.status === 'playing' && state.can_tsumo && (
                 <button type="button" class="tsumo-button" onClick={handleTsumo} disabled={busy}>
@@ -256,7 +261,7 @@ export function App() {
             />
           </div>
           <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary onMinimize={() => minimize('gloss')} />
+            <Glossary mode="practice" onMinimize={() => minimize('gloss')} />
           </div>
         </div>
       )}

@@ -7,14 +7,18 @@ export interface HandProps {
   disabled: boolean;
   // When set, only these tiles can be clicked (e.g. the riichi discards).
   allowed?: string[];
+  // Only the drawn tile can be clicked (after riichi), even if a hand tile is identical.
+  onlyDrawn?: boolean;
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
 
 /** 13-tile hand + drawn tile (set apart) + discard river. Click discards; hover/focus previews. */
 export function Hand(props: HandProps) {
-  const { hand, drawn, discards, disabled, allowed, onDiscard, onPreview } = props;
-  const can = (t: string) => !disabled && (!allowed || allowed.includes(t));
+  const { hand, drawn, discards, disabled, allowed, onlyDrawn = false, onDiscard, onPreview } = props;
+  const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
+  // Tiles are always buttons keyed by position, so keyboard focus stays at the
+  // clicked position through the request and the new hand.
   return (
     <section class="hand-panel" aria-label="手牌">
       <h2>手牌</h2>
@@ -22,11 +26,12 @@ export function Hand(props: HandProps) {
         <div class="hand-tiles" role="group" aria-label="手牌13枚">
           {hand.map((t, i) => (
             <Tile
-              key={`${t}-${i}`}
+              key={i}
               tile={t}
-              interactive={can(t)}
-              dimmed={!disabled && !can(t)}
-              onClick={() => can(t) && onDiscard(t)}
+              interactive={can(t, false)}
+              disabled={!can(t, false)}
+              dimmed={!disabled && !can(t, false)}
+              onClick={() => can(t, false) && onDiscard(t)}
               onHoverStart={() => onPreview(t)}
               onHoverEnd={() => onPreview(null)}
             />
@@ -36,9 +41,10 @@ export function Hand(props: HandProps) {
           <div class="hand-drawn" aria-label="ツモ牌">
             <Tile
               tile={drawn}
-              interactive={can(drawn)}
-              dimmed={!disabled && !can(drawn)}
-              onClick={() => can(drawn) && onDiscard(drawn)}
+              interactive={can(drawn, true)}
+              disabled={!can(drawn, true)}
+              dimmed={!disabled && !can(drawn, true)}
+              onClick={() => can(drawn, true) && onDiscard(drawn)}
               onHoverStart={() => onPreview(drawn)}
               onHoverEnd={() => onPreview(null)}
             />
