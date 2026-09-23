@@ -73,7 +73,9 @@ export function GameApp() {
     const url = new URL(location.href);
     url.searchParams.set('mode', 'game');
     url.searchParams.set('game', state.game_id);
+    // A random seed is hidden until the end: drop any seed of a previous game.
     if (state.seed !== null) url.searchParams.set('seed', String(state.seed));
+    else url.searchParams.delete('seed');
     history.replaceState(null, '', url);
   }, [state?.game_id, state?.seed]);
 
@@ -97,7 +99,9 @@ export function GameApp() {
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
   const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
   const baselineRows = previewTile && state ? state.analysis : null;
-  const appClass = state && minimized.length > 0 ? 'app game-app has-dock' : 'app game-app';
+  // The tree may be minimized from practice mode, but game mode has no tree tab.
+  const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
+  const appClass = state && docked.length > 0 ? 'app game-app has-dock' : 'app game-app';
 
   return (
     <div class={appClass}>
@@ -224,7 +228,7 @@ export function GameApp() {
       )}
       {state && (
         <Dock
-          items={GAME_PANELS.filter((p) => minimized.includes(p.key))}
+          items={docked}
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
