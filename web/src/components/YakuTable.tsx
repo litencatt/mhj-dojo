@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { YakuRow } from '../api';
 import { Tile } from './Tile';
 import { PanelHeading } from './PanelHeading';
@@ -50,13 +50,31 @@ export function YakuTable(props: YakuTableProps) {
   };
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
-  // viewport so the scrolling table panel cannot clip it.
-  const [tip, setTip] = useState<{ key: string; left: number; top: number } | null>(null);
+  // viewport so the scrolling table panel cannot clip it. It opens below the
+  // name, or above it when there is not enough room at the bottom of the screen.
+  const [tip, setTip] = useState<{ key: string; left: number; above: number; below: number } | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
   const showTip = (key: string, el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     const width = 280;
-    setTip({ key, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + 6 });
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    setTip({ key, left, above: r.top - 6, below: r.bottom + 6 });
   };
+  useLayoutEffect(() => {
+    const el = tipRef.current;
+    if (!tip || !el) return;
+    const h = el.offsetHeight;
+    const fitsBelow = tip.below + h <= window.innerHeight - 8;
+    el.style.top = `${fitsBelow ? tip.below : Math.max(8, tip.above - h)}px`;
+    el.style.visibility = 'visible';
+  }, [tip]);
+  // The position is computed once, so close the tooltip when anything scrolls.
+  useEffect(() => {
+    if (!tip) return;
+    const close = () => setTip(null);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, [tip]);
 
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
@@ -189,7 +207,13 @@ export function YakuTable(props: YakuTableProps) {
         </div>
       </div>
       {tip && YAKU_CONDITIONS[tip.key] && (
-        <div id="yaku-tip" role="tooltip" class="yaku-tip" style={{ left: `${tip.left}px`, top: `${tip.top}px` }}>
+        <div
+          id="yaku-tip"
+          role="tooltip"
+          class="yaku-tip"
+          ref={tipRef}
+          style={{ left: `${tip.left}px`, top: `${tip.below}px`, visibility: 'hidden' }}
+        >
           <strong>{shown.get(tip.key)?.name}</strong>
           <span>{YAKU_CONDITIONS[tip.key]}</span>
         </div>
