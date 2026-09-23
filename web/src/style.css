@@ -422,6 +422,72 @@ section {
 }
 
 /* ---- Yaku table ---- */
+/* Filter bar: search, shanten limit and sort on the first row, category
+   chips, count and reset on the second. It sits outside the scrolling table. */
+.yaku-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.yaku-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.yaku-filter label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.yaku-filter-search,
+.yaku-filter select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+}
+.yaku-filter-search {
+  flex: 1 1 12em;
+  min-width: 0;
+}
+.filter-chip {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.filter-chip-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.yaku-filter-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.filter-clear {
+  padding: 2px 8px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.yaku-filter-empty {
+  margin: 12px 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .yaku-table-scroll {
   overflow-x: auto;
 }

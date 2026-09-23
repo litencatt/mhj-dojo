@@ -141,7 +141,7 @@ func shantenPtr(r yakushanten.Result) *int {
 func rows(res []yakushanten.Result, visible *tile.Counts) []YakuRow {
 	out := make([]YakuRow, len(res))
 	for i, r := range res {
-		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Shanten: shantenPtr(r), Approx: r.Approx, Ukeire: []Ukeire{}}
+		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: yaku.ClosedHan(r.Key), Shanten: shantenPtr(r), Approx: r.Approx, Ukeire: []Ukeire{}}
 		for _, k := range r.Ukeire {
 			rem := max(4-visible[k], 0)
 			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
