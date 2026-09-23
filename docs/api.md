@@ -252,7 +252,9 @@ head bump (no double ron), 3000-point noten penalty at the exhaustive draw.
 Points: no kiriage mangan, counted yakuman at 13 han, no honba.
 
 ### `POST /api/games`
-Body (optional): `{"seed": 42}`. Returns a `GameState`.
+Body (optional): `{"seed": 42}`. Returns a `GameState`. Without a seed (and
+without the server's `--seed` flag) a random seed is used and `seed` stays
+`null` until the round ends, because the seed rebuilds the whole wall.
 
 ### `GET /api/games/{id}`
 Returns the `GameState`.
@@ -276,7 +278,7 @@ unknown game, `409` a move that is not legal now.
 ```jsonc
 {
   "game_id": "a1b2c3",
-  "seed": 42,
+  "seed": 42,                   // null until the end for a random seed
   "you": 0,
   "dealer": 2,                  // seat of 東
   "round_wind": "1z",
@@ -297,7 +299,7 @@ unknown game, `409` a move that is not legal now.
   "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false },
   "events": [ {"seat": 1, "type": "discard", "tile": "2z"} ],  // moves since your previous move
   "analysis": [YakuRow],        // your 13-tile hand; wind rows follow your seat and the round
-  "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each discard
+  "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
   "history": [HistoryEntry],    // your rows after each of your discards (node_id = turn)
   "result": null                // Result once ended
 }

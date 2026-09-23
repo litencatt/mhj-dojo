@@ -1,6 +1,6 @@
 # mhj2
 
-A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and it starts a local web server and opens the practice UI in your browser.
+A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a round against three CPU players.
 
 [日本語版 README](README_jp.md)
 
@@ -20,7 +20,19 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and i
 - **Minimizable panels** — the time-series chart, history tree and glossary can be minimized into tabs on the right edge of the screen and restored with a click; the layout is remembered.
 - **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
 
-Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in Phase 1.
+Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in solo practice.
+
+## Playing against CPU players (Phase 2a)
+
+Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to play one closed-hand East round against three CPU players.
+
+- **Table** — every seat's river (the riichi tile lies sideways), points, wind and dealer mark; CPU hands stay face down until the round ends. The dealer is the seed mod 4, so your seat wind varies.
+- **Your moves** — discard, **リーチ** (then pick a discard that keeps tenpai; later draws are discarded for you unless you can win), **ツモ**, and **ロン** / **見逃す** when a discard completes your hand.
+- **Rules** — riichi, double riichi, ippatsu, ura dora, haitei / houtei, furiten (own discards, same go-around, after riichi), head bump, noten penalty at the exhaustive draw. No calls (pon / chi / kan) yet.
+- **Scoring** — fu and han, mangan to (counted) yakuman, dealer / non-dealer payments and riichi sticks, shown with the point changes when the round ends.
+- **CPU players** — take every win, discard for tile efficiency, declare riichi when tenpai, and fold (genbutsu, suji, safe honors) against a riichi when two or more steps from tenpai.
+- **Practice tools stay on** — the per-yaku shanten table (its wind rows follow your seat and the round), the discard preview, the time-series chart and the glossary. There is no rewinding in a game.
+- **Seed** — a seed you choose makes the whole round (CPU moves included) repeatable; a random seed is revealed when the round ends.
 
 ### How yaku shanten is defined
 
@@ -74,6 +86,11 @@ internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire
 internal/yakushanten/ per-yaku shanten
 internal/yaku/       win decomposition, yaku and dora
 internal/session/    solo game session and history tree
+internal/score/      points from han and fu
+internal/game/       four-player round engine (riichi, furiten, settlement)
+internal/cpu/        CPU player
+internal/match/      games against CPU players for the API
+internal/store/      in-memory store for sessions and games
 internal/server/     HTTP API and embedded frontend
 web/                 Vite + Preact + TypeScript frontend
 docs/api.md          HTTP API and definitions
@@ -83,4 +100,5 @@ Tile notation: `1m`–`9m`, `1p`–`9p`, `1s`–`9s`, `1z`–`7z` (East, South, 
 
 ## Roadmap
 
-- **Phase 2** — full four-player hanchan against three CPU players: calls (pon/chi/kan), riichi, fu and score calculation.
+- **Phase 2a** (done) — one closed-hand round against three CPU players with riichi, fu and points.
+- **Phase 2b** — calls (pon / chi / kan, rinshan, kan dora) and full games (tonpuu / hanchan, dealer rotation, renchan, honba, final ranking).
