@@ -44,7 +44,7 @@ func (c *client) do(method, path, body string) (int, []byte, http.Header) {
 	if err != nil {
 		c.t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	b, _ := io.ReadAll(res.Body)
 	return res.StatusCode, b, res.Header
 }
@@ -98,7 +98,9 @@ func TestStateContract(t *testing.T) {
 		t.Errorf("win=%s discards=%s", raw["win"], raw["discards"])
 	}
 	var rows []map[string]json.RawMessage
-	json.Unmarshal(raw["analysis"], &rows)
+	if err := json.Unmarshal(raw["analysis"], &rows); err != nil {
+		t.Fatal(err)
+	}
 	if len(rows) != 18 {
 		t.Fatalf("%d rows", len(rows))
 	}
@@ -108,12 +110,16 @@ func TestStateContract(t *testing.T) {
 		}
 	}
 	var hist []map[string]json.RawMessage
-	json.Unmarshal(raw["history"], &hist)
+	if err := json.Unmarshal(raw["history"], &hist); err != nil {
+		t.Fatal(err)
+	}
 	if string(hist[0]["draw"]) != "null" || string(hist[0]["discard"]) != "null" {
 		t.Errorf("root history entry: %v", hist[0])
 	}
 	var tree []map[string]json.RawMessage
-	json.Unmarshal(raw["tree"], &tree)
+	if err := json.Unmarshal(raw["tree"], &tree); err != nil {
+		t.Fatal(err)
+	}
 	if string(tree[0]["parent_id"]) != "null" {
 		t.Errorf("root parent_id = %s", tree[0]["parent_id"])
 	}
@@ -248,7 +254,7 @@ func TestEmbeddedFrontend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	b, _ := io.ReadAll(res.Body)
 	if res.StatusCode != http.StatusOK || !strings.Contains(strings.ToLower(string(b)), "<html") {
 		t.Fatalf("embedded index: %d %q", res.StatusCode, b)
@@ -269,7 +275,7 @@ func TestGuards(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		res.Body.Close()
+		_ = res.Body.Close()
 		return res.StatusCode
 	}
 	for _, tc := range []struct {

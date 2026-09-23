@@ -30,7 +30,7 @@ func ClassicNormal(c tile.Counts) int {
 					}
 					tt := min(t, 4-m)
 					s := 8 - 2*m - tt - head
-					if head == 0 && !(a.live || b.live || d.live || e.live) && t <= 4-m {
+					if head == 0 && !a.live && !b.live && !d.live && !e.live && t <= 4-m {
 						// No leftover can become the pair: it must come from scratch.
 						s++
 					}
