@@ -118,104 +118,108 @@ export function App() {
 
   return (
     <div class={state ? 'app' : 'app app-loading'}>
-      <div class="area-header">
-        <header class="app-header">
-          <h1>mhj2 <span class="app-subtitle">麻雀練習</span></h1>
-          <form class="new-game-form" onSubmit={handleNewGame}>
-            <label>
-              シード
-              <input
-                type="number"
-                value={seedInput}
-                placeholder="未指定でランダム"
-                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-              />
-            </label>
-            <label>
-              最大巡目
-              <input
-                type="number"
-                min={1}
-                value={maxTurnsInput}
-                onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
-              />
-            </label>
-            <button type="submit" disabled={busy}>新規対局</button>
-          </form>
-          {state && (
-            <dl class="game-status">
-              <div>
-                <dt>シード</dt>
-                <dd>{state.seed}</dd>
-              </div>
-              <div>
-                <dt>巡目</dt>
-                <dd>{state.turn} / {state.max_turns}</dd>
-              </div>
-              <div>
-                <dt>残り牌</dt>
-                <dd>{state.wall_remaining}</dd>
-              </div>
-              <div>
-                <dt>ドラ表示牌</dt>
-                <dd class="dora-indicators">
-                  {state.dora_indicators.map((t, i) => (
-                    <Tile key={`${t}-${i}`} tile={t} size="sm" />
-                  ))}
-                </dd>
-              </div>
-            </dl>
-          )}
-        </header>
-
-        {error && (
-          <div class="error-banner" role="alert">
-            {error}
-          </div>
-        )}
-
-        {!state && !error && <p class="muted">対局を準備しています…</p>}
-      </div>
-
-      {state && (
-        <>
-          <div class="area-hand">
-            <Hand
-              hand={state.hand}
-              drawn={state.drawn}
-              discards={state.discards}
-              disabled={busy || state.status !== 'playing'}
-              onDiscard={handleDiscard}
-              onPreview={setPreviewTile}
-            />
-            {state.status === 'playing' && state.can_tsumo && (
-              <button type="button" class="tsumo-button" onClick={handleTsumo} disabled={busy}>
-                ツモ
-              </button>
+      <div class="area-main">
+        <div class="area-header">
+          <header class="app-header">
+            <h1>mhj2 <span class="app-subtitle">麻雀練習</span></h1>
+            <form class="new-game-form" onSubmit={handleNewGame}>
+              <label>
+                シード
+                <input
+                  type="number"
+                  value={seedInput}
+                  placeholder="ランダム"
+                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <label>
+                最大巡目
+                <input
+                  type="number"
+                  class="input-narrow"
+                  min={1}
+                  value={maxTurnsInput}
+                  onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <button type="submit" disabled={busy}>新規対局</button>
+            </form>
+            {state && (
+              <dl class="game-status">
+                <div>
+                  <dt>シード</dt>
+                  <dd>{state.seed}</dd>
+                </div>
+                <div>
+                  <dt>巡目</dt>
+                  <dd>{state.turn} / {state.max_turns}</dd>
+                </div>
+                <div>
+                  <dt>残り牌</dt>
+                  <dd>{state.wall_remaining}</dd>
+                </div>
+                <div>
+                  <dt>ドラ表示牌</dt>
+                  <dd class="dora-indicators">
+                    {state.dora_indicators.map((t, i) => (
+                      <Tile key={`${t}-${i}`} tile={t} size="sm" />
+                    ))}
+                  </dd>
+                </div>
+              </dl>
             )}
-            {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
-            {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
-          </div>
-          <div class="area-side">
-            <div class="area-yaku">
-              <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
+          </header>
+
+          {error && (
+            <div class="error-banner" role="alert">
+              {error}
             </div>
-            <div class="area-gloss">
-              <Glossary />
+          )}
+
+          {!state && !error && <p class="muted">対局を準備しています…</p>}
+        </div>
+        {state && (
+          <>
+            <div class="area-hand">
+              <Hand
+                hand={state.hand}
+                drawn={state.drawn}
+                discards={state.discards}
+                disabled={busy || state.status !== 'playing'}
+                onDiscard={handleDiscard}
+                onPreview={setPreviewTile}
+              />
+              {state.status === 'playing' && state.can_tsumo && (
+                <button type="button" class="tsumo-button" onClick={handleTsumo} disabled={busy}>
+                  ツモ
+                </button>
+              )}
+              {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
+              {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
             </div>
+            <div class="area-chart">
+              <ShantenChart
+                sessionId={state.session_id}
+                history={state.history}
+                currentAnalysis={state.analysis}
+                rowNames={rowNames}
+              />
+            </div>
+            <div class="area-tree">
+              <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
+            </div>
+          </>
+        )}
+      </div>
+      {state && (
+        <div class="area-side">
+          <div class="area-yaku">
+            <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
           </div>
-          <div class="area-chart">
-            <ShantenChart
-              sessionId={state.session_id}
-              history={state.history}
-              currentAnalysis={state.analysis}
-              rowNames={rowNames}
-            />
+          <div class="area-gloss">
+            <Glossary />
           </div>
-          <div class="area-tree">
-            <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
