@@ -362,9 +362,15 @@ section {
   padding-left: 12px;
   border-left: 2px dashed var(--border);
 }
+.discard-label {
+  margin-right: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .discard-river {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 3px;
   margin-top: 12px;
   padding-top: 8px;

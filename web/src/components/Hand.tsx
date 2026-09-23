@@ -14,6 +14,7 @@ export function Hand(props: HandProps) {
   const { hand, drawn, discards, disabled, onDiscard, onPreview } = props;
   return (
     <section class="hand-panel" aria-label="手牌">
+      <h2>手牌</h2>
       <div class="hand-row">
         <div class="hand-tiles" role="group" aria-label="手牌13枚">
           {hand.map((t, i) => (
@@ -41,6 +42,7 @@ export function Hand(props: HandProps) {
       </div>
       {discards.length > 0 && (
         <div class="discard-river" aria-label="捨て牌">
+          <span class="discard-label">捨て牌</span>
           {discards.map((t, i) => (
             <Tile key={`${t}-${i}`} tile={t} size="sm" />
           ))}
