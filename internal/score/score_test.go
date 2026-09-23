@@ -134,3 +134,10 @@ func TestFromWin(t *testing.T) {
 		t.Errorf("pinfu tsumo: %+v", p)
 	}
 }
+
+func TestNoYakuScoresNothing(t *testing.T) {
+	noYaku := yaku.Win{Fu: 30} // complete, but no yaku: HanTotal 0
+	if p := FromWin(noYaku, true, false); p != (Points{}) {
+		t.Errorf("no-yaku win scored %+v", p)
+	}
+}

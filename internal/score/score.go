@@ -34,8 +34,12 @@ type Points struct {
 // Compute scores a win. yakuman is the number of yakuman (0 for a normal
 // hand, whose han includes dora); han 13 or more without yakuman is a
 // counted yakuman.
+// A hand with no han and no yakuman is not a win and scores zero Points.
 func Compute(han, fu, yakuman int, dealer, tsumo bool) Points {
 	var p Points
+	if han < 1 && yakuman == 0 {
+		return p
+	}
 	var base int
 	switch {
 	case yakuman > 0:
