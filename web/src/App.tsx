@@ -16,10 +16,11 @@ function errorMessage(err: unknown): string {
 }
 
 // Panels that can be minimized into the right-edge dock.
-type PanelKey = 'chart' | 'tree' | 'gloss';
+type PanelKey = 'chart' | 'tree' | 'yaku' | 'gloss';
 const PANELS: Array<{ key: PanelKey; label: string }> = [
   { key: 'chart', label: '時系列チャート' },
   { key: 'tree', label: '履歴ツリー' },
+  { key: 'yaku', label: '役別向聴' },
   { key: 'gloss', label: '用語表' },
 ];
 const MINIMIZED_KEY = 'mhj2.minimized';
@@ -154,15 +155,10 @@ export function App() {
   const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
   const baselineRows = previewTile && state ? state.analysis : null;
 
-  const appClass = [
-    'app',
-    state ? '' : 'app-loading',
-    state && minimized.includes('tree') ? 'no-tree' : '',
-    state && minimized.includes('gloss') ? 'no-gloss' : '',
-    state && minimized.length > 0 ? 'has-dock' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  // Minimized panels stay mounted (hidden) so they keep their own state,
+  // such as the chart's legend selection and the glossary search.
+  const isMin = (k: PanelKey) => minimized.includes(k);
+  const appClass = state && minimized.length > 0 ? 'app has-dock' : 'app';
 
   return (
     <div class={appClass}>
@@ -245,22 +241,20 @@ export function App() {
               {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
               {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
             </div>
-            {!minimized.includes('chart') && (
-              <div class="area-chart">
-                <ShantenChart
-                  sessionId={state.session_id}
-                  history={state.history}
-                  currentAnalysis={state.analysis}
-                  rowNames={rowNames}
-                  onMinimize={() => minimize('chart')}
-                />
-              </div>
-            )}
+            <div class="area-chart" hidden={isMin('chart')}>
+              <ShantenChart
+                sessionId={state.session_id}
+                history={state.history}
+                currentAnalysis={state.analysis}
+                rowNames={rowNames}
+                onMinimize={() => minimize('chart')}
+              />
+            </div>
           </>
         )}
       </div>
-      {state && !minimized.includes('tree') && (
-        <div class="area-tree">
+      {state && (
+        <div class="area-tree" hidden={isMin('tree')}>
           <HistoryTree
             tree={state.tree}
             currentNodeId={state.node_id}
@@ -271,15 +265,18 @@ export function App() {
         </div>
       )}
       {state && (
-        <div class="area-side">
-          <div class="area-yaku">
-            <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
+        <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
+          <div class="area-yaku" hidden={isMin('yaku')}>
+            <YakuTable
+              rows={displayedRows}
+              baseline={baselineRows}
+              previewTile={previewTile}
+              onMinimize={() => minimize('yaku')}
+            />
           </div>
-          {!minimized.includes('gloss') && (
-            <div class="area-gloss">
-              <Glossary onMinimize={() => minimize('gloss')} />
-            </div>
-          )}
+          <div class="area-gloss" hidden={isMin('gloss')}>
+            <Glossary onMinimize={() => minimize('gloss')} />
+          </div>
         </div>
       )}
       {state && (
