@@ -29,8 +29,47 @@ type RowDef struct {
 	Yakuman   bool
 }
 
-// Rows lists the rows in their fixed API order.
-var Rows = []RowDef{
+// Winds are the round and seat winds, which decide the value-wind rows and
+// which pairs block pinfu.
+type Winds struct{ Round, Seat tile.Kind }
+
+// EastEast is the East round, East seat of practice mode.
+var EastEast = Winds{tile.East, tile.East}
+
+// windRows marks where RowsFor inserts the value-wind rows.
+const windRows = "winds"
+
+var (
+	windKeys  = [4]string{"ton", "nan", "shaa", "pei"}
+	windNames = [4]string{"東", "南", "西", "北"}
+)
+
+// Rows lists the practice-mode (East, East) rows in their fixed API order.
+var Rows = RowsFor(EastEast)
+
+// RowsFor lists the rows for the given winds. The value-wind rows come after
+// the dragons: one row when the round and seat winds match (a double wind),
+// else the round wind row then the seat wind row.
+func RowsFor(w Winds) []RowDef {
+	out := make([]RowDef, 0, len(baseRows)+1)
+	for _, r := range baseRows {
+		if r.Key != windRows {
+			out = append(out, r)
+			continue
+		}
+		ri, si := w.Round-tile.East, w.Seat-tile.East
+		if ri == si {
+			out = append(out, RowDef{windKeys[ri], "役牌 " + windNames[ri] + "（場風・自風）", false})
+			continue
+		}
+		out = append(out,
+			RowDef{windKeys[ri], "役牌 " + windNames[ri] + "（場風）", false},
+			RowDef{windKeys[si], "役牌 " + windNames[si] + "（自風）", false})
+	}
+	return out
+}
+
+var baseRows = []RowDef{
 	{"normal", "一般形（役なし）", false},
 	{"tanyao", "断么九", false},
 	{"pinfu", "平和", false},
@@ -50,7 +89,7 @@ var Rows = []RowDef{
 	{"haku", "役牌 白", false},
 	{"hatsu", "役牌 發", false},
 	{"chun", "役牌 中", false},
-	{"ton", "役牌 東（場風・自風）", false},
+	{windRows, "", false},
 	{"chiitoitsu", "七対子", false},
 	{"kokushi", "国士無双", true},
 	{"suuankou", "四暗刻", true},
@@ -83,9 +122,20 @@ var (
 	// 緑一色: 234s sequences, triplets/pairs of 2 3 4 6 8s and 發.
 	souGreen   = shanten.SuitRule{Seq: 0x02, Trip: 0xae, Pair: 0xae}
 	honorGreen = shanten.SuitRule{Trip: 0x20, Pair: 0x20}
-	// Pinfu pair may not be a value tile: 白發中 and 東 (round and seat wind in Phase 1).
-	honorPinfu = shanten.SuitRule{Pair: 0x0e} // 南 西 北
 )
+
+// pinfuTargets allows every sequence and any pair but a value tile: the
+// dragons and the round and seat winds.
+func pinfuTargets(w Winds) []shanten.Target {
+	var pair uint16
+	for k := tile.East; k <= tile.North; k++ {
+		if k != w.Round && k != w.Seat {
+			pair |= 1 << (k - tile.East)
+		}
+	}
+	honor := shanten.SuitRule{Pair: pair}
+	return []shanten.Target{{Rules: [4]shanten.SuitRule{numSeq, numSeq, numSeq, honor}, Melds: 4}}
+}
 
 func all4() [4]shanten.SuitRule {
 	return [4]shanten.SuitRule{shanten.RuleAll, shanten.RuleAll, shanten.RuleAll, shanten.RuleHonorAll}
@@ -103,7 +153,7 @@ var targets = func() map[string][]shanten.Target {
 	m := map[string][]shanten.Target{}
 	m["normal"] = []shanten.Target{shanten.NormalTarget}
 	m["tanyao"] = []shanten.Target{{Rules: [4]shanten.SuitRule{numTanyao, numTanyao, numTanyao, shanten.RuleNone}, Melds: 4}}
-	m["pinfu"] = []shanten.Target{{Rules: [4]shanten.SuitRule{numSeq, numSeq, numSeq, honorPinfu}, Melds: 4}}
+	m["pinfu"] = pinfuTargets(EastEast) // East, East; analyzers use their own winds
 	for s := 0; s < 3; s++ {
 		for rank := 0; rank < 7; rank++ {
 			rules := all4()
@@ -140,7 +190,11 @@ var targets = func() map[string][]shanten.Target {
 		track[s].TrackTrips = true
 	}
 	m["sanankou"] = []shanten.Target{{Rules: track, Melds: 4, MinTrips: 3}}
-	for key, k := range map[string]tile.Kind{"haku": tile.Haku, "hatsu": tile.Hatsu, "chun": tile.Chun, "ton": tile.East} {
+	yakuhai := map[string]tile.Kind{"haku": tile.Haku, "hatsu": tile.Hatsu, "chun": tile.Chun}
+	for i, key := range windKeys {
+		yakuhai[key] = tile.East + tile.Kind(i)
+	}
+	for key, k := range yakuhai {
 		rules := all4()
 		rules[tile.Honor].Forced[k-tile.East] = 3
 		m[key] = []shanten.Target{{Rules: rules, Melds: 3}}
@@ -280,21 +334,32 @@ func withinFour(c *tile.Counts) bool {
 // Analyzer computes rows, sharing a memo of suit tables across hands.
 // It is not safe for concurrent use.
 type Analyzer struct {
-	eng *shanten.Engine
+	eng    *shanten.Engine
+	winds  Winds
+	rows   []RowDef
+	pinfuT []shanten.Target
 }
 
-// NewAnalyzer returns an analyzer with an empty memo.
-func NewAnalyzer() *Analyzer { return &Analyzer{eng: shanten.NewEngine()} }
+// NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
+func NewAnalyzer() *Analyzer { return NewAnalyzerFor(EastEast) }
+
+// NewAnalyzerFor returns an analyzer whose rows follow the given winds.
+func NewAnalyzerFor(w Winds) *Analyzer {
+	return &Analyzer{eng: shanten.NewEngine(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+}
+
+// Rows returns the analyzer's rows in API order.
+func (a *Analyzer) Rows() []RowDef { return a.rows }
 
 // MemoSize returns the number of memoized suit tables.
 func (a *Analyzer) MemoSize() int { return a.eng.MemoSize() }
 
-// Analyze returns every row for a 13-tile hand, in Rows order. A 14-tile hand
+// Analyze returns every row for a 13-tile hand, in the analyzer's row order. A 14-tile hand
 // is accepted too (shanten -1 = satisfied); its pinfu row is the relaxed value.
 func (a *Analyzer) Analyze(c tile.Counts) []Result {
-	out := make([]Result, 0, len(Rows))
+	out := make([]Result, 0, len(a.rows))
 	var toitoi Result
-	for _, row := range Rows {
+	for _, row := range a.rows {
 		var r Result
 		switch row.Key {
 		case "chiitoitsu":
@@ -402,13 +467,13 @@ func explicitDist(c *tile.Counts, hands [][]kindCount) int {
 
 // pinfu: exact ryanmen check at tenpai, all-sequence approximation otherwise.
 func (a *Analyzer) pinfu(c tile.Counts) Result {
-	relaxed := a.target(c, targets["pinfu"])
+	relaxed := a.target(c, a.pinfuT)
 	// The exact wait check only applies to 13-tile hands.
 	if !relaxed.Possible || relaxed.Shanten > 0 || c.Total() != 13 {
 		relaxed.Approx = relaxed.Possible
 		return relaxed
 	}
-	if waits := PinfuWaits(c); len(waits) > 0 {
+	if waits := PinfuWaitsFor(c, a.winds); len(waits) > 0 {
 		return Result{Possible: true, Shanten: 0, Ukeire: waits}
 	}
 	// All-sequence tenpai without a two-sided pinfu wait: one more exchange is
@@ -424,7 +489,7 @@ func (a *Analyzer) pinfu(c tile.Counts) Result {
 				continue
 			}
 			c[x]--
-			if d, _ := a.dist(&c, targets["pinfu"]); d == 1 && len(PinfuWaits(c)) > 0 {
+			if d, _ := a.dist(&c, a.pinfuT); d == 1 && len(PinfuWaitsFor(c, a.winds)) > 0 {
 				set[t] = true
 			}
 			c[x]++
@@ -434,10 +499,13 @@ func (a *Analyzer) pinfu(c tile.Counts) Result {
 	return Result{Possible: true, Shanten: 1, Approx: true, Ukeire: kindsOf(&set)}
 }
 
-// PinfuWaits returns the kinds that complete a 13-tile hand into four
+// PinfuWaits is PinfuWaitsFor with the practice-mode winds (East, East).
+func PinfuWaits(c tile.Counts) []tile.Kind { return PinfuWaitsFor(c, EastEast) }
+
+// PinfuWaitsFor returns the kinds that complete a 13-tile hand into four
 // sequences + a non-value pair with the winning tile on a two-sided wait.
-func PinfuWaits(c tile.Counts) []tile.Kind {
-	ctx := yaku.Context{RoundWind: tile.East, SeatWind: tile.East}
+func PinfuWaitsFor(c tile.Counts, w Winds) []tile.Kind {
+	ctx := yaku.Context{RoundWind: w.Round, SeatWind: w.Seat}
 	var set [tile.NumKinds]bool
 	for t := tile.Kind(0); t < tile.NumKinds; t++ {
 		if c[t] >= 4 {

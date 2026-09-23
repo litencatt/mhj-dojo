@@ -91,11 +91,10 @@ var (
 	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13}
 )
 
-// closedHan maps each yaku key to its han in a closed hand. The wind
-// yakuhai 東 counts twice because Phase 1 fixes both the round and the seat
-// wind to East.
+// closedHan maps each yaku key to its han in a closed hand. Value winds are
+// handled by HanFor.
 var closedHan = func() map[string]int {
-	m := map[string]int{"ton": 2}
+	m := map[string]int{}
 	for _, y := range []Yaku{
 		yRiichi, yDoubleRiichi, yIppatsu, yHaitei, yHoutei,
 		yTsumo, yTanyao, yPinfu, yIipeikou, yRyanpeikou, ySanshoku, yDoukou, yIttsu,
@@ -110,8 +109,29 @@ var closedHan = func() map[string]int {
 }()
 
 // ClosedHan returns the han of the yaku with the given key in a closed hand
-// (East round, East seat), or 0 if key is not a yaku (e.g. "normal").
-func ClosedHan(key string) int { return closedHan[key] }
+// in practice mode (East round, East seat), or 0 if key is not a yaku (e.g.
+// "normal").
+func ClosedHan(key string) int { return HanFor(key, tile.East, tile.East) }
+
+// HanFor returns the han of the yaku with the given key in a closed hand
+// with the given winds. A value wind counts once for the round wind and once
+// for the seat wind, so it is 0 when it is neither.
+func HanFor(key string, round, seat tile.Kind) int {
+	for i, w := range windKeys {
+		if w.key == key {
+			k := tile.East + tile.Kind(i)
+			return b2i(k == round) + b2i(k == seat)
+		}
+	}
+	return closedHan[key]
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 var windKeys = [4]struct{ key, name string }{
 	{"ton", "役牌 東"}, {"nan", "役牌 南"}, {"shaa", "役牌 西"}, {"pei", "役牌 北"},

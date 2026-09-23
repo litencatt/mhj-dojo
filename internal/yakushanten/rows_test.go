@@ -3,6 +3,8 @@ package yakushanten
 import (
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/tile"
+
 	"github.com/litencatt/mhj2/internal/yaku"
 )
 
@@ -28,5 +30,46 @@ func TestRowsHaveClosedHan(t *testing.T) {
 		if got := yaku.ClosedHan(key); got != want {
 			t.Errorf("%s: han %d, want %d", key, got, want)
 		}
+	}
+}
+
+func TestRowsForWinds(t *testing.T) {
+	if len(Rows) != 30 || Rows[19].Key != "ton" || Rows[19].Name != "役牌 東（場風・自風）" {
+		t.Fatalf("East/East rows changed: %d rows, row 19 = %+v", len(Rows), Rows[19])
+	}
+	rows := RowsFor(Winds{tile.South, tile.West})
+	if len(rows) != 31 {
+		t.Fatalf("South/West: %d rows, want 31", len(rows))
+	}
+	if rows[19] != (RowDef{"nan", "役牌 南（場風）", false}) || rows[20] != (RowDef{"shaa", "役牌 西（自風）", false}) {
+		t.Fatalf("South/West wind rows = %+v, %+v", rows[19], rows[20])
+	}
+	for key, want := range map[string]int{"nan": 1, "shaa": 1, "ton": 0, "pei": 0} {
+		if got := yaku.HanFor(key, tile.South, tile.West); got != want {
+			t.Errorf("HanFor(%s, 南, 西) = %d, want %d", key, got, want)
+		}
+	}
+}
+
+func TestAnalyzerFollowsWinds(t *testing.T) {
+	// 234m 567m 34p 678s + 東東: two-sided wait, but 東 is a value pair only
+	// when East is the round or seat wind.
+	c := tile.MustCounts("234m567m34p678s11z")
+	ee := NewAnalyzer().Row(c, "pinfu")
+	sw := NewAnalyzerFor(Winds{tile.South, tile.West}).Row(c, "pinfu")
+	if ee.Shanten == 0 {
+		t.Errorf("East/East: pinfu tenpai with an East pair")
+	}
+	if !sw.Possible || sw.Shanten != 0 || len(sw.Ukeire) != 2 {
+		t.Errorf("South/West: pinfu = %+v, want tenpai on 2p/5p", sw)
+	}
+	// a South triplet counts toward the South round wind row
+	h := tile.MustCounts("222z234m567p78s99s")
+	a := NewAnalyzerFor(Winds{tile.South, tile.West})
+	if r := a.Row(h, "nan"); !r.Possible || r.Shanten != 0 {
+		t.Errorf("South/West nan row = %+v", r)
+	}
+	if r := a.Row(h, "ton"); r.Key != "ton" || r.Possible {
+		t.Errorf("South/West has no ton row, got %+v", r)
 	}
 }
