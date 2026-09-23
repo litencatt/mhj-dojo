@@ -136,7 +136,9 @@ func TestDiscardGotoBranch(t *testing.T) {
 	}
 
 	// Re-discarding the same tile from the root moves to the existing child.
-	s.Goto(0)
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
 	again, _ := s.Discard(drawn)
 	if again.NodeID != 1 || len(again.Tree) != 3 {
 		t.Fatalf("expected to revisit node 1, got %d (tree %d)", again.NodeID, len(again.Tree))
@@ -206,14 +208,20 @@ func TestTsumo(t *testing.T) {
 		t.Fatalf("discard after tsumo: %v", err)
 	}
 	// Declaring again from the parent revisits the same node.
-	s.Goto(0)
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
 	again, _ := s.Tsumo()
 	if again.NodeID != w.NodeID || len(again.Tree) != 2 {
 		t.Fatal("tsumo should reuse the existing node")
 	}
 	// After tsumogiri the hand is no longer complete.
-	s.Goto(0)
-	s.Discard("5s")
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Discard("5s"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.Tsumo(); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tsumo with incomplete hand: %v", err)
 	}
@@ -253,7 +261,9 @@ func TestRedFiveDiscardIsExact(t *testing.T) {
 	if slices.Contains(a.Hand, "0m") || !slices.Contains(a.Hand, "5m") || a.Discards[0] != "0m" {
 		t.Fatalf("hand after discarding red five: %v", a.Hand)
 	}
-	s.Goto(0)
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
 	b, _ := s.Discard("5m")
 	if b.NodeID == a.NodeID || !slices.Contains(b.Hand, "0m") {
 		t.Fatal("0m and 5m discards must be distinct children")
@@ -282,9 +292,9 @@ func TestConcurrentUse(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				v := s.State()
 				if v.Drawn != nil {
-					s.Discard(*v.Drawn)
+					_, _ = s.Discard(*v.Drawn) // conflicts between goroutines are expected
 				}
-				s.Goto(g % 2)
+				_, _ = s.Goto(g % 2)
 			}
 		}(g)
 	}
@@ -321,7 +331,9 @@ func TestDiscardCannotReachTsumoChild(t *testing.T) {
 	if _, err := s.Tsumo(); err != nil {
 		t.Fatal(err)
 	}
-	s.Goto(0)
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.Discard("tsumo"); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("discard \"tsumo\": %v", err)
 	}
