@@ -127,7 +127,7 @@ export function App() {
               <input
                 type="number"
                 value={seedInput}
-                placeholder="未指定でランダム"
+                placeholder="ランダム"
                 onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
               />
             </label>
@@ -135,6 +135,7 @@ export function App() {
               最大巡目
               <input
                 type="number"
+                class="input-narrow"
                 min={1}
                 value={maxTurnsInput}
                 onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}

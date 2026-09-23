@@ -69,35 +69,44 @@ h2 {
   margin: 0 0 8px;
 }
 
+/* Compact header: title and new-game form share the first row, the game
+   status (label and value side by side) fills the second. */
 .app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
   background: var(--panel-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 8px 14px;
+}
+.app-header h1 {
+  font-size: 1.2rem;
+  margin: 0;
 }
 
 .new-game-form {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 10px;
 }
 .new-game-form label {
   display: flex;
-  flex-direction: column;
-  font-size: 0.8rem;
+  align-items: center;
+  font-size: 0.75rem;
   color: var(--muted);
-  gap: 2px;
+  gap: 4px;
 }
 .new-game-form input {
-  width: 9em;
-  padding: 6px 8px;
+  width: 7em;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 .new-game-form button,
 .tsumo-button {
@@ -109,6 +118,13 @@ h2 {
   font-weight: bold;
   cursor: pointer;
 }
+.new-game-form input.input-narrow {
+  width: 3.5em;
+}
+.new-game-form button {
+  padding: 5px 12px;
+  font-size: 0.85rem;
+}
 .new-game-form button:disabled,
 .tsumo-button:disabled {
   opacity: 0.5;
@@ -118,13 +134,15 @@ h2 {
 .game-status {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  align-items: center;
+  gap: 4px 18px;
+  flex-basis: 100%;
   margin: 0;
 }
 .game-status > div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
 }
 .game-status dt {
   font-size: 0.75rem;
