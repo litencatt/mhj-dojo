@@ -116,7 +116,7 @@ export function App() {
   const baselineRows = previewTile && state ? state.analysis : null;
 
   return (
-    <div class="app">
+    <div class={state ? 'app' : 'app app-loading'}>
       <div class="area-header">
         <header class="app-header">
           <h1>mhj2 <span class="app-subtitle">麻雀練習</span></h1>

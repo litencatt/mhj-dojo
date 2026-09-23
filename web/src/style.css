@@ -166,6 +166,12 @@ h2 {
 .area-header { grid-area: header; }
 .area-hand { grid-area: hand; }
 .area-yaku { grid-area: yaku; }
+/* Before a game has loaded only the header is shown; let it span the page. */
+.app-loading {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "header";
+  grid-template-rows: none;
+}
 .area-chart { grid-area: chart; }
 .area-tree { grid-area: tree; }
 .area-header,
@@ -178,7 +184,7 @@ h2 {
   gap: 12px;
   min-width: 0;
 }
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "header" "hand" "yaku" "chart" "tree";
@@ -286,15 +292,11 @@ section {
 .yaku-table {
   border-collapse: collapse;
   width: 100%;
+  min-width: 480px; /* below this, scroll sideways rather than squeezing the ukeire column */
   font-size: 0.85rem;
 }
 .yaku-table thead th {
   white-space: nowrap;
-}
-@media (max-width: 560px) {
-  .yaku-table {
-    min-width: 520px; /* scroll sideways rather than squeezing the ukeire column */
-  }
 }
 .yaku-table th,
 .yaku-table td {
