@@ -101,31 +101,20 @@ func (e *Engine) Suit(v [9]int8, n int, rule SuitRule) *Table {
 
 // suitDP scans ranks left to right. State: x = sequences started two ranks
 // ago, y = sequences started one rank ago (both use the current rank),
-// k = free melds, p = pair used, r = free triplets.
+// k = free melds, p = pair used, r = free triplets. Costs are stored plus one
+// so that the zero value means unreachable and a rank's state clears with a
+// single zeroing assignment.
 func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 	type state [5][5][5][2][MaxTrips + 1]uint8
-	var cur, nxt state
-	reset := func(s *state) {
-		for x := range s {
-			for y := range s[x] {
-				for k := range s[x][y] {
-					for p := range s[x][y][k] {
-						for r := range s[x][y][k][p] {
-							s[x][y][k][p][r] = Inf
-						}
-					}
-				}
-			}
-		}
-	}
-	reset(&cur)
-	cur[0][0][0][0][0] = 0
 	rMax := 0
 	if rule.TrackTrips {
 		rMax = MaxTrips
 	}
+	var bufA, bufB state
+	cur, nxt := &bufA, &bufB
+	cur[0][0][0][0][0] = 1
 	for i := 0; i < n; i++ {
-		reset(&nxt)
+		*nxt = state{}
 		ci := int(c[i])
 		f := int(rule.Forced[i])
 		canSeq := i+2 < n && rule.Seq>>i&1 == 1
@@ -141,7 +130,7 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 					for p := 0; p <= 1; p++ {
 						for r := 0; r <= rMax; r++ {
 							v := cur[x][y][k][p][r]
-							if v == Inf {
+							if v == 0 {
 								continue
 							}
 							for z := 0; base+z <= 4 && k+z <= 4; z++ {
@@ -174,7 +163,7 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 											cost = 0
 										}
 										nv := int(v) + cost
-										if nv < int(nxt[y][z][nk][p+q][nr]) {
+										if old := nxt[y][z][nk][p+q][nr]; old == 0 || nv < int(old) {
 											nxt[y][z][nk][p+q][nr] = uint8(nv)
 										}
 									}
@@ -185,10 +174,20 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 				}
 			}
 		}
-		cur = nxt
+		cur, nxt = nxt, cur
 	}
 	t := new(Table)
-	*t = cur[0][0]
+	for k := range t {
+		for p := range t[k] {
+			for r := range t[k][p] {
+				if v := cur[0][0][k][p][r]; v == 0 {
+					t[k][p][r] = Inf
+				} else {
+					t[k][p][r] = v - 1
+				}
+			}
+		}
+	}
 	return t
 }
 
