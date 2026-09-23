@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as client from './client';
 import type { State } from './client';
 import { Hand } from './components/Hand';
@@ -20,19 +20,29 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const [busy, setBusy] = useState(false);
+  // Discard/tsumo act on the server's current node, so requests must never overlap:
+  // a concurrent goto could redirect a discard, and responses could land out of order.
+  const inFlight = useRef(false);
 
-  async function startGame(seed?: number, maxTurns?: number) {
+  async function request(fn: () => Promise<State>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
-      const s = await client.createSession({ seed, max_turns: maxTurns ?? 18 });
-      setState(s);
+      const next = await fn();
+      setState(next);
       setPreviewTile(null);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
+  }
+
+  function startGame(seed?: number, maxTurns?: number) {
+    return request(() => client.createSession({ seed, max_turns: maxTurns ?? 18 }));
   }
 
   useEffect(() => {
@@ -47,34 +57,19 @@ export function App() {
     void startGame(seed, maxTurns);
   }
 
-  async function runAction(fn: () => Promise<State>) {
-    if (!state) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await fn();
-      setState(next);
-      setPreviewTile(null);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function handleDiscard(tile: string) {
     if (!state) return;
-    void runAction(() => client.discard(state.session_id, tile));
+    void request(() => client.discard(state.session_id, tile));
   }
 
   function handleTsumo() {
     if (!state) return;
-    void runAction(() => client.tsumo(state.session_id));
+    void request(() => client.tsumo(state.session_id));
   }
 
   function handleGoto(nodeId: number) {
     if (!state) return;
-    void runAction(() => client.goto(state.session_id, nodeId));
+    void request(() => client.goto(state.session_id, nodeId));
   }
 
   const rowNames = useMemo(() => {
@@ -172,7 +167,7 @@ export function App() {
               currentAnalysis={state.analysis}
               rowNames={rowNames}
             />
-            <HistoryTree tree={state.tree} currentNodeId={state.node_id} onGoto={handleGoto} />
+            <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
           </div>
         </main>
       )}

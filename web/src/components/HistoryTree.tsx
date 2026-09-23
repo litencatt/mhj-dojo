@@ -4,6 +4,7 @@ import { Tile } from './Tile';
 export interface HistoryTreeProps {
   tree: TreeNode[];
   currentNodeId: number;
+  disabled: boolean;
   onGoto: (nodeId: number) => void;
 }
 
@@ -30,7 +31,7 @@ interface Row {
  * Only fork points add indentation — a long single-child chain stays flat, so
  * an 18-turn straight line renders as a compact vertical list, not a staircase. */
 export function HistoryTree(props: HistoryTreeProps) {
-  const { tree, currentNodeId, onGoto } = props;
+  const { tree, currentNodeId, disabled, onGoto } = props;
   const byParent = new Map<number | null, TreeNode[]>();
   const byId = new Map<number, TreeNode>();
   for (const n of tree) {
@@ -84,6 +85,7 @@ export function HistoryTree(props: HistoryTreeProps) {
               <button
                 type="button"
                 class={`tree-node-btn ${isCurrent ? 'tree-current' : ''}`}
+                disabled={disabled}
                 onClick={() => onGoto(node.node_id)}
                 aria-current={isCurrent ? 'true' : undefined}
               >
