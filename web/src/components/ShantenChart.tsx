@@ -67,7 +67,11 @@ export function ShantenChart(props: ShantenChartProps) {
     );
   }
 
-  const turns = history.map((h) => h.turn);
+  // A tsumo node keeps its parent's turn; its winning tile is the next turn's draw,
+  // so it is plotted one step right to avoid sharing an x position with the parent.
+  const xTurn = (h: HistoryEntry, i: number) => (i > 0 && h.discard === null ? h.turn + 1 : h.turn);
+  const xs = history.map(xTurn);
+  const turns = [...new Set(xs)];
   const minTurn = Math.min(...turns);
   const maxTurn = Math.max(...turns, minTurn + 1);
 
@@ -86,7 +90,7 @@ export function ShantenChart(props: ShantenChartProps) {
   const xScale = (turn: number) => MARGIN.left + ((turn - minTurn) / Math.max(1, maxTurn - minTurn)) * innerW;
   const yScale = (v: number) => MARGIN.top + ((v - minV) / Math.max(1, maxV - minV)) * innerH;
 
-  const currentTurn = history[history.length - 1]?.turn ?? minTurn;
+  const currentNodeId = history[history.length - 1]?.node_id;
 
   const yTicks: number[] = [];
   for (let v = Math.ceil(minV); v <= Math.floor(maxV); v++) yTicks.push(v);
@@ -137,14 +141,14 @@ export function ShantenChart(props: ShantenChartProps) {
           const color = colorFor(key, allKeys.indexOf(key));
           const offset = offsetFor(key);
           const segments: Array<Array<[number, number]>> = [[]];
-          for (const h of history) {
+          history.forEach((h, i) => {
             const v = h.shanten[key];
             if (v === null || v === undefined) {
               if (segments[segments.length - 1]!.length > 0) segments.push([]);
-              continue;
+              return;
             }
-            segments[segments.length - 1]!.push([xScale(h.turn), yScale(v + offset)]);
-          }
+            segments[segments.length - 1]!.push([xScale(xs[i]!), yScale(v + offset)]);
+          });
           return (
             <g key={key}>
               {segments
@@ -159,14 +163,14 @@ export function ShantenChart(props: ShantenChartProps) {
                     opacity={key === 'normal' ? 0.6 : 0.9}
                   />
                 ))}
-              {history.map((h) => {
+              {history.map((h, i) => {
                 const v = h.shanten[key];
                 if (v === null || v === undefined) return null;
-                const isCurrent = h.turn === currentTurn;
+                const isCurrent = h.node_id === currentNodeId;
                 return (
                   <circle
                     key={h.node_id}
-                    cx={xScale(h.turn)}
+                    cx={xScale(xs[i]!)}
                     cy={yScale(v + offset)}
                     r={isCurrent ? 5 : 2.5}
                     fill={color}

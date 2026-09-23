@@ -524,3 +524,6 @@ section {
     font-size: 0.9rem;
   }
 }
+.tree-node-btn:disabled {
+  cursor: progress;
+}
