@@ -66,6 +66,27 @@ var (
 	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13}
 )
 
+// closedHan maps each yaku key to its han in a closed hand. The wind
+// yakuhai 東 counts twice because Phase 1 fixes both the round and the seat
+// wind to East.
+var closedHan = func() map[string]int {
+	m := map[string]int{"ton": 2}
+	for _, y := range []Yaku{
+		yTsumo, yTanyao, yPinfu, yIipeikou, yRyanpeikou, ySanshoku, yDoukou, yIttsu,
+		yChanta, yJunchan, yHonroutou, yHonitsu, yChinitsu, yToitoi, ySanankou,
+		yShousangen, yHaku, yHatsu, yChun, yChiitoitsu,
+		yKokushi, ySuuankou, yDaisangen, yTsuuiisou, yShousuushii, yDaisuushii,
+		yRyuuiisou, yChinroutou, yChuuren,
+	} {
+		m[y.Key] = y.Han
+	}
+	return m
+}()
+
+// ClosedHan returns the han of the yaku with the given key in a closed hand
+// (East round, East seat), or 0 if key is not a yaku (e.g. "normal").
+func ClosedHan(key string) int { return closedHan[key] }
+
 var windKeys = [4]struct{ key, name string }{
 	{"ton", "役牌 東"}, {"nan", "役牌 南"}, {"shaa", "役牌 西"}, {"pei", "役牌 北"},
 }

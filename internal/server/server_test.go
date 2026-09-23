@@ -104,10 +104,13 @@ func TestStateContract(t *testing.T) {
 	if len(rows) != 30 {
 		t.Fatalf("%d rows", len(rows))
 	}
-	for _, k := range []string{"key", "name", "yakuman", "shanten", "approx", "ukeire", "ukeire_total"} {
+	for _, k := range []string{"key", "name", "yakuman", "han", "shanten", "approx", "ukeire", "ukeire_total"} {
 		if _, ok := rows[0][k]; !ok {
 			t.Errorf("row missing %q", k)
 		}
+	}
+	if string(rows[0]["han"]) != "0" || string(rows[1]["han"]) != "1" || string(rows[21]["han"]) != "13" {
+		t.Errorf("han: normal=%s tanyao=%s kokushi=%s", rows[0]["han"], rows[1]["han"], rows[21]["han"])
 	}
 	if string(rows[0]["yakuman"]) != "false" || string(rows[21]["key"]) != `"kokushi"` || string(rows[21]["yakuman"]) != "true" {
 		t.Errorf("yakuman flags: %s %s %s", rows[0]["yakuman"], rows[21]["key"], rows[21]["yakuman"])

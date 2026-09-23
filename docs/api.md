@@ -104,6 +104,7 @@ Body: `{"node_id": 3}` – moves the current node. Returns the `State`.
   "key": "tanyao",
   "name": "断么九",
   "yakuman": false,        // true for the yakuman rows (kokushi … chuuren)
+  "han": 1,                // closed-hand han (East round/seat); 13 for yakuman, 0 for "normal"
   "shanten": 2,            // 0 = tenpai, null = impossible (∞)
   "approx": false,         // true when the value is an approximation (pinfu at shanten >= 1)
   "ukeire": [ { "tile": "3m", "remaining": 3 } ],  // tile types (no red notation) that lower shanten
