@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { PanelHeading } from './PanelHeading';
 
 interface Term {
   term: string;
@@ -71,7 +72,7 @@ const GROUPS: Group[] = [
 ];
 
 /** 用語表: short explanations of the terms used on the page, filterable. */
-export function Glossary() {
+export function Glossary({ onMinimize }: { onMinimize?: () => void }) {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const groups = GROUPS.map((g) => ({
@@ -81,7 +82,7 @@ export function Glossary() {
 
   return (
     <section class="glossary-panel" aria-label="用語表">
-      <h2>用語表</h2>
+      <PanelHeading title="用語表" onMinimize={onMinimize} />
       <input
         type="search"
         class="glossary-search"

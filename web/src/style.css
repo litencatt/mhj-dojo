@@ -218,6 +218,11 @@ h2 {
     grid-area: tree;
     overflow: auto;
   }
+  /* Minimized panels leave the grid (see .panel-dock). */
+  .app.no-tree {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "main side";
+  }
   .area-side { grid-area: side; }
   /* The yaku table and glossary share the side column 3:2. */
   .area-yaku { flex: 3 1 0; }
@@ -246,6 +251,18 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "main";
   }
+  .app.no-tree {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 320px);
+    grid-template-areas: "main yaku gloss";
+  }
+  .app.no-gloss {
+    grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr);
+    grid-template-areas: "main tree yaku";
+  }
+  .app.no-tree.no-gloss {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "main yaku";
+  }
   .area-side { display: contents; }
   .area-yaku {
     grid-area: yaku;
@@ -256,19 +273,76 @@ h2 {
     flex: none;
   }
 }
+/* One column: order the panels instead of naming areas, so a minimized
+   panel leaves no empty row behind. */
 @media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "header" "hand" "tree" "yaku" "chart" "gloss";
   }
   .area-main,
   .area-side { display: contents; }
-  .area-header { grid-area: header; }
-  .area-hand { grid-area: hand; }
-  .area-yaku { grid-area: yaku; }
-  .area-chart { grid-area: chart; }
-  .area-tree { grid-area: tree; }
-  .area-gloss { grid-area: gloss; }
+  .area-header { order: 1; }
+  .area-hand { order: 2; }
+  .area-tree { order: 3; }
+  .area-yaku { order: 4; }
+  .area-chart { order: 5; }
+  .area-gloss { order: 6; }
+}
+
+/* ---- Minimize and dock ---- */
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-minimize {
+  flex: none;
+  width: 24px;
+  height: 22px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.panel-minimize:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+.panel-dock {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dock-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+.dock-tab:hover {
+  color: var(--accent);
+}
+/* Keep content clear of the docked tabs. */
+.app.has-dock {
+  padding-right: 44px;
 }
 
 /* ---- Glossary ---- */

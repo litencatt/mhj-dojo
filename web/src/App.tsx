@@ -7,11 +7,38 @@ import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
 import { Glossary } from './components/Glossary';
+import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+// Panels that can be minimized into the right-edge dock.
+type PanelKey = 'chart' | 'tree' | 'gloss';
+const PANELS: Array<{ key: PanelKey; label: string }> = [
+  { key: 'chart', label: '時系列チャート' },
+  { key: 'tree', label: '履歴ツリー' },
+  { key: 'gloss', label: '用語表' },
+];
+const MINIMIZED_KEY = 'mhj2.minimized';
+
+function loadMinimized(): PanelKey[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(MINIMIZED_KEY) ?? '[]');
+    return Array.isArray(v) ? PANELS.map((p) => p.key).filter((k) => v.includes(k)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMinimized(keys: PanelKey[]) {
+  try {
+    localStorage.setItem(MINIMIZED_KEY, JSON.stringify(keys));
+  } catch {
+    // Storage unavailable: the layout just won't persist.
+  }
 }
 
 function optionalInt(s: string | null): number | undefined {
@@ -26,6 +53,17 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const [busy, setBusy] = useState(false);
+  const [minimized, setMinimized] = useState<PanelKey[]>(loadMinimized);
+  const minimize = (k: PanelKey) => {
+    const next = [...minimized.filter((x) => x !== k), k];
+    setMinimized(next);
+    saveMinimized(next);
+  };
+  const restore = (k: PanelKey) => {
+    const next = minimized.filter((x) => x !== k);
+    setMinimized(next);
+    saveMinimized(next);
+  };
   // Discard/tsumo act on the server's current node, so requests must never overlap:
   // a concurrent goto could redirect a discard, and responses could land out of order.
   const inFlight = useRef(false);
@@ -116,8 +154,18 @@ export function App() {
   const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
   const baselineRows = previewTile && state ? state.analysis : null;
 
+  const appClass = [
+    'app',
+    state ? '' : 'app-loading',
+    state && minimized.includes('tree') ? 'no-tree' : '',
+    state && minimized.includes('gloss') ? 'no-gloss' : '',
+    state && minimized.length > 0 ? 'has-dock' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div class={state ? 'app' : 'app app-loading'}>
+    <div class={appClass}>
       <div class="area-main">
         <div class="area-header">
           <header class="app-header">
@@ -197,20 +245,29 @@ export function App() {
               {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
               {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
             </div>
-            <div class="area-chart">
-              <ShantenChart
-                sessionId={state.session_id}
-                history={state.history}
-                currentAnalysis={state.analysis}
-                rowNames={rowNames}
-              />
-            </div>
+            {!minimized.includes('chart') && (
+              <div class="area-chart">
+                <ShantenChart
+                  sessionId={state.session_id}
+                  history={state.history}
+                  currentAnalysis={state.analysis}
+                  rowNames={rowNames}
+                  onMinimize={() => minimize('chart')}
+                />
+              </div>
+            )}
           </>
         )}
       </div>
-      {state && (
+      {state && !minimized.includes('tree') && (
         <div class="area-tree">
-          <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
+          <HistoryTree
+            tree={state.tree}
+            currentNodeId={state.node_id}
+            disabled={busy}
+            onGoto={handleGoto}
+            onMinimize={() => minimize('tree')}
+          />
         </div>
       )}
       {state && (
@@ -218,10 +275,18 @@ export function App() {
           <div class="area-yaku">
             <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
           </div>
-          <div class="area-gloss">
-            <Glossary />
-          </div>
+          {!minimized.includes('gloss') && (
+            <div class="area-gloss">
+              <Glossary onMinimize={() => minimize('gloss')} />
+            </div>
+          )}
         </div>
+      )}
+      {state && (
+        <Dock
+          items={PANELS.filter((p) => minimized.includes(p.key))}
+          onRestore={(k) => restore(k as PanelKey)}
+        />
       )}
     </div>
   );
