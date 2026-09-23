@@ -14,7 +14,7 @@ function errorMessage(err: unknown): string {
 }
 
 function optionalInt(s: string | null): number | undefined {
-  if (s === null || !/^\d+$/.test(s)) return undefined;
+  if (s === null || !/^-?\d+$/.test(s)) return undefined;
   return Number(s);
 }
 
