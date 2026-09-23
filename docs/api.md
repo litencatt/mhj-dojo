@@ -1,4 +1,4 @@
-# mhj2 HTTP API (Phase 1)
+# mhj2 HTTP API
 
 All endpoints return JSON (`Content-Type: application/json`). Errors: HTTP 4xx/5xx with `{"error": "message"}`.
 
@@ -235,3 +235,92 @@ These clarify points the contract above leaves open; none changes the JSON shape
   `127.0.0.1` or another loopback IP, `[::1]`, any port — otherwise `403` (DNS-rebinding guard; this also
   means `--host 0.0.0.0` does not serve other machines). Every `POST` must send
   `Content-Type: application/json` (parameters such as `charset` allowed), otherwise `415`.
+
+## Games against CPU players (Phase 2a)
+
+A game is one closed-hand East round: you are seat 0, three CPU players take
+seats 1–3, and every player starts with 25000 points. The dealer (East) is
+`seed mod 4`, so your seat wind depends on the seed. There are no calls (pon,
+chii, kan) and no rewinding. After each of your moves the server plays the
+CPU seats until you have a choice again or the round ends.
+
+Rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after the
+discard; after riichi only the drawn tile can be discarded, and the server
+discards it for you unless you can tsumo), double riichi, ippatsu, ura dora,
+haitei, houtei, furiten (own discards, same go-around, and after riichi),
+head bump (no double ron), 3000-point noten penalty at the exhaustive draw.
+Points: no kiriage mangan, counted yakuman at 13 han, no honba.
+
+### `POST /api/games`
+Body (optional): `{"seed": 42}`. Returns a `GameState`.
+
+### `GET /api/games/{id}`
+Returns the `GameState`.
+
+### `POST /api/games/{id}/action`
+Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
+
+| type | when | tile |
+|---|---|---|
+| `discard` | your turn | a tile from `legal.discards` |
+| `riichi` | your turn | a tile from `legal.riichi` (declare riichi and discard it) |
+| `tsumo` | `legal.tsumo` | – |
+| `ron` | `legal.ron` (the tile is `last_discard`) | – |
+| `skip` | `legal.ron` (pass; you become furiten) | – |
+
+Errors: `400` malformed body, unknown type or a tile you do not hold, `404`
+unknown game, `409` a move that is not legal now.
+
+### `GameState`
+
+```jsonc
+{
+  "game_id": "a1b2c3",
+  "seed": 42,
+  "you": 0,
+  "dealer": 2,                  // seat of 東
+  "round_wind": "1z",
+  "phase": "discard",           // "discard" | "call" (a ron window) | "ended"
+  "actor": 0,                   // seat to act; -1 once ended
+  "wall_remaining": 69,         // live draws left (70 after the deal)
+  "deposit": 0,                 // riichi sticks on the table
+  "dora_indicators": ["3m"], "dora": ["4m"],
+  "ura_dora_indicators": [], "ura_dora": [],   // revealed when the round ends
+  "seats": [                    // index = seat
+    { "seat": 0, "wind": "3z", "points": 25000, "riichi": false,
+      "river": [{"tile": "9s", "riichi": false}],
+      "hand_count": 14,
+      "hand": ["1m", "..."],    // present only for you, and for every seat once ended
+      "drawn": "4p" }           // your drawn tile on your turn
+  ],
+  "last_discard": null,         // the tile you may ron, when legal.ron
+  "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false },
+  "events": [ {"seat": 1, "type": "discard", "tile": "2z"} ],  // moves since your previous move
+  "analysis": [YakuRow],        // your 13-tile hand; wind rows follow your seat and the round
+  "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each discard
+  "history": [HistoryEntry],    // your rows after each of your discards (node_id = turn)
+  "result": null                // Result once ended
+}
+```
+
+The wind rows of `analysis` are `役牌 東（場風・自風）` (2 han) when you are
+East, otherwise the round wind row then your seat wind row (1 han each).
+`remaining` counts every river and the dora indicators as visible.
+
+`Result`:
+
+```jsonc
+{
+  "kind": "ron",                // "tsumo" | "ron" | "draw"
+  "winner": 1, "from": 0,       // -1 when not applicable
+  "win_tile": "5p",
+  "yaku": [{"key": "riichi", "name": "立直", "han": 1}],
+  "han": 3, "fu": 40, "dora": 1, "ura_dora": 0,
+  "points": { "limit": "", "multiplier": 0, "total": 5200, "ron": 5200 },
+  // on a tsumo: "from_dealer" / "from_non_dealer" instead of "ron"
+  // limit: "" | "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman"
+  "deltas": [-5200, 6200, 0, 0], // riichi sticks included
+  "tenpai": [false, false, false, false],  // on a draw
+  "deposit": 0                  // sticks left on the table after a draw
+}
+```

@@ -14,6 +14,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/litencatt/mhj2/internal/game"
+	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/session"
 )
 
@@ -23,17 +25,17 @@ var staticFS embed.FS
 const maxBody = 1 << 16
 
 // New returns the HTTP handler for the API and the embedded frontend.
-func New(store *session.Store) http.Handler {
+func New(store *session.Store, games *match.Store) http.Handler {
 	static, err := fs.Sub(staticFS, "static")
 	if err != nil {
 		panic(err)
 	}
-	return NewWithFS(store, static)
+	return NewWithFS(store, games, static)
 }
 
 // NewWithFS is New with an explicit frontend file system (for tests).
-func NewWithFS(store *session.Store, static fs.FS) http.Handler {
-	a := &api{store: store}
+func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Handler {
+	a := &api{store: store, games: games}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/sessions", a.create)
 	mux.HandleFunc("GET /api/sessions/{id}", a.withSession(func(s *session.Session, _ *http.Request) (session.State, error) {
@@ -65,6 +67,29 @@ func NewWithFS(store *session.Store, static fs.FS) http.Handler {
 			return session.State{}, errInvalid("node_id is required")
 		}
 		return s.Goto(*body.NodeID)
+	}))
+	mux.HandleFunc("POST /api/games", a.createGame)
+	mux.HandleFunc("GET /api/games/{id}", a.withGame(func(m *match.Match, _ *http.Request) (match.State, error) {
+		return m.State(), nil
+	}))
+	mux.HandleFunc("POST /api/games/{id}/action", a.withGame(func(m *match.Match, r *http.Request) (match.State, error) {
+		var body struct {
+			Type game.ActionType `json:"type"`
+			Tile string          `json:"tile"`
+		}
+		if err := decode(r, &body, true); err != nil {
+			return match.State{}, err
+		}
+		switch body.Type {
+		case game.Discard, game.Riichi:
+			if body.Tile == "" {
+				return match.State{}, errInvalid("tile is required for " + string(body.Type))
+			}
+		case game.Tsumo, game.Ron, game.Skip:
+		default:
+			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron or skip")
+		}
+		return m.Act(game.Action{Type: body.Type, Tile: body.Tile})
 	}))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
@@ -107,6 +132,34 @@ func loopbackHost(hostport string) bool {
 
 type api struct {
 	store *session.Store
+	games *match.Store
+}
+
+func (a *api) createGame(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Seed *int64 `json:"seed"`
+	}
+	if err := decode(r, &body, false); err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a.games.Create(body.Seed).State())
+}
+
+func (a *api) withGame(f func(*match.Match, *http.Request) (match.State, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		m, err := a.games.Get(r.PathValue("id"))
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		st, err := f(m, r)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, st)
+	}
 }
 
 func (a *api) create(w http.ResponseWriter, r *http.Request) {
@@ -161,11 +214,11 @@ func decode(r *http.Request, v any, required bool) error {
 func writeErr(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
 	switch {
-	case errors.Is(err, session.ErrNotFound):
+	case errors.Is(err, session.ErrNotFound), errors.Is(err, match.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, session.ErrInvalid):
+	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
 		status = http.StatusBadRequest
-	case errors.Is(err, session.ErrConflict):
+	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
 		status = http.StatusConflict
 	}
 	msg := err.Error()
