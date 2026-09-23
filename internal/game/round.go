@@ -434,8 +434,10 @@ func (r *Round) ron(seat int) error {
 		return fmt.Errorf("%w: seat %d cannot ron", ErrConflict, seat)
 	}
 	// A riichi declared on the winning discard is not accepted: no stick.
-	r.pendingRiichi = false
-	r.players[r.turn].doubleRiichi = false
+	if r.pendingRiichi {
+		r.players[r.turn].doubleRiichi = false
+		r.pendingRiichi = false
+	}
 	pts := score.FromWin(w, seat == r.dealer, false)
 	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard}
 	res.Deltas[r.turn] -= pts.Ron
