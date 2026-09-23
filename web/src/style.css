@@ -166,39 +166,24 @@ h2 {
 }
 
 /* Layout by width:
-   - above 1500px: three columns; the yaku table and the glossary each get one.
-   - 1100-1500px: two columns; the glossary sits below the yaku table.
-   - up to 1100px: one column: header, hand, yaku, chart, tree, glossary.
-   .area-side wraps the yaku table and glossary; it is a flex column in the
-   two-column layout and dissolves (display: contents) otherwise, so its
-   children become grid items of .app. */
+   - above 1100px the page is exactly one viewport tall and never scrolls;
+     each column scrolls on its own instead.
+     - 1100-1500px: two columns; the glossary sits below the yaku table.
+     - above 1500px: three columns; the yaku table and glossary each get one.
+   - up to 1100px: one column in reading order (header, hand, yaku, chart,
+     tree, glossary) and the page scrolls as usual.
+   .area-main (header, hand, chart, tree) and .area-side (yaku, glossary) are
+   flex columns where they form a column, and dissolve (display: contents)
+   where their children must be placed individually. */
 .app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas:
-    "header side"
-    "hand   side"
-    "chart  side"
-    "tree   side";
-  grid-template-rows: auto auto auto 1fr;
   column-gap: 16px;
   row-gap: 12px;
-  align-items: start;
 }
-.area-header { grid-area: header; }
-.area-hand { grid-area: hand; }
-.area-side { grid-area: side; }
-.area-chart { grid-area: chart; }
-.area-tree { grid-area: tree; }
-/* Before a game has loaded only the header is shown; let it span the page. */
-.app-loading {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "header";
-  grid-template-rows: none;
-}
+.area-main,
+.area-side,
 .area-header,
 .area-hand,
-.area-side,
 .area-yaku,
 .area-gloss,
 .area-chart,
@@ -207,43 +192,77 @@ h2 {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+}
+@media (min-width: 1101px) {
+  .app {
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "main side";
+  }
+  .app-loading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main";
+  }
+  .area-main {
+    grid-area: main;
+    overflow-y: auto;
+  }
+  /* Panels in the scrolling main column keep their natural height. */
+  .area-main > * { flex-shrink: 0; }
+  .area-side { grid-area: side; }
+  /* The yaku table and glossary share the side column 3:2. */
+  .area-yaku { flex: 3 1 0; }
+  .area-gloss {
+    flex: 2 1 0;
+    overflow-y: auto;
+  }
+  .yaku-table-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .yaku-table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
 }
 @media (min-width: 1501px) {
   .app {
     max-width: 1720px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 320px);
-    grid-template-areas:
-      "header yaku gloss"
-      "hand   yaku gloss"
-      "chart  yaku gloss"
-      "tree   yaku gloss";
+    grid-template-areas: "main yaku gloss";
   }
   .app-loading {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "header";
+    grid-template-areas: "main";
   }
   .area-side { display: contents; }
   .area-yaku {
     grid-area: yaku;
-    position: sticky;
-    top: 12px;
+    flex: none;
   }
   .area-gloss {
     grid-area: gloss;
-    position: sticky;
-    top: 12px;
-    max-height: calc(100vh - 24px);
-    overflow-y: auto;
+    flex: none;
   }
 }
 @media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "header" "hand" "yaku" "chart" "tree" "gloss";
-    grid-template-rows: none;
   }
+  .area-main,
   .area-side { display: contents; }
+  .area-header { grid-area: header; }
+  .area-hand { grid-area: hand; }
   .area-yaku { grid-area: yaku; }
+  .area-chart { grid-area: chart; }
+  .area-tree { grid-area: tree; }
   .area-gloss { grid-area: gloss; }
 }
 
@@ -403,23 +422,6 @@ section {
   z-index: 1;
   background: var(--panel-bg);
   box-shadow: inset 0 -1px 0 var(--border); /* collapsed borders do not stick */
-}
-/* In the multi-column layouts the table scrolls inside its panel, keeping
-   the column headings in view, like the glossary. */
-@media (min-width: 1101px) {
-  .area-yaku {
-    max-height: calc(100vh - 24px);
-  }
-  .yaku-table-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-  .yaku-table-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-  }
 }
 .yaku-table th,
 .yaku-table td {
