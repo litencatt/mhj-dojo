@@ -125,21 +125,14 @@ const HONORS: Array<[string, string]> = [
   ['南', INK],
   ['西', INK],
   ['北', INK],
-  ['', BLUE], // 白 is a blank face with a frame
+  ['', INK], // 白 is a blank face
   ['發', GREEN],
   ['中', RED],
 ];
 
 function Jihai({ rank }: { rank: number }) {
   const [ch, color] = HONORS[rank - 1]!;
-  if (rank === 5) {
-    return (
-      <g fill="none" stroke={color}>
-        <rect x={6} y={7} width={18} height={26} rx={1.5} stroke-width={1.6} />
-        <rect x={8.5} y={9.5} width={13} height={21} rx={1} stroke-width={0.8} />
-      </g>
-    );
-  }
+  if (!ch) return null;
   return (
     <text x={15} y={28.5} font-family={FONT} font-weight={700} font-size={22} text-anchor="middle" fill={color}>
       {ch}
