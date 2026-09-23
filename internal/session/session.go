@@ -1,0 +1,287 @@
+// Package session runs solo practice games: a seeded wall, a tree of discard
+// choices that can be revisited and branched, and the per-node analysis.
+package session
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	mrand "math/rand/v2"
+	"sync"
+
+	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj2/internal/yakushanten"
+)
+
+// Errors returned by sessions; the server maps them to HTTP statuses.
+var (
+	ErrNotFound = errors.New("not found")
+	ErrInvalid  = errors.New("invalid request")
+	ErrConflict = errors.New("not allowed in the current state")
+)
+
+// Node statuses.
+const (
+	StatusPlaying   = "playing"
+	StatusTsumo     = "tsumo"
+	StatusExhausted = "exhausted"
+)
+
+const (
+	// DefaultMaxTurns is the default number of discards before the game ends.
+	DefaultMaxTurns = 18
+	// MaxSessions bounds memory; the oldest session is evicted beyond it.
+	MaxSessions = 256
+	// memoLimit resets an analyzer's memo when it grows past this many tables.
+	memoLimit = 200_000
+)
+
+// Phase 1 plays East round, East seat.
+var (
+	roundWind = tile.East
+	seatWind  = tile.East
+)
+
+// Store holds sessions in memory.
+type Store struct {
+	mu       sync.Mutex
+	sessions map[string]*Session
+	order    []string
+	// DefaultSeed, when set, is used for sessions created without a seed.
+	DefaultSeed *int64
+}
+
+// NewStore returns an empty store.
+func NewStore() *Store { return &Store{sessions: make(map[string]*Session)} }
+
+// Create starts a session. A nil seed picks the default or a random seed;
+// maxTurns 0 means DefaultMaxTurns.
+func (st *Store) Create(seed *int64, maxTurns int) (*Session, error) {
+	var s int64
+	switch {
+	case seed != nil:
+		s = *seed
+	case st.DefaultSeed != nil:
+		s = *st.DefaultSeed
+	default:
+		s = mrand.Int64N(1 << 32)
+	}
+	return st.CreateWithWall(wall.New(s), maxTurns)
+}
+
+// CreateWithWall starts a session on a given wall (used by tests).
+func (st *Store) CreateWithWall(w *wall.Wall, maxTurns int) (*Session, error) {
+	if maxTurns == 0 {
+		maxTurns = DefaultMaxTurns
+	}
+	if maxTurns < 1 || maxTurns > wall.LiveDraws {
+		return nil, fmt.Errorf("%w: max_turns must be between 1 and %d", ErrInvalid, wall.LiveDraws)
+	}
+	s := &Session{
+		id:       newID(),
+		wall:     w,
+		maxTurns: maxTurns,
+		analyzer: yakushanten.NewAnalyzer(),
+	}
+	s.addNode(&node{parent: -1, hand: w.Hand()})
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.sessions[s.id] = s
+	st.order = append(st.order, s.id)
+	for len(st.order) > MaxSessions {
+		delete(st.sessions, st.order[0])
+		st.order = st.order[1:]
+	}
+	return s, nil
+}
+
+// Get returns a session by id.
+func (st *Store) Get(id string) (*Session, error) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	s, ok := st.sessions[id]
+	if !ok {
+		return nil, fmt.Errorf("%w: session %q", ErrNotFound, id)
+	}
+	return s, nil
+}
+
+func newID() string {
+	var b [6]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// Session is one solo game with its branch tree. Methods are safe for
+// concurrent use.
+type Session struct {
+	mu       sync.Mutex
+	id       string
+	wall     *wall.Wall
+	maxTurns int
+	nodes    []*node
+	current  int
+	analyzer *yakushanten.Analyzer
+}
+
+type node struct {
+	id, parent int
+	turn       int
+	hand       []tile.Tile // 13 tiles, sorted
+	draw       *tile.Tile  // tile drawn right before this node
+	discard    *tile.Tile  // tile discarded to reach this node
+	status     string
+	children   map[string]int // discard string (or "tsumo") -> node id
+
+	analysis  []yakushanten.Result
+	byDiscard map[tile.Kind][]yakushanten.Result
+	winRows   map[string]int // tsumo nodes: row shanten on the 14 winning tiles
+	win       *Win
+}
+
+// ID returns the session id.
+func (s *Session) ID() string { return s.id }
+
+func (s *Session) addNode(n *node) *node {
+	n.id = len(s.nodes)
+	n.children = map[string]int{}
+	if n.status == "" {
+		n.status = StatusPlaying
+		if n.turn >= s.maxTurns {
+			n.status = StatusExhausted
+		}
+	}
+	s.nodes = append(s.nodes, n)
+	s.current = n.id
+	return n
+}
+
+// drawn returns the pending draw at a playing node.
+func (s *Session) drawn(n *node) (tile.Tile, bool) {
+	if n.status != StatusPlaying {
+		return tile.Tile{}, false
+	}
+	return s.wall.Draw(n.turn)
+}
+
+// State returns the view of the current node.
+func (s *Session) State() State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state()
+}
+
+// Discard discards an exact tile (red distinguished) from hand+drawn.
+func (s *Session) Discard(t string) (State, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur := s.nodes[s.current]
+	d, ok := s.drawn(cur)
+	if !ok {
+		return State{}, fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
+	}
+	tiles := append(append([]tile.Tile{}, cur.hand...), d)
+	idx := -1
+	for i, x := range tiles {
+		if x.String() == t {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return State{}, fmt.Errorf("%w: tile %q is not in hand or drawn", ErrInvalid, t)
+	}
+	if id, ok := cur.children[t]; ok {
+		s.current = id
+		return s.state(), nil
+	}
+	disc := tiles[idx]
+	hand := append(tiles[:idx:idx], tiles[idx+1:]...)
+	tile.Sort(hand)
+	child := s.addNode(&node{parent: cur.id, turn: cur.turn + 1, hand: hand, draw: &d, discard: &disc})
+	cur.children[t] = child.id
+	return s.state(), nil
+}
+
+// Tsumo declares a win with the pending draw.
+func (s *Session) Tsumo() (State, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur := s.nodes[s.current]
+	if id, ok := cur.children[StatusTsumo]; ok {
+		s.current = id
+		return s.state(), nil
+	}
+	d, ok := s.drawn(cur)
+	if !ok {
+		return State{}, fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
+	}
+	tiles := append(append([]tile.Tile{}, cur.hand...), d)
+	tile.Sort(tiles)
+	res, ok := yaku.Evaluate(tiles, yaku.Context{
+		WinTile: d.Kind, RoundWind: roundWind, SeatWind: seatWind, DoraIndicators: s.wall.DoraIndicators(),
+	})
+	if !ok {
+		return State{}, fmt.Errorf("%w: hand is not complete", ErrConflict)
+	}
+	child := s.addNode(&node{
+		parent: cur.id, turn: cur.turn, hand: cur.hand, draw: &d, status: StatusTsumo,
+		win: &Win{Tiles: tile.Strings(tiles), Yaku: res.Yaku, Dora: res.Dora, HanTotal: res.HanTotal},
+	})
+	child.winRows = s.winRows(tile.CountsOf(tiles), res)
+	cur.children[StatusTsumo] = child.id
+	return s.state(), nil
+}
+
+// Goto moves the current node.
+func (s *Session) Goto(id int) (State, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id < 0 || id >= len(s.nodes) {
+		return State{}, fmt.Errorf("%w: node %d", ErrNotFound, id)
+	}
+	s.current = id
+	return s.state(), nil
+}
+
+func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
+	if s.analyzer.MemoSize() > memoLimit {
+		s.analyzer = yakushanten.NewAnalyzer()
+	}
+	return s.analyzer.Analyze(c)
+}
+
+func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
+	if n.analysis == nil {
+		n.analysis = s.analyze(tile.CountsOf(n.hand))
+	}
+	return n.analysis
+}
+
+// winRows computes each row's shanten on the 14 winning tiles: -1 when the
+// win satisfies the row. Pinfu counts as satisfied only if the win scored it.
+func (s *Session) winRows(c tile.Counts, res yaku.Win) map[string]int {
+	rows := s.analyze(c)
+	scored := map[string]bool{}
+	for _, y := range res.Yaku {
+		scored[y.Key] = true
+	}
+	out := map[string]int{}
+	for _, r := range rows {
+		v := r.Shanten
+		if r.Key == "pinfu" {
+			v = max(v, 0)
+			if scored["pinfu"] {
+				v = -1
+			}
+		}
+		out[r.Key] = v
+	}
+	return out
+}
