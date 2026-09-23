@@ -135,3 +135,17 @@ func TestFourPlayerDeal(t *testing.T) {
 		t.Error("negative draw index accepted")
 	}
 }
+
+func TestHandOfRejectsBadSeat(t *testing.T) {
+	w := New(1)
+	for _, seat := range []int{-1, Seats} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("HandOf(%d) did not panic", seat)
+				}
+			}()
+			w.HandOf(seat)
+		}()
+	}
+}

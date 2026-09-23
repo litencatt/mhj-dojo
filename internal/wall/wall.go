@@ -120,8 +120,13 @@ func (w *Wall) Draw(k int) (tile.Tile, bool) {
 	return w.tiles[HandSize+k], true
 }
 
-// HandOf returns the 13 tiles dealt to seat (0-3) in a four-player deal, sorted.
+// HandOf returns the 13 tiles dealt to seat (0-3) in a four-player deal,
+// sorted. It panics on any other seat: reading past the deal would silently
+// return live-wall tiles as a hand.
 func (w *Wall) HandOf(seat int) []tile.Tile {
+	if seat < 0 || seat >= Seats {
+		panic(fmt.Sprintf("wall: seat %d out of range", seat))
+	}
 	h := make([]tile.Tile, HandSize)
 	copy(h, w.tiles[seat*HandSize:(seat+1)*HandSize])
 	tile.Sort(h)
