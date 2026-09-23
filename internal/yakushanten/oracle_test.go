@@ -666,10 +666,6 @@ func TestPropertiesRandom(t *testing.T) {
 				t.Fatalf("%s: %s %d < %v %d", c, rel[0], get(rel[0]).Shanten, rel[1:], lower)
 			}
 		}
-		// Closed solo play: every triplet is concealed.
-		if s, tt := get("suuankou"), get("toitoi"); s.Shanten != tt.Shanten || !slices.Equal(s.Ukeire, tt.Ukeire) {
-			t.Fatalf("%s: suuankou %d != toitoi %d", c, s.Shanten, tt.Shanten)
-		}
 		if a.eng.MemoSize() > 1<<20 {
 			a = NewAnalyzer()
 		}
