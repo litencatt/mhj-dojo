@@ -3,13 +3,12 @@
 package session
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	mrand "math/rand/v2"
 	"sync"
 
+	"github.com/litencatt/mhj2/internal/store"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -47,15 +46,13 @@ var (
 
 // Store holds sessions in memory.
 type Store struct {
-	mu       sync.Mutex
-	sessions map[string]*Session
-	order    []string
+	sessions *store.Store[*Session]
 	// DefaultSeed, when set, is used for sessions created without a seed.
 	DefaultSeed *int64
 }
 
 // NewStore returns an empty store.
-func NewStore() *Store { return &Store{sessions: make(map[string]*Session)} }
+func NewStore() *Store { return &Store{sessions: store.New[*Session](MaxSessions)} }
 
 // Create starts a session. A nil seed picks the default or a random seed;
 // maxTurns 0 means DefaultMaxTurns.
@@ -81,41 +78,22 @@ func (st *Store) CreateWithWall(w *wall.Wall, maxTurns int) (*Session, error) {
 		return nil, fmt.Errorf("%w: max_turns must be between 1 and %d", ErrInvalid, wall.LiveDraws)
 	}
 	s := &Session{
-		id:       newID(),
 		wall:     w,
 		maxTurns: maxTurns,
 		analyzer: yakushanten.NewAnalyzer(),
 	}
 	s.addNode(&node{parent: -1, hand: w.Hand()})
-
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	st.sessions[s.id] = s
-	st.order = append(st.order, s.id)
-	for len(st.order) > MaxSessions {
-		delete(st.sessions, st.order[0])
-		st.order = st.order[1:]
-	}
+	s.id = st.sessions.Add(s)
 	return s, nil
 }
 
 // Get returns a session by id.
 func (st *Store) Get(id string) (*Session, error) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	s, ok := st.sessions[id]
+	s, ok := st.sessions.Get(id)
 	if !ok {
 		return nil, fmt.Errorf("%w: session %q", ErrNotFound, id)
 	}
 	return s, nil
-}
-
-func newID() string {
-	var b [6]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b[:])
 }
 
 // Session is one solo game with its branch tree. Methods are safe for
