@@ -101,13 +101,16 @@ func TestStateContract(t *testing.T) {
 	if err := json.Unmarshal(raw["analysis"], &rows); err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 18 {
+	if len(rows) != 30 {
 		t.Fatalf("%d rows", len(rows))
 	}
-	for _, k := range []string{"key", "name", "shanten", "approx", "ukeire", "ukeire_total"} {
+	for _, k := range []string{"key", "name", "yakuman", "shanten", "approx", "ukeire", "ukeire_total"} {
 		if _, ok := rows[0][k]; !ok {
 			t.Errorf("row missing %q", k)
 		}
+	}
+	if string(rows[0]["yakuman"]) != "false" || string(rows[21]["key"]) != `"kokushi"` || string(rows[21]["yakuman"]) != "true" {
+		t.Errorf("yakuman flags: %s %s %s", rows[0]["yakuman"], rows[21]["key"], rows[21]["yakuman"])
 	}
 	var hist []map[string]json.RawMessage
 	if err := json.Unmarshal(raw["history"], &hist); err != nil {

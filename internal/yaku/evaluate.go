@@ -34,19 +34,36 @@ var (
 	yTanyao     = Yaku{"tanyao", "断么九", 1}
 	yPinfu      = Yaku{"pinfu", "平和", 1}
 	yIipeikou   = Yaku{"iipeikou", "一盃口", 1}
+	yRyanpeikou = Yaku{"ryanpeikou", "二盃口", 3}
 	ySanshoku   = Yaku{"sanshoku", "三色同順", 2}
+	yDoukou     = Yaku{"sanshoku_doukou", "三色同刻", 2}
 	yIttsu      = Yaku{"ittsu", "一気通貫", 2}
 	yChanta     = Yaku{"chanta", "混全帯么九", 2}
 	yJunchan    = Yaku{"junchan", "純全帯么九", 3}
+	yHonroutou  = Yaku{"honroutou", "混老頭", 2}
 	yHonitsu    = Yaku{"honitsu", "混一色", 3}
 	yChinitsu   = Yaku{"chinitsu", "清一色", 6}
 	yToitoi     = Yaku{"toitoi", "対々和", 2}
 	ySanankou   = Yaku{"sanankou", "三暗刻", 2}
+	yShousangen = Yaku{"shousangen", "小三元", 2}
 	yHaku       = Yaku{"haku", "役牌 白", 1}
 	yHatsu      = Yaku{"hatsu", "役牌 發", 1}
 	yChun       = Yaku{"chun", "役牌 中", 1}
 	yChiitoitsu = Yaku{"chiitoitsu", "七対子", 2}
-	yKokushi    = Yaku{"kokushi", "国士無双", 13}
+)
+
+// Yakuman: 13 han each; several yakuman add up, and a hand with any yakuman
+// scores only its yakuman (no dora, no other yaku).
+var (
+	yKokushi     = Yaku{"kokushi", "国士無双", 13}
+	ySuuankou    = Yaku{"suuankou", "四暗刻", 13}
+	yDaisangen   = Yaku{"daisangen", "大三元", 13}
+	yTsuuiisou   = Yaku{"tsuuiisou", "字一色", 13}
+	yShousuushii = Yaku{"shousuushii", "小四喜", 13}
+	yDaisuushii  = Yaku{"daisuushii", "大四喜", 13}
+	yRyuuiisou   = Yaku{"ryuuiisou", "緑一色", 13}
+	yChinroutou  = Yaku{"chinroutou", "清老頭", 13}
+	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13}
 )
 
 var windKeys = [4]struct{ key, name string }{
@@ -54,7 +71,8 @@ var windKeys = [4]struct{ key, name string }{
 }
 
 // Evaluate detects the yaku of a complete 14-tile closed tsumo hand, choosing
-// the reading with the most han. ok is false if the tiles are not complete.
+// the reading with the most han (a yakuman reading always wins). ok is false
+// if the tiles are not complete.
 func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 	c := tile.CountsOf(tiles)
 	if len(tiles) != 14 || !IsComplete(c) {
@@ -66,25 +84,120 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		win.HanTotal = yKokushi.Han
 		return win, true
 	}
-	var best []Yaku
-	bestHan := -1
-	consider := func(ys []Yaku) {
+	var best, bestYakuman []Yaku
+	bestHan, bestYakumanHan := -1, 0
+	consider := func(ys, yakuman []Yaku) {
+		if h := sumHan(yakuman); h > bestYakumanHan {
+			bestYakuman, bestYakumanHan = order(yakuman), h
+		}
 		if h := sumHan(ys); h > bestHan {
-			best, bestHan = ys, h
+			best, bestHan = order(ys), h
 		}
 	}
 	if IsChiitoitsu(c) {
 		ys := []Yaku{yTsumo}
 		ys = append(ys, handWide(c)...)
+		if onlyYaochu(c) {
+			ys = append(ys, yHonroutou)
+		}
 		ys = append(ys, yChiitoitsu)
-		consider(order(ys))
+		consider(ys, yakumanWide(c, false))
 	}
 	for _, d := range Decompose(c) {
-		consider(order(evalDecomp(c, d, ctx)))
+		consider(evalDecomp(c, d, ctx), append(yakumanWide(c, true), yakumanDecomp(d)...))
+	}
+	if bestYakumanHan > 0 {
+		win.Yaku = bestYakuman
+		win.HanTotal = bestYakumanHan
+		return win, true
 	}
 	win.Yaku = best
 	win.HanTotal = bestHan + win.Dora
 	return win, true
+}
+
+// yakumanWide returns the yakuman that depend only on the tile set; standard
+// reports a 4 melds + pair reading (false: seven pairs).
+func yakumanWide(c tile.Counts, standard bool) []Yaku {
+	allHonor, allTerminal, allGreen, anyHonor := true, true, true, false
+	suits := map[int]bool{}
+	for k, n := range c {
+		if n == 0 {
+			continue
+		}
+		kk := tile.Kind(k)
+		allHonor = allHonor && kk.IsHonor()
+		allTerminal = allTerminal && kk.IsTerminal()
+		allGreen = allGreen && green[kk]
+		if kk.IsHonor() {
+			anyHonor = true
+		} else {
+			suits[kk.Suit()] = true
+		}
+	}
+	var ys []Yaku
+	if allHonor {
+		ys = append(ys, yTsuuiisou)
+	}
+	if !standard {
+		return ys
+	}
+	if allTerminal {
+		ys = append(ys, yChinroutou)
+	}
+	if allGreen {
+		ys = append(ys, yRyuuiisou)
+	}
+	if len(suits) == 1 && !anyHonor {
+		for s := range suits {
+			chuuren := true
+			for n, need := range [9]int{3, 1, 1, 1, 1, 1, 1, 1, 3} {
+				chuuren = chuuren && c[tile.MakeKind(s, n+1)] >= need
+			}
+			if chuuren {
+				ys = append(ys, yChuuren)
+			}
+		}
+	}
+	return ys
+}
+
+// green holds the tiles of 緑一色: 2 3 4 6 8s and 發.
+var green = map[tile.Kind]bool{
+	tile.MakeKind(tile.Sou, 2): true, tile.MakeKind(tile.Sou, 3): true, tile.MakeKind(tile.Sou, 4): true,
+	tile.MakeKind(tile.Sou, 6): true, tile.MakeKind(tile.Sou, 8): true, tile.Hatsu: true,
+}
+
+// yakumanDecomp returns the yakuman of one 4 melds + pair reading. All
+// triplets are concealed on a closed tsumo.
+func yakumanDecomp(d Decomposition) []Yaku {
+	trips, dragons, winds := 0, 0, 0
+	for _, m := range d.Melds {
+		if m.Type != Trip {
+			continue
+		}
+		trips++
+		switch {
+		case m.Kind >= tile.Haku:
+			dragons++
+		case m.Kind >= tile.East:
+			winds++
+		}
+	}
+	var ys []Yaku
+	if trips == 4 {
+		ys = append(ys, ySuuankou)
+	}
+	if dragons == 3 {
+		ys = append(ys, yDaisangen)
+	}
+	switch {
+	case winds == 4:
+		ys = append(ys, yDaisuushii)
+	case winds == 3 && d.Pair >= tile.East && d.Pair <= tile.North:
+		ys = append(ys, yShousuushii)
+	}
+	return ys
 }
 
 func sumHan(ys []Yaku) int {
@@ -127,6 +240,15 @@ func handWide(c tile.Counts) []Yaku {
 	return ys
 }
 
+func onlyYaochu(c tile.Counts) bool {
+	for k, n := range c {
+		if n > 0 && !tile.Kind(k).IsYaochu() {
+			return false
+		}
+	}
+	return true
+}
+
 func isValuePair(k tile.Kind, ctx Context) bool {
 	return k >= tile.Haku || k == ctx.RoundWind || k == ctx.SeatWind
 }
@@ -155,16 +277,27 @@ func evalDecomp(c tile.Counts, d Decomposition, ctx Context) []Yaku {
 			}
 		}
 	}
+	peikou := 0
 	for _, n := range seqCount {
-		if n >= 2 {
-			ys = append(ys, yIipeikou)
-			break
-		}
+		peikou += n / 2
+	}
+	switch peikou {
+	case 2:
+		ys = append(ys, yRyanpeikou)
+	case 1:
+		ys = append(ys, yIipeikou)
 	}
 	for n := 1; n <= 7; n++ {
 		if seqCount[tile.MakeKind(tile.Man, n)] > 0 && seqCount[tile.MakeKind(tile.Pin, n)] > 0 &&
 			seqCount[tile.MakeKind(tile.Sou, n)] > 0 {
 			ys = append(ys, ySanshoku)
+			break
+		}
+	}
+	for n := 1; n <= 9; n++ {
+		if d.hasTrip(tile.MakeKind(tile.Man, n)) && d.hasTrip(tile.MakeKind(tile.Pin, n)) &&
+			d.hasTrip(tile.MakeKind(tile.Sou, n)) {
+			ys = append(ys, yDoukou)
 			break
 		}
 	}
@@ -194,12 +327,25 @@ func evalDecomp(c tile.Counts, d Decomposition, ctx Context) []Yaku {
 		}
 	}
 
+	// honroutou: only terminals and honors, i.e. all triplets (chanta/junchan need a sequence).
+	if allYaochu && seqs == 0 {
+		ys = append(ys, yHonroutou)
+	}
 	if trips == 4 {
 		ys = append(ys, yToitoi)
 	}
 	// All triplets are concealed on a closed tsumo.
 	if trips >= 3 {
 		ys = append(ys, ySanankou)
+	}
+	dragonTrips := 0
+	for _, m := range d.Melds {
+		if m.Type == Trip && m.Kind >= tile.Haku {
+			dragonTrips++
+		}
+	}
+	if d.Pair >= tile.Haku && dragonTrips == 2 {
+		ys = append(ys, yShousangen)
 	}
 	for _, m := range d.Melds {
 		if m.Type != Trip {
@@ -234,9 +380,11 @@ var displayOrder = map[string]int{}
 
 func init() {
 	for i, k := range []string{
-		"tsumo", "tanyao", "pinfu", "iipeikou", "sanshoku", "ittsu", "chanta", "junchan",
-		"honitsu", "chinitsu", "toitoi", "sanankou", "haku", "hatsu", "chun",
-		"ton", "nan", "shaa", "pei", "chiitoitsu", "kokushi",
+		"tsumo", "tanyao", "pinfu", "iipeikou", "ryanpeikou", "sanshoku", "sanshoku_doukou",
+		"ittsu", "chanta", "junchan", "honroutou", "honitsu", "chinitsu", "toitoi", "sanankou",
+		"shousangen", "haku", "hatsu", "chun", "ton", "nan", "shaa", "pei", "chiitoitsu",
+		"kokushi", "suuankou", "daisangen", "tsuuiisou", "shousuushii", "daisuushii",
+		"ryuuiisou", "chinroutou", "chuuren",
 	} {
 		displayOrder[k] = i
 	}

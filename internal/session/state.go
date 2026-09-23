@@ -29,6 +29,7 @@ type State struct {
 type YakuRow struct {
 	Key         string   `json:"key"`
 	Name        string   `json:"name"`
+	Yakuman     bool     `json:"yakuman"`
 	Shanten     *int     `json:"shanten"`
 	Approx      bool     `json:"approx"`
 	Ukeire      []Ukeire `json:"ukeire"`

@@ -33,6 +33,15 @@ type Decomposition struct {
 	Melds [4]Meld
 }
 
+func (d *Decomposition) hasTrip(k tile.Kind) bool {
+	for _, m := range d.Melds {
+		if m.Type == Trip && m.Kind == k {
+			return true
+		}
+	}
+	return false
+}
+
 // Decompose returns every distinct 4 melds + pair reading of a 14-tile hand.
 func Decompose(c tile.Counts) []Decomposition {
 	if c.Total() != 14 {

@@ -66,9 +66,9 @@ func TestEvaluate(t *testing.T) {
 		// 9m tanki: no pinfu
 		{"123m123p123s789s99m", "9m", "5z", "tsumo,sanshoku,junchan", 0, 6},
 		{"123456m777m555z22z", "2z", "5z", "tsumo,honitsu,haku", 0, 5},
-		// four concealed triplets are reported as sanankou (suuankou is out of scope)
-		{"111m222p333s666z55z", "5z", "3z", "tsumo,toitoi,sanankou,hatsu", 0, 6},
-		{"111m222p333s666z55z", "5z", "5z", "tsumo,toitoi,sanankou,hatsu", 3, 9},
+		// four concealed triplets: suuankou alone; dora is reported but not added
+		{"111m222p333s666z55z", "5z", "3z", "suuankou", 0, 13},
+		{"111m222p333s666z55z", "5z", "5z", "suuankou", 3, 13},
 		// double east
 		{"111z234m567p789s55m", "5m", "5z", "tsumo,ton", 0, 3},
 		// indicator 1m -> dora 2m (a pair)
@@ -79,7 +79,26 @@ func TestEvaluate(t *testing.T) {
 		// indicator 9s -> dora 1s; honors wrap 北 -> 東
 		{"111s234m567p789p55m", "5m", "9s", "tsumo", 3, 4},
 		{"111z234m567p789s55m", "5m", "4z", "tsumo,ton", 3, 6},
-		{"11123455678999m", "4m", "5z", "tsumo,chinitsu", 0, 7},
+		{"11123455678999m", "4m", "5z", "chuuren", 0, 13},
+		// ryanpeikou (3) beats the chiitoitsu reading (tsumo tanyao chiitoitsu = 4)
+		{"223344m556677p88s", "2m", "1z", "tsumo,tanyao,pinfu,ryanpeikou", 0, 6},
+		// four identical sequences are two peikou
+		{"111122223333m55p", "5p", "1z", "tsumo,ryanpeikou", 0, 4},
+		{"223344m234p567s88s", "2m", "1z", "tsumo,tanyao,pinfu,iipeikou", 0, 4},
+		{"111m111p111s234s55m", "5m", "1z", "tsumo,sanshoku_doukou,sanankou", 0, 5},
+		// chanta needs a sequence; three triplets make sanankou, not honroutou
+		{"111m999p123s999s11z", "3s", "5z", "tsumo,chanta,sanankou", 0, 5},
+		{"11m99m11p99p11s99s11z", "1z", "5z", "tsumo,honroutou,chiitoitsu", 0, 5},
+		{"555z666z77z123m456m", "7z", "1z", "tsumo,honitsu,shousangen,haku,hatsu", 0, 8},
+		{"555z666z777z123m44p", "4p", "1z", "daisangen", 0, 13},
+		{"11223344556677z", "7z", "1z", "tsuuiisou", 2, 13},
+		{"111z222z333z44z123m", "4z", "1z", "shousuushii", 3, 13},
+		{"223344s666s88s666z", "8s", "1s", "ryuuiisou", 2, 13},
+		{"11123456789999p", "5p", "1z", "chuuren", 0, 13},
+		// stacked yakuman (every all-triplet hand is also suuankou)
+		{"111m999m111p999p11s", "1s", "1z", "suuankou,chinroutou", 0, 26},
+		{"555666777z111z22z", "2z", "1z", "suuankou,daisangen,tsuuiisou", 2, 39},
+		{"111222333444z55z", "5z", "1z", "suuankou,tsuuiisou,daisuushii", 3, 39},
 	}
 	for _, tc := range cases {
 		ts := tile.MustParseHand(tc.hand)
@@ -107,8 +126,8 @@ func TestEvaluate(t *testing.T) {
 }
 
 func TestChinitsuNotHonitsu(t *testing.T) {
-	// Only reading: 11 + 123 456 789 999 (ittsu + chinitsu; the 999 triplet rules out pinfu).
-	ts := tile.MustParseHand("11123456789999m")
+	// Best reading: 11 + 123 456 789 777 (ittsu + chinitsu; the 777 triplet rules out pinfu).
+	ts := tile.MustParseHand("11123456777789m")
 	ctx := east()
 	ctx.WinTile = tile.MakeKind(tile.Man, 1)
 	w, ok := Evaluate(ts, ctx)
@@ -124,13 +143,13 @@ func TestChinitsuNotHonitsu(t *testing.T) {
 }
 
 func TestBestReadingByHan(t *testing.T) {
-	// Winning on 3m: chiitoitsu (tsumo tanyao chinitsu chiitoitsu) and
-	// 22 + 345x2 + 678x2 (tsumo tanyao pinfu iipeikou chinitsu) both give 10 han.
+	// Winning on 3m: chiitoitsu (tsumo tanyao chinitsu chiitoitsu = 10) loses to
+	// 22 + 345x2 + 678x2 (tsumo tanyao pinfu ryanpeikou chinitsu = 12).
 	ts := tile.MustParseHand("22334455667788m")
 	ctx := east()
 	ctx.WinTile = tile.MakeKind(tile.Man, 3)
 	w, ok := Evaluate(ts, ctx)
-	if !ok || w.HanTotal != 10 {
+	if !ok || w.HanTotal != 12 || keys(w) != "tsumo,tanyao,pinfu,ryanpeikou,chinitsu" {
 		t.Fatalf("got [%s] han=%d", keys(w), w.HanTotal)
 	}
 	// Sanankou reading beats the sequence reading: 111222333m + 789p + 55s.
@@ -151,5 +170,24 @@ func TestKokushiDoraNotAdded(t *testing.T) {
 	w, ok := Evaluate(tile.MustParseHand("119m19p19s1234567z"), ctx)
 	if !ok || keys(w) != "kokushi" || w.Dora != 1 || w.HanTotal != 13 {
 		t.Fatalf("got [%s] dora=%d han=%d", keys(w), w.Dora, w.HanTotal)
+	}
+}
+
+// All-triplet readings: honroutou, never chanta/junchan (those need a sequence).
+// On a closed tsumo such a hand is also suuankou, so this checks the reading itself.
+func TestAllTripletReadingIsNotChanta(t *testing.T) {
+	for hand, want := range map[string]string{
+		"111m999p111s11z999s": "tsumo,honroutou,toitoi,sanankou",
+		"111m999m111p999p11s": "tsumo,honroutou,toitoi,sanankou",
+	} {
+		c := tile.MustCounts(hand)
+		ds := Decompose(c)
+		if len(ds) != 1 {
+			t.Fatalf("%s: %d readings", hand, len(ds))
+		}
+		got := keys(Win{Yaku: order(evalDecomp(c, ds[0], east()))})
+		if got != want {
+			t.Errorf("%s: got [%s], want [%s]", hand, got, want)
+		}
 	}
 }

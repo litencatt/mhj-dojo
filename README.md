@@ -8,11 +8,12 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and i
 
 - **Solo practice** — draw and discard on a seeded wall (the same seed always gives the same starting hand and draws). A game ends on tsumo or after 18 turns by default.
 - **Per-yaku shanten** — after every draw/discard, see how far the hand is from each yaku, together with its effective tiles (ukeire) and how many of each remain unseen:
-  normal form, tanyao, pinfu, iipeikou, sanshoku, ittsu, chanta, junchan, honitsu, chinitsu, toitoi, sanankou, yakuhai (haku / hatsu / chun / ton), chiitoitsu, kokushi.
+  normal form, tanyao, pinfu, iipeikou, ryanpeikou, sanshoku, sanshoku doukou, ittsu, chanta, junchan, honroutou, honitsu, chinitsu, toitoi, sanankou, shousangen, yakuhai (haku / hatsu / chun / ton), chiitoitsu,
+  and the yakuman kokushi, suuankou, daisangen, tsuuiisou, shousuushii, daisuushii, ryuuiisou, chinroutou and chuuren (in a collapsible group, collapsed by default).
 - **Discard preview** — hover a tile to see the table as it would be after discarding it, with differences from the current values.
-- **Time-series chart** — shanten per yaku across turns; toggle series from the legend.
+- **Time-series chart** — shanten per yaku across turns; toggle series from the legend (yakuman series are grouped at the end and hidden by default).
 - **Rewindable history tree** — jump back to any turn and try a different discard. New branches are added and old ones are kept, so you can compare lines of play on the same wall.
-- **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives).
+- **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives). Yakuman count 13 han each and stack; dora are shown but not added.
 - **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
 
 Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in Phase 1.

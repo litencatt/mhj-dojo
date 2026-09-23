@@ -103,6 +103,7 @@ Body: `{"node_id": 3}` – moves the current node. Returns the `State`.
 {
   "key": "tanyao",
   "name": "断么九",
+  "yakuman": false,        // true for the yakuman rows (kokushi … chuuren)
   "shanten": 2,            // 0 = tenpai, null = impossible (∞)
   "approx": false,         // true when the value is an approximation (pinfu at shanten >= 1)
   "ukeire": [ { "tile": "3m", "remaining": 3 } ],  // tile types (no red notation) that lower shanten
@@ -116,26 +117,40 @@ A tile type can appear with `remaining: 0` (空聴).
 
 ### Rows (fixed order)
 
-| key | name |
-|---|---|
-| `normal` | 一般形（役なし） |
-| `tanyao` | 断么九 |
-| `pinfu` | 平和 |
-| `iipeikou` | 一盃口 |
-| `sanshoku` | 三色同順 |
-| `ittsu` | 一気通貫 |
-| `chanta` | 混全帯么九 |
-| `junchan` | 純全帯么九 |
-| `honitsu` | 混一色 |
-| `chinitsu` | 清一色 |
-| `toitoi` | 対々和 |
-| `sanankou` | 三暗刻 |
-| `haku` | 役牌 白 |
-| `hatsu` | 役牌 發 |
-| `chun` | 役牌 中 |
-| `ton` | 役牌 東（場風・自風） |
-| `chiitoitsu` | 七対子 |
-| `kokushi` | 国士無双 |
+| key | name | yakuman |
+|---|---|---|
+| `normal` | 一般形（役なし） | |
+| `tanyao` | 断么九 | |
+| `pinfu` | 平和 | |
+| `iipeikou` | 一盃口 | |
+| `ryanpeikou` | 二盃口 | |
+| `sanshoku` | 三色同順 | |
+| `sanshoku_doukou` | 三色同刻 | |
+| `ittsu` | 一気通貫 | |
+| `chanta` | 混全帯么九 | |
+| `junchan` | 純全帯么九 | |
+| `honroutou` | 混老頭 | |
+| `honitsu` | 混一色 | |
+| `chinitsu` | 清一色 | |
+| `toitoi` | 対々和 | |
+| `sanankou` | 三暗刻 | |
+| `shousangen` | 小三元 | |
+| `haku` | 役牌 白 | |
+| `hatsu` | 役牌 發 | |
+| `chun` | 役牌 中 | |
+| `ton` | 役牌 東（場風・自風） | |
+| `chiitoitsu` | 七対子 | |
+| `kokushi` | 国士無双 | ✓ |
+| `suuankou` | 四暗刻 | ✓ |
+| `daisangen` | 大三元 | ✓ |
+| `tsuuiisou` | 字一色 | ✓ |
+| `shousuushii` | 小四喜 | ✓ |
+| `daisuushii` | 大四喜 | ✓ |
+| `ryuuiisou` | 緑一色 | ✓ |
+| `chinroutou` | 清老頭 | ✓ |
+| `chuuren` | 九蓮宝燈 | ✓ |
+
+`yakuman` is `true` exactly for the rows marked ✓ (a fixed property of the key).
 
 ## Definition of yaku shanten
 
@@ -175,14 +190,42 @@ These clarify points the contract above leaves open; none changes the JSON shape
   `sanankou` = at least 3 triplets (all concealed in solo play), `iipeikou` = two identical sequences,
   `haku/hatsu/chun/ton` = a triplet of 白/發/中/東. Consequently every row is always possible in
   Phase 1 (closed hands), so `shanten: null` does not occur yet; it is reserved for Phase 2 melds.
+  The other rows (4 melds + pair unless stated):
+  - `ryanpeikou`: four sequences forming two pairs of identical sequences (the two pairs may be the
+    same sequence, i.e. four copies of one sequence).
+  - `sanshoku_doukou`: triplets of the same number in 萬子, 筒子 and 索子.
+  - `honroutou`: every tile is a terminal or honor — four triplets + pair, **or** seven distinct
+    terminal/honor pairs (chiitoitsu form); the row is the minimum over both forms.
+  - `shousangen`: two dragon triplets + a dragon pair.
+  - `suuankou`: four triplets + pair (all concealed in solo play, so it equals `toitoi` in Phase 1).
+  - `daisangen`: triplets of 白, 發 and 中.
+  - `tsuuiisou`: honors only — four triplets + pair, **or** seven distinct honor pairs (chiitoitsu form).
+  - `shousuushii`: three wind triplets + a wind pair. `daisuushii`: four wind triplets. Neither
+    contains the other, so `daisuushii` can be lower than `shousuushii` (e.g. `111222333444z5z`
+    is daisuushii tenpai but shousuushii 1-shanten).
+  - `ryuuiisou`: every tile in {2s 3s 4s 6s 8s 發} (發 is not required).
+  - `chinroutou`: every tile is a terminal (1/9 of a number suit): four triplets + pair.
+  - `chuuren`: `1112345678999` of one number suit plus any one more tile of that suit
+    (so `1112345678999m` is tenpai on all nine 萬子).
+- **Win evaluation vs. shanten rows**: the rows above are containment-based, but the win evaluation
+  follows the scoring rules. In particular `chanta`/`junchan` score only with at least one sequence
+  (an all-triplet terminal hand scores `toitoi`/`honroutou` instead), while their rows also count
+  all-triplet shapes.
 - **Pinfu**: at shanten ≥ 1 the value is "all sequences + pair not 白發中東" (`approx: true`). If that
   relaxed value is 0 but no winning tile gives a two-sided pinfu wait, the row reports `shanten: 1`,
   `approx: true`, and `ukeire` = draws after which some discard reaches exact pinfu tenpai.
-- **Win evaluation** (`win.yaku`): 門前清自摸和 is always included; the reading with the most han is
-  chosen; kokushi is reported alone with `han: 13`; four concealed triplets are reported as
-  `sanankou` (suuankou is out of scope); 東 as round+seat wind is one entry `ton` with `han: 2`.
-  `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku han + dora,
-  except for yakuman (kokushi): `dora` is still reported but `han_total` stays 13.
+- **Win evaluation** (`win.yaku`): the reading with the most han is chosen (a yakuman reading always
+  wins); 東 as round+seat wind is one entry `ton` with `han: 2`. Without yakuman, 門前清自摸和 is always
+  included. Closed han: `ryanpeikou` 3 (replaces `iipeikou`; a hand readable as both ryanpeikou and
+  chiitoitsu takes the higher-scoring reading, normally ryanpeikou), `sanshoku_doukou` 2, `honroutou` 2
+  (never with `chanta`/`junchan`; also with chiitoitsu), `shousangen` 2 (the dragon triplets also
+  score their yakuhai).
+  **Yakuman** (`kokushi`, `suuankou`, `daisangen`, `tsuuiisou`, `shousuushii`, `daisuushii`,
+  `ryuuiisou`, `chinroutou`, `chuuren`): 13 han each; several yakuman add up (e.g. `suuankou` +
+  `tsuuiisou` + `daisangen` = 39); no double-yakuman variants. When any yakuman is present, only the
+  yakuman are listed (no 門前清自摸和 or other yaku). A closed tsumo with four triplets is always
+  `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
+  han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
 - **Request guards** (all endpoints): the `Host` header must be a loopback name — `localhost`,
   `127.0.0.1` or another loopback IP, `[::1]`, any port — otherwise `403` (DNS-rebinding guard; this also
   means `--host 0.0.0.0` does not serve other machines). Every `POST` must send

@@ -311,6 +311,34 @@ section {
 .row-best {
   background: var(--row-best-bg);
 }
+.yakuman-summary th {
+  padding: 0;
+}
+.yakuman-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+.yakuman-caret {
+  width: 1em;
+  color: var(--muted);
+}
+.yakuman-best {
+  font-weight: normal;
+  color: var(--muted);
+}
+.row-yakuman .yaku-name-cell {
+  padding-left: 24px;
+}
 .badge-approx {
   margin-left: 6px;
   font-size: 0.65rem;
@@ -411,6 +439,15 @@ section {
 .legend-off {
   opacity: 0.4;
 }
+.legend-group-label {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.legend-yakuman .legend-swatch {
+  border-radius: 2px;
+}
 .legend-swatch {
   width: 10px;
   height: 10px;
@@ -493,6 +530,15 @@ section {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
   text-align: left;
+}
+.win-dora-ignored td:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.win-note {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
 }
 .win-yaku-table tfoot th,
 .win-yaku-table tfoot td {

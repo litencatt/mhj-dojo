@@ -3,6 +3,7 @@ package yakushanten
 import (
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/litencatt/mhj2/internal/shanten"
@@ -15,17 +16,9 @@ import (
 // Y" for a 14-tile hand, used as the brute-force oracle. Pinfu here is the
 // relaxed shape (the wait is checked separately).
 func satisfies(key string, c tile.Counts) bool {
-	switch key {
-	case "chiitoitsu":
-		return yaku.IsChiitoitsu(c)
-	case "kokushi":
-		return yaku.IsKokushi(c)
-	}
-	if !quickComplete(c) {
-		return false
-	}
+	// tile-set predicates
 	suits := map[int]bool{}
-	honors, yaochuTile := false, false
+	honors, yaochuTile, allYaochu, allHonors, allTerminal, allGreen := false, false, true, true, true, true
 	for k, n := range c {
 		if n == 0 {
 			continue
@@ -37,6 +30,36 @@ func satisfies(key string, c tile.Counts) bool {
 			suits[kk.Suit()] = true
 		}
 		yaochuTile = yaochuTile || kk.IsYaochu()
+		allYaochu = allYaochu && kk.IsYaochu()
+		allHonors = allHonors && kk.IsHonor()
+		allTerminal = allTerminal && kk.IsTerminal()
+		allGreen = allGreen && strings.Contains("2s 3s 4s 6s 8s 6z", kk.String())
+	}
+	switch key {
+	case "chiitoitsu":
+		return yaku.IsChiitoitsu(c)
+	case "kokushi":
+		return yaku.IsKokushi(c)
+	case "honroutou":
+		return allYaochu && (yaku.IsChiitoitsu(c) || quickComplete(c))
+	case "tsuuiisou":
+		return allHonors && (yaku.IsChiitoitsu(c) || quickComplete(c))
+	case "chuuren":
+		// one number suit holding 1112345678999 plus one more tile
+		if len(suits) != 1 || honors || c.Total() != 14 {
+			return false
+		}
+		for s := range suits {
+			for n, need := range [9]int{3, 1, 1, 1, 1, 1, 1, 1, 3} {
+				if c[tile.MakeKind(s, n+1)] < need {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if !quickComplete(c) {
+		return false
 	}
 	switch key {
 	case "normal":
@@ -47,6 +70,10 @@ func satisfies(key string, c tile.Counts) bool {
 		return len(suits) <= 1
 	case "chinitsu":
 		return len(suits) <= 1 && !honors
+	case "ryuuiisou":
+		return allGreen
+	case "chinroutou":
+		return allTerminal
 	}
 	for _, d := range yaku.Decompose(c) {
 		if readingSatisfies(key, d) {
@@ -113,10 +140,27 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 		return groupHas(tile.Kind.IsYaochu)
 	case "junchan":
 		return groupHas(tile.Kind.IsTerminal)
-	case "toitoi":
+	case "ryanpeikou":
+		return seqs == 4 && !slices.ContainsFunc(seqCount[:], func(n int) bool { return n%2 == 1 })
+	case "sanshoku_doukou":
+		for n := 1; n <= 9; n++ {
+			if has(tile.MakeKind(0, n), yaku.Trip) && has(tile.MakeKind(1, n), yaku.Trip) && has(tile.MakeKind(2, n), yaku.Trip) {
+				return true
+			}
+		}
+		return false
+	case "toitoi", "suuankou":
 		return trips == 4
 	case "sanankou":
 		return trips >= 3
+	case "shousangen":
+		return countTrips(has, tile.Haku, tile.Chun) == 2 && d.Pair >= tile.Haku
+	case "daisangen":
+		return countTrips(has, tile.Haku, tile.Chun) == 3
+	case "shousuushii":
+		return countTrips(has, tile.East, tile.North) == 3 && d.Pair >= tile.East && d.Pair <= tile.North
+	case "daisuushii":
+		return countTrips(has, tile.East, tile.North) == 4
 	case "haku":
 		return has(tile.Haku, yaku.Trip)
 	case "hatsu":
@@ -127,6 +171,17 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 		return has(tile.East, yaku.Trip)
 	}
 	panic("unknown key " + key)
+}
+
+// countTrips counts the kinds in [lo, hi] held as a triplet.
+func countTrips(has func(tile.Kind, yaku.GroupType) bool, lo, hi tile.Kind) int {
+	n := 0
+	for k := lo; k <= hi; k++ {
+		if has(k, yaku.Trip) {
+			n++
+		}
+	}
+	return n
 }
 
 // quickComplete is a fast standard-shape test used before decomposing.
@@ -281,6 +336,86 @@ func randomTarget(r *rand.Rand, key string) tile.Counts {
 				c[k] += 2
 			}
 			return c
+		case "ryanpeikou":
+			for range 2 {
+				addSeq(&c, r.IntN(3), r.IntN(7), 2)
+			}
+			melds = 0
+		case "sanshoku_doukou":
+			n := r.IntN(9)
+			for s := 0; s < 3; s++ {
+				c[tile.MakeKind(s, n+1)] += 3
+			}
+			melds = 1
+		case "honroutou", "tsuuiisou", "chinroutou", "suuankou":
+			// random groups (triplets + pair, or seven pairs) from the allowed kinds
+			var kinds []tile.Kind
+			for k := tile.Kind(0); k < tile.NumKinds; k++ {
+				if key == "suuankou" || (key == "tsuuiisou" && k.IsHonor()) ||
+					(key == "honroutou" && k.IsYaochu()) || (key == "chinroutou" && k.IsTerminal()) {
+					kinds = append(kinds, k)
+				}
+			}
+			if (key == "honroutou" || key == "tsuuiisou") && r.IntN(3) == 0 {
+				for _, i := range r.Perm(len(kinds))[:7] {
+					c[kinds[i]] += 2
+				}
+				return c
+			}
+			for m := 0; m < 4; m++ {
+				c[kinds[r.IntN(len(kinds))]] += 3
+			}
+			c[kinds[r.IntN(len(kinds))]] += 2
+			if valid(c) && satisfies(key, c) {
+				return c
+			}
+			continue
+		case "shousangen", "daisangen", "shousuushii", "daisuushii":
+			first, n, trips := tile.Haku, 3, 2
+			switch key {
+			case "daisangen":
+				trips = 3
+			case "shousuushii":
+				first, n, trips = tile.East, 4, 3
+			case "daisuushii":
+				first, n, trips = tile.East, 4, 4
+			}
+			perm := r.Perm(n)
+			for _, i := range perm[:trips] {
+				c[first+tile.Kind(i)] += 3
+			}
+			if trips < n && (key == "shousangen" || key == "shousuushii") {
+				c[first+tile.Kind(perm[trips])] += 2
+				for m := trips; m < 4; m++ {
+					addRandomMeld(r, &c)
+				}
+				if valid(c) && satisfies(key, c) {
+					return c
+				}
+				continue
+			}
+			melds = 4 - trips
+		case "ryuuiisou":
+			green := []tile.Kind{19, 20, 21, 23, 25, tile.Hatsu}
+			for m := 0; m < 4; m++ {
+				if r.IntN(3) == 0 {
+					addSeq(&c, tile.Sou, 1, 1)
+				} else {
+					c[green[r.IntN(len(green))]] += 3
+				}
+			}
+			c[green[r.IntN(len(green))]] += 2
+			if valid(c) && satisfies(key, c) {
+				return c
+			}
+			continue
+		case "chuuren":
+			s := r.IntN(3)
+			for n, v := range [9]int{3, 1, 1, 1, 1, 1, 1, 1, 3} {
+				c[tile.MakeKind(s, n+1)] = v
+			}
+			c[tile.MakeKind(s, 1+r.IntN(9))]++
+			return c
 		case "kokushi":
 			for k := tile.Kind(0); k < tile.NumKinds; k++ {
 				if k.IsYaochu() {
@@ -311,6 +446,14 @@ func randomTarget(r *rand.Rand, key string) tile.Counts {
 		if valid(c) && satisfies(key, c) {
 			return c
 		}
+	}
+}
+
+func addRandomMeld(r *rand.Rand, c *tile.Counts) {
+	if r.IntN(2) == 0 {
+		addSeq(c, r.IntN(3), r.IntN(7), 1)
+	} else {
+		c[r.IntN(tile.NumKinds)] += 3
 	}
 }
 
@@ -482,26 +625,55 @@ func TestPropertiesRandom(t *testing.T) {
 			if !row.Possible {
 				t.Fatalf("%s: %s impossible", c, row.Key)
 			}
-			if row.Key == "chiitoitsu" || row.Key == "kokushi" {
+			if row.Yakuman != (row.Key == "kokushi" || rowIndex(row.Key) > rowIndex("kokushi")) {
+				t.Fatalf("%s: yakuman flag %v", row.Key, row.Yakuman)
+			}
+			switch row.Key {
+			case "chiitoitsu", "kokushi", "honroutou", "tsuuiisou":
+				// not (only) 4 melds + pair
 				continue
 			}
 			if row.Shanten < normal.Shanten {
 				t.Fatalf("%s: %s shanten %d < normal %d", c, row.Key, row.Shanten, normal.Shanten)
 			}
 		}
-		if get("chinitsu").Shanten < get("honitsu").Shanten {
-			t.Fatalf("%s: chinitsu < honitsu", c)
-		}
-		if get("junchan").Shanten < get("chanta").Shanten {
-			t.Fatalf("%s: junchan < chanta", c)
-		}
-		if get("toitoi").Shanten < get("sanankou").Shanten {
-			t.Fatalf("%s: toitoi < sanankou", c)
+		// Containment: every W of the first row also satisfies one of the others,
+		// so the first row's shanten is never lower.
+		for _, rel := range [][]string{
+			{"chinitsu", "honitsu"},
+			{"junchan", "chanta"},
+			{"toitoi", "sanankou"},
+			{"ryanpeikou", "iipeikou"},
+			{"sanshoku_doukou", "sanankou"},
+			{"honroutou", "toitoi", "chiitoitsu"},
+			{"honroutou", "normal", "chiitoitsu"},
+			{"tsuuiisou", "honroutou"},
+			{"tsuuiisou", "honitsu", "chiitoitsu"},
+			{"chinroutou", "honroutou"},
+			{"chinroutou", "junchan"},
+			{"chinroutou", "toitoi"},
+			{"daisangen", "haku"}, {"daisangen", "hatsu"}, {"daisangen", "chun"},
+			{"daisuushii", "ton"},
+			{"daisuushii", "toitoi"},
+			{"ryuuiisou", "honitsu"},
+			{"chuuren", "chinitsu"},
+		} {
+			lower := get(rel[1]).Shanten
+			for _, k := range rel[2:] {
+				lower = min(lower, get(k).Shanten)
+			}
+			if get(rel[0]).Shanten < lower {
+				t.Fatalf("%s: %s %d < %v %d", c, rel[0], get(rel[0]).Shanten, rel[1:], lower)
+			}
 		}
 		if a.eng.MemoSize() > 1<<20 {
 			a = NewAnalyzer()
 		}
 	}
+}
+
+func rowIndex(key string) int {
+	return slices.IndexFunc(Rows, func(r RowDef) bool { return r.Key == key })
 }
 
 func names(ks []tile.Kind) []string {
