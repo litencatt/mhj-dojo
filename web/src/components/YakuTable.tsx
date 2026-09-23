@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { YakuRow } from '../api';
 import { Tile } from './Tile';
 import { PanelHeading } from './PanelHeading';
+import { YAKU_CONDITIONS } from './yakuInfo';
 import {
   CATEGORIES,
   DEFAULT_FILTER,
@@ -49,6 +50,15 @@ export function YakuTable(props: YakuTableProps) {
     saveFilter(f);
   };
 
+  // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
+  // viewport so the scrolling table panel cannot clip it.
+  const [tip, setTip] = useState<{ key: string; left: number; top: number } | null>(null);
+  const showTip = (key: string, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const width = 280;
+    setTip({ key, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + 6 });
+  };
+
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
   const base = new Map((baseline ?? []).map((r) => [r.key, r]));
@@ -70,7 +80,17 @@ export function YakuTable(props: YakuTableProps) {
     return (
       <tr key={row.key} class={cls}>
         <th scope="row" class="yaku-name-cell">
-          {row.name}
+          <span
+            class="yaku-name"
+            tabIndex={0}
+            aria-describedby={tip?.key === row.key ? 'yaku-tip' : undefined}
+            onMouseEnter={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
+            onMouseLeave={() => setTip(null)}
+            onFocus={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
+            onBlur={() => setTip(null)}
+          >
+            {row.name}
+          </span>
           {row.approx && <span class="badge-approx">近似</span>}
         </th>
         <td class="shanten-cell">
@@ -169,6 +189,12 @@ export function YakuTable(props: YakuTableProps) {
           )}
         </div>
       </div>
+      {tip && YAKU_CONDITIONS[tip.key] && (
+        <div id="yaku-tip" role="tooltip" class="yaku-tip" style={{ left: `${tip.left}px`, top: `${tip.top}px` }}>
+          <strong>{shown.get(tip.key)?.name}</strong>
+          <span>{YAKU_CONDITIONS[tip.key]}</span>
+        </div>
+      )}
       <div class="yaku-table-scroll">
         <table class="yaku-table">
           <thead>
