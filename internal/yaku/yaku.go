@@ -1,5 +1,5 @@
-// Package yaku decomposes complete hands and detects the Phase 1 yaku of a
-// closed tsumo win. Fu and points are out of scope.
+// Package yaku decomposes complete hands and detects the yaku and fu of a
+// closed win (tsumo or ron). Point tables live in package score.
 package yaku
 
 import (

@@ -827,3 +827,212 @@ section {
 .tree-node-btn:disabled {
   cursor: progress;
 }
+
+/* ---- Mode switch ---- */
+.mode-link {
+  margin-left: 10px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--accent);
+}
+
+/* ---- Game table (CPU mode) ----
+   A 3x3 grid: 対面 on top, 上家 left, 下家 right, you at the bottom and the
+   round info in the middle. Rivers wrap at six tiles like a real table. */
+.game-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas:
+    ". top ."
+    "left center right"
+    ". bottom .";
+  gap: 6px;
+  padding: 8px;
+}
+.seat-top { grid-area: top; }
+.seat-left { grid-area: left; }
+.seat-right { grid-area: right; }
+.seat-bottom { grid-area: bottom; }
+.table-center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.8rem;
+}
+.table-round {
+  font-weight: bold;
+}
+.table-remaining {
+  margin-left: 8px;
+  font-weight: normal;
+  color: var(--muted);
+}
+.table-deposit {
+  color: var(--muted);
+}
+.event-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.event-log li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.event-seat {
+  min-width: 2.5em;
+  color: var(--muted);
+}
+.seat-box {
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.seat-acting {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.seat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+.seat-name {
+  font-weight: bold;
+}
+.seat-wind {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.seat-dealer {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.seat-points {
+  font-variant-numeric: tabular-nums;
+}
+.seat-riichi {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+.seat-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-bottom: 4px;
+}
+.seat-river {
+  display: grid;
+  grid-template-columns: repeat(6, max-content);
+  gap: 2px;
+  min-height: 22px;
+}
+.river-tile {
+  display: inline-flex;
+}
+/* The riichi declaration tile lies sideways. */
+.river-riichi .tile {
+  transform: rotate(90deg);
+  margin: 0 4px;
+}
+
+/* ---- Action bar ---- */
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.action-bar button {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-weight: bold;
+  cursor: pointer;
+}
+.action-bar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.action-bar .action-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.action-riichi.active {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.action-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---- Result ---- */
+.result-panel {
+  margin-top: 10px;
+}
+.result-win-tile {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 2px dashed var(--border);
+}
+.result-deltas {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.result-deltas th,
+.result-deltas td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.result-you td {
+  font-weight: bold;
+}
+.delta-plus {
+  color: #16a34a;
+}
+.delta-minus {
+  color: var(--danger);
+}
+
+@media (max-width: 600px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "top top"
+      "left right"
+      "center center"
+      "bottom bottom";
+  }
+}

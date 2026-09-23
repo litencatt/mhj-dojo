@@ -15,15 +15,22 @@ const (
 	HandSize = 13
 	// DeadWallSize is the number of tiles in the dead wall.
 	DeadWallSize = 14
-	// LiveDraws is the number of draws available after the deal.
+	// LiveDraws is the number of draws available after the solo deal.
 	LiveDraws = Size - DeadWallSize - HandSize
+	// Seats is the number of players in a four-player deal.
+	Seats = 4
+	// LiveDraws4 is the number of draws available after a four-player deal.
+	LiveDraws4 = Size - DeadWallSize - Seats*HandSize
 	// doraIndicatorPos is the index inside the dead wall of the first dora
 	// indicator. The dead wall is 7 stacks of (upper, lower) tiles, so the
 	// ura-dora indicator is the tile below it at doraIndicatorPos+1.
 	doraIndicatorPos = 4
 )
 
-// Wall is a shuffled tile set: hand = [0,13), live draws = [13,122), dead wall = [122,136).
+// Wall is a shuffled tile set with the dead wall at [122,136). A solo deal
+// reads hand = [0,13) and draws = [13,122); a four-player deal reads seat s's
+// hand at [13s,13s+13) and draws = [52,122). Seat 0's hand is the solo hand,
+// so a seed deals the same tiles to seat 0 in both modes.
 type Wall struct {
 	seed  int64
 	tiles [Size]tile.Tile
@@ -111,6 +118,27 @@ func (w *Wall) Draw(k int) (tile.Tile, bool) {
 		return tile.Tile{}, false
 	}
 	return w.tiles[HandSize+k], true
+}
+
+// HandOf returns the 13 tiles dealt to seat (0-3) in a four-player deal,
+// sorted. It panics on any other seat: reading past the deal would silently
+// return live-wall tiles as a hand.
+func (w *Wall) HandOf(seat int) []tile.Tile {
+	if seat < 0 || seat >= Seats {
+		panic(fmt.Sprintf("wall: seat %d out of range", seat))
+	}
+	h := make([]tile.Tile, HandSize)
+	copy(h, w.tiles[seat*HandSize:(seat+1)*HandSize])
+	tile.Sort(h)
+	return h
+}
+
+// Draw4 returns the k-th draw (0-based) of a four-player deal.
+func (w *Wall) Draw4(k int) (tile.Tile, bool) {
+	if k < 0 || k >= LiveDraws4 {
+		return tile.Tile{}, false
+	}
+	return w.tiles[Seats*HandSize+k], true
 }
 
 // DoraIndicators returns the revealed dora indicators (one in Phase 1).

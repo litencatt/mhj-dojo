@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
@@ -25,7 +26,7 @@ func newClient(t *testing.T, store *session.Store) *client {
 		"index.html":    {Data: []byte("<!doctype html><title>mhj2</title>")},
 		"assets/app.js": {Data: []byte("console.log(1)")},
 	}
-	srv := httptest.NewServer(NewWithFS(store, static))
+	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))
 	t.Cleanup(srv.Close)
 	return &client{t: t, srv: srv}
 }
@@ -254,7 +255,7 @@ func TestStaticAndSPAFallback(t *testing.T) {
 }
 
 func TestEmbeddedFrontend(t *testing.T) {
-	srv := httptest.NewServer(New(session.NewStore()))
+	srv := httptest.NewServer(New(session.NewStore(), match.NewStore()))
 	defer srv.Close()
 	res, err := http.Get(srv.URL + "/")
 	if err != nil {

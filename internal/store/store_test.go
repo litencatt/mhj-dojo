@@ -1,0 +1,18 @@
+package store
+
+import "testing"
+
+func TestEvictsOldest(t *testing.T) {
+	s := New[int](2)
+	a := s.Add(1)
+	b := s.Add(2)
+	c := s.Add(3)
+	if _, ok := s.Get(a); ok {
+		t.Error("oldest item was not evicted")
+	}
+	for id, want := range map[string]int{b: 2, c: 3} {
+		if v, ok := s.Get(id); !ok || v != want {
+			t.Errorf("Get(%s) = %d, %v; want %d", id, v, ok, want)
+		}
+	}
+}

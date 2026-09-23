@@ -129,7 +129,7 @@ func (s *Session) state() State {
 			}
 		} else {
 			for _, r := range s.nodeAnalysis(n) {
-				h.Shanten[r.Key] = shantenPtr(r)
+				h.Shanten[r.Key] = ShantenOf(r)
 			}
 		}
 		st.History = append(st.History, h)
@@ -143,14 +143,15 @@ func (s *Session) state() State {
 		if n.status == StatusTsumo {
 			tn.NormalShanten = intPtr(-1) // complete hand, whatever its shape
 		} else {
-			tn.NormalShanten = shantenPtr(s.nodeAnalysis(n)[0])
+			tn.NormalShanten = ShantenOf(s.nodeAnalysis(n)[0])
 		}
 		st.Tree = append(st.Tree, tn)
 	}
 	return st
 }
 
-func shantenPtr(r yakushanten.Result) *int {
+// ShantenOf returns a row's shanten, or nil when the yaku is impossible.
+func ShantenOf(r yakushanten.Result) *int {
 	if !r.Possible {
 		return nil
 	}
@@ -158,9 +159,15 @@ func shantenPtr(r yakushanten.Result) *int {
 }
 
 func rows(res []yakushanten.Result, visible *tile.Counts) []YakuRow {
+	return Rows(res, visible, yaku.ClosedHan)
+}
+
+// Rows converts analysis results to API rows: han comes from han(key) and
+// each accepting tile's remaining count is 4 minus the visible copies.
+func Rows(res []yakushanten.Result, visible *tile.Counts, han func(key string) int) []YakuRow {
 	out := make([]YakuRow, len(res))
 	for i, r := range res {
-		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: yaku.ClosedHan(r.Key), Shanten: shantenPtr(r), Approx: r.Approx, Ukeire: []Ukeire{}}
+		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Shanten: ShantenOf(r), Approx: r.Approx, Ukeire: []Ukeire{}}
 		for _, k := range r.Ukeire {
 			rem := max(4-visible[k], 0)
 			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})

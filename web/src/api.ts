@@ -142,3 +142,107 @@ export function goto(id: string, nodeId: number): Promise<State> {
     body: JSON.stringify({ node_id: nodeId }),
   });
 }
+
+// ---- Games against CPU players (docs/api.md "Games") ----
+
+export type GamePhase = 'discard' | 'call' | 'ended';
+export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip';
+
+export interface RiverTile {
+  tile: Tile;
+  riichi: boolean; // the riichi declaration tile
+}
+
+export interface Seat {
+  seat: number;
+  wind: Tile; // 1z-4z
+  points: number;
+  riichi: boolean;
+  river: RiverTile[];
+  hand_count: number;
+  hand?: Tile[]; // yours, or everyone's once the round has ended
+  drawn?: Tile;
+}
+
+export interface Legal {
+  discards: Tile[];
+  riichi: Tile[];
+  tsumo: boolean;
+  ron: boolean;
+  skip: boolean;
+}
+
+export interface GameEvent {
+  seat: number;
+  type: ActionType;
+  tile?: Tile;
+}
+
+export type Limit = '' | 'mangan' | 'haneman' | 'baiman' | 'sanbaiman' | 'yakuman';
+
+export interface Points {
+  limit: Limit;
+  multiplier: number;
+  total: number;
+  ron?: number;
+  from_dealer?: number;
+  from_non_dealer?: number;
+}
+
+export interface GameResult {
+  kind: 'tsumo' | 'ron' | 'draw';
+  winner: number;
+  from: number;
+  win_tile: Tile | null;
+  yaku: WinYaku[];
+  han: number;
+  fu: number;
+  dora: number;
+  ura_dora: number;
+  points: Points;
+  deltas: number[];
+  tenpai: boolean[];
+  deposit: number;
+}
+
+export interface GameState {
+  game_id: string;
+  seed: number | null; // null until the end unless you chose the seed
+  you: number;
+  dealer: number;
+  round_wind: Tile;
+  phase: GamePhase;
+  actor: number;
+  wall_remaining: number;
+  deposit: number;
+  dora_indicators: Tile[];
+  dora: Tile[];
+  ura_dora_indicators: Tile[];
+  ura_dora: Tile[];
+  seats: Seat[];
+  last_discard: Tile | null;
+  legal: Legal;
+  events: GameEvent[];
+  analysis: YakuRow[];
+  by_discard: Record<Tile, YakuRow[]>;
+  history: HistoryEntry[];
+  result: GameResult | null;
+}
+
+export function createGame(opts: { seed?: number } = {}): Promise<GameState> {
+  return request<GameState>('/api/games', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function getGame(id: string): Promise<GameState> {
+  return request<GameState>(`/api/games/${encodeURIComponent(id)}`);
+}
+
+export function gameAction(id: string, type: ActionType, tile?: Tile): Promise<GameState> {
+  return request<GameState>(`/api/games/${encodeURIComponent(id)}/action`, {
+    method: 'POST',
+    body: JSON.stringify(tile ? { type, tile } : { type }),
+  });
+}

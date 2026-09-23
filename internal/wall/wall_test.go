@@ -1,6 +1,7 @@
 package wall
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/litencatt/mhj2/internal/tile"
@@ -101,5 +102,50 @@ func TestWithFront(t *testing.T) {
 	}
 	if _, err := WithFront(3, tile.MustParseHand("0m0m")); err == nil {
 		t.Fatal("two red 5m should fail")
+	}
+}
+
+func TestFourPlayerDeal(t *testing.T) {
+	w := New(7)
+	if !slices.Equal(w.Hand(), w.HandOf(0)) {
+		t.Error("seat 0 must get the solo hand")
+	}
+	var all []tile.Tile
+	for s := 0; s < Seats; s++ {
+		all = append(all, w.HandOf(s)...)
+	}
+	for k := 0; ; k++ {
+		d, ok := w.Draw4(k)
+		if !ok {
+			if k != LiveDraws4 || LiveDraws4 != 70 {
+				t.Fatalf("draws = %d, want %d = 70", k, LiveDraws4)
+			}
+			break
+		}
+		all = append(all, d)
+	}
+	ts := w.Tiles()
+	all = append(all, ts[Size-DeadWallSize:]...)
+	want := FullSet()
+	got := tile.CountsOf(all)
+	if got != tile.CountsOf(want[:]) || len(all) != Size {
+		t.Fatalf("deal + draws + dead wall is not the full set (%d tiles)", len(all))
+	}
+	if _, ok := w.Draw4(-1); ok {
+		t.Error("negative draw index accepted")
+	}
+}
+
+func TestHandOfRejectsBadSeat(t *testing.T) {
+	w := New(1)
+	for _, seat := range []int{-1, Seats} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("HandOf(%d) did not panic", seat)
+				}
+			}()
+			w.HandOf(seat)
+		}()
 	}
 }

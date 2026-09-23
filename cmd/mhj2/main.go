@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/server"
 	"github.com/litencatt/mhj2/internal/session"
 )
@@ -29,18 +30,20 @@ func main() {
 	flag.Parse()
 
 	store := session.NewStore()
+	games := match.NewStore()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "seed" {
 			store.DefaultSeed = seed
+			games.DefaultSeed = seed
 		}
 	})
 
-	if err := run(*host, *port, *open, store); err != nil {
+	if err := run(*host, *port, *open, store, games); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(host string, port int, open bool, store *session.Store) error {
+func run(host string, port int, open bool, store *session.Store, games *match.Store) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return err
@@ -52,7 +55,7 @@ func run(host string, port int, open bool, store *session.Store) error {
 	url := fmt.Sprintf("http://%s/", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
 	fmt.Printf("mhj2 listening on %s (Ctrl+C to quit)\n", url)
 
-	srv := &http.Server{Handler: server.New(store), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: server.New(store, games), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
