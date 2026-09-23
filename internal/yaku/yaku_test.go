@@ -220,3 +220,14 @@ func TestReadings(t *testing.T) {
 		}
 	}
 }
+
+// Readings with the same han are ranked by fu: three concealed triplets (40
+// fu) beat the pinfu + iipeikou reading (20 fu) of the same tiles.
+func TestFuBreaksHanTies(t *testing.T) {
+	ctx := east()
+	ctx.WinTile = tile.MakeKind(tile.Man, 4)
+	w, ok := Evaluate(tile.MustParseHand("444m555m666m77m234s"), ctx)
+	if !ok || keys(w) != "tsumo,tanyao,sanankou" || w.HanTotal != 4 || w.Fu != 40 {
+		t.Fatalf("got [%s] han=%d fu=%d", keys(w), w.HanTotal, w.Fu)
+	}
+}

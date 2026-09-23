@@ -34,9 +34,14 @@ const (
 	DefaultMaxTurns = 18
 	// MaxSessions bounds memory; the oldest session is evicted beyond it.
 	MaxSessions = 256
+	// MaxNodes bounds a session's tree (every state carries the whole tree).
+	MaxNodes = 2000
 	// memoLimit resets an analyzer's memo when it grows past this many tables.
 	memoLimit = 200_000
 )
+
+// maxNodes is MaxNodes, lowered by tests.
+var maxNodes = MaxNodes
 
 // Phase 1 plays East round, East seat.
 var (
@@ -178,6 +183,9 @@ func (s *Session) Discard(t string) (State, error) {
 	if id, ok := cur.children[t]; ok {
 		s.current = id
 		return s.state(), nil
+	}
+	if len(s.nodes) >= maxNodes {
+		return State{}, fmt.Errorf("%w: the session has %d nodes; start a new session", ErrConflict, maxNodes)
 	}
 	disc := tiles[idx]
 	hand := append(tiles[:idx:idx], tiles[idx+1:]...)

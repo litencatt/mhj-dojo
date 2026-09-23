@@ -94,7 +94,7 @@ type Result struct {
 	Points  score.Points
 	WinTile tile.Tile
 	Tenpai  [4]bool // set on a draw
-	Deltas  [4]int  // point changes, riichi sticks included
+	Deltas  [4]int  // points at the end minus points at the start (riichi sticks paid and received included)
 	// Deposit is the riichi sticks left on the table (only after a draw).
 	Deposit int
 }
@@ -170,7 +170,10 @@ func (r *Round) Actor() int {
 }
 
 func (r *Round) draw(seat int) {
-	t, _ := r.wall.Draw4(r.draws)
+	t, ok := r.wall.Draw4(r.draws)
+	if !ok {
+		panic(fmt.Sprintf("game: draw %d past the live wall", r.draws))
+	}
 	r.draws++
 	p := &r.players[seat]
 	p.drawn = &t
@@ -447,7 +450,8 @@ func (r *Round) ron(seat int) error {
 }
 
 // finish pays the riichi sticks to the winner, applies the deltas and ends
-// the round.
+// the round. The sticks were taken from the declarers when accepted, so
+// they are subtracted from the reported deltas afterwards.
 func (r *Round) finish(res *Result) {
 	if res.Winner >= 0 {
 		res.Deltas[res.Winner] += r.deposit
@@ -456,6 +460,9 @@ func (r *Round) finish(res *Result) {
 	res.Deposit = r.deposit
 	for s := range r.players {
 		r.players[s].points += res.Deltas[s]
+		if r.players[s].riichi {
+			res.Deltas[s] -= RiichiStick
+		}
 	}
 	r.callers = nil
 	r.result = res

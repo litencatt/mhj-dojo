@@ -376,3 +376,28 @@ func TestDoraAndUraDora(t *testing.T) {
 		t.Fatalf("ura dora after goto: %v", v.UraDoraIndicators)
 	}
 }
+
+func TestTreeIsBounded(t *testing.T) {
+	defer func(n int) { maxNodes = n }(maxNodes)
+	maxNodes = 10
+	st := NewStore()
+	s, err := st.Create(nil, wall.LiveDraws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for len(s.nodes) < maxNodes {
+		if _, err := s.Discard(*s.State().Drawn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Discard(*s.State().Drawn); !errors.Is(err, ErrConflict) {
+		t.Fatalf("discard past the node limit: %v", err)
+	}
+	// Revisiting an existing node is still allowed.
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Discard(*s.State().Drawn); err != nil {
+		t.Fatalf("moving to an existing child: %v", err)
+	}
+}

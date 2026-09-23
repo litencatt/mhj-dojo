@@ -180,6 +180,9 @@ These clarify points the contract above leaves open; none changes the JSON shape
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
+- **A session's tree** holds at most 2000 nodes; a discard that would add another returns `409`.
+- **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
+  example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
 - **`wall_remaining`** = 109 live draws − draws taken, where the draw shown at a playing node (or the
   winning tile at a tsumo node) counts as taken. Root: 108.
 - **Tsumo node**: `turn` and `hand` (13 tiles) equal the parent's, `draw` = winning tile, `discard = null`.
@@ -232,9 +235,10 @@ These clarify points the contract above leaves open; none changes the JSON shape
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
 - **Request guards** (all endpoints): the `Host` header must be a loopback name — `localhost`,
-  `127.0.0.1` or another loopback IP, `[::1]`, any port — otherwise `403` (DNS-rebinding guard; this also
-  means `--host 0.0.0.0` does not serve other machines). Every `POST` must send
-  `Content-Type: application/json` (parameters such as `charset` allowed), otherwise `415`.
+  `127.0.0.1` or another loopback IP, `[::1]`, any port — otherwise `403` (a DNS-rebinding guard
+  against browsers; a network client can spoof the header, so `--host 0.0.0.0` does expose the API).
+  Every `POST` must send `Content-Type: application/json` (parameters such as `charset` allowed),
+  otherwise `415`. Responses carry `X-Content-Type-Options: nosniff` and forbid framing.
 
 ## Games against CPU players (Phase 2a)
 
@@ -253,8 +257,9 @@ Points: no kiriage mangan, counted yakuman at 13 han, no honba.
 
 ### `POST /api/games`
 Body (optional): `{"seed": 42}`. Returns a `GameState`. Without a seed (and
-without the server's `--seed` flag) a random seed is used and `seed` stays
-`null` until the round ends, because the seed rebuilds the whole wall.
+without the server's `--seed` flag) a random seed in `[0, 2^53)` is used and
+`seed` stays `null` until the round ends, because the seed rebuilds the whole
+wall.
 
 ### `GET /api/games/{id}`
 Returns the `GameState`.
@@ -321,7 +326,7 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   "points": { "limit": "", "multiplier": 0, "total": 5200, "ron": 5200 },
   // on a tsumo: "from_dealer" / "from_non_dealer" instead of "ron"
   // limit: "" | "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman"
-  "deltas": [-5200, 6200, 0, 0], // riichi sticks included
+  "deltas": [-5200, 6200, 0, 0], // points at the end minus at the start: riichi sticks paid and received included
   "tenpai": [false, false, false, false],  // on a draw
   "deposit": 0                  // sticks left on the table after a draw
 }

@@ -306,3 +306,13 @@ func TestGuards(t *testing.T) {
 		}
 	}
 }
+
+func TestSecurityHeaders(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	for _, path := range []string{"/", "/api/sessions/nope"} {
+		_, _, h := c.do("GET", path, "")
+		if h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" {
+			t.Errorf("%s: headers %v", path, h)
+		}
+	}
+}

@@ -175,9 +175,11 @@ func TestDoubleRiichiIppatsuRon(t *testing.T) {
 	if res.Kind != "ron" || res.Winner != 0 || res.From != 1 || !keys["double_riichi"] || !keys["ippatsu"] || keys["riichi"] {
 		t.Fatalf("result %+v yaku %v", res, keys)
 	}
-	if res.Deltas[1] != -res.Points.Ron || res.Deltas[0] != res.Points.Ron+RiichiStick || totalPoints(r) != 4*StartPoints {
+	// seat 0 paid its stick and got it back: the delta is the ron alone
+	if res.Deltas[1] != -res.Points.Ron || res.Deltas[0] != res.Points.Ron || totalPoints(r) != 4*StartPoints {
 		t.Fatalf("deltas %v points %+v", res.Deltas, res.Points)
 	}
+	checkDeltas(t, r, res)
 }
 
 func TestRiichiRestrictions(t *testing.T) {
@@ -290,6 +292,46 @@ func TestHeadBump(t *testing.T) {
 	if res := r.Result(); res.Winner != 2 || res.From != 0 {
 		t.Fatalf("result %+v", res)
 	}
+}
+
+// checkDeltas verifies that Deltas equal each seat's change from StartPoints.
+func checkDeltas(t *testing.T, r *Round, res *Result) {
+	t.Helper()
+	for s, p := range r.players {
+		if got := p.points - StartPoints; got != res.Deltas[s] {
+			t.Fatalf("seat %d: delta %d, points changed by %d", s, res.Deltas[s], got)
+		}
+	}
+}
+
+// A riichi stick paid by a seat that does not win shows in its delta.
+func TestRiichiStickInDeltas(t *testing.T) {
+	// seat 0 in riichi, then seat 2 rons seat 1
+	r := tenpai0(t)
+	mustApply(t, r, Action{Seat: 0, Type: Riichi, Tile: "9s"})
+	setHand(r, 2, "123m456m789m234p5z", "")
+	setHand(r, 1, junk[1], "5z")
+	mustApply(t, r, Action{Seat: 1, Type: Discard, Tile: "5z"})
+	mustApply(t, r, Action{Seat: 2, Type: Ron})
+	res := r.Result()
+	if res.Deltas[0] != -RiichiStick || res.Deltas[2] != res.Points.Ron+RiichiStick {
+		t.Fatalf("deltas %v", res.Deltas)
+	}
+	checkDeltas(t, r, res)
+
+	// seat 0 in riichi, exhaustive draw with seat 0 the only tenpai: +3000 - 1000
+	r = tenpai0(t)
+	r.draws = wall.LiveDraws4 - minDrawsForRiichi
+	mustApply(t, r, Action{Seat: 0, Type: Riichi, Tile: "9s"})
+	for r.Actor() >= 0 {
+		seat := r.Actor()
+		mustApply(t, r, Action{Seat: seat, Type: Discard, Tile: r.LegalFor(seat).Discards[0]})
+	}
+	res = r.Result()
+	if res.Kind != "draw" || res.Deltas[0] != notenPenalty-RiichiStick || res.Deposit != RiichiStick {
+		t.Fatalf("draw result %+v", res)
+	}
+	checkDeltas(t, r, res)
 }
 
 func TestExhaustiveDraw(t *testing.T) {
