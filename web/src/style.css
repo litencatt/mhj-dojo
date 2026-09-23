@@ -167,12 +167,13 @@ h2 {
 
 /* Layout by width:
    - above 1100px the page is exactly one viewport tall and never scrolls;
-     each column scrolls on its own instead.
-     - 1100-1500px: two columns; the glossary sits below the yaku table.
-     - above 1500px: three columns; the yaku table and glossary each get one.
-   - up to 1100px: one column in reading order (header, hand, yaku, chart,
-     tree, glossary) and the page scrolls as usual.
-   .area-main (header, hand, chart, tree) and .area-side (yaku, glossary) are
+     each column scrolls on its own instead. A narrow history-tree column
+     sits between the main column and the yaku table.
+     - 1100-1500px: main | tree | side, the glossary below the yaku table.
+     - above 1500px: main | tree | yaku | glossary.
+   - up to 1100px: one column in reading order (header, hand, tree, yaku,
+     chart, glossary) and the page scrolls as usual.
+   .area-main (header, hand, chart) and .area-side (yaku, glossary) are
    flex columns where they form a column, and dissolve (display: contents)
    where their children must be placed individually. */
 .app {
@@ -199,9 +200,9 @@ h2 {
     height: 100vh;
     box-sizing: border-box;
     padding: 12px 16px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: "main side";
+    grid-template-areas: "main tree side";
   }
   .app-loading {
     grid-template-columns: minmax(0, 1fr);
@@ -213,6 +214,10 @@ h2 {
   }
   /* Panels in the scrolling main column keep their natural height. */
   .area-main > * { flex-shrink: 0; }
+  .area-tree {
+    grid-area: tree;
+    overflow: auto;
+  }
   .area-side { grid-area: side; }
   /* The yaku table and glossary share the side column 3:2. */
   .area-yaku { flex: 3 1 0; }
@@ -233,9 +238,9 @@ h2 {
 }
 @media (min-width: 1501px) {
   .app {
-    max-width: 1720px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 320px);
-    grid-template-areas: "main yaku gloss";
+    max-width: 1920px;
+    grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr) minmax(260px, 320px);
+    grid-template-areas: "main tree yaku gloss";
   }
   .app-loading {
     grid-template-columns: minmax(0, 1fr);
@@ -254,7 +259,7 @@ h2 {
 @media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "header" "hand" "yaku" "chart" "tree" "gloss";
+    grid-template-areas: "header" "hand" "tree" "yaku" "chart" "gloss";
   }
   .area-main,
   .area-side { display: contents; }
@@ -366,6 +371,17 @@ section {
 }
 
 /* ---- Hand ---- */
+/* Hand tiles scale with the panel so all 14 (13 + drawn) fit on one row:
+   14 tiles + 12 gaps of 4px + 16px row gap + 14px drawn-tile divider = 78px.
+   Below 28px per tile (the old phone size) the row wraps instead. */
+.hand-panel {
+  container-type: inline-size;
+}
+.hand-panel .tile-md {
+  width: clamp(28px, calc((100cqw - 78px) / 14), 36px);
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
 .hand-row {
   display: flex;
   align-items: center;

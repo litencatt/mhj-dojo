@@ -205,12 +205,14 @@ export function App() {
                 rowNames={rowNames}
               />
             </div>
-            <div class="area-tree">
-              <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
-            </div>
           </>
         )}
       </div>
+      {state && (
+        <div class="area-tree">
+          <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
+        </div>
+      )}
       {state && (
         <div class="area-side">
           <div class="area-yaku">
