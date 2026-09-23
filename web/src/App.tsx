@@ -6,6 +6,7 @@ import { YakuTable } from './components/YakuTable';
 import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
+import { Glossary } from './components/Glossary';
 import { Tile } from './components/Tile';
 
 function errorMessage(err: unknown): string {
@@ -195,8 +196,13 @@ export function App() {
             {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
             {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
           </div>
-          <div class="area-yaku">
-            <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
+          <div class="area-side">
+            <div class="area-yaku">
+              <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
+            </div>
+            <div class="area-gloss">
+              <Glossary />
+            </div>
           </div>
           <div class="area-chart">
             <ShantenChart

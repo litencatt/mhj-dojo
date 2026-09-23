@@ -147,17 +147,21 @@ h2 {
   padding: 10px 14px;
 }
 
-/* Two columns: header, hand, chart and tree stack on the left; the yaku table
-   fills the right column. A single column on narrow screens puts the yaku
-   table right after the hand. */
+/* Layout by width:
+   - above 1500px: three columns; the yaku table and the glossary each get one.
+   - 1100-1500px: two columns; the glossary sits below the yaku table.
+   - up to 1100px: one column: header, hand, yaku, chart, tree, glossary.
+   .area-side wraps the yaku table and glossary; it is a flex column in the
+   two-column layout and dissolves (display: contents) otherwise, so its
+   children become grid items of .app. */
 .app {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
-    "header yaku"
-    "hand   yaku"
-    "chart  yaku"
-    "tree   yaku";
+    "header side"
+    "hand   side"
+    "chart  side"
+    "tree   side";
   grid-template-rows: auto auto auto 1fr;
   column-gap: 16px;
   row-gap: 12px;
@@ -165,18 +169,20 @@ h2 {
 }
 .area-header { grid-area: header; }
 .area-hand { grid-area: hand; }
-.area-yaku { grid-area: yaku; }
+.area-side { grid-area: side; }
+.area-chart { grid-area: chart; }
+.area-tree { grid-area: tree; }
 /* Before a game has loaded only the header is shown; let it span the page. */
 .app-loading {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "header";
   grid-template-rows: none;
 }
-.area-chart { grid-area: chart; }
-.area-tree { grid-area: tree; }
 .area-header,
 .area-hand,
+.area-side,
 .area-yaku,
+.area-gloss,
 .area-chart,
 .area-tree {
   display: flex;
@@ -184,12 +190,79 @@ h2 {
   gap: 12px;
   min-width: 0;
 }
+@media (min-width: 1501px) {
+  .app {
+    max-width: 1720px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 320px);
+    grid-template-areas:
+      "header yaku gloss"
+      "hand   yaku gloss"
+      "chart  yaku gloss"
+      "tree   yaku gloss";
+  }
+  .app-loading {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "header";
+  }
+  .area-side { display: contents; }
+  .area-yaku { grid-area: yaku; }
+  .area-gloss {
+    grid-area: gloss;
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+}
 @media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "header" "hand" "yaku" "chart" "tree";
+    grid-template-areas: "header" "hand" "yaku" "chart" "tree" "gloss";
     grid-template-rows: none;
   }
+  .area-side { display: contents; }
+  .area-yaku { grid-area: yaku; }
+  .area-gloss { grid-area: gloss; }
+}
+
+/* ---- Glossary ---- */
+.glossary-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.9rem;
+}
+.glossary-group h3 {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+.glossary-group dl {
+  margin: 0;
+}
+.glossary-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.glossary-item dt {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.glossary-reading {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.glossary-item dd {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 section {
