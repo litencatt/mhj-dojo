@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { YakuRow } from '../api';
 import { Tile } from './Tile';
+import { PanelHeading } from './PanelHeading';
 import {
   CATEGORIES,
   DEFAULT_FILTER,
@@ -17,6 +18,7 @@ export interface YakuTableProps {
   rows: YakuRow[];
   baseline: YakuRow[] | null; // non-null while previewing a discard candidate
   previewTile: string | null;
+  onMinimize?: () => void;
 }
 
 function shantenLabel(s: number | null): string {
@@ -40,7 +42,7 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
  * jump while previewing. The normal row always comes first; yakuman rows follow
  * the others under a 役満 heading row. */
 export function YakuTable(props: YakuTableProps) {
-  const { rows, baseline, previewTile } = props;
+  const { rows, baseline, previewTile, onMinimize } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
   const setFilter = (f: YakuFilter) => {
     setFilterState(f);
@@ -102,12 +104,9 @@ export function YakuTable(props: YakuTableProps) {
 
   return (
     <section class="yaku-table-panel" aria-label="役別向聴テーブル">
-      <h2>
-        役別向聴
-        {previewTile && (
-          <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>
-        )}
-      </h2>
+      <PanelHeading title="役別向聴" onMinimize={onMinimize}>
+        {previewTile && <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>}
+      </PanelHeading>
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
           <input

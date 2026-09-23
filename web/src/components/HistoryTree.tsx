@@ -1,7 +1,9 @@
 import type { TreeNode } from '../api';
 import { Tile } from './Tile';
+import { PanelHeading } from './PanelHeading';
 
 export interface HistoryTreeProps {
+  onMinimize?: () => void;
   tree: TreeNode[];
   currentNodeId: number;
   disabled: boolean;
@@ -31,7 +33,7 @@ interface Row {
  * Only fork points add indentation — a long single-child chain stays flat, so
  * an 18-turn straight line renders as a compact vertical list, not a staircase. */
 export function HistoryTree(props: HistoryTreeProps) {
-  const { tree, currentNodeId, disabled, onGoto } = props;
+  const { tree, currentNodeId, disabled, onGoto, onMinimize } = props;
   const byParent = new Map<number | null, TreeNode[]>();
   const byId = new Map<number, TreeNode>();
   for (const n of tree) {
@@ -70,7 +72,7 @@ export function HistoryTree(props: HistoryTreeProps) {
 
   return (
     <section class="tree-panel" aria-label="履歴ツリー">
-      <h2>履歴ツリー</h2>
+      <PanelHeading title="履歴ツリー" onMinimize={onMinimize} />
       <ul class="tree-flat">
         {rows.map(({ node, depth, isBranchStart }) => {
           const isCurrent = node.node_id === currentNodeId;

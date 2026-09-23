@@ -1,8 +1,10 @@
 import { Fragment } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { HistoryEntry, YakuRow } from '../api';
+import { PanelHeading } from './PanelHeading';
 
 export interface ShantenChartProps {
+  onMinimize?: () => void;
   sessionId: string; // default legend selection resets when this changes (new game)
   history: HistoryEntry[];
   currentAnalysis: YakuRow[]; // used to pick the default "best 5" legend rows and the yakuman keys
@@ -39,7 +41,7 @@ const MARGIN = { top: 16, right: 16, bottom: 32, left: 48 };
 
 /** 時系列チャート: x = turn, y = shanten (low = top; win=-1 tenpai=0 labeled). */
 export function ShantenChart(props: ShantenChartProps) {
-  const { sessionId, history, currentAnalysis, rowNames } = props;
+  const { sessionId, history, currentAnalysis, rowNames, onMinimize } = props;
   const yakumanKeys = useMemo(
     () => new Set(currentAnalysis.filter((r) => r.yakuman).map((r) => r.key)),
     [currentAnalysis],
@@ -71,7 +73,7 @@ export function ShantenChart(props: ShantenChartProps) {
   if (history.length === 0) {
     return (
       <section class="chart-panel" aria-label="時系列チャート">
-        <h2>時系列チャート</h2>
+        <PanelHeading title="時系列チャート" onMinimize={onMinimize} />
         <p class="muted">データがありません</p>
       </section>
     );
@@ -126,7 +128,7 @@ export function ShantenChart(props: ShantenChartProps) {
 
   return (
     <section class="chart-panel" aria-label="時系列チャート">
-      <h2>時系列チャート</h2>
+      <PanelHeading title="時系列チャート" onMinimize={onMinimize} />
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} class="shanten-chart" role="img" aria-label="向聴の時系列推移">
         {/* gridlines + y labels */}
         {yTicks.map((v) => (

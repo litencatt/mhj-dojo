@@ -7,11 +7,39 @@ import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
 import { Glossary } from './components/Glossary';
+import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+// Panels that can be minimized into the right-edge dock.
+type PanelKey = 'chart' | 'tree' | 'yaku' | 'gloss';
+const PANELS: Array<{ key: PanelKey; label: string }> = [
+  { key: 'chart', label: '時系列チャート' },
+  { key: 'tree', label: '履歴ツリー' },
+  { key: 'yaku', label: '役別向聴' },
+  { key: 'gloss', label: '用語表' },
+];
+const MINIMIZED_KEY = 'mhj2.minimized';
+
+function loadMinimized(): PanelKey[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(MINIMIZED_KEY) ?? '[]');
+    return Array.isArray(v) ? PANELS.map((p) => p.key).filter((k) => v.includes(k)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMinimized(keys: PanelKey[]) {
+  try {
+    localStorage.setItem(MINIMIZED_KEY, JSON.stringify(keys));
+  } catch {
+    // Storage unavailable: the layout just won't persist.
+  }
 }
 
 function optionalInt(s: string | null): number | undefined {
@@ -26,6 +54,17 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const [busy, setBusy] = useState(false);
+  const [minimized, setMinimized] = useState<PanelKey[]>(loadMinimized);
+  const minimize = (k: PanelKey) => {
+    const next = [...minimized.filter((x) => x !== k), k];
+    setMinimized(next);
+    saveMinimized(next);
+  };
+  const restore = (k: PanelKey) => {
+    const next = minimized.filter((x) => x !== k);
+    setMinimized(next);
+    saveMinimized(next);
+  };
   // Discard/tsumo act on the server's current node, so requests must never overlap:
   // a concurrent goto could redirect a discard, and responses could land out of order.
   const inFlight = useRef(false);
@@ -116,8 +155,13 @@ export function App() {
   const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
   const baselineRows = previewTile && state ? state.analysis : null;
 
+  // Minimized panels stay mounted (hidden) so they keep their own state,
+  // such as the chart's legend selection and the glossary search.
+  const isMin = (k: PanelKey) => minimized.includes(k);
+  const appClass = state && minimized.length > 0 ? 'app has-dock' : 'app';
+
   return (
-    <div class={state ? 'app' : 'app app-loading'}>
+    <div class={appClass}>
       <div class="area-main">
         <div class="area-header">
           <header class="app-header">
@@ -197,31 +241,49 @@ export function App() {
               {state.status === 'exhausted' && <p class="exhausted-banner">流局（{state.max_turns}巡終了）</p>}
               {state.status === 'tsumo' && state.win && <WinPanel win={state.win} />}
             </div>
-            <div class="area-chart">
+            <div class="area-chart" hidden={isMin('chart')}>
               <ShantenChart
                 sessionId={state.session_id}
                 history={state.history}
                 currentAnalysis={state.analysis}
                 rowNames={rowNames}
+                onMinimize={() => minimize('chart')}
               />
             </div>
           </>
         )}
       </div>
       {state && (
-        <div class="area-tree">
-          <HistoryTree tree={state.tree} currentNodeId={state.node_id} disabled={busy} onGoto={handleGoto} />
+        <div class="area-tree" hidden={isMin('tree')}>
+          <HistoryTree
+            tree={state.tree}
+            currentNodeId={state.node_id}
+            disabled={busy}
+            onGoto={handleGoto}
+            onMinimize={() => minimize('tree')}
+          />
         </div>
       )}
       {state && (
-        <div class="area-side">
-          <div class="area-yaku">
-            <YakuTable rows={displayedRows} baseline={baselineRows} previewTile={previewTile} />
+        <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
+          <div class="area-yaku" hidden={isMin('yaku')}>
+            <YakuTable
+              rows={displayedRows}
+              baseline={baselineRows}
+              previewTile={previewTile}
+              onMinimize={() => minimize('yaku')}
+            />
           </div>
-          <div class="area-gloss">
-            <Glossary />
+          <div class="area-gloss" hidden={isMin('gloss')}>
+            <Glossary onMinimize={() => minimize('gloss')} />
           </div>
         </div>
+      )}
+      {state && (
+        <Dock
+          items={PANELS.filter((p) => minimized.includes(p.key))}
+          onRestore={(k) => restore(k as PanelKey)}
+        />
       )}
     </div>
   );
