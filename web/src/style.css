@@ -531,6 +531,15 @@ section {
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
+.win-dora-ignored td:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.win-note {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .win-yaku-table tfoot th,
 .win-yaku-table tfoot td {
   border-top: 2px solid var(--fg);

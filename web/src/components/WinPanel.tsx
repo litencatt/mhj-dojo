@@ -8,6 +8,10 @@ export interface WinPanelProps {
 /** Terminal tsumo panel: 14 tiles, yaku list with han, dora, han total. */
 export function WinPanel(props: WinPanelProps) {
   const { win } = props;
+  // Every yakuman is 13 han and no ordinary yaku reaches that; with a yakuman,
+  // dora are reported but not added to the total.
+  const yakuman = win.yaku.some((y) => y.han >= 13);
+  const doraIgnored = yakuman && win.dora > 0;
   return (
     <section class="win-panel" aria-label="和了">
       <h2>ツモ和了</h2>
@@ -30,8 +34,11 @@ export function WinPanel(props: WinPanelProps) {
               <td>{y.han}翻</td>
             </tr>
           ))}
-          <tr>
-            <td>ドラ</td>
+          <tr class={doraIgnored ? 'win-dora-ignored' : ''}>
+            <td>
+              ドラ
+              {doraIgnored && <span class="win-note">役満のため加算なし</span>}
+            </td>
             <td>{win.dora}翻</td>
           </tr>
         </tbody>
