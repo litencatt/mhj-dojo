@@ -6,8 +6,6 @@ package match
 import (
 	"errors"
 	"fmt"
-	"log"
-	mrand "math/rand/v2"
 	"sync"
 
 	"github.com/litencatt/mhj2/internal/cpu"
@@ -15,6 +13,7 @@ import (
 	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/store"
 	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
 	"github.com/litencatt/mhj2/internal/yakushanten"
 )
@@ -43,18 +42,10 @@ func NewStore() *Store { return &Store{games: store.New[*Match](MaxGames)} }
 
 // Create deals a game. A nil seed picks the default or a random seed.
 func (st *Store) Create(seed *int64) *Match {
-	var s int64
-	switch {
-	case seed != nil:
-		s = *seed
-	case st.DefaultSeed != nil:
-		s = *st.DefaultSeed
-	default:
-		// Hidden until the end; 2^53 keeps it exact in JSON while making a
-		// search from the dealt tiles impractical (2^32 takes minutes).
-		s = mrand.Int64N(1 << 53)
-	}
-	r := game.New(s)
+	// A random seed is hidden until the end: 2^53 keeps it exact in JSON
+	// while making a search from the dealt tiles impractical (2^32 would
+	// take minutes).
+	r := game.New(wall.PickSeed(seed, st.DefaultSeed, 1<<53))
 	m := &Match{
 		analyzer:  yakushanten.NewAnalyzerFor(yakushanten.Winds{Round: tile.East, Seat: r.SeatWind(Human)}),
 		history:   map[int]session.HistoryEntry{},
@@ -109,13 +100,8 @@ func (m *Match) Act(a game.Action) (State, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	before := len(m.game.Round.Log())
-	fallbacks := m.game.Fallbacks
 	if err := m.game.Act(a); err != nil {
 		return State{}, err
-	}
-	if m.game.Fallbacks > fallbacks {
-		// A CPU bug, not a rule outcome: make it visible in the server log.
-		log.Printf("match %s: %d illegal CPU move(s) replaced", m.id, m.game.Fallbacks-fallbacks)
 	}
 	m.since = before
 	return m.state(), nil

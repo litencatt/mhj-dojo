@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"log"
 	"slices"
 )
 
@@ -83,8 +84,9 @@ func (g *Game) run() {
 		a.Seat = seat
 		if err := r.Apply(a); err != nil {
 			// An illegal CPU move must not stall a live game: replace it with
-			// a legal one and count it.
+			// a legal one, count it and log it (a CPU bug, not a rule outcome).
 			g.Fallbacks++
+			log.Printf("game: seat %d illegal CPU move %+v (%v); replaced", seat, a, err)
 			g.mustApply(fallback(seat, legal))
 		}
 	}
