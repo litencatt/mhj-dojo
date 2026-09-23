@@ -413,7 +413,11 @@ func TestRowsMatchBruteForce(t *testing.T) {
 func TestPinfuExactWaits(t *testing.T) {
 	r := rand.New(rand.NewPCG(13, 14))
 	a := NewAnalyzer()
-	for i := 0; i < 300; i++ {
+	n := 300
+	if testing.Short() {
+		n = 50
+	}
+	for i := 0; i < n; i++ {
 		c := perturb(r, randomTarget(r, "pinfu"))
 		res := a.Row(c, "pinfu")
 		relaxed := a.target(c, targets["pinfu"])
