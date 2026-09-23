@@ -62,12 +62,13 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 type option struct {
 	tile    string
 	kind    tile.Kind
+	red     bool
 	shanten int
 	ukeire  int
 }
 
 // byEfficiency ranks the discards: lowest shanten, most ukeire, then honors
-// before terminals before simples, then tile order.
+// before terminals before simples, then tile order, keeping red fives.
 func (p *Player) byEfficiency(tiles []tile.Tile, discards []string, visible *tile.Counts) []option {
 	var opts []option
 	for _, s := range discards {
@@ -78,7 +79,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, discards []string, visible *til
 		for _, k := range acc {
 			n += max(0, 4-visible[k])
 		}
-		opts = append(opts, option{tile: s, kind: tiles[i].Kind, shanten: sh, ukeire: n})
+		opts = append(opts, option{tile: s, kind: tiles[i].Kind, red: tiles[i].Red, shanten: sh, ukeire: n})
 	}
 	slices.SortStableFunc(opts, func(a, b option) int {
 		switch {
@@ -88,10 +89,21 @@ func (p *Player) byEfficiency(tiles []tile.Tile, discards []string, visible *til
 			return b.ukeire - a.ukeire
 		case outer(a.kind) != outer(b.kind):
 			return outer(b.kind) - outer(a.kind)
+		case a.kind != b.kind:
+			return int(a.kind) - int(b.kind)
+		case a.red != b.red:
+			return b2i(a.red) - b2i(b.red) // a red five is dora: discard the plain one
 		}
-		return int(a.kind) - int(b.kind)
+		return 0
 	})
 	return opts
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // outer ranks how isolated a tile tends to be: honors 2, terminals 1.
@@ -180,14 +192,17 @@ func safest(opts []option, threats []map[tile.Kind]bool, visible *tile.Counts) s
 }
 
 // danger scores how likely a tile is to deal into one riichi (0 = safe):
-// genbutsu, then honors with 3 seen, suji, honors with 2 seen, half suji,
-// other honors, then terminals, 2/8 and middle tiles.
+// genbutsu or an honor with all 4 seen, then honors with 3 seen, suji,
+// honors with 2 seen, half suji, other honors, then terminals, 2/8 and
+// middle tiles.
 func danger(k tile.Kind, river map[tile.Kind]bool, visible *tile.Counts) int {
 	if river[k] {
 		return 0 // genbutsu
 	}
 	if k.IsHonor() {
 		switch visible[k] {
+		case 4:
+			return 0 // nobody can wait on it
 		case 3:
 			return 1
 		case 2:

@@ -63,7 +63,7 @@ func TestDiscardsForEfficiencyAndRiichi(t *testing.T) {
 }
 
 func TestFoldsAgainstRiichi(t *testing.T) {
-	// Far from tenpai, seat 1 in riichi with 5s and 1z in its river.
+	// Far from tenpai, seat 1 in riichi with 5s and 8m in its river.
 	v := view("147m258p369s1357z", "5s")
 	v.Seats[1].Riichi = true
 	for _, s := range []string{"5s", "8m"} {
@@ -77,7 +77,29 @@ func TestFoldsAgainstRiichi(t *testing.T) {
 	v2 := view("123m456m789m23p55s", "1z")
 	v2.Seats[1] = v.Seats[1]
 	if a := New().Decide(v2, legal(v2)); a.Tile == "5s" {
+		t.Errorf("tenpai hand folded: %+v", a)
+	}
+	// One step from tenpai (below foldShanten) it pushes too: it keeps 123m
+	// although 2m is genbutsu.
+	v3 := view("123m456m789m23p5s1z", "9s")
+	v3.Seats[1].Riichi = true
+	x, _ := tile.Parse("2m")
+	v3.Seats[1].River = []game.RiverTile{{Tile: x}}
+	if a := New().Decide(v3, legal(v3)); a.Tile == "2m" {
 		t.Errorf("1-shanten hand folded: %+v", a)
+	}
+}
+
+func TestKeepsRedFive(t *testing.T) {
+	// Discarding 0p or 5p leaves the same counts, so only the red-five
+	// tiebreak orders them: the red five is dora and is kept.
+	tiles := tile.MustParseHand("123m456m789m11s0p5p1z")
+	var vis tile.Counts
+	for _, order := range [][]string{{"0p", "5p"}, {"5p", "0p"}} {
+		opts := New().byEfficiency(tiles, order, &vis)
+		if opts[0].tile != "5p" {
+			t.Errorf("discards %v: first choice %s, want 5p", order, opts[0].tile)
+		}
 	}
 }
 
@@ -90,7 +112,8 @@ func TestDanger(t *testing.T) {
 	var vis tile.Counts
 	k := func(s string) tile.Kind { x, _ := tile.Parse(s); return x.Kind }
 	vis[k("1z")] = 3
-	for s, want := range map[string]int{"4m": 0, "1z": 1, "1m": 2, "7m": 2, "4p": 2, "5m": 9, "5p": 9, "2z": 6, "9s": 7, "7s": 9} {
+	vis[k("3z")] = 4
+	for s, want := range map[string]int{"4m": 0, "3z": 0, "1z": 1, "1m": 2, "7m": 2, "4p": 2, "5m": 9, "5p": 9, "2z": 6, "9s": 7, "7s": 9} {
 		if got := danger(k(s), river, &vis); got != want {
 			t.Errorf("danger(%s) = %d, want %d", s, got, want)
 		}
@@ -114,10 +137,9 @@ func TestSelfPlay(t *testing.T) {
 				t.Parallel()
 				p := New()
 				for seed := int64(w); seed < int64(n); seed += workers {
-					kind, times := playSeed(t, p, seed)
+					kind, _ := playSeed(t, p, seed)
 					mu.Lock()
 					kinds[kind]++
-					took = append(took, times...)
 					mu.Unlock()
 				}
 			})
@@ -125,6 +147,12 @@ func TestSelfPlay(t *testing.T) {
 	})
 	if kinds["tsumo"] == 0 || kinds["ron"] == 0 || kinds["draw"] == 0 {
 		t.Errorf("outcomes %v: want tsumo, ron and draw", kinds)
+	}
+	// Time decisions on one goroutine, so waiting for a core is not counted.
+	p := New()
+	for seed := int64(0); seed < 50; seed++ {
+		_, times := playSeed(t, p, seed)
+		took = append(took, times...)
 	}
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
