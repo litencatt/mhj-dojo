@@ -154,7 +154,18 @@ h2 {
 }
 .dora-indicators {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+.dora-arrow,
+.dora-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* A face-down tile shows its coloured back. */
+.tile.tile-back {
+  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  border-color: var(--tile-back);
 }
 
 .error-banner {
@@ -559,16 +570,37 @@ section {
 .yaku-name-cell {
   white-space: nowrap;
 }
+.han-cell {
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.yaku-name {
+  cursor: help;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 3px;
+}
+.yaku-tip {
+  position: fixed;
+  z-index: 20;
+  width: 280px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: normal;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
 .row-best {
   background: var(--row-best-bg);
-}
-.yakuman-heading th {
-  padding: 8px 8px 4px;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.row-yakuman .yaku-name-cell {
-  padding-left: 24px;
 }
 .badge-approx {
   margin-left: 6px;

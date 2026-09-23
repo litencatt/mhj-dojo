@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { YakuRow } from '../api';
 import { Tile } from './Tile';
 import { PanelHeading } from './PanelHeading';
+import { YAKU_CONDITIONS } from './yakuInfo';
 import {
   CATEGORIES,
   DEFAULT_FILTER,
@@ -39,8 +40,7 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
 /** 役別向聴テーブル: shows either the current-node analysis, or (while previewing a
  * discard) that candidate's resulting analysis with deltas vs the current node.
  * A filter bar narrows and sorts the rows by the current values, so rows do not
- * jump while previewing. The normal row always comes first; yakuman rows follow
- * the others under a 役満 heading row. */
+ * jump while previewing. The normal row always comes first. */
 export function YakuTable(props: YakuTableProps) {
   const { rows, baseline, previewTile, onMinimize } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
@@ -49,11 +49,20 @@ export function YakuTable(props: YakuTableProps) {
     saveFilter(f);
   };
 
+  // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
+  // viewport so the scrolling table panel cannot clip it.
+  const [tip, setTip] = useState<{ key: string; left: number; top: number } | null>(null);
+  const showTip = (key: string, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const width = 280;
+    setTip({ key, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), top: r.bottom + 6 });
+  };
+
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
   const base = new Map((baseline ?? []).map((r) => [r.key, r]));
-  const { regular, yakuman, total } = applyYakuFilter(current, filter);
-  const visibleCount = regular.length + yakuman.length;
+  const { keys, total } = applyYakuFilter(current, filter);
+  const visibleCount = keys.length;
 
   const finiteShanten = rows
     .filter((r) => !r.yakuman)
@@ -66,13 +75,23 @@ export function YakuTable(props: YakuTableProps) {
     if (!row) return null;
     const delta = baseline ? deltaLabel(row.shanten, base.get(key)?.shanten ?? null) : null;
     const isBest = !row.yakuman && row.shanten !== null && row.shanten === minShanten;
-    const cls = [isBest ? 'row-best' : '', row.yakuman ? 'row-yakuman' : ''].filter(Boolean).join(' ');
     return (
-      <tr key={row.key} class={cls}>
+      <tr key={row.key} class={isBest ? 'row-best' : undefined}>
         <th scope="row" class="yaku-name-cell">
-          {row.name}
+          <span
+            class="yaku-name"
+            tabIndex={0}
+            aria-describedby={tip?.key === row.key ? 'yaku-tip' : undefined}
+            onMouseEnter={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
+            onMouseLeave={() => setTip(null)}
+            onFocus={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
+            onBlur={() => setTip(null)}
+          >
+            {row.name}
+          </span>
           {row.approx && <span class="badge-approx">近似</span>}
         </th>
+        <td class="han-cell">{row.yakuman ? '役満' : row.han > 0 ? `${row.han}翻` : '—'}</td>
         <td class="shanten-cell">
           <span>{shantenLabel(row.shanten)}</span>
           {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
@@ -169,11 +188,18 @@ export function YakuTable(props: YakuTableProps) {
           )}
         </div>
       </div>
+      {tip && YAKU_CONDITIONS[tip.key] && (
+        <div id="yaku-tip" role="tooltip" class="yaku-tip" style={{ left: `${tip.left}px`, top: `${tip.top}px` }}>
+          <strong>{shown.get(tip.key)?.name}</strong>
+          <span>{YAKU_CONDITIONS[tip.key]}</span>
+        </div>
+      )}
       <div class="yaku-table-scroll">
         <table class="yaku-table">
           <thead>
             <tr>
               <th scope="col">役</th>
+              <th scope="col">翻</th>
               <th scope="col">向聴</th>
               <th scope="col">有効牌</th>
               <th scope="col">合計枚数</th>
@@ -181,18 +207,8 @@ export function YakuTable(props: YakuTableProps) {
           </thead>
           <tbody>
             {renderRow('normal')}
-            {regular.map(renderRow)}
+            {keys.map(renderRow)}
           </tbody>
-          {yakuman.length > 0 && (
-            <tbody class="yakuman-group">
-              <tr class="yakuman-heading">
-                <th scope="colgroup" colSpan={4}>
-                  役満
-                </th>
-              </tr>
-              {yakuman.map(renderRow)}
-            </tbody>
-          )}
         </table>
         {visibleCount === 0 && (
           <p class="yaku-filter-empty">

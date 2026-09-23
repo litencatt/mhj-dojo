@@ -101,8 +101,7 @@ function compare(sort: SortOrder, order: Map<string, number>) {
 }
 
 export interface FilteredKeys {
-  regular: string[]; // non-yakuman yaku rows, filtered and sorted
-  yakuman: string[]; // yakuman rows, filtered and sorted
+  keys: string[]; // yaku rows (yakuman included), filtered and sorted
   total: number; // number of yaku rows (excluding "normal")
 }
 
@@ -118,11 +117,7 @@ export function applyYakuFilter(rows: YakuRow[], f: YakuFilter): FilteredKeys {
       (f.maxShanten === null || (r.shanten !== null && r.shanten <= f.maxShanten)),
   );
   const cmp = compare(f.sort, order);
-  return {
-    regular: kept.filter((r) => !r.yakuman).sort(cmp).map((r) => r.key),
-    yakuman: kept.filter((r) => r.yakuman).sort(cmp).map((r) => r.key),
-    total: yakuRows.length,
-  };
+  return { keys: kept.sort(cmp).map((r) => r.key), total: yakuRows.length };
 }
 
 const STORAGE_KEY = 'mhj2.yakuFilter';

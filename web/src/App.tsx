@@ -208,6 +208,31 @@ export function App() {
                     {state.dora_indicators.map((t, i) => (
                       <Tile key={`${t}-${i}`} tile={t} size="sm" />
                     ))}
+                    <span class="dora-arrow" aria-hidden="true">→</span>
+                    <span class="dora-label">ドラ</span>
+                    {state.dora.map((t, i) => (
+                      <Tile key={`d-${t}-${i}`} tile={t} size="sm" label={`ドラ ${t}`} />
+                    ))}
+                  </dd>
+                </div>
+                <div>
+                  <dt>裏ドラ表示牌</dt>
+                  <dd class="dora-indicators">
+                    {state.ura_dora_indicators.length > 0 ? (
+                      <>
+                        {state.ura_dora_indicators.map((t, i) => (
+                          <Tile key={`u-${t}-${i}`} tile={t} size="sm" />
+                        ))}
+                        <span class="dora-arrow" aria-hidden="true">→</span>
+                        <span class="dora-label">裏ドラ</span>
+                        {state.ura_dora.map((t, i) => (
+                          <Tile key={`ud-${t}-${i}`} tile={t} size="sm" label={`裏ドラ ${t}`} />
+                        ))}
+                      </>
+                    ) : (
+                      // Hidden until the game ends: one face-down tile per indicator.
+                      state.dora_indicators.map((_, i) => <Tile key={`ub-${i}`} tile="" size="sm" faceDown />)
+                    )}
                   </dd>
                 </div>
               </dl>

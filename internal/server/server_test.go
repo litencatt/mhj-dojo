@@ -87,7 +87,7 @@ func TestStateContract(t *testing.T) {
 	}
 	for _, k := range []string{
 		"session_id", "seed", "max_turns", "round_wind", "seat_wind", "node_id", "turn", "status",
-		"hand", "drawn", "discards", "dora_indicators", "wall_remaining", "can_tsumo",
+		"hand", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
 		"analysis", "by_discard", "history", "tree", "win",
 	} {
 		if _, ok := raw[k]; !ok {

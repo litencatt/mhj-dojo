@@ -17,7 +17,9 @@ const (
 	DeadWallSize = 14
 	// LiveDraws is the number of draws available after the deal.
 	LiveDraws = Size - DeadWallSize - HandSize
-	// doraIndicatorPos is the index inside the dead wall of the first dora indicator.
+	// doraIndicatorPos is the index inside the dead wall of the first dora
+	// indicator. The dead wall is 7 stacks of (upper, lower) tiles, so the
+	// ura-dora indicator is the tile below it at doraIndicatorPos+1.
 	doraIndicatorPos = 4
 )
 
@@ -114,6 +116,12 @@ func (w *Wall) Draw(k int) (tile.Tile, bool) {
 // DoraIndicators returns the revealed dora indicators (one in Phase 1).
 func (w *Wall) DoraIndicators() []tile.Tile {
 	return []tile.Tile{w.tiles[Size-DeadWallSize+doraIndicatorPos]}
+}
+
+// UraDoraIndicators returns the ura-dora indicators: the tiles below the dora
+// indicators, revealed only when the game ends.
+func (w *Wall) UraDoraIndicators() []tile.Tile {
+	return []tile.Tile{w.tiles[Size-DeadWallSize+doraIndicatorPos+1]}
 }
 
 // Tiles returns the full wall order.
