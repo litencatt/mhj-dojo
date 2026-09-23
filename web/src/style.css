@@ -570,6 +570,11 @@ section {
 .yaku-name-cell {
   white-space: nowrap;
 }
+.han-cell {
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .yaku-name {
   cursor: help;
   text-decoration: underline dotted var(--muted);

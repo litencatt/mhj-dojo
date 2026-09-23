@@ -93,6 +93,7 @@ export function YakuTable(props: YakuTableProps) {
           </span>
           {row.approx && <span class="badge-approx">近似</span>}
         </th>
+        <td class="han-cell">{row.yakuman ? '役満' : row.han > 0 ? `${row.han}翻` : '—'}</td>
         <td class="shanten-cell">
           <span>{shantenLabel(row.shanten)}</span>
           {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
@@ -200,6 +201,7 @@ export function YakuTable(props: YakuTableProps) {
           <thead>
             <tr>
               <th scope="col">役</th>
+              <th scope="col">翻</th>
               <th scope="col">向聴</th>
               <th scope="col">有効牌</th>
               <th scope="col">合計枚数</th>
@@ -212,7 +214,7 @@ export function YakuTable(props: YakuTableProps) {
           {yakuman.length > 0 && (
             <tbody class="yakuman-group">
               <tr class="yakuman-heading">
-                <th scope="colgroup" colSpan={4}>
+                <th scope="colgroup" colSpan={5}>
                   役満
                 </th>
               </tr>
