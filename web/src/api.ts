@@ -10,6 +10,7 @@ export interface UkeireEntry {
 export interface YakuRow {
   key: string;
   name: string;
+  yakuman: boolean; // true for the yakuman rows (kokushi and later)
   shanten: number | null; // 0 = tenpai, null = impossible
   approx: boolean;
   ukeire: UkeireEntry[];

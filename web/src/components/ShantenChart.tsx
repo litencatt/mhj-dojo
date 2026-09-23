@@ -1,16 +1,18 @@
+import { Fragment } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { HistoryEntry, YakuRow } from '../api';
 
 export interface ShantenChartProps {
   sessionId: string; // default legend selection resets when this changes (new game)
   history: HistoryEntry[];
-  currentAnalysis: YakuRow[]; // used to pick the default "best 5" legend rows
+  currentAnalysis: YakuRow[]; // used to pick the default "best 5" legend rows and the yakuman keys
   rowNames: Record<string, string>;
 }
 
+/** Default legend selection: normal + the best 5 non-yakuman rows (yakuman are opt-in). */
 function defaultVisibleKeys(currentAnalysis: YakuRow[]): Set<string> {
   const sorted = [...currentAnalysis]
-    .filter((r) => r.key !== 'normal')
+    .filter((r) => r.key !== 'normal' && !r.yakuman)
     .sort((a, b) => {
       const av = a.shanten ?? Infinity;
       const bv = b.shanten ?? Infinity;
@@ -38,7 +40,15 @@ const MARGIN = { top: 16, right: 16, bottom: 32, left: 48 };
 /** 時系列チャート: x = turn, y = shanten (low = top; win=-1 tenpai=0 labeled). */
 export function ShantenChart(props: ShantenChartProps) {
   const { sessionId, history, currentAnalysis, rowNames } = props;
-  const allKeys = useMemo(() => Object.keys(rowNames), [rowNames]);
+  const yakumanKeys = useMemo(
+    () => new Set(currentAnalysis.filter((r) => r.yakuman).map((r) => r.key)),
+    [currentAnalysis],
+  );
+  // Yakuman keys are grouped after all the others.
+  const allKeys = useMemo(() => {
+    const keys = Object.keys(rowNames);
+    return [...keys.filter((k) => !yakumanKeys.has(k)), ...keys.filter((k) => yakumanKeys.has(k))];
+  }, [rowNames, yakumanKeys]);
 
   const [visible, setVisible] = useState<Set<string>>(() => defaultVisibleKeys(currentAnalysis));
 
@@ -160,6 +170,7 @@ export function ShantenChart(props: ShantenChartProps) {
                     fill="none"
                     stroke={color}
                     stroke-width={key === 'normal' ? 1.5 : 2}
+                    stroke-dasharray={yakumanKeys.has(key) ? '5 3' : undefined}
                     opacity={key === 'normal' ? 0.6 : 0.9}
                   />
                 ))}
@@ -184,19 +195,25 @@ export function ShantenChart(props: ShantenChartProps) {
         })}
       </svg>
       <div class="chart-legend" role="group" aria-label="凡例（クリックで表示切り替え）">
-        {allKeys.map((key, i) => (
-          <button
-            key={key}
-            type="button"
-            class={`legend-item ${visible.has(key) ? 'legend-on' : 'legend-off'}`}
-            style={{ '--legend-color': colorFor(key, i) } as Record<string, string>}
-            onClick={() => toggle(key)}
-            aria-pressed={visible.has(key)}
-          >
-            <span class="legend-swatch" />
-            {rowNames[key]}
-          </button>
-        ))}
+        {allKeys.map((key, i) => {
+          const yakuman = yakumanKeys.has(key);
+          const firstYakuman = yakuman && (i === 0 || !yakumanKeys.has(allKeys[i - 1]!));
+          return (
+            <Fragment key={key}>
+              {firstYakuman && <span class="legend-group-label">役満</span>}
+              <button
+                type="button"
+                class={`legend-item ${visible.has(key) ? 'legend-on' : 'legend-off'}${yakuman ? ' legend-yakuman' : ''}`}
+                style={{ '--legend-color': colorFor(key, i) } as Record<string, string>}
+                onClick={() => toggle(key)}
+                aria-pressed={visible.has(key)}
+              >
+                <span class="legend-swatch" />
+                {rowNames[key]}
+              </button>
+            </Fragment>
+          );
+        })}
       </div>
     </section>
   );

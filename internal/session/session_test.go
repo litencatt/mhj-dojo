@@ -42,7 +42,8 @@ func TestCreateState(t *testing.T) {
 	if v.WallRemaining != wall.LiveDraws-1 {
 		t.Fatalf("wall_remaining %d", v.WallRemaining)
 	}
-	if len(v.Analysis) != 18 || v.Analysis[0].Key != "normal" || v.Analysis[17].Key != "kokushi" {
+	if len(v.Analysis) != 30 || v.Analysis[0].Key != "normal" || v.Analysis[29].Key != "chuuren" ||
+		v.Analysis[0].Yakuman || !v.Analysis[21].Yakuman || v.Analysis[21].Key != "kokushi" {
 		t.Fatalf("analysis rows: %d", len(v.Analysis))
 	}
 	distinct := map[string]bool{*v.Drawn: true}
@@ -53,14 +54,14 @@ func TestCreateState(t *testing.T) {
 		t.Fatalf("by_discard has %d keys, want %d", len(v.ByDiscard), len(distinct))
 	}
 	for k := range distinct {
-		if len(v.ByDiscard[k]) != 18 {
+		if len(v.ByDiscard[k]) != 30 {
 			t.Fatalf("by_discard[%s] has %d rows", k, len(v.ByDiscard[k]))
 		}
 	}
 	if len(v.History) != 1 || len(v.Tree) != 1 || v.Tree[0].ParentID != nil || v.Win != nil || v.Discards == nil {
 		t.Fatalf("history/tree: %+v %+v", v.History, v.Tree)
 	}
-	if len(v.History[0].Shanten) != 18 {
+	if len(v.History[0].Shanten) != 30 {
 		t.Fatalf("history shanten keys: %d", len(v.History[0].Shanten))
 	}
 
