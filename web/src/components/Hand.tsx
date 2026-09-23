@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'preact/hooks';
 import { Tile } from './Tile';
 
 export interface HandProps {
@@ -17,34 +18,63 @@ export interface HandProps {
 export function Hand(props: HandProps) {
   const { hand, drawn, discards, disabled, allowed, onlyDrawn = false, onDiscard, onPreview } = props;
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
+  const tilesRef = useRef<HTMLDivElement>(null);
+  // Set when the drawn tile is discarded from the keyboard: if the next state has
+  // no drawn tile, its button unmounts and focus moves to the last hand tile.
+  const refocus = useRef(false);
+
   // Tiles are always buttons keyed by position, so keyboard focus stays at the
-  // clicked position through the request and the new hand.
+  // clicked position through the request and the new hand. The tile under focus
+  // may have changed, so its preview is issued again.
+  useEffect(() => {
+    const tiles = tilesRef.current;
+    if (!tiles) return;
+    const active = document.activeElement;
+    if (refocus.current) {
+      refocus.current = false;
+      if (!drawn && (!active || active === document.body)) {
+        (tiles.lastElementChild as HTMLElement | null)?.focus(); // its focus handler previews
+        return;
+      }
+    }
+    const i = Array.prototype.indexOf.call(tiles.children, active);
+    if (i >= 0) onPreview(hand[i]);
+    else if (drawn && active?.closest('.hand-drawn')) onPreview(drawn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand, drawn]);
+
   return (
     <section class="hand-panel" aria-label="手牌">
       <h2>手牌</h2>
       <div class="hand-row">
-        <div class="hand-tiles" role="group" aria-label="手牌13枚">
-          {hand.map((t, i) => (
-            <Tile
-              key={i}
-              tile={t}
-              interactive={can(t, false)}
-              disabled={!can(t, false)}
-              dimmed={!disabled && !can(t, false)}
-              onClick={() => can(t, false) && onDiscard(t)}
-              onHoverStart={() => onPreview(t)}
-              onHoverEnd={() => onPreview(null)}
-            />
-          ))}
+        <div class="hand-tiles" role="group" aria-label="手牌13枚" ref={tilesRef}>
+          {hand.map((t, i) => {
+            const ok = can(t, false);
+            return (
+              <Tile
+                key={i}
+                tile={t}
+                button
+                interactive={ok}
+                dimmed={!disabled && !ok}
+                onClick={() => onDiscard(t)}
+                onHoverStart={() => onPreview(t)}
+                onHoverEnd={() => onPreview(null)}
+              />
+            );
+          })}
         </div>
         {drawn && (
           <div class="hand-drawn" aria-label="ツモ牌">
             <Tile
               tile={drawn}
+              button
               interactive={can(drawn, true)}
-              disabled={!can(drawn, true)}
               dimmed={!disabled && !can(drawn, true)}
-              onClick={() => can(drawn, true) && onDiscard(drawn)}
+              onClick={() => {
+                refocus.current = !!document.activeElement?.closest('.hand-drawn');
+                onDiscard(drawn);
+              }}
               onHoverStart={() => onPreview(drawn)}
               onHoverEnd={() => onPreview(null)}
             />

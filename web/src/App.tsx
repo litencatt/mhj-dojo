@@ -110,8 +110,8 @@ export function App() {
     return map;
   }, [state?.analysis]);
 
-  const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
-  const baselineRows = previewTile && state ? state.analysis : null;
+  // Preview only tiles the server analysed, so the title never outruns the table.
+  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
 
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
@@ -216,8 +216,7 @@ export function App() {
                 discards={state.discards}
                 disabled={busy || state.status !== 'playing'}
                 onDiscard={handleDiscard}
-                // Preview only tiles the server analysed, so the title never outruns the table.
-                onPreview={(t) => setPreviewTile(t && state.by_discard[t] ? t : null)}
+                onPreview={setPreviewTile}
               />
               {state.status === 'playing' && state.can_tsumo && (
                 <button type="button" class="tsumo-button" onClick={handleTsumo} disabled={busy}>
@@ -254,9 +253,9 @@ export function App() {
         <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
           <div class="area-yaku" hidden={isMin('yaku')}>
             <YakuTable
-              rows={displayedRows}
-              baseline={baselineRows}
-              previewTile={previewTile}
+              rows={previewRows ?? state.analysis}
+              baseline={previewRows ? state.analysis : null}
+              previewTile={previewRows ? previewTile : null}
               onMinimize={() => minimize('yaku')}
             />
           </div>

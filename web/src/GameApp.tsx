@@ -101,8 +101,8 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
-  const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
-  const baselineRows = previewTile && state ? state.analysis : null;
+  // Preview only tiles the server analysed, so the title never outruns the table.
+  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
   // The tree may be minimized from practice mode, but game mode has no tree tab.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
@@ -192,8 +192,7 @@ export function GameApp() {
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
                 onlyDrawn={me.riichi}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
-                // Preview only tiles the server analysed, so the title never outruns the table.
-                onPreview={(t) => setPreviewTile(t && state.by_discard[t] ? t : null)}
+                onPreview={setPreviewTile}
               />
               <ActionBar
                 state={state}
@@ -221,9 +220,9 @@ export function GameApp() {
         <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
           <div class="area-yaku" hidden={isMin('yaku')}>
             <YakuTable
-              rows={displayedRows}
-              baseline={baselineRows}
-              previewTile={previewTile}
+              rows={previewRows ?? state.analysis}
+              baseline={previewRows ? state.analysis : null}
+              previewTile={previewRows ? previewTile : null}
               onMinimize={() => minimize('yaku')}
             />
           </div>
