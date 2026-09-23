@@ -452,29 +452,9 @@ section {
 .row-best {
   background: var(--row-best-bg);
 }
-.yakuman-summary th {
-  padding: 0;
-}
-.yakuman-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  background: none;
-  color: var(--fg);
-  font: inherit;
-  font-weight: bold;
-  text-align: left;
-  cursor: pointer;
-}
-.yakuman-caret {
-  width: 1em;
-  color: var(--muted);
-}
-.yakuman-best {
-  font-weight: normal;
+.yakuman-heading th {
+  padding: 8px 8px 4px;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 .row-yakuman .yaku-name-cell {
