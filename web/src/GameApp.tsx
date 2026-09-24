@@ -79,6 +79,10 @@ export function GameApp() {
     history.replaceState(null, '', url);
   }, [state?.game_id, state?.seed]);
 
+  useEffect(() => {
+    document.title = 'mhj2 - CPU対戦';
+  }, []);
+
   function act(type: ActionType, tile?: string) {
     if (!state) return;
     void request(() => api.gameAction(state.game_id, type, tile));
@@ -97,11 +101,11 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
-  const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
-  const baselineRows = previewTile && state ? state.analysis : null;
+  // Preview only tiles the server analysed, so the title never outruns the table.
+  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
   // The tree may be minimized from practice mode, but game mode has no tree tab.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app game-app has-dock' : 'app game-app';
+  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
 
   return (
     <div class={appClass}>
@@ -186,6 +190,7 @@ export function GameApp() {
                 discards={[]}
                 disabled={busy || !myTurn}
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
+                onlyDrawn={me.riichi}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
@@ -215,14 +220,14 @@ export function GameApp() {
         <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
           <div class="area-yaku" hidden={isMin('yaku')}>
             <YakuTable
-              rows={displayedRows}
-              baseline={baselineRows}
-              previewTile={previewTile}
+              rows={previewRows ?? state.analysis}
+              baseline={previewRows ? state.analysis : null}
+              previewTile={previewRows ? previewTile : null}
               onMinimize={() => minimize('yaku')}
             />
           </div>
           <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary onMinimize={() => minimize('gloss')} />
+            <Glossary mode="game" onMinimize={() => minimize('gloss')} />
           </div>
         </div>
       )}

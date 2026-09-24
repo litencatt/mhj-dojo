@@ -79,9 +79,9 @@ export function ShantenChart(props: ShantenChartProps) {
     );
   }
 
-  // A tsumo node keeps its parent's turn; its winning tile is the next turn's draw,
+  // A practice tsumo node keeps its parent's turn; its winning tile is the next turn's draw,
   // so it is plotted one step right to avoid sharing an x position with the parent.
-  const xTurn = (h: HistoryEntry, i: number) => (i > 0 && h.discard === null ? h.turn + 1 : h.turn);
+  const xTurn = (h: HistoryEntry, i: number) => (i > 0 && h.draw !== null && h.discard === null ? h.turn + 1 : h.turn);
   const xs = history.map(xTurn);
   const turns = [...new Set(xs)];
   const minTurn = Math.min(...turns);

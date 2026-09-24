@@ -5,6 +5,7 @@ interface Term {
   term: string;
   reading: string;
   body: string;
+  game?: string | null; // wording in game mode; null hides the term there
 }
 
 interface Group {
@@ -51,13 +52,18 @@ const GROUPS: Group[] = [
   {
     title: 'ルール',
     terms: [
-      { term: '門前', reading: 'メンゼン', body: '鳴いていない手。一人打ちでは常に門前。' },
+      { term: '門前', reading: 'メンゼン', body: '鳴いていない手。一人打ちでは常に門前。', game: '鳴いていない状態。CPU対戦では常に門前。' },
       { term: 'ツモ', reading: 'ツモ', body: '山から牌を引くこと。門前で自分で引いて和了ると門前清自摸和（1翻）。' },
       { term: '役牌', reading: 'ヤクハイ', body: '刻子で1翻になる字牌。白・發・中と、場風・自風。' },
-      { term: '場風・自風', reading: 'ばかぜ・じかぜ', body: 'このアプリでは東場・東家に固定。東の刻子は両方を満たし2翻。' },
+      {
+        term: '場風・自風',
+        reading: 'ばかぜ・じかぜ',
+        body: 'このアプリでは東場・東家に固定。東の刻子は両方を満たし2翻。',
+        game: '場風は東。自風は席で決まり、親が東。場風か自風の刻子は役牌（1翻）、両方なら2翻。',
+      },
       { term: 'ドラ', reading: 'ドラ', body: 'ドラ表示牌の次の牌。1枚につき1翻。赤5（赤ドラ）も1枚1翻。' },
       { term: '役満', reading: 'ヤクマン', body: '13翻の特別な役。複数あれば合算し、他の役とドラは加算しない。' },
-      { term: '流局', reading: 'りゅうきょく', body: '和了らずに最大巡目まで打ち切った状態。' },
+      { term: '流局', reading: 'りゅうきょく', body: '和了らずに最大巡目まで打ち切った状態。', game: '山が尽きて誰も和了しないこと。聴牌者はノーテン罰符を受け取る。' },
     ],
   },
   {
@@ -79,21 +85,27 @@ const GROUPS: Group[] = [
     title: 'アプリ',
     terms: [
       { term: 'シード', reading: 'シード', body: '山の並びを決める数。同じシードなら毎回同じ配牌・ツモ順。' },
-      { term: '巡目', reading: 'じゅんめ', body: '打牌した回数。最大巡目で流局。' },
-      { term: '履歴ツリー', reading: 'りれきツリー', body: '打牌の履歴。任意の巡目に戻って別の牌を切ると枝が増え、元の枝も残る。' },
+      { term: '巡目', reading: 'じゅんめ', body: '打牌した回数。最大巡目で流局。', game: null },
+      { term: '履歴ツリー', reading: 'りれきツリー', body: '打牌の履歴。任意の巡目に戻って別の牌を切ると枝が増え、元の枝も残る。', game: null },
       { term: '打牌プレビュー', reading: 'だはいプレビュー', body: '手牌にカーソルを合わせると、その牌を切った後の役別向聴と差分を表示。' },
     ],
   },
 ];
 
 /** 用語表: short explanations of the terms used on the page, filterable. */
-export function Glossary({ onMinimize }: { onMinimize?: () => void }) {
+export function Glossary({ mode, onMinimize }: { mode: 'practice' | 'game'; onMinimize?: () => void }) {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const groups = GROUPS.map((g) => ({
-    ...g,
-    terms: q === '' ? g.terms : g.terms.filter((t) => `${t.term} ${t.reading} ${t.body}`.toLowerCase().includes(q)),
-  })).filter((g) => g.terms.length > 0);
+  const groups = GROUPS.map((g) => {
+    const terms = g.terms.flatMap((t) => {
+      if (mode !== 'game' || t.game === undefined) return [t];
+      return t.game === null ? [] : [{ ...t, body: t.game }];
+    });
+    return {
+      ...g,
+      terms: q === '' ? terms : terms.filter((t) => `${t.term} ${t.reading} ${t.body}`.toLowerCase().includes(q)),
+    };
+  }).filter((g) => g.terms.length > 0);
 
   return (
     <section class="glossary-panel" aria-label="用語表">

@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light dark;
   --bg: #f4f5f7;
   --fg: #1a1d23;
   --muted: #6b7280;
@@ -9,6 +10,8 @@
   --danger: #dc2626;
   --danger-bg: #fee2e2;
   --success-bg: #dcfce7;
+  --success: #15803d;
+  --success-border: #16a34a;
   --tile-bg: #fffdf5;
   --tile-border: #c9c2a8;
   --tile-back: #3f7d5c;
@@ -28,6 +31,8 @@
     --danger: #f87171;
     --danger-bg: #3a1414;
     --success-bg: #123420;
+    --success: #4ade80;
+    --success-border: #4ade80;
     --tile-bg: #f4efe0;
     --tile-border: #8a8264;
     --tile-back: #2f6b4c;
@@ -412,9 +417,6 @@ section {
 .tile-dimmed {
   opacity: 0.35;
 }
-.tile-selected {
-  outline: 2px solid var(--accent);
-}
 .tile-interactive {
   cursor: pointer;
 }
@@ -621,7 +623,7 @@ section {
 }
 .delta-improve {
   background: var(--success-bg);
-  color: #15803d;
+  color: var(--success);
 }
 .delta-worse {
   background: var(--danger-bg);
@@ -775,7 +777,7 @@ section {
 
 /* ---- Win panel ---- */
 .win-panel {
-  border-color: var(--success-bg);
+  border-color: var(--success-border);
 }
 .win-tiles {
   display: flex;

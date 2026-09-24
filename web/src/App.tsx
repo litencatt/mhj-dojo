@@ -78,6 +78,10 @@ export function App() {
     history.replaceState(null, '', url);
   }, [state?.session_id]);
 
+  useEffect(() => {
+    document.title = 'mhj2 - 麻雀練習';
+  }, []);
+
   function handleNewGame(e: Event) {
     e.preventDefault();
     const seed = seedInput.trim() === '' ? undefined : Number(seedInput);
@@ -106,8 +110,8 @@ export function App() {
     return map;
   }, [state?.analysis]);
 
-  const displayedRows = state ? (previewTile ? (state.by_discard[previewTile] ?? state.analysis) : state.analysis) : [];
-  const baselineRows = previewTile && state ? state.analysis : null;
+  // Preview only tiles the server analysed, so the title never outruns the table.
+  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
 
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
@@ -249,14 +253,14 @@ export function App() {
         <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
           <div class="area-yaku" hidden={isMin('yaku')}>
             <YakuTable
-              rows={displayedRows}
-              baseline={baselineRows}
-              previewTile={previewTile}
+              rows={previewRows ?? state.analysis}
+              baseline={previewRows ? state.analysis : null}
+              previewTile={previewRows ? previewTile : null}
               onMinimize={() => minimize('yaku')}
             />
           </div>
           <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary onMinimize={() => minimize('gloss')} />
+            <Glossary mode="practice" onMinimize={() => minimize('gloss')} />
           </div>
         </div>
       )}
