@@ -306,3 +306,40 @@ func TestGuards(t *testing.T) {
 		}
 	}
 }
+
+func TestSecurityHeaders(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	check := func(what string, h http.Header) {
+		t.Helper()
+		if h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" {
+			t.Errorf("%s: headers %v", what, h)
+		}
+	}
+	for _, path := range []string{"/", "/api/sessions/nope"} {
+		_, _, h := c.do("GET", path, "")
+		check(path, h)
+	}
+	// Rejected requests carry them too.
+	req, _ := http.NewRequest("GET", c.srv.URL+"/", nil)
+	req.Host = "evil.example"
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("spoofed host: %d", res.StatusCode)
+	}
+	check("403", res.Header)
+	req, _ = http.NewRequest("POST", c.srv.URL+"/api/sessions", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "text/plain")
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusUnsupportedMediaType {
+		t.Fatalf("form post: %d", res.StatusCode)
+	}
+	check("415", res.Header)
+}

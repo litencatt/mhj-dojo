@@ -49,6 +49,18 @@ func FullSet() [Size]tile.Tile {
 	return ts
 }
 
+// PickSeed returns explicit if set, else def if set, else a random seed in
+// [0, bound).
+func PickSeed(explicit, def *int64, bound int64) int64 {
+	switch {
+	case explicit != nil:
+		return *explicit
+	case def != nil:
+		return *def
+	}
+	return rand.Int64N(bound)
+}
+
 // New shuffles a full set with a PCG generator seeded from seed.
 func New(seed int64) *Wall {
 	w := &Wall{seed: seed, tiles: FullSet()}

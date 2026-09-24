@@ -54,8 +54,17 @@ func run(host string, port int, open bool, store *session.Store, games *match.St
 	}
 	url := fmt.Sprintf("http://%s/", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
 	fmt.Printf("mhj2 listening on %s (Ctrl+C to quit)\n", url)
+	if addr := ln.Addr().(*net.TCPAddr); !addr.IP.IsLoopback() {
+		fmt.Fprintf(os.Stderr, "warning: bound to %s: the API has no authentication and the Host check only stops browsers, so other machines on the network can use it\n", addr)
+	}
 
-	srv := &http.Server{Handler: server.New(store, games), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{
+		Handler:           server.New(store, games),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

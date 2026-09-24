@@ -5,7 +5,6 @@ package session
 import (
 	"errors"
 	"fmt"
-	mrand "math/rand/v2"
 	"sync"
 
 	"github.com/litencatt/mhj2/internal/store"
@@ -34,9 +33,14 @@ const (
 	DefaultMaxTurns = 18
 	// MaxSessions bounds memory; the oldest session is evicted beyond it.
 	MaxSessions = 256
+	// MaxNodes bounds a session's tree (every state carries the whole tree).
+	MaxNodes = 2000
 	// memoLimit resets an analyzer's memo when it grows past this many tables.
 	memoLimit = 200_000
 )
+
+// maxNodes is MaxNodes, lowered by tests.
+var maxNodes = MaxNodes
 
 // Phase 1 plays East round, East seat.
 var (
@@ -57,16 +61,8 @@ func NewStore() *Store { return &Store{sessions: store.New[*Session](MaxSessions
 // Create starts a session. A nil seed picks the default or a random seed;
 // maxTurns 0 means DefaultMaxTurns.
 func (st *Store) Create(seed *int64, maxTurns int) (*Session, error) {
-	var s int64
-	switch {
-	case seed != nil:
-		s = *seed
-	case st.DefaultSeed != nil:
-		s = *st.DefaultSeed
-	default:
-		s = mrand.Int64N(1 << 32)
-	}
-	return st.CreateWithWall(wall.New(s), maxTurns)
+	// Practice seeds are always shown, so a small range is fine.
+	return st.CreateWithWall(wall.New(wall.PickSeed(seed, st.DefaultSeed, 1<<32)), maxTurns)
 }
 
 // CreateWithWall starts a session on a given wall (used by tests).
@@ -140,6 +136,14 @@ func (s *Session) addNode(n *node) *node {
 	return n
 }
 
+// roomForNode fails once the tree has reached maxNodes.
+func (s *Session) roomForNode() error {
+	if len(s.nodes) >= maxNodes {
+		return fmt.Errorf("%w: the session has %d nodes; start a new session", ErrConflict, maxNodes)
+	}
+	return nil
+}
+
 // drawn returns the pending draw at a playing node.
 func (s *Session) drawn(n *node) (tile.Tile, bool) {
 	if n.status != StatusPlaying {
@@ -179,6 +183,9 @@ func (s *Session) Discard(t string) (State, error) {
 		s.current = id
 		return s.state(), nil
 	}
+	if err := s.roomForNode(); err != nil {
+		return State{}, err
+	}
 	disc := tiles[idx]
 	hand := append(tiles[:idx:idx], tiles[idx+1:]...)
 	tile.Sort(hand)
@@ -199,6 +206,9 @@ func (s *Session) Tsumo() (State, error) {
 	d, ok := s.drawn(cur)
 	if !ok {
 		return State{}, fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
+	}
+	if err := s.roomForNode(); err != nil {
+		return State{}, err
 	}
 	tiles := append(append([]tile.Tile{}, cur.hand...), d)
 	tile.Sort(tiles)

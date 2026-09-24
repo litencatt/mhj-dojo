@@ -99,9 +99,16 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 }
 
 // guard rejects requests whose Host is not a loopback name (DNS rebinding)
-// and POSTs without a JSON content type (cross-site form posts).
+// and POSTs without a JSON content type (cross-site form posts), and sets
+// the response headers that keep other origins from embedding the app. It
+// is a browser-side defence only: a network client can send any Host.
 func guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		// Other origins may not frame the app (clickjacking a discard).
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+		h.Set("X-Frame-Options", "DENY")
 		if !loopbackHost(r.Host) {
 			writeError(w, http.StatusForbidden, "host not allowed: "+r.Host)
 			return

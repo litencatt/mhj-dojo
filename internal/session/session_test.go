@@ -376,3 +376,38 @@ func TestDoraAndUraDora(t *testing.T) {
 		t.Fatalf("ura dora after goto: %v", v.UraDoraIndicators)
 	}
 }
+
+func TestTreeIsBounded(t *testing.T) {
+	defer func(n int) { maxNodes = n }(maxNodes)
+	maxNodes = 10
+	st := NewStore()
+	s, err := st.Create(nil, wall.LiveDraws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for len(s.nodes) < maxNodes {
+		if _, err := s.Discard(*s.State().Drawn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Discard(*s.State().Drawn); !errors.Is(err, ErrConflict) {
+		t.Fatalf("discard past the node limit: %v", err)
+	}
+	// Tsumo creates a node too, so it is capped as well.
+	full, err := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxNodes = 1
+	if _, err := full.Tsumo(); !errors.Is(err, ErrConflict) {
+		t.Fatalf("tsumo past the node limit: %v", err)
+	}
+	maxNodes = 10
+	// Revisiting an existing node is still allowed.
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Discard(*s.State().Drawn); err != nil {
+		t.Fatalf("moving to an existing child: %v", err)
+	}
+}

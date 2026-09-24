@@ -59,7 +59,7 @@ make build        # builds bin/mhj2 (frontend is embedded)
 | `--open` | `true` | Open the browser on start |
 | `--seed` | random | Default wall seed for new games |
 
-The server only accepts requests addressed to localhost (a DNS-rebinding guard), so it is not reachable from other machines even with `--host 0.0.0.0`.
+The server only accepts requests whose `Host` header names localhost. That stops web pages in your browser from reaching it through DNS rebinding, but it is not authentication: with `--host 0.0.0.0` any machine on the network can use the API by sending a loopback `Host` header, and the server prints a warning when bound to a non-loopback address. Keep the default host unless you trust the network.
 
 ## Development
 
