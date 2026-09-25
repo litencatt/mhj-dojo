@@ -68,7 +68,7 @@ func (r *Round) ViewFor(viewer int) View {
 			Wind:      r.SeatWind(s),
 			Points:    p.points,
 			River:     slices.Clone(p.river),
-			Melds:     slices.Clone(p.melds),
+			Melds:     cloneMelds(p.melds),
 			HandCount: len(p.hand),
 			Riichi:    p.riichi,
 		}
@@ -85,6 +85,17 @@ func (r *Round) ViewFor(viewer int) View {
 		v.Seats[s] = sv
 	}
 	return v
+}
+
+// cloneMelds copies melds and their tiles, so a view never shares the
+// round's data.
+func cloneMelds(ms []Called) []Called {
+	out := make([]Called, len(ms))
+	for i, m := range ms {
+		out[i] = m
+		out[i].Tiles = slices.Clone(m.Tiles)
+	}
+	return out
 }
 
 // Legal lists what seat may do now.

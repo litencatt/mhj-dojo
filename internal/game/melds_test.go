@@ -47,6 +47,11 @@ func TestTurnWithoutDrawnTile(t *testing.T) {
 	if len(v.Seats[0].Melds) != 1 || v.Seats[0].HandCount != 11 || v.Seats[0].Hand != nil {
 		t.Fatalf("seat 0 as seen by seat 1: %+v", v.Seats[0])
 	}
+	v.Seats[0].Melds[0].Tiles[0] = tile.Tile{} // a view must not share the round's tiles
+	if r.players[0].melds[0].Tiles[0].Kind != tile.MakeKind(tile.Pin, 8) {
+		t.Fatal("changing a view changed the round")
+	}
+	v = r.ViewFor(1)
 	if vis := v.Visible(); vis[tile.MakeKind(tile.Pin, 8)] != 3 {
 		t.Fatalf("called 8p not visible: %d", vis[tile.MakeKind(tile.Pin, 8)])
 	}
