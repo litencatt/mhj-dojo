@@ -47,7 +47,13 @@ type Hanchan struct {
 
 // NewHanchan deals the first round. The first dealer is seed mod 4.
 func NewHanchan(seed int64, rules Rules) *Hanchan {
-	h := &Hanchan{rules: rules, seed: seed, firstDealer: int(((seed % 4) + 4) % 4)}
+	return NewHanchanFrom(seed, rules, int(((seed%4)+4)%4))
+}
+
+// NewHanchanFrom deals the first round with seat firstDealer (0-3) as the
+// first dealer; the walls are the same as NewHanchan's for the seed.
+func NewHanchanFrom(seed int64, rules Rules, firstDealer int) *Hanchan {
+	h := &Hanchan{rules: rules, seed: seed, firstDealer: firstDealer}
 	h.deal([4]int{rules.StartPoints, rules.StartPoints, rules.StartPoints, rules.StartPoints})
 	return h
 }

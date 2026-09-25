@@ -15,8 +15,10 @@ type State struct {
 	GameID            string                       `json:"game_id"`
 	Seed              *int64                       `json:"seed"` // null until the game ends unless you chose it
 	Length            string                       `json:"length"`
+	FirstDealerMode   string                       `json:"first_dealer_mode"` // the first_dealer asked for: random or you
+	CPU               string                       `json:"cpu"`               // weak or normal
 	You               int                          `json:"you"`
-	FirstDealer       int                          `json:"first_dealer"`
+	FirstDealer       int                          `json:"first_dealer"` // the seat
 	Dealer            int                          `json:"dealer"`
 	RoundWind         string                       `json:"round_wind"`
 	RoundNumber       int                          `json:"round_number"` // 1-4: 東1局 = round_wind 1z, round_number 1
@@ -132,7 +134,9 @@ func (m *Match) state() State {
 	v := r.ViewFor(Human)
 	st := State{
 		GameID:            m.id,
-		Length:            m.length,
+		Length:            m.opts.Length,
+		FirstDealerMode:   m.opts.FirstDealer,
+		CPU:               m.opts.CPU,
 		You:               Human,
 		FirstDealer:       h.FirstDealer(),
 		Dealer:            v.Dealer,

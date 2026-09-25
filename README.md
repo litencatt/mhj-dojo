@@ -26,11 +26,11 @@ Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and se
 
 Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to play one closed-hand East round against three CPU players.
 
-- **Table** — every seat's river (the riichi tile lies sideways), points, wind and dealer mark; CPU hands stay face down until the round ends. The dealer is the seed mod 4, so your seat wind varies.
+- **Table** — every seat's river (the riichi tile lies sideways), points, wind and dealer mark; CPU hands stay face down until the round ends. The first dealer is the seed mod 4, so your seat wind varies, unless you pick **起家: 自分** to deal first.
 - **Your moves** — discard, **リーチ** (then pick a discard that keeps tenpai; later draws are discarded for you unless you can win), **ツモ**, and **ロン** / **見逃す** when a discard completes your hand.
 - **Rules** — riichi, double riichi, ippatsu, ura dora, haitei / houtei, furiten (own discards, same go-around, after riichi), head bump, noten penalty at the exhaustive draw. No calls (pon / chi / kan) yet.
 - **Scoring** — fu and han, mangan to (counted) yakuman, dealer / non-dealer payments and riichi sticks, shown with the point changes when the round ends.
-- **CPU players** — take every win, discard for tile efficiency, declare riichi when tenpai, and fold (genbutsu, suji, safe honors) against a riichi when two or more steps from tenpai.
+- **CPU players** — take every win, discard for tile efficiency, declare riichi when tenpai, and fold (genbutsu, suji, safe honors) against a riichi when two or more steps from tenpai. Pick **CPU: 弱い** for a weaker opponent that never calls or folds and often makes a less efficient discard (still reproducible from the seed).
 - **Practice tools stay on** — the per-yaku shanten table (its wind rows follow your seat and the round), the discard preview, the time-series chart and the glossary. There is no rewinding in a game.
 - **Seed** — a seed you choose makes the whole round (CPU moves included) repeatable; a random seed is revealed when the round ends.
 

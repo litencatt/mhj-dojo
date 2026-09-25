@@ -2,10 +2,13 @@
 // riichi when tenpai, calls when the hand keeps a yaku (see calls.go),
 // discards for tile efficiency (lowest shanten, then most unseen accepting
 // tiles) and folds against a riichi when it is two or more steps from
-// tenpai. It is deterministic.
+// tenpai. It is deterministic. The weak player (NewWeak) plays worse on
+// purpose.
 package cpu
 
 import (
+	"encoding/binary"
+	"hash/fnv"
 	"slices"
 
 	"github.com/litencatt/mhj2/internal/game"
@@ -45,11 +48,29 @@ func kokushiShanten(v game.View) int {
 // Player decides moves for CPU seats. It keeps a shanten memo, so use one
 // Player per game (it is not safe for concurrent use).
 type Player struct {
-	eng *shanten.Engine
+	eng  *shanten.Engine
+	weak bool
 }
+
+// Levels of play.
+const (
+	Weak   = "weak"   // 弱い: NewWeak
+	Normal = "normal" // 普通: New
+)
+
+// weakStray is the share, in percent, of the weak player's discards picked
+// among all those keeping the lowest shanten instead of the best one.
+const weakStray = 50
 
 // New returns a player with an empty memo.
 func New() *Player { return &Player{eng: shanten.NewEngine()} }
+
+// NewWeak returns a weaker player: it still takes every win and declares
+// riichi when tenpai, but never calls or declares a kan, never folds, and
+// on about every other discard picks any discard that keeps the lowest
+// shanten instead of the one with the most ukeire. That pick is a hash of
+// what the seat sees, not a random draw, so a game replays exactly.
+func NewWeak() *Player { return &Player{eng: shanten.NewEngine(), weak: true} }
 
 // Decide implements game.Decider.
 func (p *Player) Decide(v game.View, l game.Legal) game.Action {
@@ -61,6 +82,8 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 		return game.Action{Type: game.Tsumo}
 	case l.Ron:
 		return game.Action{Type: game.Ron}
+	case l.Skip && p.weak:
+		return game.Action{Type: game.Skip}
 	case l.Skip:
 		if a, ok := p.decideCall(v, l); ok {
 			return a
@@ -69,7 +92,7 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	case l.Kyuushu && kokushiShanten(v) > kyuushuKeep:
 		return game.Action{Type: game.Kyuushu}
 	}
-	if len(l.Kan) > 0 {
+	if len(l.Kan) > 0 && !p.weak {
 		if a, ok := p.decideSelfKan(v, l); ok {
 			return a
 		}
@@ -82,17 +105,46 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	visible := v.Visible()
 
 	best := p.byEfficiency(tiles, len(me.Melds), l.Discards, &visible)
-	if best[0].shanten >= foldShanten {
+	if best[0].shanten >= foldShanten && !p.weak {
 		if threats := riichiRivers(v); len(threats) > 0 {
 			choice := safest(best, threats, &visible)
 			return game.Action{Type: game.Discard, Tile: choice}
 		}
 	}
 	choice := best[0].tile
+	if p.weak {
+		choice = stray(v, best)
+	}
 	if best[0].shanten == 0 && slices.Contains(l.Riichi, choice) {
 		return game.Action{Type: game.Riichi, Tile: choice}
 	}
 	return game.Action{Type: game.Discard, Tile: choice}
+}
+
+// stray returns the weak player's discard from the ranked opts: usually the
+// best, else any that keeps the lowest shanten. The pick depends only on the
+// round's wall seed, the seat and how far the round has got.
+func stray(v game.View, opts []option) string {
+	moves := 0
+	for _, s := range v.Seats {
+		moves += len(s.River) + len(s.Melds)
+	}
+	var b [32]byte
+	binary.BigEndian.PutUint64(b[0:], uint64(v.Seed))
+	binary.BigEndian.PutUint64(b[8:], uint64(v.Viewer))
+	binary.BigEndian.PutUint64(b[16:], uint64(v.DrawsLeft))
+	binary.BigEndian.PutUint64(b[24:], uint64(moves))
+	h := fnv.New64a()
+	h.Write(b[:])
+	x := h.Sum64()
+	if x%100 >= weakStray {
+		return opts[0].tile
+	}
+	n := 1
+	for n < len(opts) && opts[n].shanten == opts[0].shanten {
+		n++
+	}
+	return opts[(x/100)%uint64(n)].tile
 }
 
 // option is a discard with the shanten and unseen accepting tiles it leaves.

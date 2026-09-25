@@ -148,6 +148,8 @@ export function goto(id: string, nodeId: number): Promise<SessionState> {
 export type GamePhase = 'discard' | 'call' | 'ended';
 export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'pon' | 'chii' | 'kan' | 'next';
 export type GameLength = 'tonpuu' | 'hanchan'; // 東風戦 | 半荘戦
+export type FirstDealerMode = 'random' | 'you'; // 起家: ランダム | 自分
+export type CpuLevel = 'weak' | 'normal'; // 弱い | 普通
 export type AbortReason = 'kyuushu' | 'suufon' | 'suucha' | 'suukaikan'; // 九種九牌 | 四風連打 | 四家立直 | 四開槓
 
 export interface RiverTile {
@@ -252,8 +254,10 @@ export interface GameState {
   game_id: string;
   seed: number | null; // null until the end unless you chose the seed
   length: GameLength;
+  first_dealer_mode: FirstDealerMode; // the first_dealer asked for
+  cpu: CpuLevel;
   you: number;
-  first_dealer: number;
+  first_dealer: number; // the seat
   dealer: number;
   round_wind: Tile;
   round_number: number; // 1-4
@@ -280,7 +284,13 @@ export interface GameState {
   result: GameResult | null;
 }
 
-export function createGame(opts: { seed?: number; length?: GameLength } = {}): Promise<GameState> {
+export interface GameOptions {
+  length: GameLength;
+  first_dealer: FirstDealerMode;
+  cpu: CpuLevel;
+}
+
+export function createGame(opts: Partial<GameOptions> & { seed?: number } = {}): Promise<GameState> {
   return request<GameState>('/api/games', {
     method: 'POST',
     body: JSON.stringify(opts),

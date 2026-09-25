@@ -236,6 +236,20 @@ func playHanchan(t *testing.T, seed int64, rules Rules) *Hanchan {
 	}
 }
 
+// NewHanchanFrom picks the first dealer and deals the same walls as
+// NewHanchan for the seed.
+func TestNewHanchanFrom(t *testing.T) {
+	for seed := range int64(8) {
+		h, def := NewHanchanFrom(seed, Tonpuu, 0), NewHanchan(seed, Tonpuu)
+		if h.FirstDealer() != 0 || h.Dealer() != 0 || h.Round().Dealer() != 0 {
+			t.Fatalf("seed %d: first dealer %d, dealer %d", seed, h.FirstDealer(), h.Dealer())
+		}
+		if h.Round().Seed() != def.Round().Seed() {
+			t.Fatalf("seed %d: wall differs", seed)
+		}
+	}
+}
+
 // Sticks left on the table at the end go to first place, in points and score.
 func TestLeftoverSticksGoToFirst(t *testing.T) {
 	h := NewHanchan(4, Tonpuu)

@@ -47,32 +47,67 @@ const (
 	Hanchan = "hanchan" // 半荘戦: East and South
 )
 
-// Create deals a game of the given length ("" means Tonpuu). A nil seed
-// picks the default or a random seed.
-func (st *Store) Create(seed *int64, length string) (*Match, error) {
+// Choices of the first dealer (起家).
+const (
+	DealerRandom = "random" // the master seed mod 4
+	DealerYou    = "you"    // the human
+)
+
+// Options choose a game; "" picks the default (the first of each list).
+type Options struct {
+	Length      string // Tonpuu or Hanchan
+	FirstDealer string // DealerRandom or DealerYou
+	CPU         string // cpu.Normal or cpu.Weak
+}
+
+// Create deals a game with the given options. A nil seed picks the default
+// or a random seed.
+func (st *Store) Create(seed *int64, o Options) (*Match, error) {
 	var rules game.Rules
-	switch length {
+	switch o.Length {
 	case "", Tonpuu:
-		length, rules = Tonpuu, game.Tonpuu
+		o.Length, rules = Tonpuu, game.Tonpuu
 	case Hanchan:
 		rules = game.HanchanRule
 	default:
 		return nil, fmt.Errorf("%w: length must be %q or %q", game.ErrInvalid, Tonpuu, Hanchan)
 	}
+	switch o.FirstDealer {
+	case "":
+		o.FirstDealer = DealerRandom
+	case DealerRandom, DealerYou:
+	default:
+		return nil, fmt.Errorf("%w: first_dealer must be %q or %q", game.ErrInvalid, DealerRandom, DealerYou)
+	}
+	switch o.CPU {
+	case "":
+		o.CPU = cpu.Normal
+	case cpu.Normal, cpu.Weak:
+	default:
+		return nil, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
+	}
 	// A random seed is hidden until the game ends: it rebuilds every wall.
 	// 2^53 keeps it exact in JSON while making a search from the dealt tiles
 	// impractical (2^32 would take minutes).
-	h := game.NewHanchan(wall.PickSeed(seed, st.DefaultSeed, 1<<53), rules)
-	m := newMatch(h, length, seed != nil || st.DefaultSeed != nil)
+	s := wall.PickSeed(seed, st.DefaultSeed, 1<<53)
+	h := game.NewHanchan(s, rules)
+	if o.FirstDealer == DealerYou {
+		h = game.NewHanchanFrom(s, rules, Human)
+	}
+	m := newMatch(h, o, seed != nil || st.DefaultSeed != nil)
 	m.id = st.games.Add(m)
 	return m, nil
 }
 
 // newMatch starts a match and plays the CPUs up to the human's first
-// decision.
-func newMatch(h *game.Hanchan, length string, seedKnown bool) *Match {
-	m := &Match{length: length, seedKnown: seedKnown}
-	m.game = game.StartHanchan(h, cpu.New())
+// decision. The options must be filled in (see Create).
+func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
+	m := &Match{opts: o, seedKnown: seedKnown}
+	p := cpu.New()
+	if o.CPU == cpu.Weak {
+		p = cpu.NewWeak()
+	}
+	m.game = game.StartHanchan(h, p)
 	m.game.OnHumanDiscard = m.recordHand
 	m.startRound()
 	return m
@@ -111,7 +146,7 @@ type Match struct {
 	// seedKnown is set when the player chose the seed. A random seed is
 	// revealed only when the game ends: it rebuilds every wall.
 	seedKnown bool
-	length    string
+	opts      Options
 	// rounds sums up the finished rounds.
 	rounds []RoundSummary
 }
