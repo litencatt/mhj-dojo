@@ -74,8 +74,9 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 	}))
 	mux.HandleFunc("POST /api/games/{id}/action", a.withGame(func(m *match.Match, r *http.Request) (match.State, error) {
 		var body struct {
-			Type game.ActionType `json:"type"`
-			Tile string          `json:"tile"`
+			Type  game.ActionType `json:"type"`
+			Tile  string          `json:"tile"`
+			Tiles []string        `json:"tiles"`
 		}
 		if err := decode(r, &body, true); err != nil {
 			return match.State{}, err
@@ -85,13 +86,17 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 			if body.Tile == "" {
 				return match.State{}, errInvalid("tile is required for " + string(body.Type))
 			}
-		case game.Tsumo, game.Ron, game.Skip, game.Kyuushu:
+		case game.Chii:
+			if len(body.Tiles) != 2 {
+				return match.State{}, errInvalid("tiles (two) are required for chii")
+			}
+		case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
 		case actionNext:
 			return m.Next()
 		default:
-			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron, skip, kyuushu or next")
+			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
 		}
-		return m.Act(game.Action{Type: body.Type, Tile: body.Tile})
+		return m.Act(game.Action{Type: body.Type, Tile: body.Tile, Tiles: body.Tiles})
 	}))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)

@@ -242,11 +242,10 @@ These clarify points the contract above leaves open; none changes the JSON shape
 
 ## Games against CPU players
 
-A game is a 東風戦 (East round only) or 半荘戦 (East and South rounds) of
-closed hands: you are seat 0, three CPU players take seats 1–3, and every
-player starts with 25000 points. The first dealer (起家) is `seed mod 4`, so
-your seat wind depends on the seed. There are no calls (pon, chii, kan) and no
-rewinding. After each of your moves the server plays the CPU seats until you
+A game is a 東風戦 (East round only) or 半荘戦 (East and South rounds): you
+are seat 0, three CPU players take seats 1–3, and every player starts with
+25000 points. The first dealer (起家) is `seed mod 4`, so your seat wind
+depends on the seed. There is no rewinding. After each of your moves the server plays the CPU seats until you
 have a choice again or the round ends; after a round ends you send `next`.
 
 Round rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after
@@ -254,8 +253,23 @@ the discard; after riichi only the drawn tile can be discarded, and the server
 discards it for you unless you can tsumo), double riichi, ippatsu, ura dora,
 haitei, houtei, furiten (own discards, same go-around, and after riichi), head
 bump (no double ron), 3000-point noten penalty at the exhaustive draw, and the
-abortive draws 九種九牌 (declared), 四風連打 and 四家立直. Points: no kiriage
-mangan, counted yakuman at 13 han, honba 300 (ron) / 100 each (tsumo).
+abortive draws 九種九牌 (declared), 四風連打, 四家立直 and 四開槓. Points: no
+kiriage mangan, counted yakuman at 13 han, honba 300 (ron) / 100 each (tsumo).
+
+Calls: pon and open kan on any other seat's discard, chii on the discard of
+the seat to your left, and on your own turn a concealed kan or an added kan
+onto your pon. After a discard every seat that can claim it answers in turn
+order: a ron wins at once (head bump), otherwise a pon or kan beats a chii.
+Declining a ron makes you furiten; declining a call does not. The last
+discard of the round cannot be called, and a seat in riichi can only ron (or
+make a concealed kan that keeps its waits). After a pon or chii you discard
+without drawing and may not discard the called kind, nor the tile on the far
+side after a chii on an end of the sequence (喰い替え). Each kan draws a
+replacement tile (嶺上開花 if it wins), reveals another dora indicator and
+shortens the live wall by one; an added kan can be robbed (槍槓). Calls end
+ippatsu and the uninterrupted first go-around. Open hands lose the
+closed-only yaku and a han on the kuisagari yaku; the per-yaku analysis is
+left empty after a call.
 
 Game rules: the dealer keeps the deal after winning, after a draw where the
 dealer is tenpai, and after an abortive draw; otherwise the deal passes on.
@@ -286,7 +300,10 @@ Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
 | `riichi` | your turn | a tile from `legal.riichi` (declare riichi and discard it) |
 | `tsumo` | `legal.tsumo` | – |
 | `ron` | `legal.ron` (the tile is `last_discard`) | – |
-| `skip` | `legal.ron` (pass; you become furiten) | – |
+| `skip` | `legal.skip`: pass on the claims you were offered (passing a ron makes you furiten) | – |
+| `pon` | `legal.pon` (the tile is `last_discard`) | – (`tiles`: optionally the two tiles to use, e.g. with a red five) |
+| `chii` | `legal.chii` | `tiles`: one of the pairs in `legal.chii` |
+| `kan` | `legal.kan`: in the call phase an open kan of `last_discard`; on your turn a concealed or added kan | on your turn, `tile`: a kind from `legal.kan` |
 | `kyuushu` | `legal.kyuushu`: your first uninterrupted turn with nine or more different terminals and honors (九種九牌, an abortive draw) | – |
 | `next` | `can_next`: the round has ended and another follows | – |
 
@@ -309,7 +326,7 @@ unknown game, `409` a move that is not legal now.
   "standings": [ {"seat": 0, "rank": 1, "points": 25000, "score": 25.0} ],  // index = seat; score final once game_over
   "rounds": [ {"round_wind": "1z", "round_number": 1, "honba": 0, "kind": "ron",
                "winner": 1, "from": 0, "deltas": [-3900, 3900, 0, 0]} ],  // finished rounds; the current one last once it ends
-  "phase": "discard",           // "discard" | "call" (a ron window) | "ended"
+  "phase": "discard",           // "discard" | "call" (claims on a discard or an added kan) | "ended"
   "actor": 0,                   // seat to act; -1 once ended
   "wall_remaining": 69,         // live draws left (70 after the deal)
   "deposit": 0,                 // riichi sticks on the table
@@ -317,14 +334,17 @@ unknown game, `409` a move that is not legal now.
   "ura_dora_indicators": [], "ura_dora": [],   // revealed when the round ends
   "seats": [                    // index = seat
     { "seat": 0, "wind": "3z", "points": 25000, "riichi": false,
-      "river": [{"tile": "9s", "riichi": false}],
-      "hand_count": 14,
+      "river": [{"tile": "9s", "riichi": false, "called": false}],  // called: taken into another seat's meld
+      "melds": [{"type": "pon", "tiles": ["7z", "7z", "7z"], "from": 3}],  // "chii" | "pon" | "kan" | "ankan"; the called tile last; from -1 for an ankan
+      "hand_count": 14,             // concealed tiles, drawn tile included
       "hand": ["1m", "..."],    // present only for you, and for every seat once ended
       "drawn": "4p" }           // your drawn tile on your turn
   ],
-  "last_discard": null,         // the tile you may ron, when legal.ron
-  "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false },
-  "events": [ {"seat": 1, "type": "discard", "tile": "2z"} ],  // moves since your previous move
+  "last_discard": null,         // the tile you may claim, in the call phase
+  "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false,
+             "pon": false, "chii": [["3m", "4m"]], "kan": [] },
+  "events": [ {"seat": 1, "type": "discard", "tile": "2z"},
+              {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"]} ],  // moves since your previous move; no skips
   "analysis": [YakuRow],        // your 13-tile hand; wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)

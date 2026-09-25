@@ -51,15 +51,25 @@ type Seat struct {
 	Points    int         `json:"points"`
 	Riichi    bool        `json:"riichi"`
 	River     []RiverTile `json:"river"`
-	HandCount int         `json:"hand_count"`
+	Melds     []Meld      `json:"melds"`
+	HandCount int         `json:"hand_count"` // concealed tiles, drawn tile included
 	Hand      []string    `json:"hand,omitempty"`
 	Drawn     *string     `json:"drawn,omitempty"`
 }
 
-// RiverTile is a discard; riichi marks the declaration tile.
+// Meld is a called meld or a concealed kan.
+type Meld struct {
+	Type  string   `json:"type"`  // "chii", "pon", "kan" (open) or "ankan"
+	Tiles []string `json:"tiles"` // the called tile last
+	From  int      `json:"from"`  // the seat the tile came from; -1 for an ankan
+}
+
+// RiverTile is a discard; riichi marks the declaration tile, called a tile
+// another seat took into a meld.
 type RiverTile struct {
 	Tile   string `json:"tile"`
 	Riichi bool   `json:"riichi"`
+	Called bool   `json:"called"`
 }
 
 // Event is one move since your previous move: discards, riichi, calls
@@ -160,17 +170,21 @@ func (m *Match) state() State {
 		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
 		st.UraDora = apiview.DoraKinds(v.UraIndicators)
 	}
-	if v.LastDiscard != nil && st.Legal.Ron {
+	l := st.Legal
+	if v.LastDiscard != nil && (l.Ron || l.Pon || len(l.Chii) > 0 || len(l.Kan) > 0) {
 		s := v.LastDiscard.String()
 		st.LastDiscard = &s
 	}
 	for s, sv := range v.Seats {
 		seat := Seat{
 			Seat: s, Wind: sv.Wind.String(), Points: sv.Points, Riichi: sv.Riichi,
-			River: make([]RiverTile, len(sv.River)), HandCount: sv.HandCount,
+			River: make([]RiverTile, len(sv.River)), Melds: make([]Meld, len(sv.Melds)), HandCount: sv.HandCount,
 		}
 		for i, rt := range sv.River {
-			seat.River[i] = RiverTile{Tile: rt.Tile.String(), Riichi: rt.Riichi}
+			seat.River[i] = RiverTile{Tile: rt.Tile.String(), Riichi: rt.Riichi, Called: rt.Called}
+		}
+		for i, m := range sv.Melds {
+			seat.Melds[i] = Meld{Type: meldType(m), Tiles: tile.Strings(m.Tiles), From: m.From}
 		}
 		if sv.Hand != nil {
 			seat.Hand = tile.Strings(sv.Hand)
@@ -227,6 +241,18 @@ func (m *Match) recordHand() {
 	m.history = append(m.history, apiview.HistoryEntry{
 		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand))),
 	})
+}
+
+func meldType(m game.Called) string {
+	switch {
+	case m.Meld.Type == yaku.Seq:
+		return "chii"
+	case !m.Meld.Kan:
+		return "pon"
+	case m.From < 0:
+		return "ankan"
+	}
+	return "kan"
 }
 
 // summary sums up the current round once it has ended, else nil.
