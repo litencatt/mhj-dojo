@@ -7,17 +7,17 @@ import (
 	"github.com/litencatt/mhj2/internal/wall"
 )
 
-// fillTree grows a session's branch tree to MaxNodes by breadth-first
-// exploring every distinct discard reachable from the root, so
-// BenchmarkSessionMemory measures a session at the store's worst-case tree
-// size instead of one played-out line (which stops at maxTurns, far short
-// of MaxNodes). It works on the unexported node list directly, bypassing
-// Discard/Goto/State's JSON-view building (repeated per move, over an
-// already-large tree, it would dominate the run time).
-func fillTree(tb testing.TB, s *Session) {
+// fillTree grows a session's branch tree to target nodes (at most MaxNodes)
+// by breadth-first exploring every distinct discard reachable from the
+// root, so a caller can measure a session at (or near) the store's
+// worst-case tree size instead of one played-out line (which stops at
+// maxTurns, far short of MaxNodes). It works on the unexported node list
+// directly, bypassing Discard/Goto/State's JSON-view building (repeated per
+// move, over an already-large tree, it would dominate the run time).
+func fillTree(tb testing.TB, s *Session, target int) {
 	tb.Helper()
 	queue := []int{0}
-	for len(queue) > 0 && len(s.nodes) < MaxNodes {
+	for len(queue) > 0 && len(s.nodes) < target {
 		id := queue[0]
 		queue = queue[1:]
 		cur := s.nodes[id]
@@ -34,7 +34,7 @@ func fillTree(tb testing.TB, s *Session) {
 		}
 		candidates[d.String()] = true
 		for t := range candidates {
-			if len(s.nodes) >= MaxNodes {
+			if len(s.nodes) >= target {
 				break
 			}
 			if childID, ok := cur.children[t]; ok {
@@ -76,7 +76,7 @@ func BenchmarkSessionMemory(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		fillTree(b, s)
+		fillTree(b, s, MaxNodes)
 		sessions[i] = s
 	}
 

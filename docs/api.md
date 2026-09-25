@@ -477,12 +477,16 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
 
   Pruning trades a little latency for that memory: a node whose analysis was
   pruned must be recomputed if it's visited again. `internal/session/latency_test.go`
-  times requests (`Goto`/`Discard`) against a `MaxNodes` tree under
-  `TestLargeTreeRequestLatency` (fillTree's worst case: every one of 2000
-  nodes visited once, so nothing stays cached) and against a shape closer to
-  normal play (one long line plus a few local rewinds) under
-  `TestTypicalTreeRequestLatency`. Both stay in the low tens of milliseconds
-  per request even in the adversarial case (vs. ~1.3 ms/request before this
-  fix, when everything was cached forever) — imperceptible for this tool's
-  single local user, and both tests fail if a request ever exceeds 300 ms,
-  to catch a regression back toward O(tree size) work per request.
+  times `Goto` requests (`go test ./internal/session -run '^$' -bench BenchmarkXRequestLatency`,
+  same "don't run under `go test ./...`" convention as the memory
+  benchmarks above): `BenchmarkLargeTreeRequestLatency` builds a `MaxNodes`
+  tree with fillTree (every one of 2000 nodes visited once while building
+  it, so nothing stays cached — the worst case) at ~8 ms/request, and
+  `BenchmarkTypicalTreeRequestLatency` builds a shape closer to normal play
+  (one long line plus a few local rewinds) at ~7 ms/request — both up from
+  ~1.3 ms/request before this fix, when everything was cached forever, but
+  still imperceptible for this tool's single local user. `TestTreeRequestLatency`
+  is the always-on regression guard: the same measurement on a 120-node
+  tree (~2s total, fast enough for `go test ./...`), failing if a request
+  ever exceeds 300 ms — enough margin to absorb CI noise while still
+  catching a regression back toward O(tree size) work per request.
