@@ -231,3 +231,21 @@ func playHanchan(t *testing.T, seed int64, rules Rules) *Hanchan {
 		}
 	}
 }
+
+// Sticks left on the table at the end go to first place, in points and score.
+func TestLeftoverSticksGoToFirst(t *testing.T) {
+	h := NewHanchan(4, Tonpuu)
+	h.number = 3
+	h.round.deposit = 1000
+	endRound(h, Result{Kind: "draw", Winner: -1, From: -1}, [4]int{34000, 30000, 20000, 15000})
+	if !h.Over() {
+		t.Fatal("not over")
+	}
+	st := h.Standings()
+	if st[0].Points != 35000 || st[0].Score != 45 { // 35000-30000 +20 uma +20 oka
+		t.Fatalf("first: %+v", st[0])
+	}
+	if st[1].Points != 30000 {
+		t.Fatalf("second: %+v", st[1])
+	}
+}

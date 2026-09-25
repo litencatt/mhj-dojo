@@ -163,13 +163,13 @@ func (h *Hanchan) Next() error {
 type Standing struct {
 	Seat   int
 	Rank   int     // 1-4
-	Points int     // current points
+	Points int     // current points; once the game is over, final points
 	Score  float64 // (points - return) / 1000 + uma + oka, to 0.1
 }
 
 // Standings ranks the seats by points; ties go to the seat nearer the first
-// dealer. Score is final once the game is over. Riichi sticks still on the
-// table at the end go to the first place.
+// dealer. Once the game is over, riichi sticks still on the table go to the
+// first place (in Points and Score) and the scores are final.
 func (h *Hanchan) Standings() [4]Standing {
 	var out [4]Standing
 	order := []int{0, 1, 2, 3}
@@ -191,7 +191,7 @@ func (h *Hanchan) Standings() [4]Standing {
 		if rank == 0 {
 			total += oka
 		}
-		out[s] = Standing{Seat: s, Rank: rank + 1, Points: pts(s), Score: float64(total/100) / 10}
+		out[s] = Standing{Seat: s, Rank: rank + 1, Points: p, Score: float64(total/100) / 10}
 	}
 	return out
 }
