@@ -243,6 +243,11 @@ func writeErr(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
 		status = http.StatusBadRequest
+	case errors.Is(err, session.ErrTreeFull):
+		// Not a state conflict (the current node is fine); a client that
+		// re-fetches on 409 to recover from another tab's progress must
+		// not treat this the same way, since re-fetching changes nothing.
+		status = http.StatusUnprocessableEntity
 	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
 		status = http.StatusConflict
 	}

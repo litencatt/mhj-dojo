@@ -12,7 +12,7 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -55,6 +55,7 @@ export function GameApp() {
       setRiichiMode(false);
     },
     state ? () => api.getGame(state.game_id) : undefined,
+    gameMovedOn,
   );
 
   function startGame(options: GameOptions, seed?: number) {

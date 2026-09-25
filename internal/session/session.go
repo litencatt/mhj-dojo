@@ -20,6 +20,11 @@ var (
 	ErrNotFound = errors.New("not found")
 	ErrInvalid  = errors.New("invalid request")
 	ErrConflict = errors.New("not allowed in the current state")
+	// ErrTreeFull is returned instead of ErrConflict when a session's tree
+	// is already at MaxNodes: the current node itself is fine to act on, so
+	// this isn't a state conflict the client could resolve by re-fetching
+	// (the server maps it to 422, not 409; docs/api.md).
+	ErrTreeFull = errors.New("tree full")
 )
 
 // Node statuses.
@@ -151,7 +156,7 @@ func (s *Session) addNode(n *node) *node {
 // roomForNode fails once the tree has reached maxNodes.
 func (s *Session) roomForNode() error {
 	if len(s.nodes) >= maxNodes {
-		return fmt.Errorf("%w: the session has %d nodes; start a new session", ErrConflict, maxNodes)
+		return fmt.Errorf("%w: the session has %d nodes; start a new session", ErrTreeFull, maxNodes)
 	}
 	return nil
 }

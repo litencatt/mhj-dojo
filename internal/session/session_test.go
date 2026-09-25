@@ -391,7 +391,7 @@ func TestTreeIsBounded(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.Discard(*s.State().Drawn); !errors.Is(err, ErrConflict) {
+	if _, err := s.Discard(*s.State().Drawn); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("discard past the node limit: %v", err)
 	}
 	// Tsumo creates a node too, so it is capped as well.
@@ -400,7 +400,7 @@ func TestTreeIsBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	maxNodes = 1
-	if _, err := full.Tsumo(); !errors.Is(err, ErrConflict) {
+	if _, err := full.Tsumo(); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("tsumo past the node limit: %v", err)
 	}
 	maxNodes = 10

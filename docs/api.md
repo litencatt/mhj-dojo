@@ -176,11 +176,19 @@ These clarify points the contract above leaves open; none changes the JSON shape
 
 - **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
   session/node/endpoint, `415` POST without a JSON content type, `409` action not
-  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand).
+  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand),
+  `422` a session's tree is already at its node cap (see below) — not a state conflict, since the
+  current node itself is fine to act on, so unlike a `409` re-fetching the session changes nothing.
+- **Follow-up (not implemented)**: unlike games, a session has no way to detect that another tab
+  moved its current node first — `discard`/`tsumo`/`goto` just act on whatever node is current
+  server-side, silently, instead of returning `409` the way an actually-stale game request does.
+  Two tabs on the same session racing each other can currently see a discard silently land on a
+  node other than the one they thought they were acting from. The fix would be to accept an
+  expected `node_id` on those endpoints and `409` when it doesn't match the current one.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
-- **A session's tree** holds at most 2000 nodes; a discard that would add another returns `409`.
+- **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
 - **`wall_remaining`** = 109 live draws − draws taken, where the draw shown at a playing node (or the

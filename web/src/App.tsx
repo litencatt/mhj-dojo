@@ -9,7 +9,7 @@ import { Dock } from './components/Dock';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { sessionMovedOn, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -23,6 +23,7 @@ export function App() {
       setPreviewTile(null);
     },
     state ? () => api.getSession(state.session_id) : undefined,
+    sessionMovedOn,
   );
 
   function startGame(seed?: number, maxTurns?: number) {
