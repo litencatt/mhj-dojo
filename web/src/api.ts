@@ -55,7 +55,7 @@ export interface Win {
   han_total: number;
 }
 
-export interface State {
+export interface SessionState {
   session_id: string;
   seed: number;
   max_turns: number;
@@ -112,32 +112,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function createSession(opts: { seed?: number; max_turns?: number } = {}): Promise<State> {
-  return request<State>('/api/sessions', {
+export function createSession(opts: { seed?: number; max_turns?: number } = {}): Promise<SessionState> {
+  return request<SessionState>('/api/sessions', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
 }
 
-export function getSession(id: string): Promise<State> {
-  return request<State>(`/api/sessions/${encodeURIComponent(id)}`);
+export function getSession(id: string): Promise<SessionState> {
+  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
-export function discard(id: string, tile: Tile): Promise<State> {
-  return request<State>(`/api/sessions/${encodeURIComponent(id)}/discard`, {
+export function discard(id: string, tile: Tile): Promise<SessionState> {
+  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/discard`, {
     method: 'POST',
     body: JSON.stringify({ tile }),
   });
 }
 
-export function tsumo(id: string): Promise<State> {
-  return request<State>(`/api/sessions/${encodeURIComponent(id)}/tsumo`, {
+export function tsumo(id: string): Promise<SessionState> {
+  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/tsumo`, {
     method: 'POST',
   });
 }
 
-export function goto(id: string, nodeId: number): Promise<State> {
-  return request<State>(`/api/sessions/${encodeURIComponent(id)}/goto`, {
+export function goto(id: string, nodeId: number): Promise<SessionState> {
+  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/goto`, {
     method: 'POST',
     body: JSON.stringify({ node_id: nodeId }),
   });
