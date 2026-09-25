@@ -30,6 +30,10 @@ const (
 	notenPenalty = 3000
 	// minDrawsForRiichi is the number of draws that must remain to declare.
 	minDrawsForRiichi = 4
+	// honbaRon is paid per honba by the discarder on a ron, honbaTsumo by
+	// each other seat on a tsumo.
+	honbaRon   = 300
+	honbaTsumo = 100
 )
 
 // Phase is what the round is waiting for.
@@ -104,9 +108,28 @@ type Result struct {
 	Points  score.Points
 	WinTile tile.Tile
 	Tenpai  [4]bool // set on a draw
-	Deltas  [4]int  // points at the end minus points at the start (riichi sticks paid and received included)
-	// Deposit is the riichi sticks left on the table (only after a draw).
+	// Deltas are points at the end minus points at the start: the sum of
+	// the hand's payments (or the noten penalty), the honba payments and
+	// the riichi sticks paid and received.
+	Deltas      [4]int
+	HandDeltas  [4]int
+	HonbaDeltas [4]int
+	StickDeltas [4]int
+	// Honba is the round's repeat counter; Deposit the riichi sticks left on
+	// the table (only after a draw), carried ones included.
+	Honba   int
 	Deposit int
+}
+
+// RoundConfig sets up a round: the wall, the dealer's seat, the round wind,
+// the honba counter, the riichi sticks carried over and each seat's points.
+type RoundConfig struct {
+	Wall      *wall.Wall
+	Dealer    int
+	RoundWind tile.Kind
+	Honba     int
+	Deposit   int
+	Points    [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.
@@ -117,8 +140,11 @@ type Round struct {
 	players   [4]player
 	turn      int // seat whose PhaseDiscard it is, or who discarded last
 	draws     int // live draws taken
+	kans      int // kans made; each reveals a dora and shortens the live wall
 	phase     Phase
 	deposit   int
+	honba     int
+	start     [4]int // points at the start of the round
 
 	// The last discard and who may still ron it (in head-bump order).
 	lastDiscard   tile.Tile
@@ -129,19 +155,31 @@ type Round struct {
 	result *Result
 }
 
-// New deals a round from seed. The dealer is seed mod 4; the round is East.
+// New deals a single-round game from seed: the dealer is seed mod 4, the
+// round is East, and everyone starts with StartPoints.
 func New(seed int64) *Round {
 	return NewWithWall(wall.New(seed), int(((seed%4)+4)%4))
 }
 
-// NewWithWall deals a round from a given wall and dealer (used by tests).
+// NewWithWall is New with a given wall and dealer (used by tests).
 func NewWithWall(w *wall.Wall, dealer int) *Round {
-	r := &Round{wall: w, dealer: dealer, roundWind: tile.East, turn: dealer}
-	for s := range r.players {
-		r.players[s].hand = w.HandOf(s)
-		r.players[s].points = StartPoints
+	return NewRound(RoundConfig{
+		Wall: w, Dealer: dealer, RoundWind: tile.East,
+		Points: [4]int{StartPoints, StartPoints, StartPoints, StartPoints},
+	})
+}
+
+// NewRound deals a round of a longer game from cfg.
+func NewRound(cfg RoundConfig) *Round {
+	r := &Round{
+		wall: cfg.Wall, dealer: cfg.Dealer, roundWind: cfg.RoundWind, turn: cfg.Dealer,
+		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points,
 	}
-	r.draw(dealer)
+	for s := range r.players {
+		r.players[s].hand = cfg.Wall.HandOf(s)
+		r.players[s].points = cfg.Points[s]
+	}
+	r.draw(cfg.Dealer)
 	return r
 }
 
@@ -170,8 +208,15 @@ func (r *Round) Winds(seat int) yaku.Winds {
 	return yaku.Winds{Round: r.roundWind, Seat: r.SeatWind(seat)}
 }
 
-// DrawsLeft returns how many live draws remain.
-func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.draws }
+// DrawsLeft returns how many live draws remain; each kan takes one off the
+// end of the live wall, which moves haitei.
+func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.kans - r.draws }
+
+// doraIndicators returns the revealed dora indicators: one plus one per kan.
+func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kans) }
+
+// uraIndicators returns the ura-dora indicators under the revealed ones.
+func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kans) }
 
 // Actor returns the seat that must act now, or -1 once the round has ended.
 func (r *Round) Actor() int {
@@ -333,8 +378,8 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 		Haitei:         !ron && last,
 		Houtei:         ron && last,
 		Winds:          r.Winds(seat),
-		DoraIndicators: r.wall.DoraIndicators(),
-		UraIndicators:  r.wall.UraDoraIndicators(),
+		DoraIndicators: r.doraIndicators(),
+		UraIndicators:  r.uraIndicators(),
 		Melds:          p.meldShapes(),
 		MeldTiles:      p.meldTiles(),
 	}
@@ -481,8 +526,8 @@ func (r *Round) tsumo(seat int) error {
 		if o == r.dealer {
 			pay = pts.FromDealer
 		}
-		res.Deltas[o] -= pay
-		res.Deltas[seat] += pay
+		res.HandDeltas[o] -= pay
+		res.HandDeltas[seat] += pay
 	}
 	r.finish(res)
 	return nil
@@ -500,26 +545,43 @@ func (r *Round) ron(seat int) error {
 	}
 	pts := score.FromWin(w, seat == r.dealer, false)
 	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard}
-	res.Deltas[r.turn] -= pts.Ron
-	res.Deltas[seat] += pts.Ron
+	res.HandDeltas[r.turn] -= pts.Ron
+	res.HandDeltas[seat] += pts.Ron
 	r.finish(res)
 	return nil
 }
 
-// finish pays the riichi sticks to the winner, applies the deltas and ends
-// the round. The sticks were taken from the declarers when accepted, so
-// they are subtracted from the reported deltas afterwards.
+// finish adds the honba payments and the riichi sticks to the hand's
+// payments (res.HandDeltas), sets every seat's points from its points at
+// the start and ends the round.
 func (r *Round) finish(res *Result) {
+	res.Honba = r.honba
+	if res.Winner >= 0 && r.honba > 0 {
+		for o := range r.players {
+			switch {
+			case o == res.Winner:
+			case res.Kind == "ron" && o == res.From:
+				res.HonbaDeltas[o] -= honbaRon * r.honba
+				res.HonbaDeltas[res.Winner] += honbaRon * r.honba
+			case res.Kind == "tsumo":
+				res.HonbaDeltas[o] -= honbaTsumo * r.honba
+				res.HonbaDeltas[res.Winner] += honbaTsumo * r.honba
+			}
+		}
+	}
+	for s := range r.players {
+		if r.players[s].riichi {
+			res.StickDeltas[s] -= RiichiStick
+		}
+	}
 	if res.Winner >= 0 {
-		res.Deltas[res.Winner] += r.deposit
+		res.StickDeltas[res.Winner] += r.deposit // carried sticks included
 		r.deposit = 0
 	}
 	res.Deposit = r.deposit
 	for s := range r.players {
-		r.players[s].points += res.Deltas[s]
-		if r.players[s].riichi {
-			res.Deltas[s] -= RiichiStick
-		}
+		res.Deltas[s] = res.HandDeltas[s] + res.HonbaDeltas[s] + res.StickDeltas[s]
+		r.players[s].points = r.start[s] + res.Deltas[s]
 	}
 	r.callers = nil
 	r.result = res
@@ -538,9 +600,9 @@ func (r *Round) exhaustiveDraw() {
 	if n > 0 && n < 4 {
 		for s, t := range res.Tenpai {
 			if t {
-				res.Deltas[s] = notenPenalty / n
+				res.HandDeltas[s] = notenPenalty / n
 			} else {
-				res.Deltas[s] = -notenPenalty / (4 - n)
+				res.HandDeltas[s] = -notenPenalty / (4 - n)
 			}
 		}
 	}
