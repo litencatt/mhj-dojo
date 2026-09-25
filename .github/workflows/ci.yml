@@ -53,7 +53,7 @@ jobs:
       - run: go test -count=1 ./...
       - run: go build -o bin/mhj2 ./cmd/mhj2
       - uses: actions/cache/save@v6
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: ~/.cache/go-build
           key: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
@@ -77,7 +77,7 @@ jobs:
       # value for the concurrency paths (session, store, match via server).
       - run: go test -race -short -count=1 ./...
       - uses: actions/cache/save@v6
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: ~/.cache/go-build
           key: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
