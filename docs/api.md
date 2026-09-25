@@ -249,7 +249,9 @@ These clarify points the contract above leaves open; none changes the JSON shape
 A game is a 東風戦 (East round only) or 半荘戦 (East and South rounds): you
 are seat 0, three CPU players take seats 1–3, and every player starts with
 25000 points. The first dealer (起家) is `seed mod 4`, so your seat wind
-depends on the seed. There is no rewinding. After each of your moves the server plays the CPU seats until you
+depends on the seed, unless you ask to be the first dealer
+(`"first_dealer": "you"`); the walls are the same either way. There is no
+rewinding. After each of your moves the server plays the CPU seats until you
 have a choice again or the round ends; after a round ends you send `next`.
 
 Round rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after
@@ -307,9 +309,24 @@ West round). Standings rank by points (ties to the seat nearer the first
 dealer); the score is (points − 30000) / 1000 + uma (+20 / +10 / −10 / −20)
 + oka (+20 to first), and sticks left at the end go to first place.
 
+CPU players (`cpu`): `"normal"` (普通) takes every win, declares riichi when
+tenpai, calls when the hand keeps a yaku (a value triplet, or tanyao), makes
+a concealed or added kan when it does not set the hand back, discards for tile
+efficiency (lowest shanten, then most unseen accepting tiles) and folds
+against a riichi when two or more steps from tenpai. `"weak"` (弱い) also
+takes every win and declares riichi when tenpai, but never calls or declares
+a kan, never folds, and on about every other discard picks any discard that
+keeps the lowest shanten instead of the most efficient one. That pick is a
+hash of the round's wall, the seat and the progress of the round rather than a
+random draw, so a seed with the same options and moves always plays out the
+same.
+
 ### `POST /api/games`
-Body (optional): `{"seed": 42, "length": "hanchan"}`. `length` is `"tonpuu"`
-(the default) or `"hanchan"`. Returns a `GameState`. Every round's wall is
+Body (optional): `{"seed": 42, "length": "hanchan", "first_dealer": "you",
+"cpu": "weak"}`. `length` is `"tonpuu"` (the default) or `"hanchan"`;
+`first_dealer` is `"random"` (the default: `seed mod 4`) or `"you"`; `cpu` is
+`"normal"` (the default) or `"weak"`. Any other value is a `400`. Returns a
+`GameState`. Every round's wall is
 derived one-way from the seed. Without a seed (and without the server's
 `--seed` flag) a random seed in `[0, 2^53)` is used and `seed` stays `null`
 until the game ends, because the seed rebuilds every wall.
@@ -343,8 +360,10 @@ unknown game, `409` a move that is not legal now.
   "game_id": "a1b2c3",
   "seed": 42,                   // null until the game ends for a random seed
   "length": "tonpuu",           // "tonpuu" | "hanchan"
+  "first_dealer_mode": "random", // the first_dealer asked for: "random" | "you"
+  "cpu": "normal",              // "normal" | "weak"
   "you": 0,
-  "first_dealer": 2,            // 起家
+  "first_dealer": 2,            // 起家: the seat
   "dealer": 2,                  // seat of 東 this round
   "round_wind": "1z", "round_number": 1, "honba": 0,   // 東1局 0本場
   "can_next": false,            // the round has ended and another follows: send "next"
