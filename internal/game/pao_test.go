@@ -130,7 +130,46 @@ func TestPaoStackedYakuman(t *testing.T) {
 	checkSettlement(t, r, [4]int{-16000, 64000, -48000, 0}, []Pao{{Seat: 0, Yaku: "daisangen"}})
 }
 
-// 大四喜 is a double yakuman, all of it under pao.
+// The dealer (seat 0) wins 大三元 with seat 1 responsible: 48000.
+func TestPaoDealerWinner(t *testing.T) {
+	setup := func() *Round {
+		r := newRound(t)
+		r.honba = 1
+		r.players[0].melds = []Called{called("5z", 2, false), called("6z", 3, false)}
+		setHand(r, 0, "7z7z9s123m4p", "1s")
+		mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "1s"})
+		passTurn(t, r, 1, "7z")
+		mustApply(t, r, Action{Seat: 0, Type: Pon}) // the third dragon: seat 1
+		mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "9s"})
+		return r
+	}
+	want := []Pao{{Seat: 1, Yaku: "daisangen"}}
+
+	// tsumo: the responsible seat pays 48000 and all the honba
+	r := setup()
+	passTurn(t, r, 1, "1s")
+	passTurn(t, r, 2, "9m")
+	passTurn(t, r, 3, "9m")
+	setHand(r, 0, "123m4p", "4p")
+	mustApply(t, r, Action{Seat: 0, Type: Tsumo})
+	checkSettlement(t, r, [4]int{48000, -48000, 0, 0}, want)
+	if res := r.Result(); res.HonbaDeltas != [4]int{300, -300, 0, 0} {
+		t.Errorf("honba deltas %v", res.HonbaDeltas)
+	}
+
+	// ron by a third seat: 24000 each, honba from the discarder
+	r = setup()
+	passTurn(t, r, 1, "1s")
+	passTurn(t, r, 2, "4p")
+	mustApply(t, r, Action{Seat: 0, Type: Ron})
+	checkSettlement(t, r, [4]int{48000, -24000, -24000, 0}, want)
+	if res := r.Result(); res.HonbaDeltas != [4]int{300, 0, -300, 0} {
+		t.Errorf("honba deltas %v", res.HonbaDeltas)
+	}
+}
+
+// 大四喜 is a double yakuman, all of it under pao: won by ron from a third
+// seat, the discarder and the responsible seat pay 32000 each.
 func TestPaoDaisuushii(t *testing.T) {
 	r := newRound(t)
 	r.players[1].melds = []Called{called("1z", 2, false), called("2z", 3, false), called("3z", 2, false)}
