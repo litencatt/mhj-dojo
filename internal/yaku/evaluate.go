@@ -11,7 +11,17 @@ type Yaku struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	Han  int    `json:"han"`
+	open openRule
 }
+
+// openRule is how a yaku scores in an open hand (one with a called meld).
+type openRule uint8
+
+const (
+	openSame      openRule = iota // scores as in a closed hand
+	openKuisagari                 // one han less (kuisagari)
+	openNever                     // needs a closed hand
+)
 
 // Win is the evaluation of a complete hand.
 type Win struct {
@@ -59,65 +69,65 @@ func (ctx Context) Open() bool {
 	return slices.ContainsFunc(ctx.Melds, func(m Meld) bool { return m.Open })
 }
 
-// kuisagari lowers the han of the yaku that lose one han when open.
+// kuisagari lowers the han of a kuisagari yaku in an open hand.
 func kuisagari(y Yaku, open bool) Yaku {
-	if open {
+	if open && y.open == openKuisagari {
 		y.Han--
 	}
 	return y
 }
 
-// Han values of a closed hand.
+// Han values of a closed hand, and how each yaku scores in an open hand.
 var (
-	yRiichi       = Yaku{"riichi", "立直", 1}
-	yDoubleRiichi = Yaku{"double_riichi", "ダブル立直", 2}
-	yIppatsu      = Yaku{"ippatsu", "一発", 1}
-	yHaitei       = Yaku{"haitei", "海底摸月", 1}
-	yHoutei       = Yaku{"houtei", "河底撈魚", 1}
-	yRinshan      = Yaku{"rinshan", "嶺上開花", 1}
-	yChankan      = Yaku{"chankan", "槍槓", 1}
-	ySankantsu    = Yaku{"sankantsu", "三槓子", 2}
-	yTsumo        = Yaku{"tsumo", "門前清自摸和", 1}
-	yTanyao       = Yaku{"tanyao", "断么九", 1}
-	yPinfu        = Yaku{"pinfu", "平和", 1}
-	yIipeikou     = Yaku{"iipeikou", "一盃口", 1}
-	yRyanpeikou   = Yaku{"ryanpeikou", "二盃口", 3}
-	ySanshoku     = Yaku{"sanshoku", "三色同順", 2}
-	yDoukou       = Yaku{"sanshoku_doukou", "三色同刻", 2}
-	yIttsu        = Yaku{"ittsu", "一気通貫", 2}
-	yChanta       = Yaku{"chanta", "混全帯么九", 2}
-	yJunchan      = Yaku{"junchan", "純全帯么九", 3}
-	yHonroutou    = Yaku{"honroutou", "混老頭", 2}
-	yHonitsu      = Yaku{"honitsu", "混一色", 3}
-	yChinitsu     = Yaku{"chinitsu", "清一色", 6}
-	yToitoi       = Yaku{"toitoi", "対々和", 2}
-	ySanankou     = Yaku{"sanankou", "三暗刻", 2}
-	yShousangen   = Yaku{"shousangen", "小三元", 2}
-	yHaku         = Yaku{"haku", "役牌 白", 1}
-	yHatsu        = Yaku{"hatsu", "役牌 發", 1}
-	yChun         = Yaku{"chun", "役牌 中", 1}
-	yChiitoitsu   = Yaku{"chiitoitsu", "七対子", 2}
+	yRiichi       = Yaku{"riichi", "立直", 1, openNever}
+	yDoubleRiichi = Yaku{"double_riichi", "ダブル立直", 2, openNever}
+	yIppatsu      = Yaku{"ippatsu", "一発", 1, openNever}
+	yHaitei       = Yaku{"haitei", "海底摸月", 1, openSame}
+	yHoutei       = Yaku{"houtei", "河底撈魚", 1, openSame}
+	yRinshan      = Yaku{"rinshan", "嶺上開花", 1, openSame}
+	yChankan      = Yaku{"chankan", "槍槓", 1, openSame}
+	ySankantsu    = Yaku{"sankantsu", "三槓子", 2, openSame}
+	yTsumo        = Yaku{"tsumo", "門前清自摸和", 1, openNever}
+	yTanyao       = Yaku{"tanyao", "断么九", 1, openSame}
+	yPinfu        = Yaku{"pinfu", "平和", 1, openNever}
+	yIipeikou     = Yaku{"iipeikou", "一盃口", 1, openNever}
+	yRyanpeikou   = Yaku{"ryanpeikou", "二盃口", 3, openNever}
+	ySanshoku     = Yaku{"sanshoku", "三色同順", 2, openKuisagari}
+	yDoukou       = Yaku{"sanshoku_doukou", "三色同刻", 2, openSame}
+	yIttsu        = Yaku{"ittsu", "一気通貫", 2, openKuisagari}
+	yChanta       = Yaku{"chanta", "混全帯么九", 2, openKuisagari}
+	yJunchan      = Yaku{"junchan", "純全帯么九", 3, openKuisagari}
+	yHonroutou    = Yaku{"honroutou", "混老頭", 2, openSame}
+	yHonitsu      = Yaku{"honitsu", "混一色", 3, openKuisagari}
+	yChinitsu     = Yaku{"chinitsu", "清一色", 6, openKuisagari}
+	yToitoi       = Yaku{"toitoi", "対々和", 2, openSame}
+	ySanankou     = Yaku{"sanankou", "三暗刻", 2, openSame}
+	yShousangen   = Yaku{"shousangen", "小三元", 2, openSame}
+	yHaku         = Yaku{"haku", "役牌 白", 1, openSame}
+	yHatsu        = Yaku{"hatsu", "役牌 發", 1, openSame}
+	yChun         = Yaku{"chun", "役牌 中", 1, openSame}
+	yChiitoitsu   = Yaku{"chiitoitsu", "七対子", 2, openNever}
 )
 
 // Yakuman: 13 han each; several yakuman add up, and a hand with any yakuman
 // scores only its yakuman (no dora, no other yaku).
 var (
-	yKokushi     = Yaku{"kokushi", "国士無双", 13}
-	ySuuankou    = Yaku{"suuankou", "四暗刻", 13}
-	yDaisangen   = Yaku{"daisangen", "大三元", 13}
-	yTsuuiisou   = Yaku{"tsuuiisou", "字一色", 13}
-	yShousuushii = Yaku{"shousuushii", "小四喜", 13}
-	yDaisuushii  = Yaku{"daisuushii", "大四喜", 13}
-	yRyuuiisou   = Yaku{"ryuuiisou", "緑一色", 13}
-	yChinroutou  = Yaku{"chinroutou", "清老頭", 13}
-	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13}
-	ySuukantsu   = Yaku{"suukantsu", "四槓子", 13}
+	yKokushi     = Yaku{"kokushi", "国士無双", 13, openNever}
+	ySuuankou    = Yaku{"suuankou", "四暗刻", 13, openNever}
+	yDaisangen   = Yaku{"daisangen", "大三元", 13, openSame}
+	yTsuuiisou   = Yaku{"tsuuiisou", "字一色", 13, openSame}
+	yShousuushii = Yaku{"shousuushii", "小四喜", 13, openSame}
+	yDaisuushii  = Yaku{"daisuushii", "大四喜", 13, openSame}
+	yRyuuiisou   = Yaku{"ryuuiisou", "緑一色", 13, openSame}
+	yChinroutou  = Yaku{"chinroutou", "清老頭", 13, openSame}
+	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13, openNever}
+	ySuukantsu   = Yaku{"suukantsu", "四槓子", 13, openSame}
 )
 
-// closedHan maps each yaku key to its han in a closed hand. Value winds are
-// handled by HanFor.
-var closedHan = func() map[string]int {
-	m := map[string]int{}
+// byKey maps each yaku key to its definition (closed-hand han). Value winds
+// are handled by HanFor.
+var byKey = func() map[string]Yaku {
+	m := map[string]Yaku{}
 	for _, y := range []Yaku{
 		yRiichi, yDoubleRiichi, yIppatsu, yHaitei, yHoutei, yRinshan, yChankan, ySankantsu, ySuukantsu,
 		yTsumo, yTanyao, yPinfu, yIipeikou, yRyanpeikou, ySanshoku, yDoukou, yIttsu,
@@ -126,7 +136,7 @@ var closedHan = func() map[string]int {
 		yKokushi, ySuuankou, yDaisangen, yTsuuiisou, yShousuushii, yDaisuushii,
 		yRyuuiisou, yChinroutou, yChuuren,
 	} {
-		m[y.Key] = y.Han
+		m[y.Key] = y
 	}
 	return m
 }()
@@ -141,7 +151,20 @@ func HanFor(key string, w Winds) int {
 			return w.Count(tile.East + tile.Kind(i))
 		}
 	}
-	return closedHan[key]
+	return byKey[key].Han
+}
+
+// HanOpenFor is HanFor for a hand that is open (has called a meld) or not:
+// an open hand scores the kuisagari yaku one han lower and the yaku that
+// need a closed hand 0.
+func HanOpenFor(key string, w Winds, open bool) int {
+	if y, ok := byKey[key]; ok && open {
+		if y.open == openNever {
+			return 0
+		}
+		return kuisagari(y, open).Han
+	}
+	return HanFor(key, w)
 }
 
 // Evaluate detects the yaku of a complete hand: the concealed tiles
@@ -549,7 +572,7 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 		case m.Kind >= tile.East && m.Kind <= tile.North:
 			if han := ctx.Winds.Count(m.Kind); han > 0 {
 				i := m.Kind - tile.East
-				ys = append(ys, Yaku{WindKeys[i], "役牌 " + WindNames[i], han})
+				ys = append(ys, Yaku{Key: WindKeys[i], Name: "役牌 " + WindNames[i], Han: han})
 			}
 		}
 	}

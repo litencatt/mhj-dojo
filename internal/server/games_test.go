@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/session"
 )
@@ -263,8 +264,28 @@ func TestHumanPon(t *testing.T) {
 			if last.Type != "pon" || last.Seat != 0 || last.Tile != called {
 				t.Fatalf("seed %d: events %+v", seed, st.Events)
 			}
-			if len(st.Analysis) != 0 {
-				t.Fatalf("seed %d: closed-hand analysis after a call", seed)
+			// The analysis holds the pon fixed: the hand is open.
+			rows := map[string]apiview.YakuRow{}
+			for _, r := range st.Analysis {
+				rows[r.Key] = r
+				if r.Shanten != nil && *r.Shanten < 0 {
+					t.Fatalf("seed %d: %s shanten %d before the discard after the pon", seed, r.Key, *r.Shanten)
+				}
+			}
+			if rows["normal"].Shanten == nil || rows["pinfu"].Shanten != nil || rows["iipeikou"].Shanten != nil ||
+				rows["chinitsu"].Han != 5 || rows["pinfu"].Han != 0 || rows["tanyao"].Han != 1 {
+				t.Fatalf("seed %d: open-hand rows %+v", seed, st.Analysis)
+			}
+			for _, d := range st.Legal.Discards {
+				if len(st.ByDiscard[d]) != len(st.Analysis) {
+					t.Fatalf("seed %d: by_discard %s has %d rows", seed, d, len(st.ByDiscard[d]))
+				}
+			}
+			// The history goes on after the call: one entry per own discard.
+			before := len(st.History)
+			st, _ = c.game("POST", path, nextMove(st))
+			if len(st.History) != before+1 || st.History[before].Turn != before || len(st.History[before].Shanten) != len(st.Analysis) {
+				t.Fatalf("seed %d: history after the pon: %d entries (was %d)", seed, len(st.History), before)
 			}
 			return
 		}

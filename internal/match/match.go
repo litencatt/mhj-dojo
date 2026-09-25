@@ -6,6 +6,7 @@ package match
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/litencatt/mhj2/internal/apiview"
@@ -152,14 +153,17 @@ func (m *Match) Next() (State, error) {
 	return m.state(), nil
 }
 
-func (m *Match) analyze(c tile.Counts) []yakushanten.Result {
+func (m *Match) analyze(c tile.Counts, melds []yaku.Meld) []yakushanten.Result {
 	if m.analyzer.MemoSize() > memoLimit {
 		m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
 	}
-	return m.analyzer.Analyze(c)
+	return m.analyzer.AnalyzeWith(c, melds)
 }
 
-// han returns a row's closed-hand han for the human's winds.
-func (m *Match) han(key string) int {
-	return yaku.HanFor(key, m.game.Round.Winds(Human))
+// hanFor returns the rows' han for the human's winds, lowered for an open
+// hand (kuisagari).
+func (m *Match) hanFor(melds []yaku.Meld) func(key string) int {
+	w := m.game.Round.Winds(Human)
+	open := slices.ContainsFunc(melds, func(x yaku.Meld) bool { return x.Open })
+	return func(key string) int { return yaku.HanOpenFor(key, w, open) }
 }

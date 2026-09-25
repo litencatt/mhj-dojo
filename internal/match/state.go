@@ -60,8 +60,9 @@ type Seat struct {
 // Meld is a called meld or a concealed kan.
 type Meld struct {
 	Type  string   `json:"type"`  // "chii", "pon", "kan" (open) or "ankan"
-	Tiles []string `json:"tiles"` // the called tile last
+	Tiles []string `json:"tiles"` // the called tile last; a kakan's added tile just before it
 	From  int      `json:"from"`  // the seat the tile came from; -1 for an ankan
+	Added bool     `json:"added"` // a kan made by adding a tile to a pon (kakan)
 }
 
 // RiverTile is a discard; riichi marks the declaration tile, called a tile
@@ -184,7 +185,7 @@ func (m *Match) state() State {
 			seat.River[i] = RiverTile{Tile: rt.Tile.String(), Riichi: rt.Riichi, Called: rt.Called}
 		}
 		for i, m := range sv.Melds {
-			seat.Melds[i] = Meld{Type: meldType(m), Tiles: tile.Strings(m.Tiles), From: m.From}
+			seat.Melds[i] = Meld{Type: meldType(m), Tiles: tile.Strings(m.Tiles), From: m.From, Added: m.Added}
 		}
 		if sv.Hand != nil {
 			seat.Hand = tile.Strings(sv.Hand)
@@ -201,13 +202,13 @@ func (m *Match) state() State {
 
 	me := v.Seats[Human]
 	visible := v.Visible()
-	st.Analysis = []apiview.YakuRow{}
-	// The per-yaku analysis reads a closed hand; after a call it would show
-	// wrong numbers, so it is left empty until it supports melds (#27).
-	if len(me.Melds) == 0 {
-		st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
+	melds := fixedMelds(me.Melds)
+	han := m.hanFor(melds)
+	yourTurn := v.Phase == game.PhaseDiscard && v.Actor == Human
+	if !yourTurn || me.Drawn != nil {
+		st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand), melds), &visible, han)
 	}
-	if len(me.Melds) == 0 && v.Phase == game.PhaseDiscard && v.Actor == Human {
+	if yourTurn {
 		all := slices.Clone(me.Hand)
 		if me.Drawn != nil { // no drawn tile right after a call
 			all = append(all, *me.Drawn)
@@ -219,13 +220,50 @@ func (m *Match) state() State {
 				continue
 			}
 			c[t.Kind]--
-			st.ByDiscard[key] = apiview.Rows(m.analyze(c), &visible, m.han)
+			st.ByDiscard[key] = apiview.Rows(m.analyze(c, melds), &visible, han)
 			c[t.Kind]++
+		}
+		if me.Drawn == nil { // right after a call: the hand must still discard
+			st.Analysis = bestRows(st.ByDiscard, st.Legal.Discards)
 		}
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
 	return st
+}
+
+// bestRows is the analysis of a hand that must discard before it can win
+// (right after a pon or chii): each row is the row of the legal discard
+// with the lowest shanten, then the most ukeire, then the first in
+// discards order; impossible rows lose to any possible one.
+func bestRows(byDiscard map[string][]apiview.YakuRow, discards []string) []apiview.YakuRow {
+	var out []apiview.YakuRow
+	for _, d := range discards {
+		rows := byDiscard[d]
+		if out == nil {
+			out = slices.Clone(rows)
+			continue
+		}
+		for i, r := range rows {
+			if better(r, out[i]) {
+				out[i] = r
+			}
+		}
+	}
+	if out == nil {
+		out = []apiview.YakuRow{}
+	}
+	return out
+}
+
+func better(a, b apiview.YakuRow) bool {
+	switch {
+	case a.Shanten == nil:
+		return false
+	case b.Shanten == nil || *a.Shanten != *b.Shanten:
+		return b.Shanten == nil || *a.Shanten < *b.Shanten
+	}
+	return a.UkeireTotal > b.UkeireTotal
 }
 
 // recordHand appends the human's row shanten for the current hand: once at
@@ -234,13 +272,19 @@ func (m *Match) state() State {
 // change.
 func (m *Match) recordHand() {
 	me := m.game.Round.ViewFor(Human).Seats[Human]
-	if len(me.Melds) > 0 {
-		return // the analysis reads closed hands only (see state)
-	}
 	turn := len(m.history)
 	m.history = append(m.history, apiview.HistoryEntry{
-		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand))),
+		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand), fixedMelds(me.Melds))),
 	})
+}
+
+// fixedMelds returns the melds the analysis holds fixed: calls and ankans.
+func fixedMelds(called []game.Called) []yaku.Meld {
+	out := make([]yaku.Meld, len(called))
+	for i, c := range called {
+		out[i] = c.Meld
+	}
+	return out
 }
 
 func meldType(m game.Called) string {

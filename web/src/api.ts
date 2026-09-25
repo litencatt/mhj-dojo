@@ -11,7 +11,7 @@ export interface YakuRow {
   key: string;
   name: string;
   yakuman: boolean; // true for the yakuman rows (kokushi and later)
-  han: number; // closed-hand han; 13 for yakuman, 0 for the normal row
+  han: number; // han for the hand, lowered when open (kuisagari); 13 for yakuman, 0 for the normal row
   shanten: number | null; // 0 = tenpai, null = impossible
   approx: boolean;
   ukeire: UkeireEntry[];
@@ -160,8 +160,9 @@ export type MeldType = 'chii' | 'pon' | 'kan' | 'ankan'; // kan: an open or adde
 
 export interface Meld {
   type: MeldType;
-  tiles: Tile[]; // the called tile last
+  tiles: Tile[]; // the called tile last; a kakan's added tile just before it
   from: number; // the seat the called tile came from; -1 for an ankan
+  added: boolean; // a kan made by adding a tile to a pon (kakan)
 }
 
 export interface Seat {

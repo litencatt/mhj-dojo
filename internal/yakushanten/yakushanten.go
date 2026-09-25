@@ -12,11 +12,13 @@
 // (ryanpeikou, chuuren and the chiitoitsu forms of honroutou and tsuuiisou)
 // enumerate them explicitly. Shape yaku use containment: e.g. a
 // chinitsu-shaped W also satisfies honitsu, and an all-triplet terminal W
-// satisfies junchan.
+// satisfies junchan. Called melds and concealed kans are fixed groups of W
+// (AnalyzeWith).
 package yakushanten
 
 import (
 	"math/bits"
+	"slices"
 
 	"github.com/litencatt/mhj2/internal/shanten"
 	"github.com/litencatt/mhj2/internal/tile"
@@ -333,6 +335,10 @@ type Analyzer struct {
 	winds  Winds
 	rows   []RowDef
 	pinfuT []shanten.Target
+	// melds and meldTargets cache each row's targets for the last melds
+	// AnalyzeWith saw: every discard candidate of a turn shares them.
+	melds       []yaku.Meld
+	meldTargets map[string][]shanten.Target
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -373,6 +379,151 @@ func (a *Analyzer) Analyze(c tile.Counts) []Result {
 		}
 		r.Key, r.Name, r.Yakuman = row.Key, row.Name, row.Yakuman
 		out = append(out, r)
+	}
+	return out
+}
+
+// Rows that no hand with a meld satisfies: seven pairs and thirteen orphans
+// have no melds, chuuren needs fourteen concealed tiles, and pinfu and
+// ryanpeikou need four concealed sequences.
+var needNoMelds = map[string]bool{"pinfu": true, "ryanpeikou": true, "chiitoitsu": true, "kokushi": true, "chuuren": true}
+
+// Rows that need a closed hand; a concealed kan keeps them possible.
+var needClosed = map[string]bool{"iipeikou": true, "suuankou": true}
+
+// AnalyzeWith is Analyze for a hand with fixed melds: c holds the concealed
+// tiles (13 - 3*len(melds), or 14 - 3*len(melds)) and melds the called melds
+// and concealed kans. Each meld is a group of every target hand, standing for
+// one of the target's forced groups or for one of its free melds. A called
+// meld opens the hand, which rules out the closed-only rows.
+func (a *Analyzer) AnalyzeWith(c tile.Counts, melds []yaku.Meld) []Result {
+	if len(melds) == 0 {
+		return a.Analyze(c)
+	}
+	open := slices.ContainsFunc(melds, func(m yaku.Meld) bool { return m.Open })
+	// The meld tiles join the hand and the target alike (as forced tiles), so
+	// they cost nothing and count toward the 4-copy limit.
+	full := c
+	for _, m := range melds {
+		addMeld(&full, m)
+	}
+	if a.meldTargets == nil || !slices.Equal(a.melds, melds) {
+		a.melds = slices.Clone(melds)
+		a.meldTargets = map[string][]shanten.Target{}
+		for _, row := range a.rows {
+			if !needNoMelds[row.Key] && (!open || !needClosed[row.Key]) {
+				a.meldTargets[row.Key] = withMelds(targets[row.Key], melds)
+			}
+		}
+	}
+	out := make([]Result, 0, len(a.rows))
+	for _, row := range a.rows {
+		var r Result
+		if ts, ok := a.meldTargets[row.Key]; ok {
+			r = a.target(full, ts)
+		}
+		r.Key, r.Name, r.Yakuman = row.Key, row.Name, row.Yakuman
+		out = append(out, r)
+	}
+	return out
+}
+
+// addMeld adds the tiles of m to c.
+func addMeld(c *tile.Counts, m yaku.Meld) {
+	switch {
+	case m.Type == yaku.Seq:
+		c[m.Kind]++
+		c[m.Kind+1]++
+		c[m.Kind+2]++
+	case m.Kan:
+		c[m.Kind] += 4
+	default:
+		c[m.Kind] += 3
+	}
+}
+
+// forcedGroups reads the forced tiles of t back as groups. Every target's
+// forced tiles are triplets or runs of sequences, which a scan from the
+// lowest rank reads uniquely: three or more copies start with a triplet,
+// fewer copies each start a sequence.
+func forcedGroups(t *shanten.Target) []yaku.Meld {
+	var out []yaku.Meld
+	for s := 0; s < 4; s++ {
+		f := t.Rules[s].Forced
+		for r := 0; r < 9; r++ {
+			k := tile.Kind(9*s + r)
+			for ; f[r] >= 3; f[r] -= 3 {
+				out = append(out, yaku.Meld{Type: yaku.Trip, Kind: k})
+			}
+			for ; f[r] > 0 && r+2 < 9; f[r]-- {
+				f[r+1]--
+				f[r+2]--
+				out = append(out, yaku.Meld{Type: yaku.Seq, Kind: k})
+			}
+		}
+	}
+	return out
+}
+
+// withMelds returns the targets of ts that hold melds as fixed groups: each
+// meld either stands for a forced group of the same shape (a kan adds its
+// fourth tile) or takes a free meld its suit's rule allows. A concealed kan
+// taking a free meld counts as one of the concealed triplets MinTrips asks
+// for; a called triplet does not.
+func withMelds(ts []shanten.Target, melds []yaku.Meld) []shanten.Target {
+	var out []shanten.Target
+	for i := range ts {
+		groups := forcedGroups(&ts[i])
+		used := make([]bool, len(groups))
+		var rec func(t shanten.Target, j int)
+		rec = func(t shanten.Target, j int) {
+			if j == len(melds) {
+				if !slices.Contains(out, t) {
+					out = append(out, t)
+				}
+				return
+			}
+			m := melds[j]
+			s, rank := m.Kind.Suit(), m.Kind.Num()-1
+			for g, fg := range groups {
+				if used[g] || fg.Type != m.Type || fg.Kind != m.Kind {
+					continue
+				}
+				used[g] = true
+				u := t
+				if m.Kan {
+					u.Rules[s].Forced[rank]++
+				}
+				rec(u, j+1)
+				used[g] = false
+			}
+			rule := t.Rules[s]
+			bits := rule.Trip
+			if m.Type == yaku.Seq {
+				bits = rule.Seq
+			}
+			if t.Melds == 0 || bits>>rank&1 == 0 {
+				return
+			}
+			u := t
+			u.Melds--
+			f := &u.Rules[s].Forced
+			switch {
+			case m.Type == yaku.Seq:
+				f[rank]++
+				f[rank+1]++
+				f[rank+2]++
+			case m.Kan:
+				f[rank] += 4
+			default:
+				f[rank] += 3
+			}
+			if m.Kan && !m.Open && u.MinTrips > 0 {
+				u.MinTrips--
+			}
+			rec(u, j+1)
+		}
+		rec(ts[i], 0)
 	}
 	return out
 }

@@ -125,3 +125,41 @@ func TestKanAndReplacementYaku(t *testing.T) {
 		}
 	}
 }
+
+// HanOpenFor must agree with the han the evaluator scores in open wins.
+func TestHanOpenForMatchesEvaluate(t *testing.T) {
+	for _, tc := range []struct {
+		hand, win string
+		melds     []Meld
+	}{
+		{"123m456m789m5m5m", "5m", []Meld{pon("1z")}},       // ittsu, honitsu, ton
+		{"123m123m123s99s", "9s", []Meld{chii("1p")}},       // sanshoku, junchan
+		{"123m789m11s111z", "1z", []Meld{chii("7p")}},       // chanta
+		{"123m456m789m55m", "5m", []Meld{chii("1m")}},       // chinitsu
+		{"234m567m34s66s5s", "5s", []Meld{pon("8p")}},       // tanyao
+		{"222p333s77z", "7z", []Meld{pon("1m"), pon("9m")}}, // toitoi
+		{"123p789s77z", "7z", []Meld{pon("5z"), pon("6z")}}, // shousangen, haku, hatsu
+	} {
+		ctx := east()
+		ctx.WinTile = kind(tc.win)
+		ctx.Ron = true
+		ctx.Melds = tc.melds
+		w, ok := Evaluate(tile.MustParseHand(tc.hand), ctx)
+		if !ok || !w.HasYaku() {
+			t.Fatalf("%s: no win", tc.hand)
+		}
+		for _, y := range w.Yaku {
+			if got := HanOpenFor(y.Key, EastEast, true); got != y.Han {
+				t.Errorf("%s: %s han %d, HanOpenFor %d", tc.hand, y.Key, y.Han, got)
+			}
+		}
+	}
+	for _, key := range []string{"pinfu", "iipeikou", "riichi", "tsumo", "suuankou"} {
+		if got := HanOpenFor(key, EastEast, true); got != 0 {
+			t.Errorf("%s: open han %d, want 0", key, got)
+		}
+	}
+	if HanOpenFor("chinitsu", EastEast, false) != 6 || HanOpenFor("ton", EastEast, true) != 2 {
+		t.Error("closed or value-wind han changed")
+	}
+}
