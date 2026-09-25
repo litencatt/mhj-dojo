@@ -58,10 +58,10 @@ async function playOneStep(page: Page) {
   await clickAndWait(page, tile);
 }
 
-/** Plays generic steps (like TestHumanPon) until a pon is offered, then
- * takes it and returns the called tile. Fails clearly if the round ends
- * (or maxSteps is exceeded) without ever offering one. */
-async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
+/** Plays generic steps until a pon is offered, without resolving it (unlike
+ * playUntilPonTaken below): used to get two pages looking at the exact same
+ * call offer before either of them acts on it. */
+async function playUntilPonOffered(page: Page, maxSteps = 60) {
   const actionBar = page.locator('.action-bar');
   const result = page.getByRole('region', { name: '結果' });
   for (let i = 0; i < maxSteps; i++) {
@@ -70,16 +70,25 @@ async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
       throw new Error(`round ended (seed ${SEED}) before a pon was ever offered`);
     }
     await actionBar.waitFor({ state: 'visible', timeout: 15_000 });
-    const ponButton = actionBar.getByRole('button', { name: 'ポン', exact: true });
-    if (await ponButton.isVisible()) {
-      const calledTile = await actionBar.locator('.action-hint .tile').first().getAttribute('aria-label');
-      expect(calledTile, 'the call bar should show the last-discarded tile').toBeTruthy();
-      await clickAndWait(page, ponButton);
-      return calledTile!;
+    if (await actionBar.getByRole('button', { name: 'ポン', exact: true }).isVisible()) {
+      return;
     }
     await playOneStep(page);
   }
   throw new Error(`no pon offered within ${maxSteps} steps (seed ${SEED})`);
+}
+
+/** Plays generic steps (like TestHumanPon) until a pon is offered, then
+ * takes it and returns the called tile. Fails clearly if the round ends
+ * (or maxSteps is exceeded) without ever offering one. */
+async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
+  await playUntilPonOffered(page, maxSteps);
+  const actionBar = page.locator('.action-bar');
+  const ponButton = actionBar.getByRole('button', { name: 'ポン', exact: true });
+  const calledTile = await actionBar.locator('.action-hint .tile').first().getAttribute('aria-label');
+  expect(calledTile, 'the call bar should show the last-discarded tile').toBeTruthy();
+  await clickAndWait(page, ponButton);
+  return calledTile!;
 }
 
 /** Plays generic steps until the round's result panel appears. */
@@ -142,4 +151,46 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
   await waitForPlayback(page);
   await expectOptions();
   expect(page.url(), 'the reload resumes the same game').toBe(url);
+});
+
+test('a stale tab: acting after another tab moved the game on shows a notice, not an error', async ({
+  page,
+  context,
+}) => {
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const hand = handPanel(page);
+  await expect(hand).toBeVisible();
+
+  // Get page A to a pon offer, but don't resolve it yet.
+  await playUntilPonOffered(page);
+  const actionBarA = page.locator('.action-bar');
+  const ponButtonA = actionBarA.getByRole('button', { name: 'ポン', exact: true });
+  await expect(ponButtonA).toBeVisible();
+
+  // Page B: the same game, fetched fresh - it sees the same offer.
+  const gameId = new URL(page.url()).searchParams.get('game');
+  expect(gameId, 'the URL should carry the server-assigned game id').toBeTruthy();
+  const pageB = await context.newPage();
+  await pageB.goto(`/?mode=game&game=${gameId}`);
+  const actionBarB = pageB.locator('.action-bar');
+  const ponButtonB = actionBarB.getByRole('button', { name: 'ポン', exact: true });
+  await expect(ponButtonB).toBeVisible();
+
+  // Page A skips the call: the offer's window is now closed for every seat,
+  // including the human's, whichever tab acts.
+  const skipButtonA = actionBarA.getByRole('button', { name: /^(見逃す|スキップ)$/ });
+  await clickAndWait(page, skipButtonA);
+  await waitForPlayback(page);
+
+  // Page B, unaware, calls pon on its now-stale offer: the server rejects
+  // it (409, the offer is gone), the client re-fetches, sees the game
+  // really did move on (a different phase/actor/event count), and shows a
+  // notice instead of the raw error.
+  await Promise.all([
+    pageB.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
+    ponButtonB.click(),
+  ]);
+  await expect(pageB.locator('.notice-banner')).toBeVisible({ timeout: 15_000 });
+  await expect(pageB.locator('.error-banner')).toBeHidden();
+  await waitForPlayback(pageB);
 });
