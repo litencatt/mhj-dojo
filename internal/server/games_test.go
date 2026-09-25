@@ -191,8 +191,10 @@ func TestGameLength(t *testing.T) {
 	if st.Length != "hanchan" || st.RoundWind != "1z" || st.RoundNumber != 1 || st.Honba != 0 || st.FirstDealer != 1 {
 		t.Fatalf("hanchan start: %+v", st.Length)
 	}
-	st, _ = c.game("POST", "/api/games", `{}`)
-	if st.Length != "tonpuu" {
+	// A fixed seed: with a random one the CPUs can abort the first round
+	// (kyuushu) before your first move, and next is then allowed.
+	st, _ = c.game("POST", "/api/games", `{"seed":5}`)
+	if st.Length != "tonpuu" || st.Result != nil {
 		t.Fatalf("default length %q", st.Length)
 	}
 	c.wantError("POST", "/api/games", `{"length":"west"}`, http.StatusBadRequest)
