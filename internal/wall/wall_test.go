@@ -149,3 +149,43 @@ func TestHandOfRejectsBadSeat(t *testing.T) {
 		}()
 	}
 }
+
+func TestDeadWallLayout(t *testing.T) {
+	w := New(9)
+	ts := w.Tiles()
+	dead := ts[Size-DeadWallSize:]
+	if !slices.Equal(w.DoraIndicatorsN(1), w.DoraIndicators()) || !slices.Equal(w.UraDoraIndicatorsN(1), w.UraDoraIndicators()) {
+		t.Fatal("first indicators changed")
+	}
+	// rinshan = dead[0:4], dora = dead[4,6,8,10,12], ura = dead[5,7,9,11,13]
+	for k := range MaxKans {
+		if r, ok := w.Rinshan(k); !ok || r != dead[k] {
+			t.Fatalf("rinshan %d", k)
+		}
+	}
+	if _, ok := w.Rinshan(MaxKans); ok {
+		t.Fatal("a fifth rinshan tile")
+	}
+	dora, ura := w.DoraIndicatorsN(5), w.UraDoraIndicatorsN(5)
+	for i := range 5 {
+		if dora[i] != dead[4+2*i] || ura[i] != dead[5+2*i] {
+			t.Fatalf("indicator %d", i)
+		}
+	}
+}
+
+func TestRoundSeed(t *testing.T) {
+	seen := map[int64]bool{}
+	for master := int64(0); master < 50; master++ {
+		for round := range 8 {
+			s := RoundSeed(master, round)
+			if s < 0 || s >= 1<<53 || s != RoundSeed(master, round) {
+				t.Fatalf("RoundSeed(%d, %d) = %d", master, round, s)
+			}
+			if seen[s] {
+				t.Fatalf("RoundSeed(%d, %d) repeats %d", master, round, s)
+			}
+			seen[s] = true
+		}
+	}
+}
