@@ -81,7 +81,7 @@ func TestEvaluateRonAndRiichi(t *testing.T) {
 		{"haitei is tsumo only", "234m567m345p678s22s", "4m", Context{Ron: true, Haitei: true}, "tanyao,pinfu", 0, 2, 30},
 		// ron on a shanpon triplet breaks suuankou into toitoi + sanankou
 		{"ron breaks suuankou", "111m222p333s666z55z", "1m", Context{Ron: true}, "toitoi,sanankou,hatsu", 0, 5, 60},
-		{"tanki ron keeps suuankou", "111m222p333s666z55z", "5z", Context{Ron: true}, "suuankou", 0, 13, 0},
+		{"tanki ron keeps suuankou (単騎: double)", "111m222p333s666z55z", "5z", Context{Ron: true}, "suuankou", 0, 26, 0},
 		// three triplets, ron completes one: only two concealed
 		{"ron shanpon has no sanankou", "111m999p555s234m77s", "1m", Context{Ron: true}, "", 0, 0, 50},
 		{"tsumo shanpon has sanankou", "111m999p555s234m77s", "1m", Context{}, "tsumo,sanankou", 0, 3, 50},

@@ -229,8 +229,12 @@ These clarify points the contract above leaves open; none changes the JSON shape
   (never with `chanta`/`junchan`; also with chiitoitsu), `shousangen` 2 (the dragon triplets also
   score their yakuhai).
   **Yakuman** (`kokushi`, `suuankou`, `daisangen`, `tsuuiisou`, `shousuushii`, `daisuushii`,
-  `ryuuiisou`, `chinroutou`, `chuuren`): 13 han each; several yakuman add up (e.g. `suuankou` +
-  `tsuuiisou` + `daisangen` = 39); no double-yakuman variants. When any yakuman is present, only the
+  `ryuuiisou`, `chinroutou`, `chuuren`): 13 han each, 26 for a double yakuman; several yakuman add up
+  (e.g. `suuankou` + `tsuuiisou` + `daisangen` = 39, a triple yakuman). The double yakuman keep their
+  key and have their own `name`: `suuankou` won on the pair (四暗刻単騎, ron or tsumo), `kokushi` whose
+  13 tiles before the win held one of each kind (国士無双十三面待ち), `chuuren` whose 13 tiles before
+  the win were exactly 1112345678999 of the suit (純正九蓮宝燈), and `daisuushii` (大四喜, always
+  double). The analysis rows' `han` stays 13 for every yakuman. When any yakuman is present, only the
   yakuman are listed (no 門前清自摸和 or other yaku). A closed tsumo with four triplets is always
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
@@ -254,7 +258,9 @@ discards it for you unless you can tsumo), double riichi, ippatsu, ura dora,
 haitei, houtei, furiten (own discards, same go-around, and after riichi), head
 bump (no double ron), 3000-point noten penalty at the exhaustive draw, and the
 abortive draws 九種九牌 (declared), 四風連打, 四家立直 and 四開槓. Points: no
-kiriage mangan, counted yakuman at 13 han, honba 300 (ron) / 100 each (tsumo).
+kiriage mangan, counted yakuman at 13 han, yakuman multiples (a double yakuman or
+stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a non-dealer
+and 48000 × n to the dealer), honba 300 (ron) / 100 each (tsumo). No pao (責任払い).
 
 Calls: pon and open kan on any other seat's discard, chii on the discard of
 the seat to your left, and on your own turn a concealed kan or an added kan
@@ -391,6 +397,8 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   "points": { "limit": "", "multiplier": 0, "total": 5200, "ron": 5200 },
   // on a tsumo: "from_dealer" / "from_non_dealer" instead of "ron"
   // limit: "" | "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman"
+  // multiplier: yakuman count (2 = double, 3 = triple ...; 1 for a counted yakuman), else 0
+  // yaku[].han: 13 per yakuman, 26 for a double yakuman form; "han" is their sum
   "deltas": [-5800, 6800, 0, 0], // points at the end minus at the start: the sum of the next three
   "hand_deltas":  [-5200, 5200, 0, 0],    // the hand's payments (or the noten penalty)
   "honba_deltas": [-600, 600, 0, 0],      // honba: 300 each from the discarder, or 100 from each seat on a tsumo

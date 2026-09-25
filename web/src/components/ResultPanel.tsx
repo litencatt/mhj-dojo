@@ -2,6 +2,7 @@ import type { GameResult, GameState, Limit, Points } from '../api';
 import { ABORT_NAMES, seatLabel, WIND_NAMES } from './GameTable';
 import { Tile } from './Tile';
 import { Melds } from './Melds';
+import { yakuHanText, yakumanName } from '../yakumanLabel';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -13,7 +14,7 @@ const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
 
 function limitName(p: Points): string {
   if (p.limit === '') return '';
-  if (p.limit === 'yakuman' && p.multiplier > 1) return p.multiplier === 2 ? 'ダブル役満' : `${p.multiplier}倍役満`;
+  if (p.limit === 'yakuman' && p.multiplier > 1) return yakumanName(p.multiplier);
   return LIMIT_NAMES[p.limit];
 }
 
@@ -89,7 +90,7 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
               {result.yaku.map((y) => (
                 <tr key={y.key}>
                   <td>{y.name}</td>
-                  <td>{y.han}翻</td>
+                  <td>{yakuHanText(y.han)}</td>
                 </tr>
               ))}
               {!yakuman && result.dora > 0 && (

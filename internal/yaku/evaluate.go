@@ -109,8 +109,8 @@ var (
 	yChiitoitsu   = Yaku{"chiitoitsu", "七対子", 2, openNever}
 )
 
-// Yakuman: 13 han each; several yakuman add up, and a hand with any yakuman
-// scores only its yakuman (no dora, no other yaku).
+// Yakuman: 13 han each (26 for a double yakuman); several yakuman add up, and
+// a hand with any yakuman scores only its yakuman (no dora, no other yaku).
 var (
 	yKokushi     = Yaku{"kokushi", "国士無双", 13, openNever}
 	ySuuankou    = Yaku{"suuankou", "四暗刻", 13, openNever}
@@ -122,6 +122,16 @@ var (
 	yChinroutou  = Yaku{"chinroutou", "清老頭", 13, openSame}
 	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13, openNever}
 	ySuukantsu   = Yaku{"suukantsu", "四槓子", 13, openSame}
+)
+
+// Double yakuman: 26 han. They keep the key of the yakuman, whose single form
+// is what byKey (and so the per-yaku analysis rows) report; 大四喜 always
+// scores as a double yakuman.
+var (
+	yDaisuushii2   = Yaku{"daisuushii", "大四喜", 26, openSame}
+	yKokushi13     = Yaku{"kokushi", "国士無双十三面待ち", 26, openNever}
+	ySuuankouTanki = Yaku{"suuankou", "四暗刻単騎", 26, openNever}
+	yJunseiChuuren = Yaku{"chuuren", "純正九蓮宝燈", 26, openNever}
 )
 
 // byKey maps each yaku key to its definition (closed-hand han). Value winds
@@ -196,8 +206,12 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		}
 	}
 	if IsKokushi(c) {
-		win.Yaku = []Yaku{yKokushi}
-		win.HanTotal = yKokushi.Han
+		y := yKokushi
+		if c[ctx.WinTile] == 2 { // the 13 tiles held one of each kind: a 13-sided wait
+			y = yKokushi13
+		}
+		win.Yaku = []Yaku{y}
+		win.HanTotal = y.Han
 		return win, true
 	}
 	var best, bestYakuman []Yaku
@@ -218,11 +232,11 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 			ys = append(ys, yHonroutou)
 		}
 		ys = append(ys, yChiitoitsu)
-		consider(ys, yakumanWide(c, false, true), chiitoitsuFu, nil)
+		consider(ys, yakumanWide(c, false, true, ctx.WinTile), chiitoitsuFu, nil)
 	}
 	for _, r := range ReadingsWith(c, ctx.Melds, ctx.WinTile) {
 		ys := evalReading(all, r, ctx)
-		consider(ys, append(yakumanWide(all, true, len(ctx.Melds) == 0), yakumanReading(r, ctx)...), Fu(r, ctx), &r)
+		consider(ys, append(yakumanWide(all, true, len(ctx.Melds) == 0, ctx.WinTile), yakumanReading(r, ctx)...), Fu(r, ctx), &r)
 	}
 	if bestYakumanHan > 0 {
 		win.Yaku = bestYakuman
@@ -274,9 +288,10 @@ func situational(ctx Context) []Yaku {
 }
 
 // yakumanWide returns the yakuman that depend only on the tile set; standard
-// reports a 4 melds + pair reading (false: seven pairs), and noMelds a hand
-// without called melds or kan (needed for chuuren).
-func yakumanWide(c tile.Counts, standard, noMelds bool) []Yaku {
+// reports a 4 melds + pair reading (false: seven pairs), noMelds a hand
+// without called melds or kan (needed for chuuren), and win the winning tile
+// (純正九蓮宝燈: the 13 tiles before it are exactly 1112345678999).
+func yakumanWide(c tile.Counts, standard, noMelds bool, win tile.Kind) []Yaku {
 	allHonor, allTerminal, allGreen, anyHonor := true, true, true, false
 	suits := map[int]bool{}
 	for k, n := range c {
@@ -308,11 +323,19 @@ func yakumanWide(c tile.Counts, standard, noMelds bool) []Yaku {
 	}
 	if noMelds && len(suits) == 1 && !anyHonor {
 		for s := range suits {
-			chuuren := true
+			chuuren, junsei := true, true
 			for n, need := range [9]int{3, 1, 1, 1, 1, 1, 1, 1, 3} {
-				chuuren = chuuren && c[tile.MakeKind(s, n+1)] >= need
+				k := tile.MakeKind(s, n+1)
+				chuuren = chuuren && c[k] >= need
+				if k == win {
+					need++
+				}
+				junsei = junsei && c[k] == need
 			}
-			if chuuren {
+			switch {
+			case junsei:
+				ys = append(ys, yJunseiChuuren)
+			case chuuren:
 				ys = append(ys, yChuuren)
 			}
 		}
@@ -341,7 +364,10 @@ func yakumanReading(r Reading, ctx Context) []Yaku {
 		}
 	}
 	var ys []Yaku
-	if concealedTrips(r, ctx) == 4 {
+	switch {
+	case concealedTrips(r, ctx) == 4 && r.Wait == Tanki:
+		ys = append(ys, ySuuankouTanki)
+	case concealedTrips(r, ctx) == 4:
 		ys = append(ys, ySuuankou)
 	}
 	if kans(r) == 4 {
@@ -352,7 +378,7 @@ func yakumanReading(r Reading, ctx Context) []Yaku {
 	}
 	switch {
 	case winds == 4:
-		ys = append(ys, yDaisuushii)
+		ys = append(ys, yDaisuushii2)
 	case winds == 3 && r.Pair >= tile.East && r.Pair <= tile.North:
 		ys = append(ys, yShousuushii)
 	}
