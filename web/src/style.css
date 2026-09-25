@@ -458,11 +458,13 @@ section {
 .hand-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   flex-wrap: wrap;
 }
 .hand-tiles {
   display: flex;
+  justify-content: center;
   gap: 4px;
   flex-wrap: wrap;
 }
@@ -1017,9 +1019,6 @@ section {
 }
 .seat-box .melds {
   margin-bottom: 4px;
-}
-.hand-row .melds {
-  margin-left: auto;
 }
 
 /* ---- Playback (issue #29): CPU moves land one at a time. ---- */
