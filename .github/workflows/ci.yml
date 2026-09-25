@@ -30,6 +30,10 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod
 
+  # The test jobs keep their own build caches: with setup-go's cache they
+  # shared one key, so only the first job to save it (with or without -race)
+  # found its builds there, and the cache never refreshed after a hit. Each
+  # push to main saves a fresh cache; pull requests only restore it.
   go-test:
     name: Go test
     runs-on: ubuntu-latest
@@ -38,11 +42,21 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.mod
-      - run: go vet ./...
+          cache: false
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/go-build
+          key: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          restore-keys: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-
+      # go vet runs in golangci-lint (the standard set includes govet).
       # Full-size oracle and property tests; too slow to also run under -race.
       - run: go test -count=1 ./...
       - run: go build -o bin/mhj2 ./cmd/mhj2
+      - uses: actions/cache/save@v6
+        if: github.event_name == 'push'
+        with:
+          path: ~/.cache/go-build
+          key: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
 
   go-test-race:
     name: Go test (race)
@@ -52,10 +66,21 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.mod
-      # -short shrinks the CPU-bound random/oracle loops; the race detector
-      # only adds value for the session/server concurrency paths.
+          cache: false
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/go-build
+          key: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          restore-keys: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-
+      # -short shrinks the CPU-bound random/oracle loops and skips whole-game
+      # playthroughs, which run on one goroutine; the race detector only adds
+      # value for the concurrency paths (session, store, match via server).
       - run: go test -race -short -count=1 ./...
+      - uses: actions/cache/save@v6
+        if: github.event_name == 'push'
+        with:
+          path: ~/.cache/go-build
+          key: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
 
   govulncheck:
     name: Go vulnerability check
