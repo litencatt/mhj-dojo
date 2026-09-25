@@ -45,6 +45,9 @@ func playOut(t *testing.T, m *Match) State {
 }
 
 func TestHiddenUntilTheEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	m := newMatch(game.NewHanchan(3, game.Tonpuu), Tonpuu, false)
 	st := m.State()
 	if st.Seed != nil || len(st.UraDoraIndicators) != 0 {
@@ -94,6 +97,9 @@ func playGame(t *testing.T, m *Match) State {
 
 // A whole game: rounds and standings add up, and Next is refused at the end.
 func TestWholeGame(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	m := newMatch(game.NewHanchan(11, game.Tonpuu), Tonpuu, true)
 	st := playGame(t, m)
 	if len(st.Rounds) < 4 || st.CanNext {
@@ -119,6 +125,9 @@ func TestWholeGame(t *testing.T) {
 // History has one entry at the start and one per human discard, including
 // the ones played for the human in riichi.
 func TestHistoryFollowsHumanDiscards(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	riichiSeen := false
 	// Check at least 10 seeds and keep going until one reaches riichi.
 	for seed := int64(0); seed < 200 && (seed < 10 || !riichiSeen); seed++ {

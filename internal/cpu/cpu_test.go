@@ -197,7 +197,11 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 // Two games from the same seed with the same human moves play out exactly
 // the same with the real CPU, and the log replays onto a fresh round.
 func TestGameReplaysWithCPU(t *testing.T) {
-	for seed := int64(0); seed < 30; seed++ {
+	n := int64(30)
+	if testing.Short() {
+		n = 5
+	}
+	for seed := range n {
 		a, b := playGame(t, seed), playGame(t, seed)
 		if !reflect.DeepEqual(a.Round.Log(), b.Round.Log()) {
 			t.Fatalf("seed %d: logs differ", seed)
@@ -375,9 +379,13 @@ func TestCallDecisions(t *testing.T) {
 // Whole rounds with four CPU players now include calls and wins on open
 // hands, with every move legal.
 func TestSelfPlayCalls(t *testing.T) {
+	n := int64(150)
+	if testing.Short() {
+		n = 30
+	}
 	p := New()
 	calls, openWins := 0, 0
-	for seed := int64(0); seed < 150; seed++ {
+	for seed := range n {
 		r := game.New(seed)
 		for r.Actor() >= 0 {
 			seat := r.Actor()
@@ -399,5 +407,5 @@ func TestSelfPlayCalls(t *testing.T) {
 	if calls == 0 || openWins == 0 {
 		t.Fatalf("%d calls, %d open wins", calls, openWins)
 	}
-	t.Logf("%d calls, %d wins with melds in 150 rounds", calls, openWins)
+	t.Logf("%d calls, %d wins with melds in %d rounds", calls, openWins, n)
 }
