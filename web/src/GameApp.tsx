@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, GameState } from './api';
 import { Hand } from './components/Hand';
-import { YakuTable } from './components/YakuTable';
 import { ShantenChart } from './components/ShantenChart';
-import { Glossary } from './components/Glossary';
 import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
+import { DoraStatus } from './components/DoraStatus';
+import { SidePanels } from './components/SidePanels';
 import { GameTable, WIND_NAMES } from './components/GameTable';
 import { ResultPanel } from './components/ResultPanel';
-import { PANELS, errorMessage, optionalInt, useMinimized, type PanelKey } from './panels';
+import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
+import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -17,67 +18,30 @@ const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 /** A closed-hand East round against three CPU players (?mode=game). */
 export function GameApp() {
   const [state, setState] = useState<GameState | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
-  const [busy, setBusy] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
-  // Every action changes the round, so requests must never overlap.
-  const inFlight = useRef(false);
-
-  async function request(fn: () => Promise<GameState>) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      setState(await fn());
-      setPreviewTile(null);
-      setRiichiMode(false);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  }
+  const { busy, error, request } = useSerialRequest<GameState>((next) => {
+    setState(next);
+    setPreviewTile(null);
+    setRiichiMode(false);
+  });
 
   function startGame(seed?: number) {
     return request(() => api.createGame({ seed }));
   }
 
-  // The URL carries ?mode=game&game=&seed= so a reload resumes the game. Games
-  // live only in server memory; after a restart the same seed deals again.
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('game');
-    const seed = optionalInt(params.get('seed'));
-    if (!id) {
-      void startGame(seed);
-      return;
-    }
-    void request(async () => {
-      try {
-        return await api.getGame(id);
-      } catch (err) {
-        if (err instanceof api.ApiError && err.status === 404) return api.createGame({ seed });
-        throw err;
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!state) return;
-    const url = new URL(location.href);
-    url.searchParams.set('mode', 'game');
-    url.searchParams.set('game', state.game_id);
+  // The URL carries ?mode=game&game=&seed= so a reload resumes the game, or
+  // deals the same seed again after a server restart.
+  useUrlResume({
+    idKey: 'game',
+    request,
+    get: api.getGame,
+    create: (params) => api.createGame({ seed: optionalInt(params.get('seed')) }),
     // A random seed is hidden until the end: drop any seed of a previous game.
-    if (state.seed !== null) url.searchParams.set('seed', String(state.seed));
-    else url.searchParams.delete('seed');
-    history.replaceState(null, '', url);
-  }, [state?.game_id, state?.seed]);
+    sync: state && { mode: 'game', game: state.game_id, seed: state.seed !== null ? String(state.seed) : null },
+  });
 
   useEffect(() => {
     document.title = 'mhj2 - CPU対戦';
@@ -93,16 +57,10 @@ export function GameApp() {
     void startGame(seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
-  const rowNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (state) for (const r of state.analysis) map[r.key] = r.name;
-    return map;
-  }, [state?.analysis]);
+  const rowNames = useRowNames(state?.analysis);
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
-  // Preview only tiles the server analysed, so the title never outruns the table.
-  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
   // The tree may be minimized from practice mode, but game mode has no tree tab.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
@@ -138,38 +96,12 @@ export function GameApp() {
                   <dt>自風</dt>
                   <dd>{me && WIND_NAMES[me.wind]}</dd>
                 </div>
-                <div>
-                  <dt>ドラ表示牌</dt>
-                  <dd class="dora-indicators">
-                    {state.dora_indicators.map((t, i) => (
-                      <Tile key={`${t}-${i}`} tile={t} size="sm" />
-                    ))}
-                    <span class="dora-arrow" aria-hidden="true">→</span>
-                    <span class="dora-label">ドラ</span>
-                    {state.dora.map((t, i) => (
-                      <Tile key={`d-${t}-${i}`} tile={t} size="sm" label={`ドラ ${t}`} />
-                    ))}
-                  </dd>
-                </div>
-                <div>
-                  <dt>裏ドラ表示牌</dt>
-                  <dd class="dora-indicators">
-                    {state.ura_dora_indicators.length > 0 ? (
-                      <>
-                        {state.ura_dora_indicators.map((t, i) => (
-                          <Tile key={`u-${t}-${i}`} tile={t} size="sm" />
-                        ))}
-                        <span class="dora-arrow" aria-hidden="true">→</span>
-                        <span class="dora-label">裏ドラ</span>
-                        {state.ura_dora.map((t, i) => (
-                          <Tile key={`ud-${t}-${i}`} tile={t} size="sm" label={`裏ドラ ${t}`} />
-                        ))}
-                      </>
-                    ) : (
-                      state.dora_indicators.map((_, i) => <Tile key={`ub-${i}`} tile="" size="sm" faceDown />)
-                    )}
-                  </dd>
-                </div>
+                <DoraStatus
+                  doraIndicators={state.dora_indicators}
+                  dora={state.dora}
+                  uraDoraIndicators={state.ura_dora_indicators}
+                  uraDora={state.ura_dora}
+                />
               </dl>
             )}
           </header>
@@ -217,19 +149,14 @@ export function GameApp() {
         )}
       </div>
       {state && (
-        <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
-          <div class="area-yaku" hidden={isMin('yaku')}>
-            <YakuTable
-              rows={previewRows ?? state.analysis}
-              baseline={previewRows ? state.analysis : null}
-              previewTile={previewRows ? previewTile : null}
-              onMinimize={() => minimize('yaku')}
-            />
-          </div>
-          <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary mode="game" onMinimize={() => minimize('gloss')} />
-          </div>
-        </div>
+        <SidePanels
+          analysis={state.analysis}
+          byDiscard={state.by_discard}
+          previewTile={previewTile}
+          mode="game"
+          isMin={isMin}
+          onMinimize={minimize}
+        />
       )}
       {state && (
         <Dock

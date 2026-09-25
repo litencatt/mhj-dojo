@@ -1,82 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import * as api from './api';
-import type { State } from './api';
+import type { SessionState } from './api';
 import { Hand } from './components/Hand';
-import { YakuTable } from './components/YakuTable';
 import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
-import { Glossary } from './components/Glossary';
 import { Dock } from './components/Dock';
-import { Tile } from './components/Tile';
-import { PANELS, errorMessage, optionalInt, useMinimized, type PanelKey } from './panels';
+import { DoraStatus } from './components/DoraStatus';
+import { SidePanels } from './components/SidePanels';
+import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
+import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 export function App() {
-  const [state, setState] = useState<State | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<SessionState | null>(null);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
-  const [busy, setBusy] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
-  // Discard/tsumo act on the server's current node, so requests must never overlap:
-  // a concurrent goto could redirect a discard, and responses could land out of order.
-  const inFlight = useRef(false);
-
-  async function request(fn: () => Promise<State>) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await fn();
-      setState(next);
-      setPreviewTile(null);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
-  }
+  const { busy, error, request } = useSerialRequest<SessionState>((next) => {
+    setState(next);
+    setPreviewTile(null);
+  });
 
   function startGame(seed?: number, maxTurns?: number) {
     return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
   }
 
-  // The URL carries ?session=&seed=&turns= so a reload resumes the game. Sessions
-  // live only in server memory, so after a server restart the same wall is
-  // replayed from the seed instead.
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('session');
-    const seed = optionalInt(params.get('seed'));
-    const turns = optionalInt(params.get('turns')) ?? 18;
-    if (!id) {
-      void startGame(seed, turns);
-      return;
-    }
-    void request(async () => {
-      try {
-        return await api.getSession(id);
-      } catch (err) {
-        if (err instanceof api.ApiError && err.status === 404) {
-          return api.createSession({ seed, max_turns: turns });
-        }
-        throw err;
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!state) return;
-    const url = new URL(location.href);
-    url.searchParams.set('session', state.session_id);
-    url.searchParams.set('seed', String(state.seed));
-    url.searchParams.set('turns', String(state.max_turns));
-    history.replaceState(null, '', url);
-  }, [state?.session_id]);
+  // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
+  // replays the same wall from the seed after a server restart.
+  useUrlResume({
+    idKey: 'session',
+    request,
+    get: api.getSession,
+    create: (params) =>
+      api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }),
+    sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns) },
+  });
 
   useEffect(() => {
     document.title = 'mhj2 - 麻雀練習';
@@ -104,14 +63,7 @@ export function App() {
     void request(() => api.goto(state.session_id, nodeId));
   }
 
-  const rowNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (state) for (const r of state.analysis) map[r.key] = r.name;
-    return map;
-  }, [state?.analysis]);
-
-  // Preview only tiles the server analysed, so the title never outruns the table.
-  const previewRows = previewTile && state ? state.by_discard[previewTile] : undefined;
+  const rowNames = useRowNames(state?.analysis);
 
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
@@ -162,39 +114,12 @@ export function App() {
                   <dt>残り牌</dt>
                   <dd>{state.wall_remaining}</dd>
                 </div>
-                <div>
-                  <dt>ドラ表示牌</dt>
-                  <dd class="dora-indicators">
-                    {state.dora_indicators.map((t, i) => (
-                      <Tile key={`${t}-${i}`} tile={t} size="sm" />
-                    ))}
-                    <span class="dora-arrow" aria-hidden="true">→</span>
-                    <span class="dora-label">ドラ</span>
-                    {state.dora.map((t, i) => (
-                      <Tile key={`d-${t}-${i}`} tile={t} size="sm" label={`ドラ ${t}`} />
-                    ))}
-                  </dd>
-                </div>
-                <div>
-                  <dt>裏ドラ表示牌</dt>
-                  <dd class="dora-indicators">
-                    {state.ura_dora_indicators.length > 0 ? (
-                      <>
-                        {state.ura_dora_indicators.map((t, i) => (
-                          <Tile key={`u-${t}-${i}`} tile={t} size="sm" />
-                        ))}
-                        <span class="dora-arrow" aria-hidden="true">→</span>
-                        <span class="dora-label">裏ドラ</span>
-                        {state.ura_dora.map((t, i) => (
-                          <Tile key={`ud-${t}-${i}`} tile={t} size="sm" label={`裏ドラ ${t}`} />
-                        ))}
-                      </>
-                    ) : (
-                      // Hidden until the game ends: one face-down tile per indicator.
-                      state.dora_indicators.map((_, i) => <Tile key={`ub-${i}`} tile="" size="sm" faceDown />)
-                    )}
-                  </dd>
-                </div>
+                <DoraStatus
+                  doraIndicators={state.dora_indicators}
+                  dora={state.dora}
+                  uraDoraIndicators={state.ura_dora_indicators}
+                  uraDora={state.ura_dora}
+                />
               </dl>
             )}
           </header>
@@ -250,19 +175,14 @@ export function App() {
         </div>
       )}
       {state && (
-        <div class="area-side" hidden={isMin('yaku') && isMin('gloss')}>
-          <div class="area-yaku" hidden={isMin('yaku')}>
-            <YakuTable
-              rows={previewRows ?? state.analysis}
-              baseline={previewRows ? state.analysis : null}
-              previewTile={previewRows ? previewTile : null}
-              onMinimize={() => minimize('yaku')}
-            />
-          </div>
-          <div class="area-gloss" hidden={isMin('gloss')}>
-            <Glossary mode="practice" onMinimize={() => minimize('gloss')} />
-          </div>
-        </div>
+        <SidePanels
+          analysis={state.analysis}
+          byDiscard={state.by_discard}
+          previewTile={previewTile}
+          mode="practice"
+          isMin={isMin}
+          onMinimize={minimize}
+        />
       )}
       {state && (
         <Dock
