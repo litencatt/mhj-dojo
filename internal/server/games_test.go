@@ -2,10 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -135,6 +137,9 @@ func TestGameErrors(t *testing.T) {
 
 // A random seed rebuilds the whole wall, so it is hidden until the end.
 func TestRandomSeedHiddenUntilTheEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	c := newClient(t, session.NewStore())
 	st, raw := c.game("POST", "/api/games", ``)
 	if st.Seed != nil || raw["seed"] != nil {
@@ -176,6 +181,9 @@ func TestGameLength(t *testing.T) {
 // Riichi discards made for you still land in the history, and by_discard
 // only offers the tiles you may discard.
 func TestRiichiHistoryAndByDiscard(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	c := newClient(t, session.NewStore())
 	// Playing the last legal tile, seed 67 is the first seed whose hand reaches
 	// riichi; later seeds are only a safety net if the engine changes.
@@ -222,6 +230,9 @@ func TestGameStartsWithCPUMoves(t *testing.T) {
 // The human calls pon over the API: the offer names the tile, the meld and
 // the called river tile show, and kuikae holds.
 func TestHumanPon(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	c := newClient(t, session.NewStore())
 	for seed := 0; seed < 300; seed++ {
 		st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+`}`)
@@ -258,4 +269,66 @@ func TestHumanPon(t *testing.T) {
 		}
 	}
 	t.Fatal("no seed offered the human a pon")
+}
+
+// Concurrent requests on one game and on the store: the race job relies on
+// this test to cover the locks in match and store.
+func TestGameConcurrentRequests(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	st, _ := c.game("POST", "/api/games", `{"seed":7}`)
+	path := c.srv.URL + "/api/games/" + st.GameID
+	post := func(url, body string) (int, match.State, error) {
+		res, err := http.Post(url, "application/json", strings.NewReader(body))
+		if err != nil {
+			return 0, match.State{}, err
+		}
+		defer func() { _ = res.Body.Close() }()
+		var st match.State
+		if res.StatusCode == http.StatusOK {
+			err = json.NewDecoder(res.Body).Decode(&st)
+		}
+		return res.StatusCode, st, err
+	}
+	var wg sync.WaitGroup
+	errs := make(chan error, 64)
+	for g := range 6 {
+		wg.Go(func() {
+			for range 8 {
+				if g%3 == 0 { // other games come and go in the store meanwhile
+					if code, _, err := post(c.srv.URL+"/api/games", `{}`); err != nil || code != http.StatusOK {
+						errs <- fmt.Errorf("create: %d %v", code, err)
+						return
+					}
+					continue
+				}
+				res, err := http.Get(path)
+				if err != nil {
+					errs <- err
+					return
+				}
+				var cur match.State
+				err = json.NewDecoder(res.Body).Decode(&cur)
+				_ = res.Body.Close()
+				if err != nil {
+					errs <- err
+					return
+				}
+				if cur.Result != nil {
+					return
+				}
+				// Another goroutine may move first, so the move can be stale.
+				code, _, err := post(path+"/action", nextMove(cur))
+				if err != nil || (code != http.StatusOK && code != http.StatusConflict && code != http.StatusBadRequest) {
+					errs <- fmt.Errorf("action: %d %v", code, err)
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
+	c.game("GET", "/api/games/"+st.GameID, "")
 }
