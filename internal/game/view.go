@@ -50,12 +50,12 @@ func (r *Round) ViewFor(viewer int) View {
 		Actor:          r.Actor(),
 		DrawsLeft:      r.DrawsLeft(),
 		Deposit:        r.deposit,
-		DoraIndicators: r.wall.DoraIndicators(),
+		DoraIndicators: r.doraIndicators(),
 		Result:         r.result,
 	}
 	ended := r.phase == PhaseEnded
 	if ended {
-		v.UraIndicators = r.wall.UraDoraIndicators()
+		v.UraIndicators = r.uraIndicators()
 	}
 	if r.phase == PhaseCall {
 		d := r.lastDiscard

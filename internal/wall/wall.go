@@ -2,6 +2,8 @@
 package wall
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
 
@@ -22,9 +24,13 @@ const (
 	// LiveDraws4 is the number of draws available after a four-player deal.
 	LiveDraws4 = Size - DeadWallSize - Seats*HandSize
 	// doraIndicatorPos is the index inside the dead wall of the first dora
-	// indicator. The dead wall is 7 stacks of (upper, lower) tiles, so the
-	// ura-dora indicator is the tile below it at doraIndicatorPos+1.
+	// indicator. The dead wall is 7 stacks of (upper, lower) tiles: the first
+	// two stacks are the 4 rinshan (kan replacement) tiles, then each dora
+	// indicator sits on a stack with its ura-dora indicator below it.
 	doraIndicatorPos = 4
+	// MaxKans is the number of kans a round allows: 4 rinshan tiles and up
+	// to 5 dora indicators.
+	MaxKans = 4
 )
 
 // Wall is a shuffled tile set with the dead wall at [122,136). A solo deal
@@ -153,15 +159,50 @@ func (w *Wall) Draw4(k int) (tile.Tile, bool) {
 	return w.tiles[Seats*HandSize+k], true
 }
 
-// DoraIndicators returns the revealed dora indicators (one in Phase 1).
-func (w *Wall) DoraIndicators() []tile.Tile {
-	return []tile.Tile{w.tiles[Size-DeadWallSize+doraIndicatorPos]}
+// DoraIndicators returns the first dora indicator, the only one without kans.
+func (w *Wall) DoraIndicators() []tile.Tile { return w.DoraIndicatorsN(1) }
+
+// UraDoraIndicators returns the first ura-dora indicator: the tile below the
+// first dora indicator, revealed only when the round ends.
+func (w *Wall) UraDoraIndicators() []tile.Tile { return w.UraDoraIndicatorsN(1) }
+
+// DoraIndicatorsN returns the first n dora indicators (1 + kans, n <= 5).
+func (w *Wall) DoraIndicatorsN(n int) []tile.Tile { return w.deadStacks(n, 0) }
+
+// UraDoraIndicatorsN returns the ura-dora indicators below the first n dora
+// indicators.
+func (w *Wall) UraDoraIndicatorsN(n int) []tile.Tile { return w.deadStacks(n, 1) }
+
+func (w *Wall) deadStacks(n, lower int) []tile.Tile {
+	if n < 1 || n > MaxKans+1 {
+		panic(fmt.Sprintf("wall: %d dora indicators", n))
+	}
+	out := make([]tile.Tile, n)
+	for i := range n {
+		out[i] = w.tiles[Size-DeadWallSize+doraIndicatorPos+2*i+lower]
+	}
+	return out
 }
 
-// UraDoraIndicators returns the ura-dora indicators: the tiles below the dora
-// indicators, revealed only when the game ends.
-func (w *Wall) UraDoraIndicators() []tile.Tile {
-	return []tile.Tile{w.tiles[Size-DeadWallSize+doraIndicatorPos+1]}
+// Rinshan returns the k-th (0-based) rinshan tile, drawn after a kan. Each
+// kan also takes one draw off the end of the live wall (the dead wall stays
+// 14 tiles), which the caller accounts for.
+func (w *Wall) Rinshan(k int) (tile.Tile, bool) {
+	if k < 0 || k >= MaxKans {
+		return tile.Tile{}, false
+	}
+	return w.tiles[Size-DeadWallSize+k], true
+}
+
+// RoundSeed derives the wall seed of round i of a game from the game's
+// master seed. It is one-way: showing one round's seed reveals neither the
+// master seed nor another round's wall. The result is in [0, 2^53).
+func RoundSeed(master int64, round int) int64 {
+	var b [16]byte
+	binary.BigEndian.PutUint64(b[:8], uint64(master))
+	binary.BigEndian.PutUint64(b[8:], uint64(round))
+	sum := sha256.Sum256(b[:])
+	return int64(binary.BigEndian.Uint64(sum[:8]) >> 11)
 }
 
 // Tiles returns the full wall order.
