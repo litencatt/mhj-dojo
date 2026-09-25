@@ -80,14 +80,13 @@ func Compute(han, fu, yakuman int, dealer, tsumo bool) Points {
 
 func up100(v int) int { return (v + 99) / 100 * 100 }
 
-// FromWin scores an evaluated win. Yakuman yaku carry 13 han each, so their
-// number is the multiplier.
+// FromWin scores an evaluated win. Yakuman yaku carry 13 han per yakuman (26
+// for a double yakuman) and other yaku fewer, so han/13 summed over the yaku
+// is the multiplier.
 func FromWin(w yaku.Win, dealer, tsumo bool) Points {
 	n := 0
 	for _, y := range w.Yaku {
-		if y.Han >= 13 {
-			n++
-		}
+		n += y.Han / 13
 	}
 	return Compute(w.HanTotal, w.Fu, n, dealer, tsumo)
 }

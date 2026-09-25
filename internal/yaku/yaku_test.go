@@ -66,20 +66,28 @@ func TestEvaluate(t *testing.T) {
 		// 9m tanki: no pinfu
 		{"123m123p123s789s99m", "9m", "5z", "tsumo,sanshoku,junchan", 0, 6},
 		{"123456m777m555z22z", "2z", "5z", "tsumo,honitsu,haku", 0, 5},
-		// four concealed triplets: suuankou alone; dora is reported but not added
-		{"111m222p333s666z55z", "5z", "3z", "suuankou", 0, 13},
-		{"111m222p333s666z55z", "5z", "5z", "suuankou", 3, 13},
+		// four concealed triplets: suuankou alone; dora is reported but not added.
+		// Won on a triplet tile (shanpon tsumo) it is a single yakuman ...
+		{"111m222p333s666z55z", "1m", "3z", "suuankou", 0, 13},
+		{"111m222p333s666z55z", "1m", "5z", "suuankou", 3, 13},
+		// ... and on the pair (四暗刻単騎) a double yakuman.
+		{"111m222p333s666z55z", "5z", "3z", "suuankou", 0, 26},
 		// double east
 		{"111z234m567p789s55m", "5m", "5z", "tsumo,ton", 0, 3},
 		// indicator 1m -> dora 2m (a pair)
 		{"22m44m66p88p33s55s77s", "7s", "1m", "tsumo,tanyao,chiitoitsu", 2, 6},
-		{"119m19p19s1234567z", "1m", "1m", "kokushi", 0, 13},
+		// kokushi on a single wait (9m) vs. the 13-sided wait (1m: the 13 tiles held one of each)
+		{"119m19p19s1234567z", "9m", "1m", "kokushi", 0, 13},
+		{"119m19p19s1234567z", "1m", "1m", "kokushi", 0, 26},
 		// red five counts as dora
 		{"234m067p345s678s55s", "2m", "1z", "tsumo,tanyao,pinfu", 1, 4},
 		// indicator 9s -> dora 1s; honors wrap 北 -> 東
 		{"111s234m567p789p55m", "5m", "9s", "tsumo", 3, 4},
 		{"111z234m567p789s55m", "5m", "4z", "tsumo,ton", 3, 6},
+		// chuuren: 1112345567899 won on 4m is not pure; 1112345678999 won on 5m is (純正, 9-sided)
 		{"11123455678999m", "4m", "5z", "chuuren", 0, 13},
+		{"11123455678999m", "5m", "5z", "chuuren", 0, 26},
+		{"11112345678999s", "1s", "5z", "chuuren", 0, 26},
 		// ryanpeikou (3) beats the chiitoitsu reading (tsumo tanyao chiitoitsu = 4)
 		{"223344m556677p88s", "2m", "1z", "tsumo,tanyao,pinfu,ryanpeikou", 0, 6},
 		// four identical sequences are two peikou
@@ -96,9 +104,14 @@ func TestEvaluate(t *testing.T) {
 		{"223344s666s88s666z", "8s", "1s", "ryuuiisou", 2, 13},
 		{"11123456789999p", "5p", "1z", "chuuren", 0, 13},
 		// stacked yakuman (every all-triplet hand is also suuankou)
-		{"111m999m111p999p11s", "1s", "1z", "suuankou,chinroutou", 0, 26},
-		{"555666777z111z22z", "2z", "1z", "suuankou,daisangen,tsuuiisou", 2, 39},
-		{"111222333444z55z", "5z", "1z", "suuankou,tsuuiisou,daisuushii", 3, 39},
+		{"111m999m111p999p11s", "1m", "1z", "suuankou,chinroutou", 0, 26},
+		{"111m999m111p999p11s", "1s", "1z", "suuankou,chinroutou", 0, 39}, // tanki: double + single
+		{"555666777z111z22z", "5z", "1z", "suuankou,daisangen,tsuuiisou", 2, 39},
+		{"555666777z111z22z", "2z", "1z", "suuankou,daisangen,tsuuiisou", 2, 52},
+		// daisuushii is always a double yakuman: 26 + tsuuiisou 13 + suuankou 13 (shanpon) or 26 (tanki)
+		{"111222333444z55z", "1z", "1z", "suuankou,tsuuiisou,daisuushii", 3, 52},
+		{"111222333444z55z", "5z", "1z", "suuankou,tsuuiisou,daisuushii", 3, 65},
+		{"111222333z444z55m", "1z", "1z", "suuankou,daisuushii", 3, 39},
 	}
 	for _, tc := range cases {
 		ts := tile.MustParseHand(tc.hand)
@@ -165,7 +178,7 @@ func TestBestReadingByHan(t *testing.T) {
 func TestKokushiDoraNotAdded(t *testing.T) {
 	ind, _ := tile.Parse("9s")
 	ctx := east()
-	ctx.WinTile = tile.MakeKind(tile.Man, 1)
+	ctx.WinTile = tile.MakeKind(tile.Man, 9)
 	ctx.DoraIndicators = []tile.Tile{ind}
 	w, ok := Evaluate(tile.MustParseHand("119m19p19s1234567z"), ctx)
 	if !ok || keys(w) != "kokushi" || w.Dora != 1 || w.HanTotal != 13 {
@@ -229,5 +242,27 @@ func TestFuBreaksHanTies(t *testing.T) {
 	w, ok := Evaluate(tile.MustParseHand("444m555m666m77m234s"), ctx)
 	if !ok || keys(w) != "tsumo,tanyao,sanankou" || w.HanTotal != 4 || w.Fu != 40 {
 		t.Fatalf("got [%s] han=%d fu=%d", keys(w), w.HanTotal, w.Fu)
+	}
+}
+
+// The double-yakuman forms keep the yakuman's key and carry their own name.
+func TestDoubleYakumanNames(t *testing.T) {
+	cases := []struct{ hand, win, name string }{
+		{"111m222p333s666z55z", "5z", "四暗刻単騎"},
+		{"111m222p333s666z55z", "1m", "四暗刻"},
+		{"119m19p19s1234567z", "1m", "国士無双十三面待ち"},
+		{"119m19p19s1234567z", "9m", "国士無双"},
+		{"11123455678999m", "5m", "純正九蓮宝燈"},
+		{"11123455678999m", "4m", "九蓮宝燈"},
+		{"111222333z444z55m", "5m", "大四喜"},
+	}
+	for _, tc := range cases {
+		wt, _ := tile.Parse(tc.win)
+		ctx := east()
+		ctx.WinTile = wt.Kind
+		w, ok := Evaluate(tile.MustParseHand(tc.hand), ctx)
+		if !ok || !slices.ContainsFunc(w.Yaku, func(y Yaku) bool { return y.Name == tc.name }) {
+			t.Errorf("%s win %s: got %+v, want %s", tc.hand, tc.win, w.Yaku, tc.name)
+		}
 	}
 }

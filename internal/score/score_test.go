@@ -120,7 +120,36 @@ func TestLimits(t *testing.T) {
 	}
 }
 
+// Yakuman multiples: non-dealer 32000 x n, dealer 48000 x n, tsumo split
+// as for any limit hand.
+func TestYakumanMultiples(t *testing.T) {
+	for n := 1; n <= 3; n++ {
+		cases := []struct {
+			name                              string
+			dealer, tsumo                     bool
+			ron, fromDealer, fromOther, total int
+		}{
+			{"non-dealer ron", false, false, 32000 * n, 0, 0, 32000 * n},
+			{"dealer ron", true, false, 48000 * n, 0, 0, 48000 * n},
+			{"non-dealer tsumo", false, true, 0, 16000 * n, 8000 * n, 32000 * n},
+			{"dealer tsumo", true, true, 0, 0, 16000 * n, 48000 * n},
+		}
+		for _, tc := range cases {
+			p := Compute(13*n, 0, n, tc.dealer, tc.tsumo)
+			if p.Limit != Yakuman || p.Multiplier != n || p.Ron != tc.ron || p.FromDealer != tc.fromDealer ||
+				p.FromNonDealer != tc.fromOther || p.Total != tc.total {
+				t.Errorf("x%d %s: got %+v", n, tc.name, p)
+			}
+		}
+	}
+}
+
 func TestFromWin(t *testing.T) {
+	// a double yakuman form (26 han) counts as two yakuman, stacked with another
+	triple := yaku.Win{Yaku: []yaku.Yaku{{Key: "suuankou", Han: 26}, {Key: "tsuuiisou", Han: 13}}, HanTotal: 39}
+	if p := FromWin(triple, true, true); p.Multiplier != 3 || p.FromNonDealer != 48000 || p.Total != 144000 {
+		t.Errorf("triple yakuman: %+v", p)
+	}
 	stacked := yaku.Win{Yaku: []yaku.Yaku{{Key: "suuankou", Han: 13}, {Key: "tsuuiisou", Han: 13}}, HanTotal: 26}
 	if p := FromWin(stacked, false, false); p.Multiplier != 2 || p.Total != 64000 {
 		t.Errorf("double yakuman: %+v", p)
