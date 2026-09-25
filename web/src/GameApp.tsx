@@ -12,7 +12,7 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useLastAnalysis, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -76,8 +76,12 @@ export function GameApp() {
   const chartAnalysis = useLastAnalysis(state?.analysis);
   const rowNames = useRowNames(chartAnalysis);
 
+  // Replays state.events (issue #29) before the player can act again or the
+  // round result appears.
+  const playback = usePlayback(state);
+
   const me = state?.seats[state.you];
-  const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
+  const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
   // The tree may be minimized from practice mode, but game mode has no tree tab.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
@@ -153,7 +157,14 @@ export function GameApp() {
         {state && me && (
           <>
             <div class="area-hand">
-              <GameTable state={state} />
+              <GameTable
+                state={state}
+                seats={playback.seats}
+                events={playback.events}
+                highlight={playback.highlight}
+                playing={playback.playing}
+                onSkip={playback.skip}
+              />
               <Hand
                 hand={me.hand ?? []}
                 drawn={me.drawn ?? null}
@@ -165,18 +176,27 @@ export function GameApp() {
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
-              <ActionBar
-                state={state}
-                busy={busy}
-                myTurn={myTurn}
-                riichiMode={riichiMode}
-                onRiichiMode={setRiichiMode}
-                onAction={act}
-              />
-              {state.result && (
+              {playback.playing ? (
+                <div class="action-bar action-bar-playback" role="status" aria-live="polite">
+                  <span class="action-hint">CPUの動きを再生中…</span>
+                  <button type="button" onClick={playback.skip}>
+                    スキップ
+                  </button>
+                </div>
+              ) : (
+                <ActionBar
+                  state={state}
+                  busy={busy}
+                  myTurn={myTurn}
+                  riichiMode={riichiMode}
+                  onRiichiMode={setRiichiMode}
+                  onAction={act}
+                />
+              )}
+              {!playback.playing && state.result && (
                 <ResultPanel state={state} result={state.result} busy={busy} onNext={() => act('next')} />
               )}
-              {state.game_over && (
+              {!playback.playing && state.game_over && (
                 <FinalPanel state={state} busy={busy} onNewGame={() => void startGame(state.length)} />
               )}
             </div>

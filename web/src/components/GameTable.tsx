@@ -1,4 +1,5 @@
 import type { AbortReason, GameEvent, GameLength, GameState, RiverTile, Seat, Tile as TileT } from '../api';
+import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
 import { Melds } from './Melds';
 
@@ -31,15 +32,30 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
 
 export interface GameTableProps {
   state: GameState;
+  // A playback in progress overrides what is shown: seats with events not
+  // yet revealed hidden, and the tile or meld that just landed. Omitted
+  // (or playing: false), the table just shows state as-is.
+  seats?: Seat[];
+  events?: GameEvent[];
+  highlight?: PlaybackHighlight | null;
+  playing?: boolean;
+  onSkip?: () => void;
 }
 
 /** The table: each seat's river, points and (hidden) hand around the round info. */
-export function GameTable({ state }: GameTableProps) {
-  const at = (rel: number) => state.seats[(state.you + rel) % 4];
+export function GameTable({ state, seats, events, highlight, playing = false, onSkip }: GameTableProps) {
+  const view = seats ?? state.seats;
+  const log = events ?? state.events;
+  const at = (rel: number) => view[(state.you + rel) % 4];
   return (
-    <section class="game-table" aria-label="卓">
-      <SeatBox className="seat-top" seat={at(2)} state={state} />
-      <SeatBox className="seat-left" seat={at(3)} state={state} />
+    <section
+      class={playing ? 'game-table game-table-playing' : 'game-table'}
+      aria-label="卓"
+      data-playing={playing ? 'true' : 'false'}
+      onClick={playing ? onSkip : undefined}
+    >
+      <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} />
+      <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} />
       <div class="table-center">
         <div class="table-round">
           {roundName(state.round_wind, state.round_number, state.honba)}
@@ -47,7 +63,7 @@ export function GameTable({ state }: GameTableProps) {
         </div>
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
         <ol class="event-log" aria-label="直前の動き">
-          {state.events.slice(-6).map((e, i) => (
+          {log.slice(-6).map((e, i) => (
             <li key={i}>
               <span class="event-seat">{seatLabel(e.seat, state.you)}</span>
               {EVENT_VERB[e.type]}
@@ -56,9 +72,14 @@ export function GameTable({ state }: GameTableProps) {
             </li>
           ))}
         </ol>
+        {playing && (
+          <button type="button" class="playback-skip" onClick={onSkip}>
+            スキップ
+          </button>
+        )}
       </div>
-      <SeatBox className="seat-right" seat={at(1)} state={state} />
-      <SeatBox className="seat-bottom" seat={at(0)} state={state} />
+      <SeatBox className="seat-right" seat={at(1)} state={state} highlight={highlight} />
+      <SeatBox className="seat-bottom" seat={at(0)} state={state} highlight={highlight} />
     </section>
   );
 }
@@ -67,13 +88,16 @@ interface SeatBoxProps {
   className: string;
   seat: Seat;
   state: GameState;
+  highlight?: PlaybackHighlight | null;
 }
 
-function SeatBox({ className, seat, state }: SeatBoxProps) {
+function SeatBox({ className, seat, state, highlight }: SeatBoxProps) {
   const you = seat.seat === state.you;
   const acting = state.actor === seat.seat;
+  const landed = highlight?.seat === seat.seat;
   const classes = ['seat-box', className];
   if (acting) classes.push('seat-acting');
+  if (landed && highlight?.kind === 'meld') classes.push('seat-landed');
   return (
     <div class={classes.join(' ')} aria-label={seatLabel(seat.seat, state.you)}>
       <div class="seat-head">
@@ -94,7 +118,13 @@ function SeatBox({ className, seat, state }: SeatBoxProps) {
       <div class="seat-river" aria-label="捨て牌">
         {seat.river.map((r, i) => (
           <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
-            <Tile tile={r.tile} size="xs" dimmed={r.called} label={riverLabel(r)} />
+            <Tile
+              tile={r.tile}
+              size="xs"
+              dimmed={r.called}
+              label={riverLabel(r)}
+              className={landed && highlight?.kind === 'river' && highlight.index === i ? 'tile-landed' : undefined}
+            />
           </span>
         ))}
       </div>

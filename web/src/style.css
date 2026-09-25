@@ -1014,6 +1014,45 @@ section {
   margin-left: auto;
 }
 
+/* ---- Playback (issue #29): CPU moves land one at a time. ---- */
+.game-table-playing {
+  cursor: pointer;
+}
+.playback-skip {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tile-landed {
+    animation: tile-landed 0.5s ease-out;
+  }
+  .seat-landed {
+    animation: seat-landed 0.5s ease-out;
+  }
+}
+@keyframes tile-landed {
+  from {
+    transform: translateY(-6px) scale(1.15);
+    box-shadow: 0 2px 0 var(--tile-back), 0 4px 10px rgba(0, 0, 0, 0.35);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes seat-landed {
+  from {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 /* ---- Action bar ---- */
 .action-bar {
   display: flex;
