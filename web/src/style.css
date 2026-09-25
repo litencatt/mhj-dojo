@@ -970,6 +970,36 @@ section {
   margin: 0 4px;
 }
 
+/* Called melds: each group together, the called tile sideways (the rotated
+   tile keeps its box, so the margin makes room and the shift sits it low). */
+.melds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.meld {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+.meld-called {
+  display: inline-flex;
+}
+.meld-called .tile-xs {
+  transform: translateY(3px) rotate(90deg);
+  margin: 0 3px;
+}
+.meld-called .tile-sm {
+  transform: translateY(4.5px) rotate(90deg);
+  margin: 0 5px;
+}
+.seat-box .melds {
+  margin-bottom: 4px;
+}
+.hand-row .melds {
+  margin-left: auto;
+}
+
 /* ---- Action bar ---- */
 .action-bar {
   display: flex;
@@ -1000,6 +1030,17 @@ section {
   background: var(--danger-bg);
   border-color: var(--danger);
   color: var(--danger);
+}
+.action-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.call-tiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-weight: normal;
 }
 .action-hint {
   display: inline-flex;

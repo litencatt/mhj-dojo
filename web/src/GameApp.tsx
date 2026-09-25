@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, GameLength, GameState } from './api';
+import type { ActionType, GameLength, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, WIND_NAMES } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, WIND_NAMES, seatLabel } from './components/GameTable';
+import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { useLastAnalysis, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -61,9 +62,9 @@ export function GameApp() {
     document.title = 'mhj2 - CPU対戦';
   }, []);
 
-  function act(type: ActionType, tile?: string) {
+  function act(type: ActionType, tile?: TileT, tiles?: TileT[]) {
     if (!state) return;
-    void request(() => api.gameAction(state.game_id, type, tile));
+    void request(() => api.gameAction(state.game_id, type, tile, tiles));
   }
 
   function handleNewGame(e: Event) {
@@ -71,7 +72,9 @@ export function GameApp() {
     void startGame(lengthInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
-  const rowNames = useRowNames(state?.analysis);
+  // After a call the analysis is empty; the chart keeps the rows from before.
+  const chartAnalysis = useLastAnalysis(state?.analysis);
+  const rowNames = useRowNames(chartAnalysis);
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
@@ -158,6 +161,7 @@ export function GameApp() {
                 disabled={busy || !myTurn}
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
                 onlyDrawn={me.riichi}
+                melds={<Melds melds={me.melds} owner={state.you} size="sm" />}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
@@ -180,7 +184,7 @@ export function GameApp() {
               <ShantenChart
                 sessionId={state.game_id}
                 history={state.history}
-                currentAnalysis={state.analysis}
+                currentAnalysis={chartAnalysis}
                 rowNames={rowNames}
                 onMinimize={() => minimize('chart')}
               />
@@ -214,25 +218,61 @@ interface ActionBarProps {
   myTurn: boolean;
   riichiMode: boolean;
   onRiichiMode: (on: boolean) => void;
-  onAction: (type: ActionType) => void;
+  onAction: (type: ActionType, tile?: TileT, tiles?: TileT[]) => void;
 }
 
-/** Your options right now: ron / skip on a discard, tsumo, riichi, 九種九牌, or a hint. */
+/** Your options right now: ron / pon / kan / chii / skip on a discard, or on
+ * your turn tsumo, kan, riichi, 九種九牌, or a hint. */
 function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: ActionBarProps) {
   const { legal } = state;
   if (state.phase === 'ended') return null;
-  if (legal.ron) {
+  if (state.phase === 'call' && legal.skip) {
+    // The claimed tile is the last move shown: a discard, or an added kan (槍槓).
+    const last = state.events[state.events.length - 1];
     return (
       <div class="action-bar" role="group" aria-label="操作">
         <span class="action-hint">
-          ロンできます
+          {last && `${seatLabel(last.seat, state.you)}の${last.type === 'kan' ? '加槓' : '打牌'}`}
           {state.last_discard && <Tile tile={state.last_discard} size="sm" />}
         </span>
-        <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('ron')}>
-          ロン
-        </button>
+        {legal.ron && (
+          <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('ron')}>
+            ロン
+          </button>
+        )}
+        {legal.pon && (
+          <button type="button" disabled={busy} onClick={() => onAction('pon')}>
+            ポン
+          </button>
+        )}
+        {legal.kan.length > 0 && (
+          <button type="button" disabled={busy} onClick={() => onAction('kan')}>
+            カン
+          </button>
+        )}
+        {legal.chii.map((pair) => (
+          <button
+            key={pair.join()}
+            type="button"
+            class="action-call"
+            aria-label={`チー ${pair.join(' ')} + ${state.last_discard ?? ''}`}
+            disabled={busy}
+            onClick={() => onAction('chii', undefined, pair)}
+          >
+            チー
+            <span class="call-tiles" aria-hidden="true">
+              <Tile tile={pair[0]} size="xs" />
+              <Tile tile={pair[1]} size="xs" />
+              {state.last_discard && (
+                <>
+                  +<Tile tile={state.last_discard} size="xs" />
+                </>
+              )}
+            </span>
+          </button>
+        ))}
         <button type="button" disabled={busy} onClick={() => onAction('skip')}>
-          見逃す
+          {legal.ron ? '見逃す' : 'スキップ'}
         </button>
       </div>
     );
@@ -246,6 +286,21 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
           ツモ
         </button>
       )}
+      {legal.kan.map((t) => (
+        <button
+          key={t}
+          type="button"
+          class="action-call"
+          aria-label={`カン ${t}`}
+          disabled={busy}
+          onClick={() => onAction('kan', t)}
+        >
+          カン
+          <span class="call-tiles" aria-hidden="true">
+            <Tile tile={t} size="xs" />
+          </span>
+        </button>
+      ))}
       {legal.kyuushu && (
         <button type="button" disabled={busy} onClick={() => onAction('kyuushu')}>
           九種九牌
