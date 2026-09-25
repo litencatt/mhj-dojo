@@ -9,7 +9,7 @@ import (
 )
 
 func east() Context {
-	return Context{RoundWind: tile.East, SeatWind: tile.East}
+	return Context{Winds: EastEast}
 }
 
 func TestDecompose(t *testing.T) {

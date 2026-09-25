@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -190,4 +191,43 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 		t.Fatalf("seed %d: points sum %d", seed, sum)
 	}
 	return res.Kind, took
+}
+
+// Two games from the same seed with the same human moves play out exactly
+// the same with the real CPU, and the log replays onto a fresh round.
+func TestGameReplaysWithCPU(t *testing.T) {
+	for seed := int64(0); seed < 30; seed++ {
+		a, b := playGame(t, seed), playGame(t, seed)
+		if !slices.Equal(a.Round.Log(), b.Round.Log()) {
+			t.Fatalf("seed %d: logs differ", seed)
+		}
+		r := game.New(seed)
+		for _, act := range a.Round.Log() {
+			if err := r.Apply(act); err != nil {
+				t.Fatalf("seed %d: replay %+v: %v", seed, act, err)
+			}
+		}
+		if !reflect.DeepEqual(r.ViewFor(0), a.Round.ViewFor(0)) {
+			t.Fatalf("seed %d: replay differs", seed)
+		}
+		if a.Fallbacks != 0 {
+			t.Fatalf("seed %d: %d CPU fallbacks", seed, a.Fallbacks)
+		}
+	}
+}
+
+// playGame plays seat 0 by discarding the drawn tile (winning when it can)
+// against three fresh CPU players.
+func playGame(t *testing.T, seed int64) *game.Game {
+	t.Helper()
+	g := game.NewGame(seed, New())
+	for steps := 0; g.Round.Actor() >= 0; steps++ {
+		if steps > 200 {
+			t.Fatalf("seed %d: game does not end", seed)
+		}
+		if err := g.Act(game.Tsumogiri{}.Decide(g.Round.ViewFor(0), g.Round.LegalFor(0))); err != nil {
+			t.Fatalf("seed %d: %v", seed, err)
+		}
+	}
+	return g
 }

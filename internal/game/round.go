@@ -155,6 +155,11 @@ func (r *Round) SeatWind(seat int) tile.Kind {
 	return tile.East + tile.Kind((seat-r.dealer+4)%4)
 }
 
+// Winds returns the round wind and seat's wind.
+func (r *Round) Winds(seat int) yaku.Winds {
+	return yaku.Winds{Round: r.roundWind, Seat: r.SeatWind(seat)}
+}
+
 // DrawsLeft returns how many live draws remain.
 func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.draws }
 
@@ -317,8 +322,7 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 		Ippatsu:        p.ippatsu,
 		Haitei:         !ron && last,
 		Houtei:         ron && last,
-		RoundWind:      r.roundWind,
-		SeatWind:       r.SeatWind(seat),
+		Winds:          r.Winds(seat),
 		DoraIndicators: r.wall.DoraIndicators(),
 		UraIndicators:  r.wall.UraDoraIndicators(),
 	}

@@ -42,7 +42,7 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	}
 	me := v.Seats[v.Viewer]
 	tiles := append(slices.Clone(me.Hand), *me.Drawn)
-	visible := visibleCounts(v, tiles)
+	visible := v.Visible()
 
 	best := p.byEfficiency(tiles, l.Discards, &visible)
 	if best[0].shanten >= foldShanten {
@@ -142,21 +142,6 @@ func (p *Player) shanten(c tile.Counts) (int, []tile.Kind) {
 		}
 	}
 	return best, acc
-}
-
-// visibleCounts counts the tiles the seat can see: its own, every river and
-// the dora indicators.
-func visibleCounts(v game.View, own []tile.Tile) tile.Counts {
-	c := tile.CountsOf(own)
-	for _, s := range v.Seats {
-		for _, rt := range s.River {
-			c[rt.Tile.Kind]++
-		}
-	}
-	for _, d := range v.DoraIndicators {
-		c[d.Kind]++
-	}
-	return c
 }
 
 // riichiRivers returns the river kinds of every other seat in riichi.

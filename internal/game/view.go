@@ -122,16 +122,21 @@ func (r *Round) LegalFor(seat int) Legal {
 	return l
 }
 
-// Visible counts the tiles seat can see: its own hand and drawn tile, every
-// river and the dora indicators. Unseen copies = 4 - Visible.
-func (r *Round) Visible(seat int) tile.Counts {
-	c := tile.CountsOf(r.players[seat].tiles14())
-	for s := range r.players {
-		for _, rt := range r.players[s].river {
+// Visible counts the tiles the viewer can see: its own hand and drawn tile,
+// every river and the dora indicators. Unseen copies = 4 - Visible. It is
+// the one place that decides what is visible, for the CPU and the API.
+func (v View) Visible() tile.Counts {
+	me := v.Seats[v.Viewer]
+	c := tile.CountsOf(me.Hand)
+	if me.Drawn != nil {
+		c[me.Drawn.Kind]++
+	}
+	for _, s := range v.Seats {
+		for _, rt := range s.River {
 			c[rt.Tile.Kind]++
 		}
 	}
-	for _, d := range r.wall.DoraIndicators() {
+	for _, d := range v.DoraIndicators {
 		c[d.Kind]++
 	}
 	return c

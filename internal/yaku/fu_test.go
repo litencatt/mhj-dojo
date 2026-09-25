@@ -36,7 +36,7 @@ func TestFu(t *testing.T) {
 	}
 	for _, tc := range cases {
 		wt, _ := tile.Parse(tc.win)
-		ctx := Context{WinTile: wt.Kind, Ron: tc.ron, RoundWind: tile.East, SeatWind: tc.seat}
+		ctx := Context{WinTile: wt.Kind, Ron: tc.ron, Winds: Winds{tile.East, tc.seat}}
 		best := 0
 		for _, r := range Readings(tile.MustCounts(tc.hand), wt.Kind) {
 			best = max(best, Fu(r, ctx))
@@ -51,8 +51,8 @@ func eval(t *testing.T, hand string, ctx Context, win string) Win {
 	t.Helper()
 	wt, _ := tile.Parse(win)
 	ctx.WinTile = wt.Kind
-	if ctx.RoundWind == 0 && ctx.SeatWind == 0 {
-		ctx.RoundWind, ctx.SeatWind = tile.East, tile.East
+	if ctx.Winds == (Winds{}) {
+		ctx.Winds = EastEast
 	}
 	w, ok := Evaluate(tile.MustParseHand(hand), ctx)
 	if !ok {

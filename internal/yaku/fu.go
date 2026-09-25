@@ -48,11 +48,5 @@ func pairFu(k tile.Kind, ctx Context) int {
 	if k >= tile.Haku {
 		fu += 2
 	}
-	if k == ctx.RoundWind {
-		fu += 2
-	}
-	if k == ctx.SeatWind {
-		fu += 2
-	}
-	return fu
+	return fu + 2*ctx.Winds.Count(k)
 }

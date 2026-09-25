@@ -39,8 +39,7 @@ type Context struct {
 	Riichi, DoubleRiichi, Ippatsu bool
 	// Haitei is a tsumo on the last draw, Houtei a ron on the last discard.
 	Haitei, Houtei bool
-	RoundWind      tile.Kind
-	SeatWind       tile.Kind
+	Winds          Winds
 	DoraIndicators []tile.Tile
 	// UraIndicators are counted only when the hand is in riichi.
 	UraIndicators []tile.Tile
@@ -108,33 +107,17 @@ var closedHan = func() map[string]int {
 	return m
 }()
 
-// ClosedHan returns the han of the yaku with the given key in a closed hand
-// in practice mode (East round, East seat), or 0 if key is not a yaku (e.g.
-// "normal").
-func ClosedHan(key string) int { return HanFor(key, tile.East, tile.East) }
-
 // HanFor returns the han of the yaku with the given key in a closed hand
-// with the given winds. A value wind counts once for the round wind and once
-// for the seat wind, so it is 0 when it is neither.
-func HanFor(key string, round, seat tile.Kind) int {
-	for i, w := range windKeys {
-		if w.key == key {
-			k := tile.East + tile.Kind(i)
-			return b2i(k == round) + b2i(k == seat)
+// with the given winds, or 0 if key is not a yaku (e.g. "normal"). A value
+// wind counts once for the round wind and once for the seat wind, so it is 0
+// when it is neither.
+func HanFor(key string, w Winds) int {
+	for i, wk := range WindKeys {
+		if wk == key {
+			return w.Count(tile.East + tile.Kind(i))
 		}
 	}
 	return closedHan[key]
-}
-
-func b2i(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-var windKeys = [4]struct{ key, name string }{
-	{"ton", "役牌 東"}, {"nan", "役牌 南"}, {"shaa", "役牌 西"}, {"pei", "役牌 北"},
 }
 
 // Evaluate detects the yaku of a complete 14-tile closed hand, choosing the
@@ -353,7 +336,7 @@ func onlyYaochu(c tile.Counts) bool {
 // IsValuePair reports whether a pair of k is a value pair (dragon, round
 // wind or seat wind), which rules out pinfu and, from Phase 2, adds fu.
 func (ctx Context) IsValuePair(k tile.Kind) bool {
-	return k >= tile.Haku || k == ctx.RoundWind || k == ctx.SeatWind
+	return k >= tile.Haku || ctx.Winds.Count(k) > 0
 }
 
 // IsPinfu reports whether r is a pinfu reading: four sequences, a non-value
@@ -484,16 +467,9 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 		case m.Kind == tile.Chun:
 			ys = append(ys, yChun)
 		case m.Kind >= tile.East && m.Kind <= tile.North:
-			han := 0
-			if m.Kind == ctx.RoundWind {
-				han++
-			}
-			if m.Kind == ctx.SeatWind {
-				han++
-			}
-			if han > 0 {
-				w := windKeys[m.Kind-tile.East]
-				ys = append(ys, Yaku{w.key, w.name, han})
+			if han := ctx.Winds.Count(m.Kind); han > 0 {
+				i := m.Kind - tile.East
+				ys = append(ys, Yaku{WindKeys[i], "役牌 " + WindNames[i], han})
 			}
 		}
 	}

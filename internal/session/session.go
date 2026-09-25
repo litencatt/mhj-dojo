@@ -42,11 +42,8 @@ const (
 // maxNodes is MaxNodes, lowered by tests.
 var maxNodes = MaxNodes
 
-// Phase 1 plays East round, East seat.
-var (
-	roundWind = tile.East
-	seatWind  = tile.East
-)
+// Practice plays East round, East seat.
+var winds = yaku.EastEast
 
 // Store holds sessions in memory.
 type Store struct {
@@ -213,7 +210,7 @@ func (s *Session) Tsumo() (State, error) {
 	tiles := append(append([]tile.Tile{}, cur.hand...), d)
 	tile.Sort(tiles)
 	res, ok := yaku.Evaluate(tiles, yaku.Context{
-		WinTile: d.Kind, RoundWind: roundWind, SeatWind: seatWind, DoraIndicators: s.wall.DoraIndicators(),
+		WinTile: d.Kind, Winds: winds, DoraIndicators: s.wall.DoraIndicators(),
 	})
 	if !ok {
 		return State{}, fmt.Errorf("%w: hand is not complete", ErrConflict)
