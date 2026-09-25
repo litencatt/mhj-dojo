@@ -1,5 +1,5 @@
 import type { GameResult, GameState, Limit, Points } from '../api';
-import { seatLabel, WIND_NAMES } from './GameTable';
+import { ABORT_NAMES, seatLabel, WIND_NAMES } from './GameTable';
 import { Tile } from './Tile';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
@@ -23,23 +23,55 @@ function paymentText(p: Points): string {
   return `${p.from_non_dealer}-${p.from_dealer}点`;
 }
 
+/** "+600", "-1000" or "0". */
+export function signed(n: number): string {
+  return n > 0 ? `+${n}` : String(n);
+}
+
+export function deltaClass(n: number): string {
+  return n > 0 ? 'delta-plus' : n < 0 ? 'delta-minus' : '';
+}
+
+/** The honba and riichi-stick parts of a seat's change, when the round had any. */
+function breakdown(result: GameResult, seat: number): string {
+  const parts: string[] = [];
+  const hand = result.hand_deltas[seat];
+  if (hand !== 0) parts.push(`${result.kind === 'draw' ? '罰符' : '点数'} ${signed(hand)}`);
+  if (result.honba_deltas[seat] !== 0) parts.push(`本場 ${signed(result.honba_deltas[seat])}`);
+  if (result.stick_deltas[seat] !== 0) parts.push(`供託 ${signed(result.stick_deltas[seat])}`);
+  return parts.join(' / ');
+}
+
 export interface ResultPanelProps {
   state: GameState;
   result: GameResult;
+  busy: boolean;
+  onNext: () => void;
 }
 
 /** End of the round: the winning hand with yaku, fu and points, or the draw, and the point changes. */
-export function ResultPanel({ state, result }: ResultPanelProps) {
+export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
   const who = (s: number) => seatLabel(s, state.you);
   const winner = result.winner >= 0 ? state.seats[result.winner] : null;
   const yakuman = result.yaku.some((y) => y.han >= 13);
   let title = '流局';
+  if (result.kind === 'abort') title = `途中流局（${result.reason ? ABORT_NAMES[result.reason] : ''}）`;
   if (result.kind === 'tsumo') title = `${who(result.winner)}のツモ和了`;
   if (result.kind === 'ron') title = `${who(result.winner)}のロン和了（${who(result.from)}から）`;
 
+  // A 内訳 column only when honba or riichi sticks moved points this round.
+  const split = [0, 1, 2, 3].some((s) => result.honba_deltas[s] !== 0 || result.stick_deltas[s] !== 0);
+
   return (
     <section class={result.winner === state.you ? 'result-panel win-panel' : 'result-panel'} aria-label="結果">
-      <h2>{title}</h2>
+      <div class="result-heading">
+        <h2>{title}</h2>
+        {state.can_next && (
+          <button type="button" class="next-round-button" disabled={busy} onClick={onNext}>
+            次の局へ
+          </button>
+        )}
+      </div>
       {winner && result.win_tile && (
         <>
           <div class="win-tiles" role="group" aria-label="和了形">
@@ -88,6 +120,7 @@ export function ResultPanel({ state, result }: ResultPanelProps) {
             <th scope="col">席</th>
             {result.kind === 'draw' && <th scope="col">聴牌</th>}
             <th scope="col">収支</th>
+            {split && <th scope="col">内訳</th>}
             <th scope="col">持ち点</th>
           </tr>
         </thead>
@@ -98,10 +131,8 @@ export function ResultPanel({ state, result }: ResultPanelProps) {
                 {who(s.seat)}（{WIND_NAMES[s.wind]}）
               </td>
               {result.kind === 'draw' && <td>{result.tenpai[s.seat] ? '聴牌' : 'ノーテン'}</td>}
-              <td class={result.deltas[s.seat] > 0 ? 'delta-plus' : result.deltas[s.seat] < 0 ? 'delta-minus' : ''}>
-                {result.deltas[s.seat] > 0 ? '+' : ''}
-                {result.deltas[s.seat]}
-              </td>
+              <td class={deltaClass(result.deltas[s.seat])}>{signed(result.deltas[s.seat])}</td>
+              {split && <td class="result-breakdown">{breakdown(result, s.seat)}</td>}
               <td>{s.points.toLocaleString()}</td>
             </tr>
           ))}

@@ -146,7 +146,9 @@ export function goto(id: string, nodeId: number): Promise<SessionState> {
 // ---- Games against CPU players (docs/api.md "Games") ----
 
 export type GamePhase = 'discard' | 'call' | 'ended';
-export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip';
+export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'next';
+export type GameLength = 'tonpuu' | 'hanchan'; // 東風戦 | 半荘戦
+export type AbortReason = 'kyuushu' | 'suufon' | 'suucha'; // 九種九牌 | 四風連打 | 四家立直
 
 export interface RiverTile {
   tile: Tile;
@@ -170,11 +172,12 @@ export interface Legal {
   tsumo: boolean;
   ron: boolean;
   skip: boolean;
+  kyuushu: boolean; // may declare 九種九牌
 }
 
 export interface GameEvent {
   seat: number;
-  type: ActionType;
+  type: Exclude<ActionType, 'next'>;
   tile?: Tile;
 }
 
@@ -189,8 +192,29 @@ export interface Points {
   from_non_dealer?: number;
 }
 
+export type RoundKind = 'tsumo' | 'ron' | 'draw' | 'abort';
+
+export interface Standing {
+  seat: number;
+  rank: number; // 1-4
+  points: number;
+  score: number; // final once game_over
+}
+
+export interface RoundSummary {
+  round_wind: Tile;
+  round_number: number;
+  honba: number;
+  kind: RoundKind;
+  reason?: AbortReason;
+  winner: number;
+  from: number;
+  deltas: number[];
+}
+
 export interface GameResult {
-  kind: 'tsumo' | 'ron' | 'draw';
+  kind: RoundKind;
+  reason?: AbortReason; // abort only
   winner: number;
   from: number;
   win_tile: Tile | null;
@@ -200,7 +224,11 @@ export interface GameResult {
   dora: number;
   ura_dora: number;
   points: Points;
-  deltas: number[];
+  deltas: number[]; // the sum of the next three
+  hand_deltas: number[]; // the hand's payments (or the noten penalty)
+  honba_deltas: number[];
+  stick_deltas: number[]; // riichi sticks paid and received
+  honba: number;
   tenpai: boolean[];
   deposit: number;
 }
@@ -208,9 +236,17 @@ export interface GameResult {
 export interface GameState {
   game_id: string;
   seed: number | null; // null until the end unless you chose the seed
+  length: GameLength;
   you: number;
+  first_dealer: number;
   dealer: number;
   round_wind: Tile;
+  round_number: number; // 1-4
+  honba: number;
+  can_next: boolean; // the round has ended and another follows
+  game_over: boolean;
+  standings: Standing[]; // index = seat
+  rounds: RoundSummary[]; // finished rounds, the current one last once it ends
   phase: GamePhase;
   actor: number;
   wall_remaining: number;
@@ -229,7 +265,7 @@ export interface GameState {
   result: GameResult | null;
 }
 
-export function createGame(opts: { seed?: number } = {}): Promise<GameState> {
+export function createGame(opts: { seed?: number; length?: GameLength } = {}): Promise<GameState> {
   return request<GameState>('/api/games', {
     method: 'POST',
     body: JSON.stringify(opts),
