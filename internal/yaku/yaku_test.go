@@ -133,6 +133,14 @@ func TestEvaluate(t *testing.T) {
 				tc.hand, tc.win, keys(w), w.Dora, w.HanTotal, tc.keys, tc.doraCount, tc.han)
 		}
 	}
+	// A ron on a triplet tile of a four-concealed-triplet shape opens that
+	// triplet: not suuankou (single or double), but toitoi + sanankou.
+	ron := east()
+	ron.Ron = true
+	ron.WinTile = tile.MakeKind(tile.Man, 1)
+	if w, _ := Evaluate(tile.MustParseHand("111m999p555s777z22s"), ron); keys(w) != "toitoi,sanankou,chun" || w.HanTotal != 5 {
+		t.Errorf("ron on a triplet tile: got [%s] han=%d, want [toitoi,sanankou,chun] han=5", keys(w), w.HanTotal)
+	}
 	if _, ok := Evaluate(tile.MustParseHand("123m456m789m123p45s"), east()); ok {
 		t.Error("incomplete hand evaluated")
 	}
