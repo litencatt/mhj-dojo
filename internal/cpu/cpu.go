@@ -18,6 +18,29 @@ const foldShanten = 2
 // memoLimit resets the shanten memo when it grows past this many tables.
 const memoLimit = 100_000
 
+// kyuushuKeep is the thirteen-orphans shanten up to which the player goes
+// for kokushi instead of declaring 九種九牌 (ten kinds and a pair, or more).
+const kyuushuKeep = 2
+
+// kokushiShanten returns the thirteen-orphans shanten of the viewer's 14
+// tiles, drawn tile included (a hand one discard from 13).
+func kokushiShanten(v game.View) int {
+	me := v.Seats[v.Viewer]
+	tiles := slices.Clone(me.Hand)
+	if me.Drawn != nil {
+		tiles = append(tiles, *me.Drawn)
+	}
+	c := tile.CountsOf(tiles)
+	kinds, pair := 0, false
+	for k := tile.Kind(0); k < tile.NumKinds; k++ {
+		if k.IsYaochu() && c[k] > 0 {
+			kinds++
+			pair = pair || c[k] >= 2
+		}
+	}
+	return 13 - kinds - b2i(pair)
+}
+
 // Player decides moves for CPU seats. It keeps a shanten memo, so use one
 // Player per game (it is not safe for concurrent use).
 type Player struct {
@@ -36,6 +59,8 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 		return game.Action{Type: game.Ron}
 	case l.Skip:
 		return game.Action{Type: game.Skip}
+	case l.Kyuushu && kokushiShanten(v) > kyuushuKeep:
+		return game.Action{Type: game.Kyuushu}
 	}
 	if p.eng.MemoSize() > memoLimit {
 		p.eng = shanten.NewEngine()

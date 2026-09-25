@@ -11,11 +11,13 @@ type Decider interface {
 	Decide(v View, legal Legal) Action
 }
 
-// Game is a round between one human seat and CPU seats. After every human
-// move it plays the CPU seats until the human must decide again or the
-// round ends. Methods are not safe for concurrent use.
+// Game is played between one human seat and CPU seats: a single round, or
+// the rounds of a Hanchan. After every human move it plays the CPU seats
+// until the human must decide again or the round ends. Methods are not safe
+// for concurrent use.
 type Game struct {
-	Round *Round
+	Round *Round   // the current round
+	H     *Hanchan // nil for a single round
 	Human int
 	cpu   Decider
 	// OnHumanDiscard, when set, runs after each of the human's discards,
@@ -37,6 +39,28 @@ func Start(r *Round, human int, cpu Decider) *Game {
 	g := &Game{Round: r, Human: human, cpu: cpu}
 	g.run()
 	return g
+}
+
+// StartHanchan plays a game of rounds with seat 0 as the human, up to the
+// human's first decision.
+func StartHanchan(h *Hanchan, cpu Decider) *Game {
+	g := &Game{Round: h.Round(), H: h, cpu: cpu}
+	g.run()
+	return g
+}
+
+// Next deals the next round of the game once the current one has ended, and
+// plays the CPU seats up to the human's first decision in it.
+func (g *Game) Next() error {
+	if g.H == nil {
+		return fmt.Errorf("%w: %w", ErrConflict, ErrOver)
+	}
+	if err := g.H.Next(); err != nil {
+		return err
+	}
+	g.Round = g.H.Round()
+	g.run()
+	return nil
 }
 
 // Act applies the human's move, then plays the CPU seats.

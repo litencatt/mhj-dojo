@@ -1,7 +1,8 @@
-// Package game plays one closed-hand round of four-player riichi mahjong
-// (Phase 2a): deal, draws and discards, riichi, tsumo and ron, and the
-// exhaustive draw, with points settled at the end. Calls (pon, chii, kan)
-// and multi-round games come in Phase 2b.
+// Package game plays four-player riichi mahjong against CPU seats: a Round
+// (deal, draws and discards, riichi, tsumo and ron, exhaustive and abortive
+// draws, settlement) and a Hanchan of rounds (dealer rotation, honba,
+// carried sticks, end of the game and standings). Calls (pon, chii, kan)
+// come later (#27).
 package game
 
 import (
@@ -59,7 +60,15 @@ const (
 	Riichi  ActionType = "riichi" // declare riichi and discard Tile
 	Tsumo   ActionType = "tsumo"
 	Ron     ActionType = "ron"
-	Skip    ActionType = "skip" // pass on a ron
+	Skip    ActionType = "skip"    // pass on a ron
+	Kyuushu ActionType = "kyuushu" // declare nine different terminals and honors: an abortive draw
+)
+
+// Abortive draw reasons (Result.Reason when Kind is "abort").
+const (
+	AbortKyuushu = "kyuushu" // 九種九牌
+	AbortSuufon  = "suufon"  // 四風連打
+	AbortSuucha  = "suucha"  // 四家立直
 )
 
 // Action is one move by a seat. Tile is set for Discard and Riichi.
@@ -100,7 +109,8 @@ type player struct {
 
 // Result describes how the round ended.
 type Result struct {
-	Kind   string // "tsumo", "ron" or "draw"
+	Kind   string // "tsumo", "ron", "draw" or "abort"
+	Reason string // for "abort": AbortKyuushu, AbortSuufon or AbortSuucha
 	Winner int    // -1 on a draw
 	From   int    // the discarder on a ron, else -1
 	// Win, Points and WinTile are set for tsumo and ron.
@@ -258,6 +268,12 @@ func (r *Round) Apply(a Action) error {
 		err = r.discard(a.Seat, a.Tile, a.Type == Riichi)
 	case r.phase == PhaseDiscard && a.Type == Tsumo:
 		err = r.tsumo(a.Seat)
+	case r.phase == PhaseDiscard && a.Type == Kyuushu:
+		if !r.canKyuushu(a.Seat) {
+			err = fmt.Errorf("%w: kyuushu needs the first uninterrupted turn and nine different terminals and honors", ErrConflict)
+			break
+		}
+		r.finish(&Result{Kind: "abort", Reason: AbortKyuushu, Winner: -1, From: -1})
 	case r.phase == PhaseCall && a.Type == Ron:
 		err = r.ron(a.Seat)
 	case r.phase == PhaseCall && a.Type == Skip:
@@ -298,7 +314,7 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 		return fmt.Errorf("%w: riichi is not allowed discarding %s", ErrConflict, s)
 	}
 	t := tiles[idx]
-	first := len(p.river) == 0
+	first := r.firstGoAround(seat)
 	p.hand = slices.Delete(tiles, idx, idx+1)
 	tile.Sort(p.hand)
 	p.drawn = nil
@@ -306,7 +322,7 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare})
 	if declare {
 		// Accepted once the discard passes without a ron.
-		p.doubleRiichi = first // no calls in Phase 2a, so the first go-around is never interrupted
+		p.doubleRiichi = first
 	}
 	r.pendingRiichi = declare
 	r.lastDiscard = t
@@ -350,6 +366,10 @@ func (r *Round) afterDiscard() {
 		r.pendingRiichi = false
 	}
 	r.callers = nil
+	if reason := r.abortAfterDiscard(); reason != "" {
+		r.finish(&Result{Kind: "abort", Reason: reason, Winner: -1, From: -1})
+		return
+	}
 	if r.DrawsLeft() == 0 {
 		r.exhaustiveDraw()
 		return
@@ -586,6 +606,57 @@ func (r *Round) finish(res *Result) {
 	r.callers = nil
 	r.result = res
 	r.phase = PhaseEnded
+}
+
+// firstGoAround reports whether seat has not discarded yet and nobody has
+// called, so the first go-around is uninterrupted for it.
+func (r *Round) firstGoAround(seat int) bool {
+	for s := range r.players {
+		if len(r.players[s].melds) > 0 {
+			return false
+		}
+	}
+	return len(r.players[seat].river) == 0
+}
+
+// canKyuushu reports whether seat may declare 九種九牌: its first
+// uninterrupted turn, with nine or more different terminals and honors.
+func (r *Round) canKyuushu(seat int) bool {
+	p := &r.players[seat]
+	if seat != r.turn || r.phase != PhaseDiscard || p.drawn == nil || !r.firstGoAround(seat) {
+		return false
+	}
+	c := tile.CountsOf(p.concealed())
+	kinds := 0
+	for k := tile.Kind(0); k < tile.NumKinds; k++ {
+		if k.IsYaochu() && c[k] > 0 {
+			kinds++
+		}
+	}
+	return kinds >= 9
+}
+
+// abortAfterDiscard returns the abortive draw a passed discard causes:
+// 四風連打 (the first four discards are the same wind, no calls) or 四家立直
+// (all four seats in riichi); "" if none.
+func (r *Round) abortAfterDiscard() string {
+	riichi, sameWind := 0, true
+	first := r.players[0].river
+	for s := range r.players {
+		p := &r.players[s]
+		if p.riichi {
+			riichi++
+		}
+		sameWind = sameWind && len(p.melds) == 0 && len(p.river) == 1 && len(first) == 1 &&
+			p.river[0].Tile.Kind == first[0].Tile.Kind && first[0].Tile.Kind >= tile.East && first[0].Tile.Kind <= tile.North
+	}
+	switch {
+	case riichi == 4:
+		return AbortSuucha
+	case sameWind:
+		return AbortSuufon
+	}
+	return ""
 }
 
 func (r *Round) exhaustiveDraw() {
