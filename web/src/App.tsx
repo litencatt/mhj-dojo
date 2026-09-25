@@ -17,10 +17,13 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
-  const { busy, error, request } = useSerialRequest<SessionState>((next) => {
-    setState(next);
-    setPreviewTile(null);
-  });
+  const { busy, error, notice, request } = useSerialRequest<SessionState>(
+    (next) => {
+      setState(next);
+      setPreviewTile(null);
+    },
+    state ? () => api.getSession(state.session_id) : undefined,
+  );
 
   function startGame(seed?: number, maxTurns?: number) {
     return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
@@ -127,6 +130,11 @@ export function App() {
           {error && (
             <div class="error-banner" role="alert">
               {error}
+            </div>
+          )}
+          {notice && (
+            <div class="notice-banner" role="status">
+              {notice}
             </div>
           )}
 

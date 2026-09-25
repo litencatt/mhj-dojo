@@ -15,10 +15,16 @@ import {
  * Runs one API request at a time. Every action acts on the server's current
  * state, so requests must never overlap: a second one could be redirected by
  * the first, and responses could land out of order. Overlapping calls are dropped.
+ *
+ * A 409 means the same session or game moved on elsewhere (another tab, or a
+ * CPU turn that finished mid-request); when `refetch` is given, its current
+ * state is fetched and shown instead of just an error.
  */
-export function useSerialRequest<T>(onSuccess: (next: T) => void) {
+export function useSerialRequest<T>(onSuccess: (next: T) => void, refetch?: () => Promise<T>) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
   const inFlight = useRef(false);
 
   async function request(fn: () => Promise<T>) {
@@ -26,17 +32,27 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
     inFlight.current = true;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       onSuccess(await fn());
     } catch (err) {
-      setError(errorMessage(err));
+      if (refetch && err instanceof api.ApiError && err.status === 409) {
+        try {
+          onSuccess(await refetch());
+          setNotice('別の画面で進んだため最新の状態に更新しました');
+        } catch (refetchErr) {
+          setError(errorMessage(refetchErr));
+        }
+      } else {
+        setError(errorMessage(err));
+      }
     } finally {
       inFlight.current = false;
       setBusy(false);
     }
   }
 
-  return { busy, error, request };
+  return { busy, error, notice, request };
 }
 
 export interface UrlResumeOptions<T> {
