@@ -28,7 +28,7 @@ func BenchmarkGameMemory(b *testing.B) {
 	runtime.ReadMemStats(&before)
 
 	for i := range matches {
-		m := newMatch(game.NewHanchan(int64(i), game.HanchanRule), Hanchan, true)
+		m := newMatch(game.NewHanchan(int64(i), game.HanchanRule), Options{Length: Hanchan}, true)
 		playGame(b, m)
 		matches[i] = m
 	}
