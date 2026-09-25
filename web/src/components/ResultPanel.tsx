@@ -11,9 +11,19 @@ const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   yakuman: '役満',
 };
 
+/** "役満", "ダブル役満", "トリプル役満", then "4倍役満" … for n yakuman. */
+export function yakumanName(n: number): string {
+  return n === 1 ? '役満' : n === 2 ? 'ダブル役満' : n === 3 ? 'トリプル役満' : `${n}倍役満`;
+}
+
+/** A yaku's han cell: "2翻", or its yakuman count ("役満", "ダブル役満") at 13 han per yakuman. */
+export function yakuHanText(han: number): string {
+  return han >= 13 ? yakumanName(Math.floor(han / 13)) : `${han}翻`;
+}
+
 function limitName(p: Points): string {
   if (p.limit === '') return '';
-  if (p.limit === 'yakuman' && p.multiplier > 1) return p.multiplier === 2 ? 'ダブル役満' : `${p.multiplier}倍役満`;
+  if (p.limit === 'yakuman' && p.multiplier > 1) return yakumanName(p.multiplier);
   return LIMIT_NAMES[p.limit];
 }
 
@@ -89,7 +99,7 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
               {result.yaku.map((y) => (
                 <tr key={y.key}>
                   <td>{y.name}</td>
-                  <td>{y.han}翻</td>
+                  <td>{yakuHanText(y.han)}</td>
                 </tr>
               ))}
               {!yakuman && result.dora > 0 && (

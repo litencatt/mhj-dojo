@@ -1,5 +1,6 @@
 import type { Win } from '../api';
 import { Tile } from './Tile';
+import { yakuHanText } from './ResultPanel';
 
 export interface WinPanelProps {
   win: Win;
@@ -8,8 +9,8 @@ export interface WinPanelProps {
 /** Terminal tsumo panel: 14 tiles, yaku list with han, dora, han total. */
 export function WinPanel(props: WinPanelProps) {
   const { win } = props;
-  // Every yakuman is 13 han and no ordinary yaku reaches that; with a yakuman,
-  // dora are reported but not added to the total.
+  // Every yakuman is 13 han (26 for a double yakuman) and no ordinary yaku
+  // reaches that; with a yakuman, dora are reported but not added to the total.
   const yakuman = win.yaku.some((y) => y.han >= 13);
   const doraIgnored = yakuman && win.dora > 0;
   return (
@@ -31,7 +32,7 @@ export function WinPanel(props: WinPanelProps) {
           {win.yaku.map((y) => (
             <tr key={y.key}>
               <td>{y.name}</td>
-              <td>{y.han}翻</td>
+              <td>{yakuHanText(y.han)}</td>
             </tr>
           ))}
           <tr class={doraIgnored ? 'win-dora-ignored' : ''}>
@@ -45,7 +46,7 @@ export function WinPanel(props: WinPanelProps) {
         <tfoot>
           <tr>
             <th scope="row">合計</th>
-            <td>{win.han_total}翻</td>
+            <td>{yakuman ? yakuHanText(win.han_total) : `${win.han_total}翻`}</td>
           </tr>
         </tfoot>
       </table>
