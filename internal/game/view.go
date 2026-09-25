@@ -105,6 +105,7 @@ type Legal struct {
 	Tsumo    bool     `json:"tsumo"`
 	Ron      bool     `json:"ron"`
 	Skip     bool     `json:"skip"`
+	Kyuushu  bool     `json:"kyuushu"` // may declare 九種九牌
 }
 
 // Any reports whether seat has any move.
@@ -132,6 +133,7 @@ func (r *Round) LegalFor(seat int) Legal {
 		l.Riichi = append(l.Riichi, r.riichiDiscards(seat)...)
 	}
 	_, l.Tsumo = r.tsumoWin(seat)
+	l.Kyuushu = r.canKyuushu(seat)
 	return l
 }
 

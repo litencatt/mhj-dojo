@@ -252,3 +252,79 @@ func TestDecideAfterACall(t *testing.T) {
 		t.Fatalf("open hand shanten %d, want tenpai", sh)
 	}
 }
+
+// Whole games with four CPU players: every move is legal, points plus sticks
+// stay at 100000 at the end of each round, every game ends, and the logs
+// replay to the same standings.
+func TestHanchanSelfPlay(t *testing.T) {
+	n := 64
+	if testing.Short() {
+		n = 8
+	}
+	const workers = 8
+	for w := range workers {
+		t.Run(strconv.Itoa(w), func(t *testing.T) {
+			t.Parallel()
+			p := New()
+			for seed := int64(w); seed < int64(n); seed += workers {
+				rules := game.Tonpuu
+				if seed%4 == 3 {
+					rules = game.HanchanRule
+				}
+				h := game.NewHanchan(seed, rules)
+				for rounds := 1; ; rounds++ {
+					if rounds > 60 {
+						t.Fatalf("seed %d: game does not end", seed)
+					}
+					r := h.Round()
+					for steps := 0; r.Actor() >= 0; steps++ {
+						if steps > 1000 {
+							t.Fatalf("seed %d: round does not end", seed)
+						}
+						seat := r.Actor()
+						a := p.Decide(r.ViewFor(seat), r.LegalFor(seat))
+						a.Seat = seat
+						if err := r.Apply(a); err != nil {
+							t.Fatalf("seed %d: illegal CPU move %+v: %v", seed, a, err)
+						}
+					}
+					sum := r.Result().Deposit
+					for _, s := range r.ViewFor(0).Seats {
+						sum += s.Points
+					}
+					if sum != 100000 {
+						t.Fatalf("seed %d round %d: points + sticks = %d", seed, rounds, sum)
+					}
+					if h.Over() {
+						break
+					}
+					if err := h.Next(); err != nil {
+						t.Fatal(err)
+					}
+				}
+				total := 0.0
+				for _, st := range h.Standings() {
+					total += st.Score
+				}
+				if total < -0.5 || total > 0.5 {
+					t.Fatalf("seed %d: scores add up to %v", seed, total)
+				}
+			}
+		})
+	}
+}
+
+func TestKyuushu(t *testing.T) {
+	v := view("19m19p19s12z56788m", "3z") // nine kinds: declare
+	l := legal(v)
+	l.Kyuushu = true
+	if a := New().Decide(v, l); a.Type != game.Kyuushu {
+		t.Fatalf("nine kinds: got %+v", a)
+	}
+	v = view("19m19p19s1234567z", "1m") // thirteen kinds and a pair: go for kokushi
+	l = legal(v)
+	l.Kyuushu = true
+	if a := New().Decide(v, l); a.Type == game.Kyuushu {
+		t.Fatal("declared kyuushu on a kokushi tenpai-level hand")
+	}
+}
