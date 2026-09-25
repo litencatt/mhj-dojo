@@ -284,8 +284,12 @@ open kan the hand is open: `iipeikou` and `suuankou` are impossible too, and
 `han` is the open-hand han: `sanshoku`, `ittsu`, `chanta`, `junchan`,
 `honitsu` and `chinitsu` one lower (kuisagari), the closed-only rows 0. An
 ankan keeps the hand closed. Right after a pon or chii there is no drawn
-tile: `analysis` reads all your concealed tiles (14 - 3 per meld, as a hand
-with its draw would) and `by_discard` covers their legal discards.
+tile and you must discard before you can win: `by_discard` covers the legal
+discards of your concealed tiles, and `analysis` keeps its 13-tile meaning as
+the best you can reach with one of them. Each row is that row of the legal
+discard with the lowest `shanten`, then the highest `ukeire_total`, then the
+first in `legal.discards` order (a `null` row only when every discard gives
+`null`), with that discard's `ukeire` and `approx`. So it is never `-1`.
 
 Game rules: the dealer keeps the deal after winning, after a draw where the
 dealer is tenpai, and after an abortive draw; otherwise the deal passes on.
@@ -362,7 +366,8 @@ unknown game, `409` a move that is not legal now.
              "pon": false, "chii": [["3m", "4m"]], "kan": [] },
   "events": [ {"seat": 1, "type": "discard", "tile": "2z"},
               {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"]} ],  // moves since your previous move; no skips
-  "analysis": [YakuRow],        // your 13-tile hand (melds held fixed); wind rows follow your seat and the round
+  "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
+                                // wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended

@@ -204,8 +204,11 @@ func (m *Match) state() State {
 	visible := v.Visible()
 	melds := fixedMelds(me.Melds)
 	han := m.hanFor(melds)
-	st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand), melds), &visible, han)
-	if v.Phase == game.PhaseDiscard && v.Actor == Human {
+	yourTurn := v.Phase == game.PhaseDiscard && v.Actor == Human
+	if !yourTurn || me.Drawn != nil {
+		st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand), melds), &visible, han)
+	}
+	if yourTurn {
 		all := slices.Clone(me.Hand)
 		if me.Drawn != nil { // no drawn tile right after a call
 			all = append(all, *me.Drawn)
@@ -220,10 +223,47 @@ func (m *Match) state() State {
 			st.ByDiscard[key] = apiview.Rows(m.analyze(c, melds), &visible, han)
 			c[t.Kind]++
 		}
+		if me.Drawn == nil { // right after a call: the hand must still discard
+			st.Analysis = bestRows(st.ByDiscard, st.Legal.Discards)
+		}
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
 	return st
+}
+
+// bestRows is the analysis of a hand that must discard before it can win
+// (right after a pon or chii): each row is the row of the legal discard
+// with the lowest shanten, then the most ukeire, then the first in
+// discards order; impossible rows lose to any possible one.
+func bestRows(byDiscard map[string][]apiview.YakuRow, discards []string) []apiview.YakuRow {
+	var out []apiview.YakuRow
+	for _, d := range discards {
+		rows := byDiscard[d]
+		if out == nil {
+			out = slices.Clone(rows)
+			continue
+		}
+		for i, r := range rows {
+			if better(r, out[i]) {
+				out[i] = r
+			}
+		}
+	}
+	if out == nil {
+		out = []apiview.YakuRow{}
+	}
+	return out
+}
+
+func better(a, b apiview.YakuRow) bool {
+	switch {
+	case a.Shanten == nil:
+		return false
+	case b.Shanten == nil || *a.Shanten != *b.Shanten:
+		return b.Shanten == nil || *a.Shanten < *b.Shanten
+	}
+	return a.UkeireTotal > b.UkeireTotal
 }
 
 // recordHand appends the human's row shanten for the current hand: once at

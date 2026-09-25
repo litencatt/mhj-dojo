@@ -268,6 +268,9 @@ func TestHumanPon(t *testing.T) {
 			rows := map[string]apiview.YakuRow{}
 			for _, r := range st.Analysis {
 				rows[r.Key] = r
+				if r.Shanten != nil && *r.Shanten < 0 {
+					t.Fatalf("seed %d: %s shanten %d before the discard after the pon", seed, r.Key, *r.Shanten)
+				}
 			}
 			if rows["normal"].Shanten == nil || rows["pinfu"].Shanten != nil || rows["iipeikou"].Shanten != nil ||
 				rows["chinitsu"].Han != 5 || rows["pinfu"].Han != 0 || rows["tanyao"].Han != 1 {
