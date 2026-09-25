@@ -146,15 +146,15 @@ func (h *openHand) ukeire(key string, dist int) []tile.Kind {
 	return out
 }
 
-// randomOpen turns one or two groups of a complete 4 melds + pair hand into melds (chii,
-// pon, open kan or ankan) and perturbs the concealed rest by one or two
-// exchanges.
+// randomOpen turns one to four groups of a complete 4 melds + pair hand into
+// melds (chii, pon, open kan or ankan) and perturbs the concealed rest by one
+// or two exchanges.
 func randomOpen(r *rand.Rand, c tile.Counts) *openHand {
 	ds := yaku.Decompose(c)
 	d := ds[r.IntN(len(ds))]
 	orig := c // a kan needs the fourth copy to be free
 	var melds []yaku.Meld
-	for _, i := range r.Perm(4)[:1+r.IntN(2)] {
+	for _, i := range r.Perm(4)[:1+r.IntN(4)] {
 		m := d.Melds[i]
 		switch {
 		case m.Type == yaku.Seq:
@@ -291,6 +291,13 @@ func TestOpenHandRows(t *testing.T) {
 			hand:  "55m456p34678s",
 			melds: []yaku.Meld{mustMeld(t, yaku.Seq, "2m", true, false)},
 			want:  want{"normal": 0, "tanyao": 0, "chanta": nil, "junchan": nil, "pinfu": nil, "iipeikou": nil},
+		},
+		{
+			// 中 pon + 234m 567p 345s 88s: complete (14 - 3 tiles).
+			name:  "complete open hand",
+			hand:  "234m567p34588s",
+			melds: []yaku.Meld{mustMeld(t, yaku.Trip, "7z", true, false)},
+			want:  want{"normal": -1, "chun": -1, "tanyao": nil, "haku": 2, "pinfu": nil},
 		},
 		{
 			// 1z ankan keeps the hand closed: iipeikou and suuankou stay possible.
