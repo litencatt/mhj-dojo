@@ -12,7 +12,7 @@ type YakuRow struct {
 	Key         string   `json:"key"`
 	Name        string   `json:"name"`
 	Yakuman     bool     `json:"yakuman"`
-	Han         int      `json:"han"` // closed-hand han (13 for yakuman); 0 for the normal row
+	Han         int      `json:"han"` // han for the hand, open or closed (13 for yakuman); 0 for the normal row
 	Shanten     *int     `json:"shanten"`
 	Approx      bool     `json:"approx"`
 	Ukeire      []Ukeire `json:"ukeire"`

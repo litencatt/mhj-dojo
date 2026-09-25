@@ -201,13 +201,10 @@ func (m *Match) state() State {
 
 	me := v.Seats[Human]
 	visible := v.Visible()
-	st.Analysis = []apiview.YakuRow{}
-	// The per-yaku analysis reads a closed hand; after a call it would show
-	// wrong numbers, so it is left empty until it supports melds (#27).
-	if len(me.Melds) == 0 {
-		st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
-	}
-	if len(me.Melds) == 0 && v.Phase == game.PhaseDiscard && v.Actor == Human {
+	melds := fixedMelds(me.Melds)
+	han := m.hanFor(melds)
+	st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand), melds), &visible, han)
+	if v.Phase == game.PhaseDiscard && v.Actor == Human {
 		all := slices.Clone(me.Hand)
 		if me.Drawn != nil { // no drawn tile right after a call
 			all = append(all, *me.Drawn)
@@ -219,7 +216,7 @@ func (m *Match) state() State {
 				continue
 			}
 			c[t.Kind]--
-			st.ByDiscard[key] = apiview.Rows(m.analyze(c), &visible, m.han)
+			st.ByDiscard[key] = apiview.Rows(m.analyze(c, melds), &visible, han)
 			c[t.Kind]++
 		}
 	}
@@ -234,13 +231,19 @@ func (m *Match) state() State {
 // change.
 func (m *Match) recordHand() {
 	me := m.game.Round.ViewFor(Human).Seats[Human]
-	if len(me.Melds) > 0 {
-		return // the analysis reads closed hands only (see state)
-	}
 	turn := len(m.history)
 	m.history = append(m.history, apiview.HistoryEntry{
-		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand))),
+		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand), fixedMelds(me.Melds))),
 	})
+}
+
+// fixedMelds returns the melds the analysis holds fixed: calls and ankans.
+func fixedMelds(called []game.Called) []yaku.Meld {
+	out := make([]yaku.Meld, len(called))
+	for i, c := range called {
+		out[i] = c.Meld
+	}
+	return out
 }
 
 func meldType(m game.Called) string {

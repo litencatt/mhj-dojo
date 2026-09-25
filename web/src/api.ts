@@ -11,7 +11,7 @@ export interface YakuRow {
   key: string;
   name: string;
   yakuman: boolean; // true for the yakuman rows (kokushi and later)
-  han: number; // closed-hand han; 13 for yakuman, 0 for the normal row
+  han: number; // han for the hand, lowered when open (kuisagari); 13 for yakuman, 0 for the normal row
   shanten: number | null; // 0 = tenpai, null = impossible
   approx: boolean;
   ukeire: UkeireEntry[];

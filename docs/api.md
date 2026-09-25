@@ -108,7 +108,7 @@ Body: `{"node_id": 3}` – moves the current node. Returns the `State`.
   "key": "tanyao",
   "name": "断么九",
   "yakuman": false,        // true for the yakuman rows (kokushi … chuuren)
-  "han": 1,                // closed-hand han (East round/seat); 13 for yakuman, 0 for "normal"
+  "han": 1,                // han for your hand (practice: closed, East round/seat); 13 for yakuman, 0 for "normal"
   "shanten": 2,            // 0 = tenpai, null = impossible (∞)
   "approx": false,         // true when the value is an approximation (pinfu at shanten >= 1)
   "ukeire": [ { "tile": "3m", "remaining": 3 } ],  // tile types (no red notation) that lower shanten
@@ -196,8 +196,8 @@ These clarify points the contract above leaves open; none changes the JSON shape
   suit only, `chanta` = every group incl. the pair contains a terminal/honor (junchan/honroutou shapes
   count), `junchan` = every group contains a terminal and there are no honors, `toitoi` = 4 triplets,
   `sanankou` = at least 3 triplets (all concealed in solo play), `iipeikou` = two identical sequences,
-  `haku/hatsu/chun/ton` = a triplet of 白/發/中/東. Consequently every row is always possible in
-  Phase 1 (closed hands), so `shanten: null` does not occur yet; it is reserved for Phase 2 melds.
+  `haku/hatsu/chun/ton` = a triplet of 白/發/中/東. Consequently every row is always possible for a
+  closed hand without melds, so `shanten: null` occurs only in games, after a call (see below).
   The other rows (4 melds + pair unless stated):
   - `ryanpeikou`: four sequences forming two pairs of identical sequences (the two pairs may be the
     same sequence, i.e. four copies of one sequence).
@@ -268,8 +268,24 @@ side after a chii on an end of the sequence (喰い替え). Each kan draws a
 replacement tile (嶺上開花 if it wins), reveals another dora indicator and
 shortens the live wall by one; an added kan can be robbed (槍槓). Calls end
 ippatsu and the uninterrupted first go-around. Open hands lose the
-closed-only yaku and a han on the kuisagari yaku; the per-yaku analysis is
-left empty after a call.
+closed-only yaku and a han on the kuisagari yaku.
+
+Analysis with melds: `analysis`, `by_discard` and `history` go on after a
+call. Every meld (chii, pon, kan, ankan) is a fixed group of each complete
+hand W, so the shanten counts only the concealed tiles (13 - 3 per meld; the
+tiles of a kan count toward the 4-copy limit). A meld may stand for a group
+the yaku requires (e.g. the 中 pon for `chun`, a 456m chii for `ittsu`) or
+for a free group the yaku's shape allows; a meld that fits neither makes the
+row impossible (`shanten: null`), e.g. a 中 pon for `tanyao`. `sanankou`
+counts only concealed triplets (an ankan counts). With any meld,
+`chiitoitsu`, `kokushi`, `chuuren`, `pinfu` and `ryanpeikou` are impossible,
+and the honroutou / tsuuiisou chiitoitsu forms drop out. After a chii, pon or
+open kan the hand is open: `iipeikou` and `suuankou` are impossible too, and
+`han` is the open-hand han: `sanshoku`, `ittsu`, `chanta`, `junchan`,
+`honitsu` and `chinitsu` one lower (kuisagari), the closed-only rows 0. An
+ankan keeps the hand closed. Right after a pon or chii there is no drawn
+tile: `analysis` reads all your concealed tiles (14 - 3 per meld, as a hand
+with its draw would) and `by_discard` covers their legal discards.
 
 Game rules: the dealer keeps the deal after winning, after a draw where the
 dealer is tenpai, and after an abortive draw; otherwise the deal passes on.
@@ -345,7 +361,7 @@ unknown game, `409` a move that is not legal now.
              "pon": false, "chii": [["3m", "4m"]], "kan": [] },
   "events": [ {"seat": 1, "type": "discard", "tile": "2z"},
               {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"]} ],  // moves since your previous move; no skips
-  "analysis": [YakuRow],        // your 13-tile hand; wind rows follow your seat and the round
+  "analysis": [YakuRow],        // your 13-tile hand (melds held fixed); wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended
