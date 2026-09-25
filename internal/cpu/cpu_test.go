@@ -199,7 +199,7 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 func TestGameReplaysWithCPU(t *testing.T) {
 	for seed := int64(0); seed < 30; seed++ {
 		a, b := playGame(t, seed), playGame(t, seed)
-		if !slices.Equal(a.Round.Log(), b.Round.Log()) {
+		if !reflect.DeepEqual(a.Round.Log(), b.Round.Log()) {
 			t.Fatalf("seed %d: logs differ", seed)
 		}
 		r := game.New(seed)

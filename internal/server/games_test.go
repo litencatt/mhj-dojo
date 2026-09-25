@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,8 @@ func nextMove(st match.State) string {
 		return `{"type":"tsumo"}`
 	case l.Ron:
 		return `{"type":"ron"}`
+	case l.Skip: // a pon or chii offer
+		return `{"type":"skip"}`
 	}
 	return `{"type":"discard","tile":"` + l.Discards[len(l.Discards)-1] + `"}`
 }
@@ -55,10 +58,11 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 		if len(st.Analysis) != 31 { // seat wind 西 differs from the round wind 東
 			t.Fatalf("analysis has %d rows", len(st.Analysis))
 		}
+		move := nextMove(st)
 		start := time.Now()
-		st, raw = c.game("POST", path+"/action", nextMove(st))
+		st, raw = c.game("POST", path+"/action", move)
 		took = append(took, time.Since(start))
-		if len(st.Events) == 0 {
+		if strings.Contains(move, "discard") && len(st.Events) == 0 {
 			t.Fatal("no events after a move")
 		}
 	}

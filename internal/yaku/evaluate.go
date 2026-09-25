@@ -39,8 +39,11 @@ type Context struct {
 	Riichi, DoubleRiichi, Ippatsu bool
 	// Haitei is a tsumo on the last draw, Houtei a ron on the last discard.
 	Haitei, Houtei bool
-	Winds          Winds
-	DoraIndicators []tile.Tile
+	// Rinshan is a tsumo on the replacement tile after a kan, Chankan a ron
+	// on the tile added to a pon (robbing the kan).
+	Rinshan, Chankan bool
+	Winds            Winds
+	DoraIndicators   []tile.Tile
 	// UraIndicators are counted only when the hand is in riichi.
 	UraIndicators []tile.Tile
 	// Melds are the called melds (and ankan), and MeldTiles their tiles,
@@ -71,6 +74,9 @@ var (
 	yIppatsu      = Yaku{"ippatsu", "一発", 1}
 	yHaitei       = Yaku{"haitei", "海底摸月", 1}
 	yHoutei       = Yaku{"houtei", "河底撈魚", 1}
+	yRinshan      = Yaku{"rinshan", "嶺上開花", 1}
+	yChankan      = Yaku{"chankan", "槍槓", 1}
+	ySankantsu    = Yaku{"sankantsu", "三槓子", 2}
 	yTsumo        = Yaku{"tsumo", "門前清自摸和", 1}
 	yTanyao       = Yaku{"tanyao", "断么九", 1}
 	yPinfu        = Yaku{"pinfu", "平和", 1}
@@ -105,6 +111,7 @@ var (
 	yRyuuiisou   = Yaku{"ryuuiisou", "緑一色", 13}
 	yChinroutou  = Yaku{"chinroutou", "清老頭", 13}
 	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13}
+	ySuukantsu   = Yaku{"suukantsu", "四槓子", 13}
 )
 
 // closedHan maps each yaku key to its han in a closed hand. Value winds are
@@ -112,7 +119,7 @@ var (
 var closedHan = func() map[string]int {
 	m := map[string]int{}
 	for _, y := range []Yaku{
-		yRiichi, yDoubleRiichi, yIppatsu, yHaitei, yHoutei,
+		yRiichi, yDoubleRiichi, yIppatsu, yHaitei, yHoutei, yRinshan, yChankan, ySankantsu, ySuukantsu,
 		yTsumo, yTanyao, yPinfu, yIipeikou, yRyanpeikou, ySanshoku, yDoukou, yIttsu,
 		yChanta, yJunchan, yHonroutou, yHonitsu, yChinitsu, yToitoi, ySanankou,
 		yShousangen, yHaku, yHatsu, yChun, yChiitoitsu,
@@ -229,8 +236,16 @@ func situational(ctx Context) []Yaku {
 		if ctx.Haitei {
 			ys = append(ys, yHaitei)
 		}
-	} else if ctx.Houtei {
-		ys = append(ys, yHoutei)
+		if ctx.Rinshan {
+			ys = append(ys, yRinshan)
+		}
+	} else {
+		if ctx.Houtei {
+			ys = append(ys, yHoutei)
+		}
+		if ctx.Chankan {
+			ys = append(ys, yChankan)
+		}
 	}
 	return ys
 }
@@ -306,6 +321,9 @@ func yakumanReading(r Reading, ctx Context) []Yaku {
 	if concealedTrips(r, ctx) == 4 {
 		ys = append(ys, ySuuankou)
 	}
+	if kans(r) == 4 {
+		ys = append(ys, ySuukantsu)
+	}
 	if dragons == 3 {
 		ys = append(ys, yDaisangen)
 	}
@@ -316,6 +334,17 @@ func yakumanReading(r Reading, ctx Context) []Yaku {
 		ys = append(ys, yShousuushii)
 	}
 	return ys
+}
+
+// kans counts the kans of a reading.
+func kans(r Reading) int {
+	n := 0
+	for _, m := range r.Melds {
+		if m.Kan {
+			n++
+		}
+	}
+	return n
 }
 
 func sumHan(ys []Yaku) int {
@@ -494,6 +523,9 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 	if concealedTrips(r, ctx) >= 3 {
 		ys = append(ys, ySanankou)
 	}
+	if kans(r) == 3 {
+		ys = append(ys, ySankantsu)
+	}
 	dragonTrips := 0
 	for _, m := range d.Melds {
 		if m.Type == Trip && m.Kind >= tile.Haku {
@@ -529,11 +561,11 @@ var displayOrder = map[string]int{}
 
 func init() {
 	for i, k := range []string{
-		"riichi", "double_riichi", "ippatsu", "tsumo", "haitei", "houtei", "tanyao", "pinfu", "iipeikou", "ryanpeikou", "sanshoku", "sanshoku_doukou",
-		"ittsu", "chanta", "junchan", "honroutou", "honitsu", "chinitsu", "toitoi", "sanankou",
+		"riichi", "double_riichi", "ippatsu", "tsumo", "haitei", "houtei", "rinshan", "chankan", "tanyao", "pinfu", "iipeikou", "ryanpeikou", "sanshoku", "sanshoku_doukou",
+		"ittsu", "chanta", "junchan", "honroutou", "honitsu", "chinitsu", "toitoi", "sanankou", "sankantsu",
 		"shousangen", "haku", "hatsu", "chun", "ton", "nan", "shaa", "pei", "chiitoitsu",
 		"kokushi", "suuankou", "daisangen", "tsuuiisou", "shousuushii", "daisuushii",
-		"ryuuiisou", "chinroutou", "chuuren",
+		"ryuuiisou", "chinroutou", "chuuren", "suukantsu",
 	} {
 		displayOrder[k] = i
 	}

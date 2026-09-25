@@ -62,12 +62,15 @@ type RiverTile struct {
 	Riichi bool   `json:"riichi"`
 }
 
-// Event is one move since your previous move. Other seats' skips are not
-// reported (they would reveal a wait).
+// Event is one move since your previous move: discards, riichi, calls
+// (tile = the claimed tile, tiles = the seat's own tiles in the meld), kans,
+// wins and declarations. Skips and claims that lost to a higher one are not
+// reported.
 type Event struct {
-	Seat int             `json:"seat"`
-	Type game.ActionType `json:"type"`
-	Tile string          `json:"tile,omitempty"`
+	Seat  int             `json:"seat"`
+	Type  game.ActionType `json:"type"`
+	Tile  string          `json:"tile,omitempty"`
+	Tiles []string        `json:"tiles,omitempty"`
 }
 
 // Standing is a seat's place in the game.
@@ -179,9 +182,6 @@ func (m *Match) state() State {
 		st.Seats[s] = seat
 	}
 	for _, a := range m.game.Events(m.since) {
-		if a.Type == game.Skip && a.Seat != Human {
-			continue
-		}
 		st.Events = append(st.Events, Event(a))
 	}
 

@@ -21,16 +21,18 @@ func TestGameStopsForHuman(t *testing.T) {
 				a = Action{Type: Ron}
 			case l.Tsumo:
 				a = Action{Type: Tsumo}
+			case l.Skip: // a pon or chii offer
+				a = Action{Type: Skip}
 			case len(l.Riichi) > 0:
 				a = Action{Type: Riichi, Tile: l.Riichi[0]}
 			default:
 				a = Action{Type: Discard, Tile: l.Discards[len(l.Discards)-1]}
 			}
-			before := len(g.Round.Log())
+			before := len(g.Round.Events())
 			if err := g.Act(a); err != nil {
 				t.Fatalf("seed %d: %v", seed, err)
 			}
-			if len(g.Events(before)) == 0 {
+			if a.Type != Skip && len(g.Events(before)) == 0 {
 				t.Fatalf("seed %d: no events after a move", seed)
 			}
 		}

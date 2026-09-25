@@ -101,8 +101,8 @@ type Match struct {
 	id       string
 	game     *game.Game
 	analyzer *yakushanten.Analyzer
-	// since is the log length before the human's last move: the events
-	// reported are the moves after it.
+	// since is the number of round events before the human's last move:
+	// the events reported are the moves after it.
 	since int
 	// history holds the human's per-yaku shanten at the start and after
 	// each own discard, in order (entry i = after i discards).
@@ -130,7 +130,7 @@ func (m *Match) State() State {
 func (m *Match) Act(a game.Action) (State, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	before := len(m.game.Round.Log())
+	before := len(m.game.Round.Events())
 	if err := m.game.Act(a); err != nil {
 		return State{}, err
 	}
