@@ -41,10 +41,13 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 		p.eng = shanten.NewEngine()
 	}
 	me := v.Seats[v.Viewer]
-	tiles := append(slices.Clone(me.Hand), *me.Drawn)
-	visible := visibleCounts(v, tiles)
+	tiles := slices.Clone(me.Hand)
+	if me.Drawn != nil { // no drawn tile right after a call
+		tiles = append(tiles, *me.Drawn)
+	}
+	visible := v.Visible()
 
-	best := p.byEfficiency(tiles, l.Discards, &visible)
+	best := p.byEfficiency(tiles, len(me.Melds), l.Discards, &visible)
 	if best[0].shanten >= foldShanten {
 		if threats := riichiRivers(v); len(threats) > 0 {
 			choice := safest(best, threats, &visible)
@@ -69,12 +72,12 @@ type option struct {
 
 // byEfficiency ranks the discards: lowest shanten, most ukeire, then honors
 // before terminals before simples, then tile order, keeping red fives.
-func (p *Player) byEfficiency(tiles []tile.Tile, discards []string, visible *tile.Counts) []option {
+func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, visible *tile.Counts) []option {
 	var opts []option
 	for _, s := range discards {
 		i := slices.IndexFunc(tiles, func(t tile.Tile) bool { return t.String() == s })
 		c := tile.CountsOf(slices.Delete(slices.Clone(tiles), i, i+1))
-		sh, acc := p.shanten(c)
+		sh, acc := p.shanten(c, melds)
 		n := 0
 		for _, k := range acc {
 			n += max(0, 4-visible[k])
@@ -117,13 +120,19 @@ func outer(k tile.Kind) int {
 	return 0
 }
 
-// shanten returns the lowest shanten over the normal, seven-pairs and
-// thirteen-orphans shapes of a 13-tile hand and the kinds that lower it.
-func (p *Player) shanten(c tile.Counts) (int, []tile.Kind) {
-	ev := p.eng.Evaluate(&c, &shanten.NormalTarget)
+// shanten returns the lowest shanten of the concealed tiles c, with melds
+// called melds, and the kinds that lower it. Seven pairs and thirteen
+// orphans count only without melds.
+func (p *Player) shanten(c tile.Counts, melds int) (int, []tile.Kind) {
+	target := shanten.NormalTarget
+	target.Melds -= melds
+	ev := p.eng.Evaluate(&c, &target)
 	var set [tile.NumKinds]bool
 	ev.Ukeire(&set)
 	best := ev.Dist - 1
+	if melds > 0 {
+		return best, kindsOf(&set)
+	}
 	for _, r := range []shanten.Result{shanten.Chiitoitsu(c), shanten.Kokushi(c)} {
 		if r.Shanten > best {
 			continue
@@ -135,28 +144,17 @@ func (p *Player) shanten(c tile.Counts) (int, []tile.Kind) {
 			set[k] = true
 		}
 	}
-	var acc []tile.Kind
-	for k, ok := range set {
-		if ok {
-			acc = append(acc, tile.Kind(k))
-		}
-	}
-	return best, acc
+	return best, kindsOf(&set)
 }
 
-// visibleCounts counts the tiles the seat can see: its own, every river and
-// the dora indicators.
-func visibleCounts(v game.View, own []tile.Tile) tile.Counts {
-	c := tile.CountsOf(own)
-	for _, s := range v.Seats {
-		for _, rt := range s.River {
-			c[rt.Tile.Kind]++
+func kindsOf(set *[tile.NumKinds]bool) []tile.Kind {
+	var out []tile.Kind
+	for k, ok := range set {
+		if ok {
+			out = append(out, tile.Kind(k))
 		}
 	}
-	for _, d := range v.DoraIndicators {
-		c[d.Kind]++
-	}
-	return c
+	return out
 }
 
 // riichiRivers returns the river kinds of every other seat in riichi.

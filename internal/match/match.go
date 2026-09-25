@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/cpu"
 	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/store"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
@@ -45,16 +45,18 @@ func (st *Store) Create(seed *int64) *Match {
 	// A random seed is hidden until the end: 2^53 keeps it exact in JSON
 	// while making a search from the dealt tiles impractical (2^32 would
 	// take minutes).
-	r := game.New(wall.PickSeed(seed, st.DefaultSeed, 1<<53))
-	m := &Match{
-		analyzer:  yakushanten.NewAnalyzerFor(yakushanten.Winds{Round: tile.East, Seat: r.SeatWind(Human)}),
-		history:   map[int]session.HistoryEntry{},
-		seedKnown: seed != nil || st.DefaultSeed != nil,
-	}
+	m := newMatch(game.New(wall.PickSeed(seed, st.DefaultSeed, 1<<53)), seed != nil || st.DefaultSeed != nil)
+	m.id = st.games.Add(m)
+	return m
+}
+
+// newMatch starts a match on a dealt round and plays the CPUs up to the
+// human's first decision.
+func newMatch(r *game.Round, seedKnown bool) *Match {
+	m := &Match{analyzer: yakushanten.NewAnalyzerFor(r.Winds(Human)), seedKnown: seedKnown}
 	m.game = game.Start(r, Human, cpu.New())
 	m.game.OnHumanDiscard = m.recordHand
 	m.recordHand()
-	m.id = st.games.Add(m)
 	return m
 }
 
@@ -76,9 +78,9 @@ type Match struct {
 	// since is the log length before the human's last move: the events
 	// reported are the moves after it.
 	since int
-	// history holds the human's per-yaku shanten after each own discard,
-	// keyed by the number of discards so far.
-	history map[int]session.HistoryEntry
+	// history holds the human's per-yaku shanten at the start and after
+	// each own discard, in order (entry i = after i discards).
+	history []apiview.HistoryEntry
 	// seedKnown is set when the player chose the seed. A random seed is
 	// revealed only at the end: it rebuilds the whole wall.
 	seedKnown bool
@@ -109,12 +111,12 @@ func (m *Match) Act(a game.Action) (State, error) {
 
 func (m *Match) analyze(c tile.Counts) []yakushanten.Result {
 	if m.analyzer.MemoSize() > memoLimit {
-		m.analyzer = yakushanten.NewAnalyzerFor(yakushanten.Winds{Round: tile.East, Seat: m.game.Round.SeatWind(Human)})
+		m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
 	}
 	return m.analyzer.Analyze(c)
 }
 
 // han returns a row's closed-hand han for the human's winds.
 func (m *Match) han(key string) int {
-	return yaku.HanFor(key, tile.East, m.game.Round.SeatWind(Human))
+	return yaku.HanFor(key, m.game.Round.Winds(Human))
 }

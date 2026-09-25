@@ -1,5 +1,6 @@
 // Package yaku decomposes complete hands and detects the yaku and fu of a
-// closed win (tsumo or ron). Point tables live in package score.
+// win (tsumo or ron), with or without called melds. Point tables live in
+// package score.
 package yaku
 
 import (
@@ -17,10 +18,14 @@ const (
 	Trip
 )
 
-// Meld is a sequence (Kind = lowest tile) or a triplet.
+// Meld is a sequence (Kind = lowest tile) or a triplet. Melds read from the
+// concealed tiles have neither flag; a called meld is Open (chii, pon,
+// open kan), and a kan is a Trip with Kan set (an ankan is Kan, not Open).
 type Meld struct {
 	Type GroupType
 	Kind tile.Kind
+	Open bool
+	Kan  bool
 }
 
 // Contains reports whether the meld uses a tile of kind k.
@@ -47,8 +52,14 @@ func (d *Decomposition) hasTrip(k tile.Kind) bool {
 }
 
 // Decompose returns every distinct 4 melds + pair reading of a 14-tile hand.
-func Decompose(c tile.Counts) []Decomposition {
-	if c.Total() != 14 {
+func Decompose(c tile.Counts) []Decomposition { return DecomposeWith(c, nil) }
+
+// DecomposeWith returns every distinct reading of concealed tiles c that,
+// with the called melds, makes 4 melds + pair: c holds 14 - 3*len(called)
+// tiles, and each reading lists the concealed melds first, then called.
+func DecomposeWith(c tile.Counts, called []Meld) []Decomposition {
+	want := 4 - len(called)
+	if want < 0 || c.Total() != 3*want+2 {
 		return nil
 	}
 	var out []Decomposition
@@ -59,18 +70,20 @@ func Decompose(c tile.Counts) []Decomposition {
 			i++
 		}
 		if i == tile.NumKinds {
-			if n == 4 {
-				out = append(out, Decomposition{Pair: pair, Melds: melds})
+			if n == want {
+				d := Decomposition{Pair: pair, Melds: melds}
+				copy(d.Melds[want:], called)
+				out = append(out, d)
 			}
 			return
 		}
-		if n == 4 {
+		if n == want {
 			return
 		}
 		k := tile.Kind(i)
 		if c[i] >= 3 {
 			c[i] -= 3
-			melds[n] = Meld{Trip, k}
+			melds[n] = Meld{Type: Trip, Kind: k}
 			rec(i, n+1, pair)
 			c[i] += 3
 		}
@@ -78,7 +91,7 @@ func Decompose(c tile.Counts) []Decomposition {
 			c[i]--
 			c[i+1]--
 			c[i+2]--
-			melds[n] = Meld{Seq, k}
+			melds[n] = Meld{Type: Seq, Kind: k}
 			rec(i, n+1, pair)
 			c[i]++
 			c[i+1]++
@@ -127,8 +140,15 @@ func IsKokushi(c tile.Counts) bool {
 }
 
 // IsComplete reports whether 14 tiles form any winning shape.
-func IsComplete(c tile.Counts) bool {
-	return c.Total() == 14 && (IsChiitoitsu(c) || IsKokushi(c) || len(Decompose(c)) > 0)
+func IsComplete(c tile.Counts) bool { return IsCompleteWith(c, nil) }
+
+// IsCompleteWith reports whether concealed tiles c complete a winning shape
+// with the called melds. Seven pairs and thirteen orphans need no melds.
+func IsCompleteWith(c tile.Counts, called []Meld) bool {
+	if len(called) == 0 && c.Total() == 14 && (IsChiitoitsu(c) || IsKokushi(c)) {
+		return true
+	}
+	return len(DecomposeWith(c, called)) > 0
 }
 
 // Wait is the shape the winning tile completed.
@@ -152,15 +172,20 @@ type Reading struct {
 	Wait     Wait
 }
 
-// Readings returns every reading of a 14-tile hand won on win. Identical
-// melds in one decomposition yield a single reading.
-func Readings(c tile.Counts, win tile.Kind) []Reading {
+// Readings returns every reading of a 14-tile closed hand won on win.
+func Readings(c tile.Counts, win tile.Kind) []Reading { return ReadingsWith(c, nil, win) }
+
+// ReadingsWith returns every reading of concealed tiles c with the called
+// melds, won on win. The winning tile completes the pair or a concealed
+// meld; identical melds in one decomposition yield a single reading.
+func ReadingsWith(c tile.Counts, called []Meld, win tile.Kind) []Reading {
 	var out []Reading
-	for _, d := range Decompose(c) {
+	concealed := 4 - len(called)
+	for _, d := range DecomposeWith(c, called) {
 		if d.Pair == win {
 			out = append(out, Reading{Decomposition: d, WinGroup: -1, Wait: Tanki})
 		}
-		for i, m := range d.Melds {
+		for i, m := range d.Melds[:concealed] {
 			if !m.Contains(win) || slices.Contains(d.Melds[:i], m) {
 				continue
 			}

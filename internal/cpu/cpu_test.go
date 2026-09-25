@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/litencatt/mhj2/internal/game"
 	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj2/internal/yaku"
 )
 
 func view(hand, drawn string) game.View {
@@ -96,7 +98,7 @@ func TestKeepsRedFive(t *testing.T) {
 	tiles := tile.MustParseHand("123m456m789m11s0p5p1z")
 	var vis tile.Counts
 	for _, order := range [][]string{{"0p", "5p"}, {"5p", "0p"}} {
-		opts := New().byEfficiency(tiles, order, &vis)
+		opts := New().byEfficiency(tiles, 0, order, &vis)
 		if opts[0].tile != "5p" {
 			t.Errorf("discards %v: first choice %s, want 5p", order, opts[0].tile)
 		}
@@ -190,4 +192,63 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 		t.Fatalf("seed %d: points sum %d", seed, sum)
 	}
 	return res.Kind, took
+}
+
+// Two games from the same seed with the same human moves play out exactly
+// the same with the real CPU, and the log replays onto a fresh round.
+func TestGameReplaysWithCPU(t *testing.T) {
+	for seed := int64(0); seed < 30; seed++ {
+		a, b := playGame(t, seed), playGame(t, seed)
+		if !slices.Equal(a.Round.Log(), b.Round.Log()) {
+			t.Fatalf("seed %d: logs differ", seed)
+		}
+		r := game.New(seed)
+		for _, act := range a.Round.Log() {
+			if err := r.Apply(act); err != nil {
+				t.Fatalf("seed %d: replay %+v: %v", seed, act, err)
+			}
+		}
+		if !reflect.DeepEqual(r.ViewFor(0), a.Round.ViewFor(0)) {
+			t.Fatalf("seed %d: replay differs", seed)
+		}
+		if a.Fallbacks != 0 {
+			t.Fatalf("seed %d: %d CPU fallbacks", seed, a.Fallbacks)
+		}
+	}
+}
+
+// playGame plays seat 0 by discarding the drawn tile (winning when it can)
+// against three fresh CPU players.
+func playGame(t *testing.T, seed int64) *game.Game {
+	t.Helper()
+	g := game.NewGame(seed, New())
+	for steps := 0; g.Round.Actor() >= 0; steps++ {
+		if steps > 200 {
+			t.Fatalf("seed %d: game does not end", seed)
+		}
+		if err := g.Act(game.Tsumogiri{}.Decide(g.Round.ViewFor(0), g.Round.LegalFor(0))); err != nil {
+			t.Fatalf("seed %d: %v", seed, err)
+		}
+	}
+	return g
+}
+
+// Right after a call there is no drawn tile, and the shanten counts the
+// called meld: 234m 567m 34s 66s + pon 8p is tenpai once 1z goes.
+func TestDecideAfterACall(t *testing.T) {
+	var v game.View
+	for s := range v.Seats {
+		v.Seats[s].Seat = s
+	}
+	v.Seats[0].Hand = tile.MustParseHand("234m567m34s66s1z")
+	k, _ := tile.Parse("8p")
+	v.Seats[0].Melds = []game.Called{{Meld: yaku.Meld{Type: yaku.Trip, Kind: k.Kind, Open: true}, Tiles: []tile.Tile{k, k, k}, From: 2}}
+	l := game.Legal{Discards: []string{"2m", "3m", "4m", "5m", "6m", "7m", "3s", "4s", "6s", "1z"}}
+	a := New().Decide(v, l)
+	if a.Type != game.Discard || a.Tile != "1z" {
+		t.Fatalf("got %+v, want discard 1z", a)
+	}
+	if sh, _ := New().shanten(tile.MustCounts("234m567m34s66s"), 1); sh != 0 {
+		t.Fatalf("open hand shanten %d, want tenpai", sh)
+	}
 }

@@ -1,58 +1,34 @@
 package session
 
-import "github.com/litencatt/mhj2/internal/yaku"
+import (
+	"github.com/litencatt/mhj2/internal/apiview"
+	"github.com/litencatt/mhj2/internal/yaku"
+)
 
 // State is the JSON view of a session at its current node (docs/api.md).
 type State struct {
-	SessionID         string               `json:"session_id"`
-	Seed              int64                `json:"seed"`
-	MaxTurns          int                  `json:"max_turns"`
-	RoundWind         string               `json:"round_wind"`
-	SeatWind          string               `json:"seat_wind"`
-	NodeID            int                  `json:"node_id"`
-	Turn              int                  `json:"turn"`
-	Status            string               `json:"status"`
-	Hand              []string             `json:"hand"`
-	Drawn             *string              `json:"drawn"`
-	Discards          []string             `json:"discards"`
-	DoraIndicators    []string             `json:"dora_indicators"`
-	Dora              []string             `json:"dora"`                // dora kinds pointed to by dora_indicators
-	UraDoraIndicators []string             `json:"ura_dora_indicators"` // empty until the game ends (tsumo or exhausted)
-	UraDora           []string             `json:"ura_dora"`            // kinds pointed to by ura_dora_indicators
-	WallRemaining     int                  `json:"wall_remaining"`
-	CanTsumo          bool                 `json:"can_tsumo"`
-	Analysis          []YakuRow            `json:"analysis"`
-	ByDiscard         map[string][]YakuRow `json:"by_discard"`
-	History           []HistoryEntry       `json:"history"`
-	Tree              []TreeNode           `json:"tree"`
-	Win               *Win                 `json:"win"`
-}
-
-// YakuRow is one row of the per-yaku analysis.
-type YakuRow struct {
-	Key         string   `json:"key"`
-	Name        string   `json:"name"`
-	Yakuman     bool     `json:"yakuman"`
-	Han         int      `json:"han"` // closed-hand han (13 for yakuman); 0 for the normal row
-	Shanten     *int     `json:"shanten"`
-	Approx      bool     `json:"approx"`
-	Ukeire      []Ukeire `json:"ukeire"`
-	UkeireTotal int      `json:"ukeire_total"`
-}
-
-// Ukeire is an accepting tile type and how many copies remain unseen.
-type Ukeire struct {
-	Tile      string `json:"tile"`
-	Remaining int    `json:"remaining"`
-}
-
-// HistoryEntry is one node on the path from the root to the current node.
-type HistoryEntry struct {
-	NodeID  int             `json:"node_id"`
-	Turn    int             `json:"turn"`
-	Draw    *string         `json:"draw"`
-	Discard *string         `json:"discard"`
-	Shanten map[string]*int `json:"shanten"`
+	SessionID         string                       `json:"session_id"`
+	Seed              int64                        `json:"seed"`
+	MaxTurns          int                          `json:"max_turns"`
+	RoundWind         string                       `json:"round_wind"`
+	SeatWind          string                       `json:"seat_wind"`
+	NodeID            int                          `json:"node_id"`
+	Turn              int                          `json:"turn"`
+	Status            string                       `json:"status"`
+	Hand              []string                     `json:"hand"`
+	Drawn             *string                      `json:"drawn"`
+	Discards          []string                     `json:"discards"`
+	DoraIndicators    []string                     `json:"dora_indicators"`
+	Dora              []string                     `json:"dora"`                // dora kinds pointed to by dora_indicators
+	UraDoraIndicators []string                     `json:"ura_dora_indicators"` // empty until the game ends (tsumo or exhausted)
+	UraDora           []string                     `json:"ura_dora"`            // kinds pointed to by ura_dora_indicators
+	WallRemaining     int                          `json:"wall_remaining"`
+	CanTsumo          bool                         `json:"can_tsumo"`
+	Analysis          []apiview.YakuRow            `json:"analysis"`
+	ByDiscard         map[string][]apiview.YakuRow `json:"by_discard"`
+	History           []apiview.HistoryEntry       `json:"history"`
+	Tree              []TreeNode                   `json:"tree"`
+	Win               *Win                         `json:"win"`
 }
 
 // TreeNode is one node of the whole branch tree.

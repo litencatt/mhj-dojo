@@ -12,7 +12,7 @@ import (
 // scoring cannot disagree.
 func TestRowsHaveClosedHan(t *testing.T) {
 	for _, r := range Rows {
-		h := yaku.ClosedHan(r.Key)
+		h := yaku.HanFor(r.Key, yaku.EastEast)
 		switch {
 		case r.Key == "normal":
 			if h != 0 {
@@ -27,7 +27,7 @@ func TestRowsHaveClosedHan(t *testing.T) {
 		}
 	}
 	for key, want := range map[string]int{"tanyao": 1, "chiitoitsu": 2, "ryanpeikou": 3, "chinitsu": 6, "ton": 2} {
-		if got := yaku.ClosedHan(key); got != want {
+		if got := yaku.HanFor(key, yaku.EastEast); got != want {
 			t.Errorf("%s: han %d, want %d", key, got, want)
 		}
 	}
@@ -37,7 +37,7 @@ func TestRowsForWinds(t *testing.T) {
 	if len(Rows) != 30 || Rows[19].Key != "ton" || Rows[19].Name != "役牌 東（場風・自風）" {
 		t.Fatalf("East/East rows changed: %d rows, row 19 = %+v", len(Rows), Rows[19])
 	}
-	rows := RowsFor(Winds{tile.South, tile.West})
+	rows := RowsFor(Winds{Round: tile.South, Seat: tile.West})
 	if len(rows) != 31 {
 		t.Fatalf("South/West: %d rows, want 31", len(rows))
 	}
@@ -45,7 +45,7 @@ func TestRowsForWinds(t *testing.T) {
 		t.Fatalf("South/West wind rows = %+v, %+v", rows[19], rows[20])
 	}
 	for key, want := range map[string]int{"nan": 1, "shaa": 1, "ton": 0, "pei": 0} {
-		if got := yaku.HanFor(key, tile.South, tile.West); got != want {
+		if got := yaku.HanFor(key, yaku.Winds{Round: tile.South, Seat: tile.West}); got != want {
 			t.Errorf("HanFor(%s, 南, 西) = %d, want %d", key, got, want)
 		}
 	}
@@ -56,7 +56,7 @@ func TestAnalyzerFollowsWinds(t *testing.T) {
 	// when East is the round or seat wind.
 	c := tile.MustCounts("234m567m34p678s11z")
 	ee := NewAnalyzer().Row(c, "pinfu")
-	sw := NewAnalyzerFor(Winds{tile.South, tile.West}).Row(c, "pinfu")
+	sw := NewAnalyzerFor(Winds{Round: tile.South, Seat: tile.West}).Row(c, "pinfu")
 	if ee.Shanten == 0 {
 		t.Errorf("East/East: pinfu tenpai with an East pair")
 	}
@@ -65,7 +65,7 @@ func TestAnalyzerFollowsWinds(t *testing.T) {
 	}
 	// a South triplet counts toward the South round wind row
 	h := tile.MustCounts("222z234m567p78s99s")
-	a := NewAnalyzerFor(Winds{tile.South, tile.West})
+	a := NewAnalyzerFor(Winds{Round: tile.South, Seat: tile.West})
 	if r := a.Row(h, "nan"); !r.Possible || r.Shanten != 0 {
 		t.Errorf("South/West nan row = %+v", r)
 	}

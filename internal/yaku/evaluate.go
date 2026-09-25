@@ -28,8 +28,8 @@ type Win struct {
 // HasYaku reports whether the win has a yaku; dora alone cannot win.
 func (w Win) HasYaku() bool { return len(w.Yaku) > 0 }
 
-// Context describes how a closed hand was won. The zero value of the flags is
-// a plain closed tsumo, which is every Phase 1 win.
+// Context describes how a hand was won. The zero value of the flags is a
+// plain closed tsumo without melds, which is every Phase 1 win.
 type Context struct {
 	WinTile tile.Kind
 	// Ron is a win on another player's discard; false is a tsumo.
@@ -39,14 +39,30 @@ type Context struct {
 	Riichi, DoubleRiichi, Ippatsu bool
 	// Haitei is a tsumo on the last draw, Houtei a ron on the last discard.
 	Haitei, Houtei bool
-	RoundWind      tile.Kind
-	SeatWind       tile.Kind
+	Winds          Winds
 	DoraIndicators []tile.Tile
 	// UraIndicators are counted only when the hand is in riichi.
 	UraIndicators []tile.Tile
+	// Melds are the called melds (and ankan), and MeldTiles their tiles,
+	// which count for dora.
+	Melds     []Meld
+	MeldTiles []tile.Tile
 }
 
 func (ctx Context) inRiichi() bool { return ctx.Riichi || ctx.DoubleRiichi }
+
+// Open reports whether the hand has called a meld; an ankan keeps it closed.
+func (ctx Context) Open() bool {
+	return slices.ContainsFunc(ctx.Melds, func(m Meld) bool { return m.Open })
+}
+
+// kuisagari lowers the han of the yaku that lose one han when open.
+func kuisagari(y Yaku, open bool) Yaku {
+	if open {
+		y.Han--
+	}
+	return y
+}
 
 // Han values of a closed hand.
 var (
@@ -108,48 +124,46 @@ var closedHan = func() map[string]int {
 	return m
 }()
 
-// ClosedHan returns the han of the yaku with the given key in a closed hand
-// in practice mode (East round, East seat), or 0 if key is not a yaku (e.g.
-// "normal").
-func ClosedHan(key string) int { return HanFor(key, tile.East, tile.East) }
-
 // HanFor returns the han of the yaku with the given key in a closed hand
-// with the given winds. A value wind counts once for the round wind and once
-// for the seat wind, so it is 0 when it is neither.
-func HanFor(key string, round, seat tile.Kind) int {
-	for i, w := range windKeys {
-		if w.key == key {
-			k := tile.East + tile.Kind(i)
-			return b2i(k == round) + b2i(k == seat)
+// with the given winds, or 0 if key is not a yaku (e.g. "normal"). A value
+// wind counts once for the round wind and once for the seat wind, so it is 0
+// when it is neither.
+func HanFor(key string, w Winds) int {
+	for i, wk := range WindKeys {
+		if wk == key {
+			return w.Count(tile.East + tile.Kind(i))
 		}
 	}
 	return closedHan[key]
 }
 
-func b2i(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-var windKeys = [4]struct{ key, name string }{
-	{"ton", "役牌 東"}, {"nan", "役牌 南"}, {"shaa", "役牌 西"}, {"pei", "役牌 北"},
-}
-
-// Evaluate detects the yaku of a complete 14-tile closed hand, choosing the
-// reading with the most han, then the most fu (a yakuman reading always
-// wins). ok is false if the tiles are not complete or do not contain
-// ctx.WinTile. A complete hand without yaku is ok with no Yaku; callers must
-// check HasYaku before allowing the win.
+// Evaluate detects the yaku of a complete hand: the concealed tiles
+// (including the winning tile, 14 - 3*len(ctx.Melds) of them) and the called
+// melds in ctx. It chooses the reading with the most han, then the most fu
+// (a yakuman reading always wins). ok is false if the tiles are not complete
+// or do not contain ctx.WinTile. A complete hand without yaku is ok with no
+// Yaku; callers must check HasYaku before allowing the win.
 func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 	c := tile.CountsOf(tiles)
-	if len(tiles) != 14 || c[ctx.WinTile] == 0 || !IsComplete(c) {
+	if len(tiles) != 14-3*len(ctx.Melds) || c[ctx.WinTile] == 0 || !IsCompleteWith(c, ctx.Melds) {
 		return Win{}, false
 	}
-	win.Dora = countRed(tiles) + countDora(tiles, ctx.DoraIndicators)
+	shown := append(slices.Clone(tiles), ctx.MeldTiles...)
+	win.Dora = countRed(shown) + countDora(shown, ctx.DoraIndicators)
 	if ctx.inRiichi() {
-		win.UraDora = countDora(tiles, ctx.UraIndicators)
+		win.UraDora = countDora(shown, ctx.UraIndicators)
+	}
+	// all counts every tile of the hand (a kan as three) for the yaku that
+	// depend only on the tile set.
+	all := c
+	for _, m := range ctx.Melds {
+		for i := range 3 {
+			if m.Type == Seq {
+				all[m.Kind+tile.Kind(i)]++
+			} else {
+				all[m.Kind]++
+			}
+		}
 	}
 	if IsKokushi(c) {
 		win.Yaku = []Yaku{yKokushi}
@@ -167,18 +181,18 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 			best, bestHan, bestFu, bestReading = order(ys), h, fu, r
 		}
 	}
-	if IsChiitoitsu(c) {
+	if len(ctx.Melds) == 0 && IsChiitoitsu(c) {
 		ys := situational(ctx)
-		ys = append(ys, handWide(c)...)
+		ys = append(ys, handWide(c, false)...)
 		if onlyYaochu(c) {
 			ys = append(ys, yHonroutou)
 		}
 		ys = append(ys, yChiitoitsu)
-		consider(ys, yakumanWide(c, false), chiitoitsuFu, nil)
+		consider(ys, yakumanWide(c, false, true), chiitoitsuFu, nil)
 	}
-	for _, r := range Readings(c, ctx.WinTile) {
-		ys := evalReading(c, r, ctx)
-		consider(ys, append(yakumanWide(c, true), yakumanReading(r, ctx)...), Fu(r, ctx), &r)
+	for _, r := range ReadingsWith(c, ctx.Melds, ctx.WinTile) {
+		ys := evalReading(all, r, ctx)
+		consider(ys, append(yakumanWide(all, true, len(ctx.Melds) == 0), yakumanReading(r, ctx)...), Fu(r, ctx), &r)
 	}
 	if bestYakumanHan > 0 {
 		win.Yaku = bestYakuman
@@ -209,7 +223,9 @@ func situational(ctx Context) []Yaku {
 		ys = append(ys, yIppatsu)
 	}
 	if !ctx.Ron {
-		ys = append(ys, yTsumo)
+		if !ctx.Open() {
+			ys = append(ys, yTsumo) // 門前清自摸和 needs a closed hand
+		}
 		if ctx.Haitei {
 			ys = append(ys, yHaitei)
 		}
@@ -220,8 +236,9 @@ func situational(ctx Context) []Yaku {
 }
 
 // yakumanWide returns the yakuman that depend only on the tile set; standard
-// reports a 4 melds + pair reading (false: seven pairs).
-func yakumanWide(c tile.Counts, standard bool) []Yaku {
+// reports a 4 melds + pair reading (false: seven pairs), and noMelds a hand
+// without called melds or kan (needed for chuuren).
+func yakumanWide(c tile.Counts, standard, noMelds bool) []Yaku {
 	allHonor, allTerminal, allGreen, anyHonor := true, true, true, false
 	suits := map[int]bool{}
 	for k, n := range c {
@@ -251,7 +268,7 @@ func yakumanWide(c tile.Counts, standard bool) []Yaku {
 	if allGreen {
 		ys = append(ys, yRyuuiisou)
 	}
-	if len(suits) == 1 && !anyHonor {
+	if noMelds && len(suits) == 1 && !anyHonor {
 		for s := range suits {
 			chuuren := true
 			for n, need := range [9]int{3, 1, 1, 1, 1, 1, 1, 1, 3} {
@@ -309,8 +326,9 @@ func sumHan(ys []Yaku) int {
 	return n
 }
 
-// handWide returns yaku that depend only on the tile set: tanyao, honitsu, chinitsu.
-func handWide(c tile.Counts) []Yaku {
+// handWide returns yaku that depend only on the tile set: tanyao (open
+// tanyao allowed), honitsu, chinitsu.
+func handWide(c tile.Counts, open bool) []Yaku {
 	var ys []Yaku
 	yaochu, honors := false, false
 	suits := map[int]bool{}
@@ -333,9 +351,9 @@ func handWide(c tile.Counts) []Yaku {
 	}
 	if len(suits) == 1 {
 		if honors {
-			ys = append(ys, yHonitsu)
+			ys = append(ys, kuisagari(yHonitsu, open))
 		} else {
-			ys = append(ys, yChinitsu)
+			ys = append(ys, kuisagari(yChinitsu, open))
 		}
 	}
 	return ys
@@ -353,12 +371,15 @@ func onlyYaochu(c tile.Counts) bool {
 // IsValuePair reports whether a pair of k is a value pair (dragon, round
 // wind or seat wind), which rules out pinfu and, from Phase 2, adds fu.
 func (ctx Context) IsValuePair(k tile.Kind) bool {
-	return k >= tile.Haku || k == ctx.RoundWind || k == ctx.SeatWind
+	return k >= tile.Haku || ctx.Winds.Count(k) > 0
 }
 
-// IsPinfu reports whether r is a pinfu reading: four sequences, a non-value
-// pair and a two-sided wait.
+// IsPinfu reports whether r is a pinfu reading: a closed hand of four
+// sequences, a non-value pair and a two-sided wait.
 func IsPinfu(r Reading, ctx Context) bool {
+	if len(ctx.Melds) > 0 {
+		return false
+	}
 	for _, m := range r.Melds {
 		if m.Type != Seq {
 			return false
@@ -373,21 +394,30 @@ func (r Reading) ronCompleted(i int, ctx Context) bool {
 	return ctx.Ron && i == r.WinGroup
 }
 
-// concealedTrips counts the concealed triplets of a reading.
+// concealed reports whether meld i of r is concealed: not called, and not a
+// triplet the winning tile completed on a ron. An ankan is concealed.
+func (r Reading) concealed(i int, ctx Context) bool {
+	return !r.Melds[i].Open && !r.ronCompleted(i, ctx)
+}
+
+// concealedTrips counts the concealed triplets (and ankan) of a reading.
 func concealedTrips(r Reading, ctx Context) int {
 	n := 0
 	for i, m := range r.Melds {
-		if m.Type == Trip && !r.ronCompleted(i, ctx) {
+		if m.Type == Trip && r.concealed(i, ctx) {
 			n++
 		}
 	}
 	return n
 }
 
+// evalReading returns the yaku of one reading; c counts every tile of the
+// hand, called melds included.
 func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 	d := &r.Decomposition
+	open := ctx.Open()
 	ys := situational(ctx)
-	ys = append(ys, handWide(c)...)
+	ys = append(ys, handWide(c, open)...)
 
 	seqs, trips := 0, 0
 	var seqCount [tile.NumKinds]int
@@ -407,16 +437,17 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 	for _, n := range seqCount {
 		peikou += n / 2
 	}
-	switch peikou {
-	case 2:
+	switch {
+	case open: // iipeikou and ryanpeikou need a closed hand
+	case peikou == 2:
 		ys = append(ys, yRyanpeikou)
-	case 1:
+	case peikou == 1:
 		ys = append(ys, yIipeikou)
 	}
 	for n := 1; n <= 7; n++ {
 		if seqCount[tile.MakeKind(tile.Man, n)] > 0 && seqCount[tile.MakeKind(tile.Pin, n)] > 0 &&
 			seqCount[tile.MakeKind(tile.Sou, n)] > 0 {
-			ys = append(ys, ySanshoku)
+			ys = append(ys, kuisagari(ySanshoku, open))
 			break
 		}
 	}
@@ -430,7 +461,7 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 	for s := tile.Man; s <= tile.Sou; s++ {
 		if seqCount[tile.MakeKind(s, 1)] > 0 && seqCount[tile.MakeKind(s, 4)] > 0 &&
 			seqCount[tile.MakeKind(s, 7)] > 0 {
-			ys = append(ys, yIttsu)
+			ys = append(ys, kuisagari(yIttsu, open))
 			break
 		}
 	}
@@ -447,9 +478,9 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 	}
 	if allYaochu && seqs > 0 {
 		if anyHonor {
-			ys = append(ys, yChanta)
+			ys = append(ys, kuisagari(yChanta, open))
 		} else {
-			ys = append(ys, yJunchan)
+			ys = append(ys, kuisagari(yJunchan, open))
 		}
 	}
 
@@ -484,16 +515,9 @@ func evalReading(c tile.Counts, r Reading, ctx Context) []Yaku {
 		case m.Kind == tile.Chun:
 			ys = append(ys, yChun)
 		case m.Kind >= tile.East && m.Kind <= tile.North:
-			han := 0
-			if m.Kind == ctx.RoundWind {
-				han++
-			}
-			if m.Kind == ctx.SeatWind {
-				han++
-			}
-			if han > 0 {
-				w := windKeys[m.Kind-tile.East]
-				ys = append(ys, Yaku{w.key, w.name, han})
+			if han := ctx.Winds.Count(m.Kind); han > 0 {
+				i := m.Kind - tile.East
+				ys = append(ys, Yaku{WindKeys[i], "役牌 " + WindNames[i], han})
 			}
 		}
 	}

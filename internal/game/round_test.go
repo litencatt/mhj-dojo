@@ -80,7 +80,7 @@ func checkInvariants(t *testing.T, r *Round) {
 	}
 	tiles := 0
 	for _, p := range r.players {
-		tiles += len(p.hand) + len(p.river)
+		tiles += len(p.hand) + len(p.river) + len(p.meldTiles())
 		if p.drawn != nil {
 			tiles++
 		}
@@ -401,5 +401,69 @@ func TestViewHidesOtherHands(t *testing.T) {
 	}
 	if v.UraIndicators == nil {
 		t.Fatal("ura dora hidden after the end")
+	}
+}
+
+// newConfigRound deals seed 1 with junk hands from a round config: dealer 0,
+// honba 2, two carried riichi sticks and uneven points.
+func newConfigRound(t *testing.T) *Round {
+	t.Helper()
+	r := NewRound(RoundConfig{
+		Wall: wall.New(1), Dealer: 0, RoundWind: tile.South, Honba: 2, Deposit: 2 * RiichiStick,
+		Points: [4]int{30000, 20000, 24000, 24000},
+	})
+	for s := range 4 {
+		setHand(r, s, junk[s], "")
+	}
+	setHand(r, 0, junk[0], "5z")
+	return r
+}
+
+func TestHonbaAndCarriedSticks(t *testing.T) {
+	// ron: the discarder pays 300 per honba; the winner takes the carried sticks
+	r := newConfigRound(t)
+	setHand(r, 2, "123m456m789m234p5z", "") // 5z tanki, ittsu
+	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
+	mustApply(t, r, Action{Seat: 2, Type: Ron})
+	res := r.Result()
+	if res.Honba != 2 || res.HonbaDeltas != [4]int{-600, 0, 600, 0} || res.StickDeltas != [4]int{0, 0, 2000, 0} || res.Deposit != 0 {
+		t.Fatalf("ron: %+v", res)
+	}
+	for s, p := range r.players {
+		if p.points != r.start[s]+res.Deltas[s] || res.Deltas[s] != res.HandDeltas[s]+res.HonbaDeltas[s]+res.StickDeltas[s] {
+			t.Fatalf("seat %d points %d deltas %v", s, p.points, res.Deltas)
+		}
+	}
+	if r.Winds(2) != (yaku.Winds{Round: tile.South, Seat: tile.West}) {
+		t.Fatalf("winds %v", r.Winds(2))
+	}
+
+	// tsumo: 100 per honba from each other seat
+	r = newConfigRound(t)
+	setHand(r, 0, "123m456m789m234p5z", "5z")
+	mustApply(t, r, Action{Seat: 0, Type: Tsumo})
+	if res := r.Result(); res.HonbaDeltas != [4]int{600, -200, -200, -200} || res.StickDeltas[0] != 2000 {
+		t.Fatalf("tsumo: %+v", res)
+	}
+
+	// draw: no honba payment; the carried sticks stay on the table
+	r = newConfigRound(t)
+	r.draws = wall.LiveDraws4
+	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
+	if res := r.Result(); res.Kind != "draw" || res.HonbaDeltas != [4]int{} || res.Deposit != 2000 {
+		t.Fatalf("draw: %+v", res)
+	}
+	if n := r.deposit + r.players[0].points + r.players[1].points + r.players[2].points + r.players[3].points; n != 100000 {
+		t.Fatalf("points + deposit = %d", n)
+	}
+}
+
+// Each kan reveals a dora indicator and takes a draw off the live wall.
+func TestKansMoveHaiteiAndDora(t *testing.T) {
+	r := newRound(t)
+	left := r.DrawsLeft()
+	r.kans = 2
+	if r.DrawsLeft() != left-2 || len(r.ViewFor(0).DoraIndicators) != 3 {
+		t.Fatalf("draws left %d, dora %d", r.DrawsLeft(), len(r.ViewFor(0).DoraIndicators))
 	}
 }

@@ -13,7 +13,8 @@ type SeatView struct {
 	Wind      tile.Kind
 	Points    int
 	River     []RiverTile
-	HandCount int
+	Melds     []Called // public
+	HandCount int      // concealed tiles, drawn tile included
 	Hand      []tile.Tile
 	Drawn     *tile.Tile
 	Riichi    bool
@@ -49,12 +50,12 @@ func (r *Round) ViewFor(viewer int) View {
 		Actor:          r.Actor(),
 		DrawsLeft:      r.DrawsLeft(),
 		Deposit:        r.deposit,
-		DoraIndicators: r.wall.DoraIndicators(),
+		DoraIndicators: r.doraIndicators(),
 		Result:         r.result,
 	}
 	ended := r.phase == PhaseEnded
 	if ended {
-		v.UraIndicators = r.wall.UraDoraIndicators()
+		v.UraIndicators = r.uraIndicators()
 	}
 	if r.phase == PhaseCall {
 		d := r.lastDiscard
@@ -67,6 +68,7 @@ func (r *Round) ViewFor(viewer int) View {
 			Wind:      r.SeatWind(s),
 			Points:    p.points,
 			River:     slices.Clone(p.river),
+			Melds:     cloneMelds(p.melds),
 			HandCount: len(p.hand),
 			Riichi:    p.riichi,
 		}
@@ -83,6 +85,17 @@ func (r *Round) ViewFor(viewer int) View {
 		v.Seats[s] = sv
 	}
 	return v
+}
+
+// cloneMelds copies melds and their tiles, so a view never shares the
+// round's data.
+func cloneMelds(ms []Called) []Called {
+	out := make([]Called, len(ms))
+	for i, m := range ms {
+		out[i] = m
+		out[i].Tiles = slices.Clone(m.Tiles)
+	}
+	return out
 }
 
 // Legal lists what seat may do now.
@@ -111,7 +124,7 @@ func (r *Round) LegalFor(seat int) Legal {
 	if p.riichi {
 		l.Discards = append(l.Discards, p.drawn.String())
 	} else {
-		for _, t := range p.tiles14() {
+		for _, t := range p.concealed() {
 			if !slices.Contains(l.Discards, t.String()) {
 				l.Discards = append(l.Discards, t.String())
 			}
@@ -122,16 +135,27 @@ func (r *Round) LegalFor(seat int) Legal {
 	return l
 }
 
-// Visible counts the tiles seat can see: its own hand and drawn tile, every
-// river and the dora indicators. Unseen copies = 4 - Visible.
-func (r *Round) Visible(seat int) tile.Counts {
-	c := tile.CountsOf(r.players[seat].tiles14())
-	for s := range r.players {
-		for _, rt := range r.players[s].river {
+// Visible counts the tiles the viewer can see: its own hand and drawn tile,
+// every river and called meld, and the dora indicators. Unseen copies = 4 -
+// Visible. It is the one place that decides what is visible, for the CPU and
+// the API.
+func (v View) Visible() tile.Counts {
+	me := v.Seats[v.Viewer]
+	c := tile.CountsOf(me.Hand)
+	if me.Drawn != nil {
+		c[me.Drawn.Kind]++
+	}
+	for _, s := range v.Seats {
+		for _, rt := range s.River {
 			c[rt.Tile.Kind]++
 		}
+		for _, m := range s.Melds {
+			for _, t := range m.Tiles {
+				c[t.Kind]++
+			}
+		}
 	}
-	for _, d := range r.wall.DoraIndicators() {
+	for _, d := range v.DoraIndicators {
 		c[d.Kind]++
 	}
 	return c

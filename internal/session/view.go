@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -35,16 +36,6 @@ func strPtr(t *tile.Tile) *string {
 
 func intPtr(v int) *int { return &v }
 
-// doraKinds returns the dora kind each indicator points to (next tile, wrapping
-// within the suit or wind/dragon group), without red notation.
-func doraKinds(indicators []tile.Tile) []string {
-	out := make([]string, len(indicators))
-	for i, ind := range indicators {
-		out[i] = tile.DoraFromIndicator(ind.Kind).String()
-	}
-	return out
-}
-
 func (s *Session) state() State {
 	cur := s.nodes[s.current]
 	path := s.path(cur)
@@ -66,25 +57,25 @@ func (s *Session) state() State {
 		SessionID:      s.id,
 		Seed:           s.wall.Seed(),
 		MaxTurns:       s.maxTurns,
-		RoundWind:      roundWind.String(),
-		SeatWind:       seatWind.String(),
+		RoundWind:      winds.Round.String(),
+		SeatWind:       winds.Seat.String(),
 		NodeID:         cur.id,
 		Turn:           cur.turn,
 		Status:         cur.status,
 		Hand:           tile.Strings(cur.hand),
 		Discards:       append([]string{}, discards...),
 		DoraIndicators: tile.Strings(dora),
-		Dora:           doraKinds(dora),
+		Dora:           apiview.DoraKinds(dora),
 		// Ura dora are revealed only once the game has ended.
 		UraDoraIndicators: []string{},
 		UraDora:           []string{},
-		ByDiscard:         map[string][]YakuRow{},
+		ByDiscard:         map[string][]apiview.YakuRow{},
 		Win:               cur.win,
 	}
 	if cur.status != StatusPlaying {
 		ura := s.wall.UraDoraIndicators()
 		st.UraDoraIndicators = tile.Strings(ura)
-		st.UraDora = doraKinds(ura)
+		st.UraDora = apiview.DoraKinds(ura)
 	}
 	drawsTaken := cur.turn
 	if d, ok := s.drawn(cur); ok {
@@ -122,14 +113,14 @@ func (s *Session) state() State {
 	}
 
 	for _, n := range path {
-		h := HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Shanten: map[string]*int{}}
+		h := apiview.HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Shanten: map[string]*int{}}
 		if n.status == StatusTsumo {
 			for k, v := range n.winRows {
 				h.Shanten[k] = intPtr(v)
 			}
 		} else {
 			for _, r := range s.nodeAnalysis(n) {
-				h.Shanten[r.Key] = ShantenOf(r)
+				h.Shanten[r.Key] = shantenPtr(r)
 			}
 		}
 		st.History = append(st.History, h)
@@ -143,37 +134,15 @@ func (s *Session) state() State {
 		if n.status == StatusTsumo {
 			tn.NormalShanten = intPtr(-1) // complete hand, whatever its shape
 		} else {
-			tn.NormalShanten = ShantenOf(s.nodeAnalysis(n)[0])
+			tn.NormalShanten = shantenPtr(s.nodeAnalysis(n)[0])
 		}
 		st.Tree = append(st.Tree, tn)
 	}
 	return st
 }
 
-// ShantenOf returns a row's shanten, or nil when the yaku is impossible.
-func ShantenOf(r yakushanten.Result) *int {
-	if !r.Possible {
-		return nil
-	}
-	return intPtr(r.Shanten)
-}
+func shantenPtr(r yakushanten.Result) *int { return apiview.ShantenOf(r) }
 
-func rows(res []yakushanten.Result, visible *tile.Counts) []YakuRow {
-	return Rows(res, visible, yaku.ClosedHan)
-}
-
-// Rows converts analysis results to API rows: han comes from han(key) and
-// each accepting tile's remaining count is 4 minus the visible copies.
-func Rows(res []yakushanten.Result, visible *tile.Counts, han func(key string) int) []YakuRow {
-	out := make([]YakuRow, len(res))
-	for i, r := range res {
-		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Shanten: ShantenOf(r), Approx: r.Approx, Ukeire: []Ukeire{}}
-		for _, k := range r.Ukeire {
-			rem := max(4-visible[k], 0)
-			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
-			row.UkeireTotal += rem
-		}
-		out[i] = row
-	}
-	return out
+func rows(res []yakushanten.Result, visible *tile.Counts) []apiview.YakuRow {
+	return apiview.Rows(res, visible, func(key string) int { return yaku.HanFor(key, winds) })
 }

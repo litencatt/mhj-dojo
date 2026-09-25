@@ -31,18 +31,13 @@ type RowDef struct {
 
 // Winds are the round and seat winds, which decide the value-wind rows and
 // which pairs block pinfu.
-type Winds struct{ Round, Seat tile.Kind }
+type Winds = yaku.Winds
 
 // EastEast is the East round, East seat of practice mode.
-var EastEast = Winds{tile.East, tile.East}
+var EastEast = yaku.EastEast
 
 // windRows marks where RowsFor inserts the value-wind rows.
 const windRows = "winds"
-
-var (
-	windKeys  = [4]string{"ton", "nan", "shaa", "pei"}
-	windNames = [4]string{"東", "南", "西", "北"}
-)
 
 // Rows lists the practice-mode (East, East) rows in their fixed API order.
 var Rows = RowsFor(EastEast)
@@ -59,12 +54,12 @@ func RowsFor(w Winds) []RowDef {
 		}
 		ri, si := w.Round-tile.East, w.Seat-tile.East
 		if ri == si {
-			out = append(out, RowDef{windKeys[ri], "役牌 " + windNames[ri] + "（場風・自風）", false})
+			out = append(out, RowDef{yaku.WindKeys[ri], "役牌 " + yaku.WindNames[ri] + "（場風・自風）", false})
 			continue
 		}
 		out = append(out,
-			RowDef{windKeys[ri], "役牌 " + windNames[ri] + "（場風）", false},
-			RowDef{windKeys[si], "役牌 " + windNames[si] + "（自風）", false})
+			RowDef{yaku.WindKeys[ri], "役牌 " + yaku.WindNames[ri] + "（場風）", false},
+			RowDef{yaku.WindKeys[si], "役牌 " + yaku.WindNames[si] + "（自風）", false})
 	}
 	return out
 }
@@ -191,7 +186,7 @@ var targets = func() map[string][]shanten.Target {
 	}
 	m["sanankou"] = []shanten.Target{{Rules: track, Melds: 4, MinTrips: 3}}
 	yakuhai := map[string]tile.Kind{"haku": tile.Haku, "hatsu": tile.Hatsu, "chun": tile.Chun}
-	for i, key := range windKeys {
+	for i, key := range yaku.WindKeys {
 		yakuhai[key] = tile.East + tile.Kind(i)
 	}
 	for key, k := range yakuhai {
@@ -505,7 +500,7 @@ func PinfuWaits(c tile.Counts) []tile.Kind { return PinfuWaitsFor(c, EastEast) }
 // PinfuWaitsFor returns the kinds that complete a 13-tile hand into four
 // sequences + a non-value pair with the winning tile on a two-sided wait.
 func PinfuWaitsFor(c tile.Counts, w Winds) []tile.Kind {
-	ctx := yaku.Context{RoundWind: w.Round, SeatWind: w.Seat}
+	ctx := yaku.Context{Winds: w}
 	var set [tile.NumKinds]bool
 	for t := tile.Kind(0); t < tile.NumKinds; t++ {
 		if c[t] >= 4 {

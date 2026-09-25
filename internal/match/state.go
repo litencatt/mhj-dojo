@@ -3,9 +3,9 @@ package match
 import (
 	"slices"
 
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/game"
 	"github.com/litencatt/mhj2/internal/score"
-	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yaku"
 )
@@ -29,9 +29,9 @@ type State struct {
 	LastDiscard       *string                      `json:"last_discard"` // the tile you may ron
 	Legal             game.Legal                   `json:"legal"`
 	Events            []Event                      `json:"events"`
-	Analysis          []session.YakuRow            `json:"analysis"`
-	ByDiscard         map[string][]session.YakuRow `json:"by_discard"`
-	History           []session.HistoryEntry       `json:"history"`
+	Analysis          []apiview.YakuRow            `json:"analysis"`
+	ByDiscard         map[string][]apiview.YakuRow `json:"by_discard"`
+	History           []apiview.HistoryEntry       `json:"history"`
 	Result            *Result                      `json:"result"`
 }
 
@@ -92,12 +92,12 @@ func (m *Match) state() State {
 		WallRemaining:     v.DrawsLeft,
 		Deposit:           v.Deposit,
 		DoraIndicators:    tile.Strings(v.DoraIndicators),
-		Dora:              doraKinds(v.DoraIndicators),
+		Dora:              apiview.DoraKinds(v.DoraIndicators),
 		UraDoraIndicators: []string{},
 		UraDora:           []string{},
 		Legal:             r.LegalFor(Human),
 		Events:            []Event{},
-		ByDiscard:         map[string][]session.YakuRow{},
+		ByDiscard:         map[string][]apiview.YakuRow{},
 	}
 	if m.seedKnown || v.Phase == game.PhaseEnded {
 		seed := v.Seed
@@ -105,7 +105,7 @@ func (m *Match) state() State {
 	}
 	if v.UraIndicators != nil {
 		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
-		st.UraDora = doraKinds(v.UraIndicators)
+		st.UraDora = apiview.DoraKinds(v.UraIndicators)
 	}
 	if v.LastDiscard != nil && st.Legal.Ron {
 		s := v.LastDiscard.String()
@@ -136,10 +136,18 @@ func (m *Match) state() State {
 	}
 
 	me := v.Seats[Human]
-	visible := r.Visible(Human)
-	st.Analysis = session.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
-	if me.Drawn != nil && v.Phase == game.PhaseDiscard && v.Actor == Human {
-		all := append(slices.Clone(me.Hand), *me.Drawn)
+	visible := v.Visible()
+	st.Analysis = []apiview.YakuRow{}
+	// The per-yaku analysis reads a closed hand; after a call it would show
+	// wrong numbers, so it is left empty until it supports melds (#27).
+	if len(me.Melds) == 0 {
+		st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
+	}
+	if len(me.Melds) == 0 && v.Phase == game.PhaseDiscard && v.Actor == Human {
+		all := slices.Clone(me.Hand)
+		if me.Drawn != nil { // no drawn tile right after a call
+			all = append(all, *me.Drawn)
+		}
 		c := tile.CountsOf(all)
 		for _, t := range all {
 			key := t.String()
@@ -147,37 +155,28 @@ func (m *Match) state() State {
 				continue
 			}
 			c[t.Kind]--
-			st.ByDiscard[key] = session.Rows(m.analyze(c), &visible, m.han)
+			st.ByDiscard[key] = apiview.Rows(m.analyze(c), &visible, m.han)
 			c[t.Kind]++
 		}
 	}
-	st.History = m.historyList()
+	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
 	return st
 }
 
-// recordHand keeps the human's row shanten for the current 13-tile hand,
-// keyed by the number of discards made (the start of the round is 0).
+// recordHand appends the human's row shanten for the current hand: once at
+// the start of the round and after each of the human's discards. The turn is
+// the number of those discards, not the river length, which calls will
+// change.
 func (m *Match) recordHand() {
 	me := m.game.Round.ViewFor(Human).Seats[Human]
-	turn := len(me.River)
-	if _, ok := m.history[turn]; ok {
-		return
+	if len(me.Melds) > 0 {
+		return // the analysis reads closed hands only (see state)
 	}
-	h := session.HistoryEntry{NodeID: turn, Turn: turn, Shanten: map[string]*int{}}
-	for _, r := range m.analyze(tile.CountsOf(me.Hand)) {
-		h.Shanten[r.Key] = session.ShantenOf(r)
-	}
-	m.history[turn] = h
-}
-
-func (m *Match) historyList() []session.HistoryEntry {
-	out := make([]session.HistoryEntry, 0, len(m.history))
-	for _, h := range m.history {
-		out = append(out, h)
-	}
-	slices.SortFunc(out, func(a, b session.HistoryEntry) int { return a.Turn - b.Turn })
-	return out
+	turn := len(m.history)
+	m.history = append(m.history, apiview.HistoryEntry{
+		NodeID: turn, Turn: turn, Shanten: apiview.ShantenMap(m.analyze(tile.CountsOf(me.Hand))),
+	})
 }
 
 func result(res *game.Result) *Result {
@@ -193,14 +192,6 @@ func result(res *game.Result) *Result {
 		out.WinTile = &t
 		out.Yaku = w.Yaku
 		out.Han, out.Fu, out.Dora, out.UraDora = w.HanTotal, w.Fu, w.Dora, w.UraDora
-	}
-	return out
-}
-
-func doraKinds(indicators []tile.Tile) []string {
-	out := make([]string, len(indicators))
-	for i, ind := range indicators {
-		out[i] = tile.DoraFromIndicator(ind.Kind).String()
 	}
 	return out
 }
