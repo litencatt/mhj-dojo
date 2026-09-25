@@ -33,11 +33,11 @@ func TestHanchanProgression(t *testing.T) {
 			t.Fatalf("after %s: dealer %d number %d honba %d", res.Kind, h.Dealer(), h.Number(), h.Honba())
 		}
 	}
-	step(Result{Kind: "tsumo", Winner: 0, From: -1}, 0, 1, 1)                            // dealer win: renchan
-	step(Result{Kind: "draw", Winner: -1, From: -1, Tenpai: [4]bool{true}}, 0, 1, 2)     // dealer tenpai: renchan
-	step(Result{Kind: "abort", Reason: AbortSuufon, Winner: -1, From: -1}, 0, 1, 3)       // abortive draw: repeat
+	step(Result{Kind: "tsumo", Winner: 0, From: -1}, 0, 1, 1)                               // dealer win: renchan
+	step(Result{Kind: "draw", Winner: -1, From: -1, Tenpai: [4]bool{true}}, 0, 1, 2)        // dealer tenpai: renchan
+	step(Result{Kind: "abort", Reason: AbortSuufon, Winner: -1, From: -1}, 0, 1, 3)         // abortive draw: repeat
 	step(Result{Kind: "draw", Winner: -1, From: -1, Tenpai: [4]bool{false, true}}, 1, 2, 4) // dealer noten: moves, honba stays
-	step(Result{Kind: "ron", Winner: 2, From: 1}, 2, 3, 0)                                // non-dealer win: moves, honba 0
+	step(Result{Kind: "ron", Winner: 2, From: 1}, 2, 3, 0)                                  // non-dealer win: moves, honba 0
 	step(Result{Kind: "ron", Winner: 0, From: 2}, 3, 4, 0)
 	// East 4, the dealer loses: the East-only game ends
 	endRound(h, Result{Kind: "ron", Winner: 0, From: 3}, even)
