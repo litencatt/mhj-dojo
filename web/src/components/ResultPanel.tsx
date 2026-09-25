@@ -115,6 +115,11 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
               </tr>
             </tfoot>
           </table>
+          {result.pao.map((p) => (
+            <p key={p.yaku} class="result-pao">
+              包: {who(p.seat)}（{result.yaku.find((y) => y.key === p.yaku)?.name ?? p.yaku}）
+            </p>
+          ))}
         </>
       )}
       <table class="result-deltas">
