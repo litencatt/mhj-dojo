@@ -60,8 +60,9 @@ type Seat struct {
 // Meld is a called meld or a concealed kan.
 type Meld struct {
 	Type  string   `json:"type"`  // "chii", "pon", "kan" (open) or "ankan"
-	Tiles []string `json:"tiles"` // the called tile last
+	Tiles []string `json:"tiles"` // the called tile last; a kakan's added tile just before it
 	From  int      `json:"from"`  // the seat the tile came from; -1 for an ankan
+	Added bool     `json:"added"` // a kan made by adding a tile to a pon (kakan)
 }
 
 // RiverTile is a discard; riichi marks the declaration tile, called a tile
@@ -184,7 +185,7 @@ func (m *Match) state() State {
 			seat.River[i] = RiverTile{Tile: rt.Tile.String(), Riichi: rt.Riichi, Called: rt.Called}
 		}
 		for i, m := range sv.Melds {
-			seat.Melds[i] = Meld{Type: meldType(m), Tiles: tile.Strings(m.Tiles), From: m.From}
+			seat.Melds[i] = Meld{Type: meldType(m), Tiles: tile.Strings(m.Tiles), From: m.From, Added: m.Added}
 		}
 		if sv.Hand != nil {
 			seat.Hand = tile.Strings(sv.Hand)

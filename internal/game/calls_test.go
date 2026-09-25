@@ -149,7 +149,7 @@ func TestOpenKanAndRinshan(t *testing.T) {
 	mustApply(t, r, Action{Seat: 2, Type: Kan})
 	p := &r.players[2]
 	rin, _ := r.wall.Rinshan(0)
-	if r.kans != 1 || p.drawn == nil || *p.drawn != rin || !p.rinshan || !p.melds[0].Meld.Kan || len(p.melds[0].Tiles) != 4 {
+	if r.kans != 1 || p.drawn == nil || *p.drawn != rin || !p.rinshan || !p.melds[0].Meld.Kan || p.melds[0].Added || len(p.melds[0].Tiles) != 4 {
 		t.Fatalf("after kan: kans %d drawn %v melds %+v", r.kans, p.drawn, p.melds)
 	}
 	if r.DrawsLeft() != left-1 || len(r.ViewFor(0).DoraIndicators) != 2 {
@@ -208,7 +208,7 @@ func TestAddedKanCanBeRobbed(t *testing.T) {
 	mustApply(t, r, Action{Seat: 0, Type: Kan, Tile: "5p"})
 	mustApply(t, r, Action{Seat: 2, Type: Skip})
 	p := &r.players[0]
-	if r.Actor() != 0 || !p.melds[0].Meld.Kan || len(p.melds[0].Tiles) != 4 || !p.rinshan || !r.players[2].tempFuriten {
+	if r.Actor() != 0 || !p.melds[0].Meld.Kan || !p.melds[0].Added || len(p.melds[0].Tiles) != 4 || !p.rinshan || !r.players[2].tempFuriten {
 		t.Fatalf("after the kan: actor %d melds %+v", r.Actor(), p.melds)
 	}
 	if called := p.melds[0].Tiles[3]; called != (tile.Tile{Kind: tile.MakeKind(tile.Pin, 5)}) || p.melds[0].From != 2 {

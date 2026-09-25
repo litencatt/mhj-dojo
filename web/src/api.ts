@@ -160,8 +160,9 @@ export type MeldType = 'chii' | 'pon' | 'kan' | 'ankan'; // kan: an open or adde
 
 export interface Meld {
   type: MeldType;
-  tiles: Tile[]; // the called tile last
+  tiles: Tile[]; // the called tile last; a kakan's added tile just before it
   from: number; // the seat the called tile came from; -1 for an ankan
+  added: boolean; // a kan made by adding a tile to a pon (kakan)
 }
 
 export interface Seat {

@@ -276,6 +276,7 @@ func (r *Round) completeKakan(k *pendingKakan) {
 	p := &r.players[k.seat]
 	m := &p.melds[k.meld]
 	m.Meld.Kan = true
+	m.Added = true
 	// keep the called tile last: the added tile goes before it
 	n := len(m.Tiles)
 	m.Tiles = append(m.Tiles[:n-1:n-1], k.tile, m.Tiles[n-1])

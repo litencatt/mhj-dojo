@@ -98,11 +98,13 @@ type RiverTile struct {
 }
 
 // Called is a meld a seat has called (or an ankan): its shape, its tiles
-// and the seat the called tile came from (-1 for an ankan).
+// and the seat the called tile came from (-1 for an ankan). Added marks a
+// kan made by adding a tile to a pon (kakan).
 type Called struct {
 	Meld  yaku.Meld
 	Tiles []tile.Tile
 	From  int
+	Added bool
 }
 
 type player struct {
