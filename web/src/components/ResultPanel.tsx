@@ -1,6 +1,7 @@
 import type { GameResult, GameState, Limit, Points } from '../api';
 import { ABORT_NAMES, seatLabel, WIND_NAMES } from './GameTable';
 import { Tile } from './Tile';
+import { Melds } from './Melds';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -81,6 +82,7 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
             <span class="result-win-tile">
               <Tile tile={result.win_tile} label={`和了牌 ${result.win_tile}`} />
             </span>
+            <Melds melds={winner.melds} owner={winner.seat} size="sm" />
           </div>
           <table class="win-yaku-table">
             <tbody>

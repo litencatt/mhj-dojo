@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,8 @@ func nextMove(st match.State) string {
 		return `{"type":"tsumo"}`
 	case l.Ron:
 		return `{"type":"ron"}`
+	case l.Skip: // a pon or chii offer
+		return `{"type":"skip"}`
 	}
 	return `{"type":"discard","tile":"` + l.Discards[len(l.Discards)-1] + `"}`
 }
@@ -55,10 +58,11 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 		if len(st.Analysis) != 31 { // seat wind 西 differs from the round wind 東
 			t.Fatalf("analysis has %d rows", len(st.Analysis))
 		}
+		move := nextMove(st)
 		start := time.Now()
-		st, raw = c.game("POST", path+"/action", nextMove(st))
+		st, raw = c.game("POST", path+"/action", move)
 		took = append(took, time.Since(start))
-		if len(st.Events) == 0 {
+		if strings.Contains(move, "discard") && len(st.Events) == 0 {
 			t.Fatal("no events after a move")
 		}
 	}
@@ -109,7 +113,9 @@ func TestGameErrors(t *testing.T) {
 	st, _ := c.game("POST", "/api/games", `{"seed":4}`) // dealer 0: you move first
 	path := "/api/games/" + st.GameID + "/action"
 	c.wantError("GET", "/api/games/nope", "", http.StatusNotFound)
-	c.wantError("POST", path, `{"type":"pon"}`, http.StatusBadRequest)
+	c.wantError("POST", path, `{"type":"pass"}`, http.StatusBadRequest)
+	c.wantError("POST", path, `{"type":"pon"}`, http.StatusConflict)
+	c.wantError("POST", path, `{"type":"chii","tiles":["1m"]}`, http.StatusBadRequest)
 	c.wantError("POST", path, `{"type":"discard"}`, http.StatusBadRequest)
 	c.wantError("POST", path, `{"type":"discard","tile":"xx"}`, http.StatusBadRequest)
 	c.wantError("POST", path, `{"type":"ron"}`, http.StatusConflict)
@@ -211,4 +217,45 @@ func TestGameStartsWithCPUMoves(t *testing.T) {
 	if len(st.History) != 1 || st.History[0].Turn != 0 {
 		t.Fatalf("history %+v", st.History)
 	}
+}
+
+// The human calls pon over the API: the offer names the tile, the meld and
+// the called river tile show, and kuikae holds.
+func TestHumanPon(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	for seed := 0; seed < 300; seed++ {
+		st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+`}`)
+		path := "/api/games/" + st.GameID + "/action"
+		for st.Result == nil {
+			if !st.Legal.Pon {
+				st, _ = c.game("POST", path, nextMove(st))
+				continue
+			}
+			if st.LastDiscard == nil {
+				t.Fatal("pon offered without last_discard")
+			}
+			called := *st.LastDiscard
+			st, _ = c.game("POST", path, `{"type":"pon"}`)
+			me := st.Seats[0]
+			if len(me.Melds) != 1 || me.Melds[0].Type != "pon" || me.Melds[0].Tiles[2] != called {
+				t.Fatalf("seed %d: melds %+v", seed, me.Melds)
+			}
+			from := st.Seats[me.Melds[0].From]
+			if !from.River[len(from.River)-1].Called {
+				t.Fatalf("seed %d: the called tile is not marked", seed)
+			}
+			if slices.Contains(st.Legal.Discards, called) || len(st.Legal.Discards) == 0 || me.Drawn != nil {
+				t.Fatalf("seed %d: after the pon: legal %+v", seed, st.Legal)
+			}
+			last := st.Events[len(st.Events)-1]
+			if last.Type != "pon" || last.Seat != 0 || last.Tile != called {
+				t.Fatalf("seed %d: events %+v", seed, st.Events)
+			}
+			if len(st.Analysis) != 0 {
+				t.Fatalf("seed %d: closed-hand analysis after a call", seed)
+			}
+			return
+		}
+	}
+	t.Fatal("no seed offered the human a pon")
 }

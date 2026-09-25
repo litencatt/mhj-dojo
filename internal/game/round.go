@@ -45,7 +45,8 @@ const (
 	// PhaseDiscard waits for the seat to move (Turn) to discard, declare
 	// riichi or tsumo. That seat holds 14 tiles.
 	PhaseDiscard Phase = "discard"
-	// PhaseCall waits for a seat that can ron the last discard to ron or skip.
+	// PhaseCall waits for the seats that may claim the last discard (ron,
+	// pon, kan, chii), or rob an added kan (ron), to answer or skip.
 	PhaseCall Phase = "call"
 	// PhaseEnded means the round is over; see Result.
 	PhaseEnded Phase = "ended"
@@ -60,33 +61,44 @@ const (
 	Riichi  ActionType = "riichi" // declare riichi and discard Tile
 	Tsumo   ActionType = "tsumo"
 	Ron     ActionType = "ron"
-	Skip    ActionType = "skip"    // pass on a ron
+	Skip    ActionType = "skip"    // pass on a claim
 	Kyuushu ActionType = "kyuushu" // declare nine different terminals and honors: an abortive draw
+	Pon     ActionType = "pon"     // claim the discard with two tiles of its kind
+	Chii    ActionType = "chii"    // claim the left seat's discard with the two Tiles
+	// Kan is a claimed open kan (daiminkan) in the call phase, or on the
+	// seat's own turn a concealed kan (ankan) or an added kan (kakan) of
+	// the kind of Tile.
+	Kan ActionType = "kan"
 )
 
 // Abortive draw reasons (Result.Reason when Kind is "abort").
 const (
-	AbortKyuushu = "kyuushu" // 九種九牌
-	AbortSuufon  = "suufon"  // 四風連打
-	AbortSuucha  = "suucha"  // 四家立直
+	AbortKyuushu = "kyuushu"   // 九種九牌
+	AbortSuufon  = "suufon"    // 四風連打
+	AbortSuucha  = "suucha"    // 四家立直
+	AbortKans    = "suukaikan" // 四開槓: four kans by more than one seat
 )
 
-// Action is one move by a seat. Tile is set for Discard and Riichi.
+// Action is one move by a seat. Tile is set for Discard, Riichi and Kan
+// (the kind), Tiles for Chii (the two concealed tiles) and optionally Pon.
 type Action struct {
-	Seat int        `json:"seat"`
-	Type ActionType `json:"type"`
-	Tile string     `json:"tile,omitempty"`
+	Seat  int        `json:"seat"`
+	Type  ActionType `json:"type"`
+	Tile  string     `json:"tile,omitempty"`
+	Tiles []string   `json:"tiles,omitempty"`
 }
 
-// RiverTile is a discarded tile; Riichi marks the declaration tile.
+// RiverTile is a discarded tile. Riichi marks the declaration tile, Called
+// a tile another seat claimed into a meld (it stays in the river for
+// furiten, but counts once, in the meld).
 type RiverTile struct {
 	Tile   tile.Tile
 	Riichi bool
+	Called bool
 }
 
 // Called is a meld a seat has called (or an ankan): its shape, its tiles
-// and the seat the called tile came from (-1 for an ankan). Phase 2a has no
-// calls; the engine already scores and counts them.
+// and the seat the called tile came from (-1 for an ankan).
 type Called struct {
 	Meld  yaku.Meld
 	Tiles []tile.Tile
@@ -102,9 +114,13 @@ type player struct {
 
 	riichi, doubleRiichi bool
 	ippatsu              bool
-	// tempFuriten: passed a winning tile since this seat's last draw.
+	// tempFuriten: passed a winning tile since this seat's last turn.
 	// riichiFuriten: passed a winning tile after riichi (lasts the round).
 	tempFuriten, riichiFuriten bool
+	// kuikae are the kinds the seat may not discard right after a call.
+	kuikae []tile.Kind
+	// rinshan: the drawn tile is a kan replacement (rinshan kaihou, not haitei).
+	rinshan bool
 }
 
 // Result describes how the round ended.
@@ -156,12 +172,16 @@ type Round struct {
 	honba     int
 	start     [4]int // points at the start of the round
 
-	// The last discard and who may still ron it (in head-bump order).
+	// The last discard (or the tile added to a kan) and the claims on it,
+	// in turn order from the discarder.
 	lastDiscard   tile.Tile
-	callers       []int
-	pendingRiichi bool // the last discard declared riichi, not yet accepted
+	claims        []claim
+	robbing       *pendingKakan // claims on an added kan: ron only (chankan)
+	pendingRiichi bool          // the last discard declared riichi, not yet accepted
+	kanSeats      []int         // who made each kan (四開槓)
 
-	log    []Action
+	log    []Action // every applied action, for replay
+	events []Action // the moves that happened, without skips and unused claims
 	result *Result
 }
 
@@ -205,8 +225,14 @@ func (r *Round) Phase() Phase { return r.phase }
 // Result returns the outcome once the round has ended, else nil.
 func (r *Round) Result() *Result { return r.result }
 
-// Log returns every applied action in order.
+// Log returns every applied action in order, including the answers to
+// claims (for replay).
 func (r *Round) Log() []Action { return slices.Clone(r.log) }
+
+// Events returns the moves that happened, in order: discards, riichi,
+// executed calls, wins and declarations. Skips and claims that lost to a
+// higher one are left out, so they reveal nothing about hidden hands.
+func (r *Round) Events() []Action { return slices.Clone(r.events) }
 
 // SeatWind returns seat's wind: the dealer is East.
 func (r *Round) SeatWind(seat int) tile.Kind {
@@ -234,7 +260,11 @@ func (r *Round) Actor() int {
 	case PhaseDiscard:
 		return r.turn
 	case PhaseCall:
-		return r.callers[0]
+		for _, c := range r.claims {
+			if c.answer == nil {
+				return c.seat
+			}
+		}
 	}
 	return -1
 }
@@ -247,7 +277,13 @@ func (r *Round) draw(seat int) {
 	r.draws++
 	p := &r.players[seat]
 	p.drawn = &t
-	p.tempFuriten = false
+	p.rinshan = false
+	r.startTurn(seat)
+}
+
+// startTurn gives seat the turn: its same go-around furiten ends.
+func (r *Round) startTurn(seat int) {
+	r.players[seat].tempFuriten = false
 	r.turn = seat
 	r.phase = PhaseDiscard
 }
@@ -265,19 +301,35 @@ func (r *Round) Apply(a Action) error {
 	var err error
 	switch {
 	case r.phase == PhaseDiscard && (a.Type == Discard || a.Type == Riichi):
-		err = r.discard(a.Seat, a.Tile, a.Type == Riichi)
+		r.log = append(r.log, a) // logged first: the discard opens the claims
+		if err = r.discard(a.Seat, a.Tile, a.Type == Riichi); err != nil {
+			r.log = r.log[:len(r.log)-1]
+		}
+		return err
 	case r.phase == PhaseDiscard && a.Type == Tsumo:
-		err = r.tsumo(a.Seat)
+		r.events = append(r.events, a)
+		if err = r.tsumo(a.Seat); err != nil {
+			r.events = r.events[:len(r.events)-1]
+		}
+	case r.phase == PhaseDiscard && a.Type == Kan:
+		r.log = append(r.log, a)
+		if err = r.selfKan(a.Seat, a.Tile); err != nil {
+			r.log = r.log[:len(r.log)-1]
+		}
+		return err
 	case r.phase == PhaseDiscard && a.Type == Kyuushu:
 		if !r.canKyuushu(a.Seat) {
 			err = fmt.Errorf("%w: kyuushu needs the first uninterrupted turn and nine different terminals and honors", ErrConflict)
 			break
 		}
+		r.events = append(r.events, a)
 		r.finish(&Result{Kind: "abort", Reason: AbortKyuushu, Winner: -1, From: -1})
-	case r.phase == PhaseCall && a.Type == Ron:
-		err = r.ron(a.Seat)
-	case r.phase == PhaseCall && a.Type == Skip:
-		r.skip(a.Seat)
+	case r.phase == PhaseCall:
+		r.log = append(r.log, a)
+		if err = r.answer(a); err != nil {
+			r.log = r.log[:len(r.log)-1]
+		}
+		return err
 	default:
 		err = fmt.Errorf("%w: %s during %s", ErrConflict, a.Type, r.phase)
 	}
@@ -310,6 +362,9 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 			return fmt.Errorf("%w: after riichi only the drawn tile can be discarded", ErrConflict)
 		}
 	}
+	if slices.Contains(p.kuikae, tiles[idx].Kind) {
+		return fmt.Errorf("%w: %s may not be discarded right after the call (kuikae)", ErrConflict, s)
+	}
 	if declare && !slices.Contains(r.riichiDiscards(seat), s) {
 		return fmt.Errorf("%w: riichi is not allowed discarding %s", ErrConflict, s)
 	}
@@ -318,31 +373,22 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	p.hand = slices.Delete(tiles, idx, idx+1)
 	tile.Sort(p.hand)
 	p.drawn = nil
+	p.rinshan = false
+	p.kuikae = nil
 	p.ippatsu = false // a discard after the declaration ends ippatsu
 	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare})
+	kind := Discard
+	if declare {
+		kind = Riichi
+	}
+	r.events = append(r.events, Action{Seat: seat, Type: kind, Tile: s})
 	if declare {
 		// Accepted once the discard passes without a ron.
 		p.doubleRiichi = first
 	}
 	r.pendingRiichi = declare
 	r.lastDiscard = t
-	r.callers = nil
-	for i := 1; i < 4; i++ {
-		o := (seat + i) % 4
-		if !slices.Contains(r.waits(o), t.Kind) {
-			continue
-		}
-		if r.canRon(o) {
-			r.callers = append(r.callers, o)
-		} else {
-			r.passed(o)
-		}
-	}
-	if len(r.callers) > 0 {
-		r.phase = PhaseCall
-		return nil
-	}
-	r.afterDiscard()
+	r.openClaims(seat, false)
 	return nil
 }
 
@@ -355,17 +401,24 @@ func (r *Round) passed(seat int) {
 	}
 }
 
-// afterDiscard runs once nobody rons the last discard.
-func (r *Round) afterDiscard() {
-	if r.pendingRiichi {
-		p := &r.players[r.turn]
-		p.riichi = true
-		p.ippatsu = true
-		p.points -= RiichiStick
-		r.deposit += RiichiStick
-		r.pendingRiichi = false
+// acceptRiichi accepts a riichi declared on the last discard, once nobody
+// rons it: the stick goes on the table.
+func (r *Round) acceptRiichi() {
+	if !r.pendingRiichi {
+		return
 	}
-	r.callers = nil
+	p := &r.players[r.turn]
+	p.riichi = true
+	p.ippatsu = true
+	p.points -= RiichiStick
+	r.deposit += RiichiStick
+	r.pendingRiichi = false
+}
+
+// afterDiscard runs once nobody claims the last discard.
+func (r *Round) afterDiscard() {
+	r.acceptRiichi()
+	r.claims = nil
 	if reason := r.abortAfterDiscard(); reason != "" {
 		r.finish(&Result{Kind: "abort", Reason: reason, Winner: -1, From: -1})
 		return
@@ -377,26 +430,21 @@ func (r *Round) afterDiscard() {
 	r.draw((r.turn + 1) % 4)
 }
 
-func (r *Round) skip(seat int) {
-	r.passed(seat)
-	r.callers = r.callers[1:]
-	if len(r.callers) == 0 {
-		r.afterDiscard()
-	}
-}
-
 // ctx is the win context for seat winning on win.
 func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 	p := &r.players[seat]
 	last := r.DrawsLeft() == 0
+	chankan := ron && r.robbing != nil
 	return yaku.Context{
 		WinTile:        win,
 		Ron:            ron,
 		Riichi:         p.riichi && !p.doubleRiichi,
 		DoubleRiichi:   p.riichi && p.doubleRiichi,
 		Ippatsu:        p.ippatsu,
-		Haitei:         !ron && last,
-		Houtei:         ron && last,
+		Haitei:         !ron && last && !p.rinshan,
+		Houtei:         ron && last && !chankan,
+		Rinshan:        !ron && p.rinshan,
+		Chankan:        chankan,
 		Winds:          r.Winds(seat),
 		DoraIndicators: r.doraIndicators(),
 		UraIndicators:  r.uraIndicators(),
@@ -461,7 +509,7 @@ func (r *Round) furiten(seat int) bool {
 		return true
 	}
 	for _, w := range r.waits(seat) {
-		if slices.ContainsFunc(p.river, func(rt RiverTile) bool { return rt.Tile.Kind == w }) {
+		if slices.ContainsFunc(p.river, func(rt RiverTile) bool { return rt.Tile.Kind == w }) { // called tiles count too
 			return true
 		}
 	}
@@ -563,6 +611,7 @@ func (r *Round) ron(seat int) error {
 		r.players[r.turn].doubleRiichi = false
 		r.pendingRiichi = false
 	}
+	r.events = append(r.events, Action{Seat: seat, Type: Ron})
 	pts := score.FromWin(w, seat == r.dealer, false)
 	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard}
 	res.HandDeltas[r.turn] -= pts.Ron
@@ -603,7 +652,7 @@ func (r *Round) finish(res *Result) {
 		res.Deltas[s] = res.HandDeltas[s] + res.HonbaDeltas[s] + res.StickDeltas[s]
 		r.players[s].points = r.start[s] + res.Deltas[s]
 	}
-	r.callers = nil
+	r.claims = nil
 	r.result = res
 	r.phase = PhaseEnded
 }
@@ -655,6 +704,8 @@ func (r *Round) abortAfterDiscard() string {
 		return AbortSuucha
 	case sameWind:
 		return AbortSuufon
+	case len(r.kanSeats) == wall.MaxKans && slices.ContainsFunc(r.kanSeats, func(s int) bool { return s != r.kanSeats[0] }):
+		return AbortKans
 	}
 	return ""
 }

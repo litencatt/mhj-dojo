@@ -76,10 +76,10 @@ func (g *Game) Act(a Action) error {
 	return nil
 }
 
-// Events returns the actions applied since index from (use the previous
-// length to get only the new ones).
+// Events returns the round's moves since index from (use the previous
+// length of Round.Events to get only the new ones).
 func (g *Game) Events(from int) []Action {
-	log := g.Round.Log()
+	log := g.Round.Events()
 	if from < 0 || from > len(log) {
 		from = len(log)
 	}
@@ -97,7 +97,7 @@ func (g *Game) run() {
 		}
 		legal := r.LegalFor(seat)
 		if seat == g.Human {
-			if !r.players[seat].riichi || legal.Tsumo || r.phase != PhaseDiscard {
+			if !r.players[seat].riichi || legal.Tsumo || len(legal.Kan) > 0 || r.phase != PhaseDiscard {
 				return
 			}
 			g.mustApply(Action{Seat: seat, Type: Discard, Tile: legal.Discards[0]})

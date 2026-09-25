@@ -199,7 +199,7 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 func TestGameReplaysWithCPU(t *testing.T) {
 	for seed := int64(0); seed < 30; seed++ {
 		a, b := playGame(t, seed), playGame(t, seed)
-		if !slices.Equal(a.Round.Log(), b.Round.Log()) {
+		if !reflect.DeepEqual(a.Round.Log(), b.Round.Log()) {
 			t.Fatalf("seed %d: logs differ", seed)
 		}
 		r := game.New(seed)
@@ -327,4 +327,77 @@ func TestKyuushu(t *testing.T) {
 	if a := New().Decide(v, l); a.Type == game.Kyuushu {
 		t.Fatal("declared kyuushu on a kokushi tenpai-level hand")
 	}
+}
+
+// callView is seat 0 facing a discard of s from seat 3 in the call phase.
+func callView(hand, s string) game.View {
+	var v game.View
+	for i := range v.Seats {
+		v.Seats[i].Seat = i
+		v.Seats[i].Wind = tile.East + tile.Kind(i)
+	}
+	v.RoundWind = tile.East
+	v.Seats[0].Hand = tile.MustParseHand(hand)
+	d, _ := tile.Parse(s)
+	v.LastDiscard = &d
+	return v
+}
+
+func TestCallDecisions(t *testing.T) {
+	cases := []struct {
+		name, hand, discard string
+		legal               game.Legal
+		want                game.ActionType
+	}{
+		// a value pon (白) that does not set the hand back
+		{"value pon", "5z5z123m456p78s19m", "5z", game.Legal{Pon: true, Skip: true}, game.Pon},
+		// a pon with no yaku left (terminals everywhere): skip
+		{"no yaku", "1m1m9m9p1s3z4z567p78s", "1m", game.Legal{Pon: true, Skip: true}, game.Skip},
+		// tanyao chii that brings the hand closer: 34m + 5m, simples only
+		{"tanyao chii", "34m678m456p2233s8s", "5m", game.Legal{Chii: [][]string{{"3m", "4m"}}, Skip: true}, game.Chii},
+		// a chii that does not help: skip
+		{"useless chii", "34m5m678m456p223s8s", "2m", game.Legal{Chii: [][]string{{"3m", "4m"}}, Skip: true}, game.Skip},
+	}
+	for _, tc := range cases {
+		v := callView(tc.hand, tc.discard)
+		if a := New().Decide(v, tc.legal); a.Type != tc.want {
+			t.Errorf("%s: got %+v, want %s", tc.name, a, tc.want)
+		}
+	}
+	// folding against a riichi: no call even on a value tile
+	v := callView("5z5z147m258p369s1z", "5z")
+	v.Seats[1].Riichi = true
+	if a := New().Decide(v, game.Legal{Pon: true, Skip: true}); a.Type != game.Skip {
+		t.Errorf("called while folding: %+v", a)
+	}
+}
+
+// Whole rounds with four CPU players now include calls and wins on open
+// hands, with every move legal.
+func TestSelfPlayCalls(t *testing.T) {
+	p := New()
+	calls, openWins := 0, 0
+	for seed := int64(0); seed < 150; seed++ {
+		r := game.New(seed)
+		for r.Actor() >= 0 {
+			seat := r.Actor()
+			a := p.Decide(r.ViewFor(seat), r.LegalFor(seat))
+			a.Seat = seat
+			if err := r.Apply(a); err != nil {
+				t.Fatalf("seed %d: %+v: %v", seed, a, err)
+			}
+		}
+		for _, e := range r.Events() {
+			if e.Type == game.Pon || e.Type == game.Chii || e.Type == game.Kan {
+				calls++
+			}
+		}
+		if res := r.Result(); res.Winner >= 0 && len(r.ViewFor(res.Winner).Seats[res.Winner].Melds) > 0 {
+			openWins++
+		}
+	}
+	if calls == 0 || openWins == 0 {
+		t.Fatalf("%d calls, %d open wins", calls, openWins)
+	}
+	t.Logf("%d calls, %d wins with melds in 150 rounds", calls, openWins)
 }

@@ -100,3 +100,28 @@ func TestCompleteWithMelds(t *testing.T) {
 		t.Error("seven pairs with a meld")
 	}
 }
+
+func TestKanAndReplacementYaku(t *testing.T) {
+	cases := []struct {
+		name, hand, win string
+		melds           []Meld
+		ctx             Context
+		keys            string
+	}{
+		{"rinshan", "234m567m34s66s5s", "5s", []Meld{minkan("8p")}, Context{Rinshan: true}, "rinshan,tanyao"},
+		{"rinshan is tsumo only", "234m567m34s66s5s", "5s", []Meld{minkan("8p")}, Context{Ron: true, Rinshan: true}, "tanyao"},
+		{"chankan", "234m567m34s66s5s", "5s", []Meld{pon("8p")}, Context{Ron: true, Chankan: true}, "chankan,tanyao"},
+		{"sankantsu", "234m5s5s", "5s", []Meld{ankan("8p"), minkan("2s"), minkan("7m")}, Context{Ron: true}, "tanyao,sankantsu"},
+		{"suukantsu", "5s5s", "5s", []Meld{ankan("8p"), minkan("2s"), minkan("7m"), minkan("1z")}, Context{Ron: true}, "suukantsu"},
+	}
+	for _, tc := range cases {
+		ctx := tc.ctx
+		ctx.Winds = EastEast
+		ctx.WinTile = kind(tc.win)
+		ctx.Melds = tc.melds
+		w, ok := Evaluate(tile.MustParseHand(tc.hand), ctx)
+		if !ok || keys(w) != tc.keys {
+			t.Errorf("%s: got [%s] ok=%v, want [%s]", tc.name, keys(w), ok, tc.keys)
+		}
+	}
+}

@@ -80,13 +80,19 @@ func checkInvariants(t *testing.T, r *Round) {
 	}
 	tiles := 0
 	for _, p := range r.players {
-		tiles += len(p.hand) + len(p.river) + len(p.meldTiles())
+		tiles += len(p.hand) + len(p.meldTiles())
+		for _, rt := range p.river {
+			if !rt.Called { // a called tile is counted in the meld
+				tiles++
+			}
+		}
 		if p.drawn != nil {
 			tiles++
 		}
 	}
-	if tiles != 4*wall.HandSize+r.draws {
-		t.Fatalf("tiles in hands and rivers = %d, want %d", tiles, 4*wall.HandSize+r.draws)
+	// the deal, the live draws and one replacement tile per kan
+	if want := 4*wall.HandSize + r.draws + r.kans; tiles != want {
+		t.Fatalf("tiles in hands, melds and rivers = %d, want %d", tiles, want)
 	}
 }
 
@@ -256,6 +262,9 @@ func TestFuriten(t *testing.T) {
 		t.Fatal("ron offered in the same go-around after passing")
 	}
 	mustApply(t, r, Action{Seat: 3, Type: Discard, Tile: r.LegalFor(3).Discards[0]})
+	if r.Phase() == PhaseCall { // seat 0 may chii seat 3's discard: decline
+		mustApply(t, r, Action{Seat: 0, Type: Skip})
+	}
 	if r.players[0].tempFuriten {
 		t.Fatal("same go-around furiten survived the next draw")
 	}
@@ -282,8 +291,12 @@ func TestHeadBump(t *testing.T) {
 	setHand(r, 2, "123m456m789m234p5z", "")
 	setHand(r, 3, "123p456p789p234s5z", "")
 	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
-	if !slices.Equal(r.callers, []int{2, 3}) {
-		t.Fatalf("callers = %v, want [2 3]", r.callers)
+	var seats []int
+	for _, c := range r.claims {
+		seats = append(seats, c.seat)
+	}
+	if !slices.Equal(seats, []int{2, 3}) {
+		t.Fatalf("claims from %v, want [2 3]", seats)
 	}
 	if err := r.Apply(Action{Seat: 3, Type: Ron}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("seat 3 ron before seat 2 decided: %v", err)

@@ -36,7 +36,10 @@ type View struct {
 	UraIndicators []tile.Tile
 	Seats         [4]SeatView
 	LastDiscard   *tile.Tile // set during PhaseCall
-	Result        *Result
+	// Robbing is set while a tile added to a kan waits to be robbed; it is
+	// LastDiscard, shown to everyone but in no river or meld yet.
+	Robbing bool
+	Result  *Result
 }
 
 // ViewFor returns what viewer may see.
@@ -60,6 +63,7 @@ func (r *Round) ViewFor(viewer int) View {
 	if r.phase == PhaseCall {
 		d := r.lastDiscard
 		v.LastDiscard = &d
+		v.Robbing = r.robbing != nil
 	}
 	for s := range r.players {
 		p := &r.players[s]
@@ -106,6 +110,13 @@ type Legal struct {
 	Ron      bool     `json:"ron"`
 	Skip     bool     `json:"skip"`
 	Kyuushu  bool     `json:"kyuushu"` // may declare 九種九牌
+	// Calls on the last discard (call phase): pon, an open kan, and the
+	// concealed pairs a chii can use.
+	Pon  bool       `json:"pon"`
+	Chii [][]string `json:"chii"`
+	// Kan lists the kinds of a kan: in the call phase the discard's kind
+	// (open kan); on the seat's turn a concealed or added kan.
+	Kan []string `json:"kan"`
 }
 
 // Any reports whether seat has any move.
@@ -113,12 +124,19 @@ func (l Legal) Any() bool { return len(l.Discards) > 0 || l.Tsumo || l.Ron || l.
 
 // LegalFor returns seat's legal moves; empty unless seat is the actor.
 func (r *Round) LegalFor(seat int) Legal {
-	l := Legal{Discards: []string{}, Riichi: []string{}}
+	l := Legal{Discards: []string{}, Riichi: []string{}, Chii: [][]string{}, Kan: []string{}}
 	if seat != r.Actor() {
 		return l
 	}
 	if r.phase == PhaseCall {
-		l.Ron, l.Skip = true, true
+		c := r.claims[slices.IndexFunc(r.claims, func(c claim) bool { return c.seat == seat })]
+		l.Ron, l.Pon, l.Skip = c.ron, c.pon, true
+		for _, pair := range c.chii {
+			l.Chii = append(l.Chii, tile.Strings(pair[:]))
+		}
+		if c.minkan {
+			l.Kan = append(l.Kan, r.lastDiscard.Kind.String())
+		}
 		return l
 	}
 	p := &r.players[seat]
@@ -126,7 +144,7 @@ func (r *Round) LegalFor(seat int) Legal {
 		l.Discards = append(l.Discards, p.drawn.String())
 	} else {
 		for _, t := range p.concealed() {
-			if !slices.Contains(l.Discards, t.String()) {
+			if !slices.Contains(l.Discards, t.String()) && !slices.Contains(p.kuikae, t.Kind) {
 				l.Discards = append(l.Discards, t.String())
 			}
 		}
@@ -134,6 +152,7 @@ func (r *Round) LegalFor(seat int) Legal {
 	}
 	_, l.Tsumo = r.tsumoWin(seat)
 	l.Kyuushu = r.canKyuushu(seat)
+	l.Kan = append(l.Kan, r.selfKans(seat)...)
 	return l
 }
 
@@ -149,7 +168,9 @@ func (v View) Visible() tile.Counts {
 	}
 	for _, s := range v.Seats {
 		for _, rt := range s.River {
-			c[rt.Tile.Kind]++
+			if !rt.Called { // a called tile is counted in the meld
+				c[rt.Tile.Kind]++
+			}
 		}
 		for _, m := range s.Melds {
 			for _, t := range m.Tiles {
@@ -159,6 +180,9 @@ func (v View) Visible() tile.Counts {
 	}
 	for _, d := range v.DoraIndicators {
 		c[d.Kind]++
+	}
+	if v.Robbing {
+		c[v.LastDiscard.Kind]++
 	}
 	return c
 }

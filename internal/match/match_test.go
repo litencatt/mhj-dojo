@@ -18,6 +18,8 @@ func move(st State, riichi *bool) game.Action {
 		return game.Action{Type: game.Ron}
 	case l.Tsumo:
 		return game.Action{Type: game.Tsumo}
+	case l.Skip: // a pon or chii offer
+		return game.Action{Type: game.Skip}
 	case !*riichi && len(l.Riichi) > 0:
 		*riichi = true
 		return game.Action{Type: game.Riichi, Tile: l.Riichi[0]}
