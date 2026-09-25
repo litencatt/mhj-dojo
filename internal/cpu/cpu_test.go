@@ -92,6 +92,41 @@ func TestFoldsAgainstRiichi(t *testing.T) {
 	}
 }
 
+// The weak player still wins and declares riichi, but skips every call
+// offer and never declares a kan.
+func TestWeakPlayer(t *testing.T) {
+	v := view("123m456m789m23p55s", "1p")
+	if a := NewWeak().Decide(v, game.Legal{Tsumo: true, Discards: []string{"1p"}}); a.Type != game.Tsumo {
+		t.Errorf("tsumo: got %+v", a)
+	}
+	if a := NewWeak().Decide(v, game.Legal{Ron: true, Skip: true}); a.Type != game.Ron {
+		t.Errorf("ron: got %+v", a)
+	}
+	v = view("123m456m789m23p55s", "1z")
+	l := legal(v)
+	l.Riichi = []string{"1z"}
+	if a := NewWeak().Decide(v, l); a.Type != game.Riichi || a.Tile != "1z" {
+		t.Errorf("tenpai: got %+v, want riichi 1z", a)
+	}
+	// Pon of a dragon, which the normal player takes.
+	v = view("123m456m78p5s77z", "1z")
+	v.Seats[0].Drawn = nil
+	d, _ := tile.Parse("7z")
+	v.LastDiscard = &d
+	if a := New().Decide(v, game.Legal{Skip: true, Pon: true}); a.Type != game.Pon {
+		t.Fatalf("normal: got %+v, want pon", a)
+	}
+	if a := NewWeak().Decide(v, game.Legal{Skip: true, Pon: true}); a.Type != game.Skip {
+		t.Errorf("weak: got %+v, want skip", a)
+	}
+	v = view("1111m456m789m23p5s", "1z")
+	l = legal(v)
+	l.Kan = []string{"1m"}
+	if a := NewWeak().Decide(v, l); a.Type == game.Kan {
+		t.Errorf("weak declared a kan: %+v", a)
+	}
+}
+
 func TestKeepsRedFive(t *testing.T) {
 	// Discarding 0p or 5p leaves the same counts, so only the red-five
 	// tiebreak orders them: the red five is dora and is kept.
@@ -275,46 +310,133 @@ func TestHanchanSelfPlay(t *testing.T) {
 				if seed%4 == 3 {
 					rules = game.HanchanRule
 				}
-				h := game.NewHanchan(seed, rules)
-				for rounds := 1; ; rounds++ {
-					if rounds > 60 {
-						t.Fatalf("seed %d: game does not end", seed)
-					}
-					r := h.Round()
-					for steps := 0; r.Actor() >= 0; steps++ {
-						if steps > 1000 {
-							t.Fatalf("seed %d: round does not end", seed)
-						}
-						seat := r.Actor()
-						a := p.Decide(r.ViewFor(seat), r.LegalFor(seat))
-						a.Seat = seat
-						if err := r.Apply(a); err != nil {
-							t.Fatalf("seed %d: illegal CPU move %+v: %v", seed, a, err)
-						}
-					}
-					sum := r.Result().Deposit
-					for _, s := range r.ViewFor(0).Seats {
-						sum += s.Points
-					}
-					if sum != 100000 {
-						t.Fatalf("seed %d round %d: points + sticks = %d", seed, rounds, sum)
-					}
-					if h.Over() {
-						break
-					}
-					if err := h.Next(); err != nil {
-						t.Fatal(err)
-					}
-				}
-				total := 0.0
-				for _, st := range h.Standings() {
-					total += st.Score
-				}
-				if total < -0.5 || total > 0.5 {
-					t.Fatalf("seed %d: scores add up to %v", seed, total)
-				}
+				playHanchan(t, game.NewHanchan(seed, rules), [4]*Player{p, p, p, p})
 			}
 		})
+	}
+}
+
+// playHanchan plays h to the end with a player per seat, checking that
+// every move is legal, points plus sticks stay at 100000 after each round,
+// the game ends and the scores add up to zero.
+func playHanchan(t *testing.T, h *game.Hanchan, players [4]*Player) {
+	t.Helper()
+	seed := h.Seed()
+	for rounds := 1; ; rounds++ {
+		if rounds > 60 {
+			t.Fatalf("seed %d: game does not end", seed)
+		}
+		r := h.Round()
+		for steps := 0; r.Actor() >= 0; steps++ {
+			if steps > 1000 {
+				t.Fatalf("seed %d: round does not end", seed)
+			}
+			seat := r.Actor()
+			a := players[seat].Decide(r.ViewFor(seat), r.LegalFor(seat))
+			a.Seat = seat
+			if err := r.Apply(a); err != nil {
+				t.Fatalf("seed %d: illegal CPU move %+v: %v", seed, a, err)
+			}
+		}
+		sum := r.Result().Deposit
+		for _, s := range r.ViewFor(0).Seats {
+			sum += s.Points
+		}
+		if sum != 100000 {
+			t.Fatalf("seed %d round %d: points + sticks = %d", seed, rounds, sum)
+		}
+		if h.Over() {
+			break
+		}
+		if err := h.Next(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	total := 0.0
+	for _, st := range h.Standings() {
+		total += st.Score
+	}
+	if total < -0.5 || total > 0.5 {
+		t.Fatalf("seed %d: scores add up to %v", seed, total)
+	}
+}
+
+// Whole games with four weak players: the same checks as above, the weak
+// player never calls, and a game played twice from the same seed gives the
+// same logs, which replay onto a fresh game.
+func TestWeakSelfPlay(t *testing.T) {
+	n := int64(12)
+	if testing.Short() {
+		n = 4
+	}
+	rounds := 0
+	for seed := range n {
+		var logs [2][][]game.Action
+		for i := range logs {
+			h := game.NewHanchanFrom(seed, game.Tonpuu, int(seed%4))
+			w := NewWeak()
+			playHanchan(t, h, [4]*Player{w, w, w, w})
+			logs[i] = h.Logs()
+		}
+		if !reflect.DeepEqual(logs[0], logs[1]) {
+			t.Fatalf("seed %d: logs differ", seed)
+		}
+		rounds += len(logs[0])
+		again := game.NewHanchanFrom(seed, game.Tonpuu, int(seed%4))
+		for i, log := range logs[0] {
+			for _, a := range log {
+				switch a.Type {
+				case game.Pon, game.Chii, game.Kan:
+					t.Fatalf("seed %d: the weak player made a call %+v", seed, a)
+				}
+				if err := again.Round().Apply(a); err != nil {
+					t.Fatalf("seed %d: replay %+v: %v", seed, a, err)
+				}
+			}
+			if i < len(logs[0])-1 {
+				if err := again.Next(); err != nil {
+					t.Fatalf("seed %d: replay next: %v", seed, err)
+				}
+			}
+		}
+		if !again.Over() {
+			t.Fatalf("seed %d: the replay did not end", seed)
+		}
+	}
+	t.Logf("%d rounds", rounds)
+}
+
+// The weak player loses to the normal one: at a table of two of each
+// (seats swapped every other game), the normal players win more rounds and
+// finish with more points.
+func TestWeakPlaysWorse(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays many games; run without -short")
+	}
+	var wins, points [2]int // index 0 normal, 1 weak
+	for seed := range int64(40) {
+		normal, weak := New(), NewWeak()
+		players := [4]*Player{normal, weak, normal, weak}
+		if seed%2 == 1 {
+			players = [4]*Player{weak, normal, weak, normal}
+		}
+		h := game.NewHanchan(seed, game.Tonpuu)
+		playHanchan(t, h, players)
+		level := func(s int) int { return b2i(players[s] == weak) }
+		for _, log := range h.Logs() {
+			for _, a := range log {
+				if a.Type == game.Tsumo || a.Type == game.Ron {
+					wins[level(a.Seat)]++
+				}
+			}
+		}
+		for s, st := range h.Standings() {
+			points[level(s)] += st.Points
+		}
+	}
+	t.Logf("wins normal %d weak %d, points normal %d weak %d", wins[0], wins[1], points[0], points[1])
+	if wins[0] < wins[1]*5/4 || points[0] <= points[1] {
+		t.Errorf("the weak player is not weaker: wins %v, points %v", wins, points)
 	}
 }
 
