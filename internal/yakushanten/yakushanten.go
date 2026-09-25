@@ -335,6 +335,10 @@ type Analyzer struct {
 	winds  Winds
 	rows   []RowDef
 	pinfuT []shanten.Target
+	// melds and meldTargets cache each row's targets for the last melds
+	// AnalyzeWith saw: every discard candidate of a turn shares them.
+	melds       []yaku.Meld
+	meldTargets map[string][]shanten.Target
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -403,11 +407,20 @@ func (a *Analyzer) AnalyzeWith(c tile.Counts, melds []yaku.Meld) []Result {
 	for _, m := range melds {
 		addMeld(&full, m)
 	}
+	if a.meldTargets == nil || !slices.Equal(a.melds, melds) {
+		a.melds = slices.Clone(melds)
+		a.meldTargets = map[string][]shanten.Target{}
+		for _, row := range a.rows {
+			if !needNoMelds[row.Key] && (!open || !needClosed[row.Key]) {
+				a.meldTargets[row.Key] = withMelds(targets[row.Key], melds)
+			}
+		}
+	}
 	out := make([]Result, 0, len(a.rows))
 	for _, row := range a.rows {
 		var r Result
-		if !needNoMelds[row.Key] && (!open || !needClosed[row.Key]) {
-			r = a.target(full, withMelds(targets[row.Key], melds))
+		if ts, ok := a.meldTargets[row.Key]; ok {
+			r = a.target(full, ts)
 		}
 		r.Key, r.Name, r.Yakuman = row.Key, row.Name, row.Yakuman
 		out = append(out, r)
