@@ -30,7 +30,7 @@ export default defineConfig({
     command: `go run ./cmd/mhj2 --port ${PORT} --host 127.0.0.1 --open=false`,
     cwd: path.resolve(__dirname, '..'),
     url: BASE_URL,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: 'pipe',
     stderr: 'pipe',
