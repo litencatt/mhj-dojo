@@ -476,10 +476,18 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
     cache was pruned just recomputes it, from the still-memoized suit
     tables, if it's revisited.
 
-  Result: ~2.5 MiB per maximally branched session (a 34x cut), 256 sessions
-  ≈ 634 MiB — most of what's left is the base cost of 2000 nodes' own data
-  (hand, per-node child map) rather than cached analysis, so shrinking it
-  further would mean lowering `MaxNodes` itself, not tightening a cache.
+  Result: ~2.51 MiB per maximally branched session (a 34x cut), 256 sessions
+  ≈ 644 MiB. Most of what's left (~72% in this benchmark, measured by
+  swapping in a fresh `Analyzer` after the build and re-reading `HeapAlloc`)
+  is the *analyzer's own* suit-table memo, not node data: a session tied to
+  one wall still explores enough distinct hands, while branching into
+  thousands of alternate lines, to grow it well past what one played-out
+  line ever needs. It's already bounded by `memoLimit` (200,000 tables,
+  ~140 bytes each once map/allocator overhead is counted) exactly like the
+  memos described above, so ~28 MiB is the worst case for it alone,
+  independent of `MaxNodes`; the rest — 2000 nodes' own data (hand,
+  per-node child map) plus the current node and its history path's pruned
+  cache — is a few hundred KiB, not worth tightening further.
   `TestStateUnchangedAfterCachePruning` checks that revisiting a pruned node
   reproduces the exact same `state()` JSON.
 
