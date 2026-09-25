@@ -144,6 +144,31 @@ func HanFor(key string, w Winds) int {
 	return closedHan[key]
 }
 
+// Yaku that need a closed hand, and those that lose one han when open.
+var (
+	closedOnly = map[string]bool{
+		"riichi": true, "double_riichi": true, "ippatsu": true, "tsumo": true, "pinfu": true,
+		"iipeikou": true, "ryanpeikou": true, "chiitoitsu": true, "kokushi": true, "suuankou": true, "chuuren": true,
+	}
+	openMinusOne = map[string]bool{
+		"sanshoku": true, "ittsu": true, "chanta": true, "junchan": true, "honitsu": true, "chinitsu": true,
+	}
+)
+
+// HanOpenFor is HanFor for a hand that is open (has called a meld) or not:
+// an open hand scores the kuisagari yaku one han lower and the yaku that
+// need a closed hand 0.
+func HanOpenFor(key string, w Winds, open bool) int {
+	switch {
+	case !open:
+	case closedOnly[key]:
+		return 0
+	case openMinusOne[key]:
+		return closedHan[key] - 1
+	}
+	return HanFor(key, w)
+}
+
 // Evaluate detects the yaku of a complete hand: the concealed tiles
 // (including the winning tile, 14 - 3*len(ctx.Melds) of them) and the called
 // melds in ctx. It chooses the reading with the most han, then the most fu
