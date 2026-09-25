@@ -1,10 +1,10 @@
 # mhj2
 
-A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a round against three CPU players.
+A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
 
 [日本語版 README](README_jp.md)
 
-## Features (Phase 1)
+## Practice mode
 
 - **Solo practice** — draw and discard on a seeded wall (the same seed always gives the same starting hand and draws). A game ends on tsumo or after 18 turns by default.
 - **Per-yaku shanten** — after every draw/discard, see how far the hand is from each yaku, together with its effective tiles (ukeire) and how many of each remain unseen:
@@ -22,17 +22,21 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and i
 
 Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in solo practice.
 
-## Playing against CPU players (Phase 2a)
+## Playing against CPU players
 
-Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to play one closed-hand East round against three CPU players.
+Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to play a 東風戦 (one East round) or 半荘戦 (East then South) against three CPU players, with calls, riichi and full scoring.
 
-- **Table** — every seat's river (the riichi tile lies sideways), points, wind and dealer mark; CPU hands stay face down until the round ends. The first dealer is the seed mod 4, so your seat wind varies, unless you pick **起家: 自分** to deal first.
-- **Your moves** — discard, **リーチ** (then pick a discard that keeps tenpai; later draws are discarded for you unless you can win), **ツモ**, and **ロン** / **見逃す** when a discard completes your hand.
-- **Rules** — riichi, double riichi, ippatsu, ura dora, haitei / houtei, furiten (own discards, same go-around, after riichi), head bump, noten penalty at the exhaustive draw. No calls (pon / chi / kan) yet.
-- **Scoring** — fu and han, mangan to (counted) yakuman, dealer / non-dealer payments and riichi sticks, shown with the point changes when the round ends.
-- **CPU players** — take every win, discard for tile efficiency, declare riichi when tenpai, and fold (genbutsu, suji, safe honors) against a riichi when two or more steps from tenpai. Pick **CPU: 弱い** for a weaker opponent that never calls or folds and often makes a less efficient discard (still reproducible from the seed).
+- **Table** — every seat's river (a riichi tile lies sideways, a called tile shows in the taker's meld), melds, points, wind and dealer mark; CPU hands stay face down until the round ends. Choose **対局: 東風戦** or **半荘戦**, and **起家: ランダム** (seed mod 4) or **自分** to deal first yourself.
+- **Your moves** — discard, **リーチ** (pick a discard that keeps tenpai; later draws are discarded for you unless you can win), **ツモ**, **ロン** / **見逃す**, and calls: **ポン** / **チー** / **カン** when offered, or a concealed/added kan on your own turn.
+- **Calls** — pon and open kan on any seat's discard, chii from the seat to your left. Kuikae (喰い替え) blocks discarding the called kind (or the far tile after an end-of-sequence chii) right after a call; an added kan can be robbed (槍槓 chankan); each kan draws a replacement tile (嶺上開花 rinshan if it wins) and reveals a kan dora indicator. Open hands lose the closed-only yaku and a han on the kuisagari yaku.
+- **CPU move playback** — after each of your moves the server plays every CPU turn at once; the table replays them one discard/call at a time, with a **スキップ** button to jump straight to your next choice.
+- **Rules** — riichi, double riichi, ippatsu, ura dora, haitei / houtei, furiten (own discards, same go-around, after riichi), head bump (no double ron), a noten penalty at the exhaustive draw, and the abortive draws 九種九牌, 四風連打, 四家立直 and 四開槓.
+- **Scoring** — fu and han, mangan to counted yakuman, with double and stacked yakuman (a double yakuman counts 26 han; several together add up); dealer / non-dealer payments, honba (300 on a ron, 100 each on a tsumo) and riichi sticks — carried on the table until someone wins — shown with the point changes when the round ends.
+- **Game flow** — the dealer keeps the deal (連荘) after winning, after a tenpai draw, or after an abortive draw, otherwise it passes on; honba resets to 0 when a non-dealer wins. The game ends after its last round (unless the last dealer keeps the deal) or as soon as anyone drops below 0 points (tobi); final standings rank by points, with uma (+20 / +10 / −10 / −20) and oka (+20 to first place).
+- **Per-yaku shanten for open hands** — melds count as fixed groups, so shanten only counts your concealed tiles; a meld that can't satisfy a yaku's shape makes that row impossible. Any meld drops chiitoitsu, kokushi, chuuren, pinfu and ryanpeikou; a chii, pon or open kan additionally opens the hand, dropping iipeikou and suuankou too (a concealed kan alone keeps the hand closed).
+- **CPU players** — **CPU: 普通** takes every win, riichis when tenpai, calls when it keeps a yaku, kans when it doesn't set the hand back, discards for tile efficiency, and folds against a riichi two or more steps from tenpai. **CPU: 弱い** also wins and riichis but never calls, kans or folds, and often picks a less efficient discard — both are reproducible from the seed.
 - **Practice tools stay on** — the per-yaku shanten table (its wind rows follow your seat and the round), the discard preview, the time-series chart and the glossary. There is no rewinding in a game.
-- **Seed** — a seed you choose makes the whole round (CPU moves included) repeatable; a random seed is revealed when the round ends.
+- **Seed** — a seed you choose makes the whole game (CPU moves included) repeatable; a random seed is revealed when the game ends. If another tab (or a CPU turn finishing mid-request) has already moved the game on, your next action re-fetches the current state instead of failing.
 
 ### How yaku shanten is defined
 
@@ -92,6 +96,7 @@ internal/wall/       seeded wall, deal, draws
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire
 internal/yakushanten/ per-yaku shanten
 internal/yaku/       win decomposition, yaku and dora
+internal/apiview/    JSON views shared by the practice and game APIs
 internal/session/    solo game session and history tree
 internal/score/      points from han and fu
 internal/game/       four-player round engine (riichi, furiten, settlement)
@@ -104,8 +109,3 @@ docs/api.md          HTTP API and definitions
 ```
 
 Tile notation: `1m`–`9m`, `1p`–`9p`, `1s`–`9s`, `1z`–`7z` (East, South, West, North, White, Green, Red). A red five is written `0m` / `0p` / `0s`.
-
-## Roadmap
-
-- **Phase 2a** (done) — one closed-hand round against three CPU players with riichi, fu and points.
-- **Phase 2b** — calls (pon / chi / kan, rinshan, kan dora) and full games (tonpuu / hanchan, dealer rotation, renchan, honba, final ranking).
