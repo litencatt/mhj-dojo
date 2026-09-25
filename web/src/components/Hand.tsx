@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import { Tile } from './Tile';
 
@@ -10,13 +11,14 @@ export interface HandProps {
   allowed?: string[];
   // Only the drawn tile can be clicked (after riichi), even if a hand tile is identical.
   onlyDrawn?: boolean;
+  melds?: ComponentChildren; // called melds, shown after the hand (game mode)
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
 
 /** 13-tile hand + drawn tile (set apart) + discard river. Click discards; hover/focus previews. */
 export function Hand(props: HandProps) {
-  const { hand, drawn, discards, disabled, allowed, onlyDrawn = false, onDiscard, onPreview } = props;
+  const { hand, drawn, discards, disabled, allowed, onlyDrawn = false, melds, onDiscard, onPreview } = props;
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
   const tilesRef = useRef<HTMLDivElement>(null);
   // Set when the drawn tile is discarded from the keyboard: if the next state has
@@ -47,7 +49,7 @@ export function Hand(props: HandProps) {
     <section class="hand-panel" aria-label="手牌">
       <h2>手牌</h2>
       <div class="hand-row">
-        <div class="hand-tiles" role="group" aria-label="手牌13枚" ref={tilesRef}>
+        <div class="hand-tiles" role="group" aria-label={`手牌${hand.length}枚`} ref={tilesRef}>
           {hand.map((t, i) => {
             const ok = can(t, false);
             return (
@@ -80,6 +82,7 @@ export function Hand(props: HandProps) {
             />
           </div>
         )}
+        {melds}
       </div>
       {discards.length > 0 && (
         <div class="discard-river" aria-label="捨て牌">

@@ -146,13 +146,22 @@ export function goto(id: string, nodeId: number): Promise<SessionState> {
 // ---- Games against CPU players (docs/api.md "Games") ----
 
 export type GamePhase = 'discard' | 'call' | 'ended';
-export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'next';
+export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'pon' | 'chii' | 'kan' | 'next';
 export type GameLength = 'tonpuu' | 'hanchan'; // 東風戦 | 半荘戦
-export type AbortReason = 'kyuushu' | 'suufon' | 'suucha'; // 九種九牌 | 四風連打 | 四家立直
+export type AbortReason = 'kyuushu' | 'suufon' | 'suucha' | 'suukaikan'; // 九種九牌 | 四風連打 | 四家立直 | 四開槓
 
 export interface RiverTile {
   tile: Tile;
   riichi: boolean; // the riichi declaration tile
+  called: boolean; // taken into another seat's meld (stays in the river for furiten)
+}
+
+export type MeldType = 'chii' | 'pon' | 'kan' | 'ankan'; // kan: an open or added kan
+
+export interface Meld {
+  type: MeldType;
+  tiles: Tile[]; // the called tile last
+  from: number; // the seat the called tile came from; -1 for an ankan
 }
 
 export interface Seat {
@@ -161,6 +170,7 @@ export interface Seat {
   points: number;
   riichi: boolean;
   river: RiverTile[];
+  melds: Meld[];
   hand_count: number;
   hand?: Tile[]; // yours, or everyone's once the round has ended
   drawn?: Tile;
@@ -173,12 +183,16 @@ export interface Legal {
   ron: boolean;
   skip: boolean;
   kyuushu: boolean; // may declare 九種九牌
+  pon: boolean; // may pon last_discard
+  chii: [Tile, Tile][]; // the pairs of own tiles that can chii last_discard
+  kan: Tile[]; // call phase: open kan of last_discard; own turn: kinds to ankan or add to a pon
 }
 
 export interface GameEvent {
   seat: number;
   type: Exclude<ActionType, 'next'>;
-  tile?: Tile;
+  tile?: Tile; // for a call, the claimed tile; for a kan on your own turn, the kind
+  tiles?: Tile[]; // for a call, the seat's own tiles in the meld
 }
 
 export type Limit = '' | 'mangan' | 'haneman' | 'baiman' | 'sanbaiman' | 'yakuman';
@@ -276,9 +290,9 @@ export function getGame(id: string): Promise<GameState> {
   return request<GameState>(`/api/games/${encodeURIComponent(id)}`);
 }
 
-export function gameAction(id: string, type: ActionType, tile?: Tile): Promise<GameState> {
+export function gameAction(id: string, type: ActionType, tile?: Tile, tiles?: Tile[]): Promise<GameState> {
   return request<GameState>(`/api/games/${encodeURIComponent(id)}/action`, {
     method: 'POST',
-    body: JSON.stringify(tile ? { type, tile } : { type }),
+    body: JSON.stringify({ type, ...(tile ? { tile } : {}), ...(tiles ? { tiles } : {}) }),
   });
 }

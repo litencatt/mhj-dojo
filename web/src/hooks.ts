@@ -76,6 +76,16 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
 }
 
 /** Yaku key → display name, for the chart legend. */
+/**
+ * The last non-empty analysis: after a call the server stops sending one,
+ * but the chart still draws the history from before the call.
+ */
+export function useLastAnalysis(analysis: YakuRow[] | undefined): YakuRow[] {
+  const last = useRef<YakuRow[]>([]);
+  if (analysis && analysis.length > 0) last.current = analysis;
+  return analysis && analysis.length > 0 ? analysis : last.current;
+}
+
 export function useRowNames(analysis: YakuRow[] | undefined) {
   return useMemo(() => {
     const map: Record<string, string> = {};

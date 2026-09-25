@@ -1,7 +1,8 @@
-// Package cpu is the Phase 2a computer player: it always takes a win,
-// declares riichi when tenpai, discards for tile efficiency (lowest
-// shanten, then most unseen accepting tiles) and folds against a riichi
-// when it is two or more steps from tenpai. It is deterministic.
+// Package cpu is the computer player: it always takes a win, declares
+// riichi when tenpai, calls when the hand keeps a yaku (see calls.go),
+// discards for tile efficiency (lowest shanten, then most unseen accepting
+// tiles) and folds against a riichi when it is two or more steps from
+// tenpai. It is deterministic.
 package cpu
 
 import (
@@ -52,18 +53,26 @@ func New() *Player { return &Player{eng: shanten.NewEngine()} }
 
 // Decide implements game.Decider.
 func (p *Player) Decide(v game.View, l game.Legal) game.Action {
+	if p.eng.MemoSize() > memoLimit {
+		p.eng = shanten.NewEngine()
+	}
 	switch {
 	case l.Tsumo:
 		return game.Action{Type: game.Tsumo}
 	case l.Ron:
 		return game.Action{Type: game.Ron}
 	case l.Skip:
+		if a, ok := p.decideCall(v, l); ok {
+			return a
+		}
 		return game.Action{Type: game.Skip}
 	case l.Kyuushu && kokushiShanten(v) > kyuushuKeep:
 		return game.Action{Type: game.Kyuushu}
 	}
-	if p.eng.MemoSize() > memoLimit {
-		p.eng = shanten.NewEngine()
+	if len(l.Kan) > 0 {
+		if a, ok := p.decideSelfKan(v, l); ok {
+			return a
+		}
 	}
 	me := v.Seats[v.Viewer]
 	tiles := slices.Clone(me.Hand)
