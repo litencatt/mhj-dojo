@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, GameLength, GameState, Tile as TileT } from './api';
+import type { ActionType, GameOptions, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -17,8 +17,21 @@ import { useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResu
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 
-function parseLength(s: string | null): GameLength {
-  return s === 'hanchan' ? 'hanchan' : 'tonpuu';
+const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
+const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
+
+/** The game options in the URL (or a form), unknown values as the defaults. */
+function parseOptions(get: (key: string) => string | null): GameOptions {
+  return {
+    length: get('length') === 'hanchan' ? 'hanchan' : 'tonpuu',
+    first_dealer: get('first_dealer') === 'you' ? 'you' : 'random',
+    cpu: get('cpu') === 'weak' ? 'weak' : 'normal',
+  };
+}
+
+function urlOptions(): GameOptions {
+  const params = new URLSearchParams(location.search);
+  return parseOptions((k) => params.get(k));
 }
 
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game). */
@@ -27,9 +40,7 @@ export function GameApp() {
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
-  const [lengthInput, setLengthInput] = useState<GameLength>(() =>
-    parseLength(new URLSearchParams(location.search).get('length')),
-  );
+  const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const { busy, error, request } = useSerialRequest<GameState>((next) => {
     setState(next);
@@ -37,24 +48,35 @@ export function GameApp() {
     setRiichiMode(false);
   });
 
-  function startGame(length: GameLength, seed?: number) {
-    return request(() => api.createGame({ seed, length }));
+  function startGame(options: GameOptions, seed?: number) {
+    return request(() => api.createGame({ seed, ...options }));
   }
 
-  // The URL carries ?mode=game&game=&seed=&length= so a reload resumes the
-  // game, or deals the same seed and length again after a server restart.
+  // One select of the new-game form changed.
+  function setOption(key: keyof GameOptions) {
+    return (e: Event) => {
+      const value = (e.target as HTMLSelectElement).value;
+      setOptionsInput((o) => ({ ...o, [key]: value }));
+    };
+  }
+
+  // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
+  // reload resumes the game, or deals the same seed and options again after
+  // a server restart.
   useUrlResume({
     idKey: 'game',
     request,
     get: api.getGame,
     create: (params) =>
-      api.createGame({ seed: optionalInt(params.get('seed')), length: parseLength(params.get('length')) }),
+      api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
     // A random seed is hidden until the end: drop any seed of a previous game.
     sync: state && {
       mode: 'game',
       game: state.game_id,
       seed: state.seed !== null ? String(state.seed) : null,
       length: state.length,
+      first_dealer: state.first_dealer_mode,
+      cpu: state.cpu,
     },
   });
 
@@ -69,7 +91,7 @@ export function GameApp() {
 
   function handleNewGame(e: Event) {
     e.preventDefault();
-    void startGame(lengthInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
   // After a call the analysis is empty; the chart keeps the rows from before.
@@ -118,12 +140,23 @@ export function GameApp() {
             <form class="new-game-form" onSubmit={handleNewGame}>
               <label>
                 対局
-                <select
-                  value={lengthInput}
-                  onChange={(e) => setLengthInput(parseLength((e.target as HTMLSelectElement).value))}
-                >
+                <select value={optionsInput.length} onChange={setOption('length')}>
                   <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
                   <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+                </select>
+              </label>
+              <label>
+                起家
+                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+                  <option value="random">{DEALER_NAMES.random}</option>
+                  <option value="you">{DEALER_NAMES.you}</option>
+                </select>
+              </label>
+              <label>
+                CPU
+                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+                  <option value="weak">{CPU_NAMES.weak}</option>
+                  <option value="normal">{CPU_NAMES.normal}</option>
                 </select>
               </label>
               <label>
@@ -146,6 +179,10 @@ export function GameApp() {
                 <div>
                   <dt>対局</dt>
                   <dd>{LENGTH_NAMES[state.length]}</dd>
+                </div>
+                <div>
+                  <dt>CPU</dt>
+                  <dd>{CPU_NAMES[state.cpu]}</dd>
                 </div>
                 <div>
                   <dt>局</dt>
@@ -225,7 +262,9 @@ export function GameApp() {
                 <ResultPanel state={state} result={state.result} busy={busy} onNext={() => act('next')} />
               )}
               {!playback.playing && state.game_over && (
-                <FinalPanel state={state} busy={busy} onNewGame={() => void startGame(state.length)} />
+                <FinalPanel state={state} busy={busy} onNewGame={() =>
+                    void startGame({ length: state.length, first_dealer: state.first_dealer_mode, cpu: state.cpu })
+                  } />
               )}
             </div>
             <div class="area-chart" hidden={isMin('chart')}>
