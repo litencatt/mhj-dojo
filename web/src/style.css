@@ -995,15 +995,15 @@ section {
 }
 /* A kakan stacks the added tile on the called one: the negative margins
    shrink each rotated tile's box to its visible height. */
-.meld-added {
+.meld-called.meld-added {
   flex-direction: column;
   gap: 1px;
 }
-.meld-added .tile-xs {
+.meld-called.meld-added .tile-xs {
   transform: rotate(90deg);
   margin: -3px 3px;
 }
-.meld-added .tile-sm {
+.meld-called.meld-added .tile-sm {
   transform: rotate(90deg);
   margin: -4.5px 5px;
 }
