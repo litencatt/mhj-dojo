@@ -170,3 +170,11 @@ func TestNoYakuScoresNothing(t *testing.T) {
 		t.Errorf("no-yaku win scored %+v", p)
 	}
 }
+
+func TestHalf(t *testing.T) {
+	for v, want := range map[int]int{32000: 16000, 48000: 24000, 3900: 2000, 100: 100, 0: 0} {
+		if got := Half(v); got != want {
+			t.Errorf("Half(%d) = %d, want %d", v, got, want)
+		}
+	}
+}

@@ -73,6 +73,9 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 	if st.Phase != "ended" || st.Actor != -1 || len(st.UraDoraIndicators) != 1 {
 		t.Fatalf("ended state: phase %s actor %d ura %v", st.Phase, st.Actor, st.UraDoraIndicators)
 	}
+	if st.Result.Pao == nil {
+		t.Fatal("result pao is null, want an array")
+	}
 	sum := st.Result.Deposit
 	for _, s := range st.Seats {
 		if len(s.Hand) == 0 {

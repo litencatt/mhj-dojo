@@ -127,6 +127,8 @@ type Result struct {
 	Honba       int     `json:"honba"`
 	Tenpai      [4]bool `json:"tenpai"`
 	Deposit     int     `json:"deposit"`
+	// Pao are the seats responsible (包) for yakuman of the win.
+	Pao []game.Pao `json:"pao"`
 }
 
 func (m *Match) state() State {
@@ -323,6 +325,7 @@ func result(res *game.Result) *Result {
 		Kind: res.Kind, Reason: res.Reason, Winner: res.Winner, From: res.From, Yaku: []yaku.Yaku{},
 		Points: res.Points, Deltas: res.Deltas, Tenpai: res.Tenpai, Deposit: res.Deposit,
 		HandDeltas: res.HandDeltas, HonbaDeltas: res.HonbaDeltas, StickDeltas: res.StickDeltas, Honba: res.Honba,
+		Pao: append([]game.Pao{}, res.Pao...),
 	}
 	if w := res.Win; w != nil {
 		t := res.WinTile.String()
