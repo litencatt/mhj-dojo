@@ -134,10 +134,16 @@ func (s *Session) state() State {
 		if n.status == StatusTsumo {
 			tn.NormalShanten = intPtr(-1) // complete hand, whatever its shape
 		} else {
-			tn.NormalShanten = shantenPtr(s.nodeAnalysis(n)[0])
+			tn.NormalShanten = s.nodeNormalShanten(n)
 		}
 		st.Tree = append(st.Tree, tn)
 	}
+
+	// The full per-yaku analysis (and, for the old current node, the
+	// per-discard preview) is only needed above for the current node and
+	// its history path; free it from every other node that held it after
+	// the previous call (see docs/api.md "Memory").
+	s.pruneAnalysisCache(path, cur)
 	return st
 }
 

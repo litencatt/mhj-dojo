@@ -672,6 +672,29 @@ func TestPropertiesRandom(t *testing.T) {
 	}
 }
 
+// TestNormalShantenMatchesAnalyze checks the cheap single-row path (used by
+// session's tree view, see docs/api.md "Memory") against the "normal" row
+// of the full Analyze it replaces there.
+func TestNormalShantenMatchesAnalyze(t *testing.T) {
+	r := rand.New(rand.NewPCG(31, 32))
+	a := NewAnalyzer()
+	n := 2000
+	if testing.Short() {
+		n = 200
+	}
+	for i := 0; i < n; i++ {
+		c := randomHand(r)
+		want := a.Row(c, "normal")
+		got := a.NormalShanten(c)
+		if got.Possible != want.Possible || got.Shanten != want.Shanten || got.Approx != want.Approx || !slices.Equal(got.Ukeire, want.Ukeire) {
+			t.Fatalf("%s: NormalShanten %+v != Analyze row %+v", c, got, want)
+		}
+		if a.eng.MemoSize() > 1<<20 {
+			a = NewAnalyzer()
+		}
+	}
+}
+
 func rowIndex(key string) int {
 	return slices.IndexFunc(Rows, func(r RowDef) bool { return r.Key == key })
 }

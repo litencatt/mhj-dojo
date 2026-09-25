@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/store"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
@@ -19,6 +20,11 @@ var (
 	ErrNotFound = errors.New("not found")
 	ErrInvalid  = errors.New("invalid request")
 	ErrConflict = errors.New("not allowed in the current state")
+	// ErrTreeFull is returned instead of ErrConflict when a session's tree
+	// is already at MaxNodes: the current node itself is fine to act on, so
+	// this isn't a state conflict the client could resolve by re-fetching
+	// (the server maps it to 422, not 409; docs/api.md).
+	ErrTreeFull = errors.New("tree full")
 )
 
 // Node statuses.
@@ -99,6 +105,10 @@ type Session struct {
 	nodes    []*node
 	current  int
 	analyzer *yakushanten.Analyzer
+	// pathCache holds the ids of the nodes currently holding a full
+	// per-yaku analysis (the current node and its history path from the
+	// last state() call); see pruneAnalysisCache.
+	pathCache []int
 }
 
 type node struct {
@@ -110,10 +120,20 @@ type node struct {
 	status     string
 	children   map[string]int // discard string (or "tsumo") -> node id
 
+	// analysis and byDiscard are the full per-yaku analysis (all rows,
+	// with ukeire) and per-discard preview. They are only ever needed for
+	// the current node (both) and its history path (analysis only), so
+	// pruneAnalysisCache clears them once a node falls off that path.
 	analysis  []yakushanten.Result
 	byDiscard map[tile.Kind][]yakushanten.Result
-	winRows   map[string]int // tsumo nodes: row shanten on the 14 winning tiles
-	win       *Win
+	// normalShanten is just the normal-form row, needed for every node in
+	// the tree view (state()'s Tree field). Unlike analysis/byDiscard
+	// above it is tiny (one int) and cheap to recompute, so it is cached
+	// forever instead of being pruned with them.
+	normalShanten     *int
+	normalShantenDone bool
+	winRows           map[string]int // tsumo nodes: row shanten on the 14 winning tiles
+	win               *Win
 }
 
 // ID returns the session id.
@@ -136,7 +156,7 @@ func (s *Session) addNode(n *node) *node {
 // roomForNode fails once the tree has reached maxNodes.
 func (s *Session) roomForNode() error {
 	if len(s.nodes) >= maxNodes {
-		return fmt.Errorf("%w: the session has %d nodes; start a new session", ErrConflict, maxNodes)
+		return fmt.Errorf("%w: the session has %d nodes; start a new session", ErrTreeFull, maxNodes)
 	}
 	return nil
 }
@@ -235,10 +255,16 @@ func (s *Session) Goto(id int) (State, error) {
 	return s.state(), nil
 }
 
-func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
+// resetAnalyzerIfFull recycles the shared analyzer once its suit-table memo
+// has grown past memoLimit.
+func (s *Session) resetAnalyzerIfFull() {
 	if s.analyzer.MemoSize() > memoLimit {
 		s.analyzer = yakushanten.NewAnalyzer()
 	}
+}
+
+func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
+	s.resetAnalyzerIfFull()
 	return s.analyzer.Analyze(c)
 }
 
@@ -247,6 +273,43 @@ func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
 		n.analysis = s.analyze(tile.CountsOf(n.hand))
 	}
 	return n.analysis
+}
+
+// nodeNormalShanten returns just the normal-form shanten (nil = complete
+// hand impossible), for the tree view. It is cached on the node forever
+// (unlike analysis/byDiscard) since it is tiny.
+func (s *Session) nodeNormalShanten(n *node) *int {
+	if !n.normalShantenDone {
+		s.resetAnalyzerIfFull()
+		n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
+		n.normalShantenDone = true
+	}
+	return n.normalShanten
+}
+
+// pruneAnalysisCache frees the full per-yaku analysis of any node that held
+// one after the previous state() call but is not on the given (new) path,
+// and the per-discard preview of any such node other than cur — state()
+// only ever reads a node's analysis if it's on the current path, and its
+// byDiscard if it's the current node. Nodes newly added to the path just
+// keep whatever nodeAnalysis/byDiscard already cached for them this call.
+func (s *Session) pruneAnalysisCache(path []*node, cur *node) {
+	keep := make(map[int]bool, len(path))
+	next := make([]int, len(path))
+	for i, n := range path {
+		keep[n.id] = true
+		next[i] = n.id
+	}
+	for _, id := range s.pathCache {
+		n := s.nodes[id]
+		if !keep[id] {
+			n.analysis = nil
+		}
+		if id != cur.id {
+			n.byDiscard = nil
+		}
+	}
+	s.pathCache = next
 }
 
 // winRows computes each row's shanten on the 14 winning tiles: -1 when the

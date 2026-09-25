@@ -12,7 +12,7 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -44,15 +44,19 @@ export function GameApp() {
   const { minimized, isMin, minimize, restore } = useMinimized();
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
-  const { busy, error, request } = useSerialRequest<GameState>((next) => {
-    if (!optionsSynced.current) {
-      optionsSynced.current = true;
-      setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
-    }
-    setState(next);
-    setPreviewTile(null);
-    setRiichiMode(false);
-  });
+  const { busy, error, notice, request } = useSerialRequest<GameState>(
+    (next) => {
+      if (!optionsSynced.current) {
+        optionsSynced.current = true;
+        setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
+      }
+      setState(next);
+      setPreviewTile(null);
+      setRiichiMode(false);
+    },
+    state ? () => api.getGame(state.game_id) : undefined,
+    gameMovedOn,
+  );
 
   function startGame(options: GameOptions, seed?: number) {
     return request(() => api.createGame({ seed, ...options }));
@@ -213,6 +217,11 @@ export function GameApp() {
           {error && (
             <div class="error-banner" role="alert">
               {error}
+            </div>
+          )}
+          {notice && (
+            <div class="notice-banner" role="status">
+              {notice}
             </div>
           )}
           {!state && !error && <p class="muted">対局を準備しています…</p>}

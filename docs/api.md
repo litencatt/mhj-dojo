@@ -176,11 +176,19 @@ These clarify points the contract above leaves open; none changes the JSON shape
 
 - **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
   session/node/endpoint, `415` POST without a JSON content type, `409` action not
-  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand).
+  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand),
+  `422` a session's tree is already at its node cap (see below) — not a state conflict, since the
+  current node itself is fine to act on, so unlike a `409` re-fetching the session changes nothing.
+- **Follow-up (not implemented)**: unlike games, a session has no way to detect that another tab
+  moved its current node first — `discard`/`tsumo`/`goto` just act on whatever node is current
+  server-side, silently, instead of returning `409` the way an actually-stale game request does.
+  Two tabs on the same session racing each other can currently see a discard silently land on a
+  node other than the one they thought they were acting from. The fix would be to accept an
+  expected `node_id` on those endpoints and `409` when it doesn't match the current one.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
-- **A session's tree** holds at most 2000 nodes; a discard that would add another returns `409`.
+- **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
 - **`wall_remaining`** = 109 live draws − draws taken, where the draw shown at a playing node (or the
@@ -427,3 +435,74 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   "deposit": 0                  // sticks left on the table after a draw (carried to the next round)
 }
 ```
+
+## Memory
+
+The server keeps two in-memory stores, each evicting its oldest entry once full
+(`internal/store`): up to `session.MaxSessions` = 256 practice sessions and up
+to `match.MaxGames` = 256 CPU games. Each session or game owns a
+`yakushanten.Analyzer`, whose shanten memo resets once it exceeds 200,000 suit
+tables; a game's three CPU seats additionally share one `cpu.Player`, whose own
+memo resets past 100,000 tables.
+
+Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
+`internal/session/memory_test.go`'s `BenchmarkSessionMemory` (not run by
+`go test ./...`; each plays or grows N real games/sessions, then divides the
+`runtime.MemStats` `HeapAlloc` delta, after a `runtime.GC()`, by N — run with
+`go test ./internal/<pkg> -run '^$' -bench BenchmarkXMemory -benchtime=1x`):
+
+- **A finished 半荘戦 game**, played out with the real CPU: ~1.7 MiB. 256 games
+  ≈ 441 MiB — under the ~500 MB rule of thumb, so the memo caps above were
+  left as they are.
+- **A session's branch tree at its `MaxNodes` = 2000 cap** (reached by
+  branching into every distinct discard at every node): originally ~84 MiB,
+  256 such sessions ≈ 21 GiB — alarming, and not explained by the analyzer's
+  memo above. `state()` used to report every tree node's `normal_shanten` by
+  running the *whole* per-yaku analysis (30+ rows with ukeire) and caching it
+  on the node forever just to read that one field, so a heavily branched
+  session's cache grew with its whole tree instead of resetting like the
+  memos above.
+
+  Fixed in two parts (`internal/yakushanten/yakushanten.go`,
+  `internal/session/session.go`, `internal/session/view.go`):
+  - `Analyzer.NormalShanten` computes only the normal-form row (one target
+    family) instead of every row; `state()`'s tree-wide loop now calls it and
+    caches just that one int per node, permanently (`TestNormalShantenMatchesAnalyze`
+    checks it against `Analyze`'s "normal" row on random hands).
+  - The *full* per-yaku analysis and per-discard preview — genuinely needed
+    only for the current node and its history path (`state()`'s `analysis`
+    and `history` fields) — are now pruned once a node is no longer on that
+    path (`pruneAnalysisCache`), instead of being kept forever. A node whose
+    cache was pruned just recomputes it, from the still-memoized suit
+    tables, if it's revisited.
+
+  Result: ~2.51 MiB per maximally branched session (a 34x cut), 256 sessions
+  ≈ 644 MiB. Most of what's left (~72% in this benchmark, measured by
+  swapping in a fresh `Analyzer` after the build and re-reading `HeapAlloc`)
+  is the *analyzer's own* suit-table memo, not node data: a session tied to
+  one wall still explores enough distinct hands, while branching into
+  thousands of alternate lines, to grow it well past what one played-out
+  line ever needs. It's already bounded by `memoLimit` (200,000 tables,
+  ~140 bytes each once map/allocator overhead is counted) exactly like the
+  memos described above, so ~28 MiB is the worst case for it alone,
+  independent of `MaxNodes`; the rest — 2000 nodes' own data (hand,
+  per-node child map) plus the current node and its history path's pruned
+  cache — is a few hundred KiB, not worth tightening further.
+  `TestStateUnchangedAfterCachePruning` checks that revisiting a pruned node
+  reproduces the exact same `state()` JSON.
+
+  Pruning trades a little latency for that memory: a node whose analysis was
+  pruned must be recomputed if it's visited again. `internal/session/latency_test.go`
+  times `Goto` requests (`go test ./internal/session -run '^$' -bench BenchmarkXRequestLatency`,
+  same "don't run under `go test ./...`" convention as the memory
+  benchmarks above): `BenchmarkLargeTreeRequestLatency` builds a `MaxNodes`
+  tree with fillTree (every one of 2000 nodes visited once while building
+  it, so nothing stays cached — the worst case) at ~8 ms/request, and
+  `BenchmarkTypicalTreeRequestLatency` builds a shape closer to normal play
+  (one long line plus a few local rewinds) at ~7 ms/request — both up from
+  ~1.3 ms/request before this fix, when everything was cached forever, but
+  still imperceptible for this tool's single local user. `TestTreeRequestLatency`
+  is the always-on regression guard: the same measurement on a 120-node
+  tree (~2s total, fast enough for `go test ./...`), failing if a request
+  ever exceeds 300 ms — enough margin to absorb CI noise while still
+  catching a regression back toward O(tree size) work per request.
