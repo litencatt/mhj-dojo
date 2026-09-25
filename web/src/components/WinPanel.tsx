@@ -1,6 +1,6 @@
 import type { Win } from '../api';
 import { Tile } from './Tile';
-import { yakuHanText } from './ResultPanel';
+import { yakuHanText } from '../yakumanLabel';
 
 export interface WinPanelProps {
   win: Win;
