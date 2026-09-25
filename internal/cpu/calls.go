@@ -120,7 +120,7 @@ func keepsYaku(v game.View, melds []yaku.Meld, rest []tile.Tile) bool {
 		if m.Type == yaku.Trip && isValue(v, m.Kind) {
 			return true
 		}
-		simples = simples && !m.Kind.IsYaochu() && !(m.Type == yaku.Seq && (m.Kind.Num() == 1 || m.Kind.Num() == 7))
+		simples = simples && allSimples(m)
 	}
 	yaochu := 0
 	for _, t := range rest {
@@ -129,6 +129,14 @@ func keepsYaku(v game.View, melds []yaku.Meld, rest []tile.Tile) bool {
 		}
 	}
 	return simples && yaochu <= 1
+}
+
+// allSimples reports whether every tile of meld m is a 2-8 number tile.
+func allSimples(m yaku.Meld) bool {
+	if m.Type == yaku.Seq {
+		return m.Kind.Num() >= 2 && m.Kind.Num() <= 6
+	}
+	return !m.Kind.IsYaochu()
 }
 
 // bannedAfter is the kuikae the engine applies after a call (for the
