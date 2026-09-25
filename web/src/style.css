@@ -104,6 +104,14 @@ h2 {
   color: var(--muted);
   gap: 4px;
 }
+.new-game-form select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
 .new-game-form input {
   width: 7em;
   padding: 4px 6px;
@@ -907,6 +915,7 @@ section {
 }
 .seat-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
@@ -927,6 +936,10 @@ section {
 }
 .seat-points {
   font-variant-numeric: tabular-nums;
+}
+.seat-rank {
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 .seat-riichi {
   padding: 0 4px;
@@ -999,6 +1012,47 @@ section {
 /* ---- Result ---- */
 .result-panel {
   margin-top: 10px;
+}
+.result-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.result-heading h2 {
+  margin: 0;
+}
+.next-round-button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
+  cursor: pointer;
+}
+.next-round-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.result-breakdown {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* The rounds table can be wider than a phone: it scrolls on its own. */
+.table-scroll {
+  overflow-x: auto;
+}
+.final-rounds caption {
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.final-rounds td,
+.final-rounds th {
+  white-space: nowrap;
 }
 .result-win-tile {
   margin-left: 8px;
