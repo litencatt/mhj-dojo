@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -290,11 +291,15 @@ func TestGameConcurrentRequests(t *testing.T) {
 		return res.StatusCode, st, err
 	}
 	var wg sync.WaitGroup
+	var moved atomic.Int32
 	errs := make(chan error, 64)
 	for g := range 6 {
 		wg.Go(func() {
-			for range 8 {
+			for i := range 8 {
 				if g%3 == 0 { // other games come and go in the store meanwhile
+					if i >= 3 {
+						return
+					}
 					if code, _, err := post(c.srv.URL+"/api/games", `{}`); err != nil || code != http.StatusOK {
 						errs <- fmt.Errorf("create: %d %v", code, err)
 						return
@@ -322,6 +327,9 @@ func TestGameConcurrentRequests(t *testing.T) {
 					errs <- fmt.Errorf("action: %d %v", code, err)
 					return
 				}
+				if code == http.StatusOK {
+					moved.Add(1)
+				}
 			}
 		})
 	}
@@ -329,6 +337,9 @@ func TestGameConcurrentRequests(t *testing.T) {
 	close(errs)
 	for err := range errs {
 		t.Error(err)
+	}
+	if moved.Load() == 0 {
+		t.Error("no concurrent action succeeded")
 	}
 	c.game("GET", "/api/games/"+st.GameID, "")
 }
