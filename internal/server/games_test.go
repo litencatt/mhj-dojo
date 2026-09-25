@@ -112,6 +112,25 @@ func checkHidden(t *testing.T, raw map[string]any) {
 	}
 }
 
+func TestGameOptions(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	for _, body := range []string{`{"first_dealer":"me"}`, `{"first_dealer":0}`, `{"cpu":"strong"}`, `{"cpu":"Weak"}`} {
+		c.wantError("POST", "/api/games", body, http.StatusBadRequest)
+	}
+	st, raw := c.game("POST", "/api/games", `{"seed":42}`)
+	if raw["first_dealer_mode"] != "random" || raw["cpu"] != "normal" || st.FirstDealer != 2 {
+		t.Fatalf("defaults: %v %v first dealer %d", raw["first_dealer_mode"], raw["cpu"], st.FirstDealer)
+	}
+	st, raw = c.game("POST", "/api/games", `{"seed":42,"first_dealer":"you","cpu":"weak"}`)
+	if raw["first_dealer_mode"] != "you" || raw["cpu"] != "weak" || st.FirstDealer != 0 || st.Dealer != 0 || st.Seats[0].Wind != "1z" {
+		t.Fatalf("options: %v %v first dealer %d dealer %d", raw["first_dealer_mode"], raw["cpu"], st.FirstDealer, st.Dealer)
+	}
+	again, _ := c.game("GET", "/api/games/"+st.GameID, "")
+	if again.CPU != "weak" || again.FirstDealerMode != "you" {
+		t.Fatalf("GET lost the options: %s %s", again.CPU, again.FirstDealerMode)
+	}
+}
+
 func TestGameErrors(t *testing.T) {
 	c := newClient(t, session.NewStore())
 	st, _ := c.game("POST", "/api/games", `{"seed":4}`) // dealer 0: you move first

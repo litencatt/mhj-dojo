@@ -154,14 +154,16 @@ const actionNext game.ActionType = "next"
 
 func (a *api) createGame(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Seed   *int64 `json:"seed"`
-		Length string `json:"length"`
+		Seed        *int64 `json:"seed"`
+		Length      string `json:"length"`
+		FirstDealer string `json:"first_dealer"`
+		CPU         string `json:"cpu"`
 	}
 	if err := decode(r, &body, false); err != nil {
 		writeErr(w, err)
 		return
 	}
-	m, err := a.games.Create(body.Seed, body.Length)
+	m, err := a.games.Create(body.Seed, match.Options{Length: body.Length, FirstDealer: body.FirstDealer, CPU: body.CPU})
 	if err != nil {
 		writeErr(w, err)
 		return
