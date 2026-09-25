@@ -80,7 +80,7 @@ func checkInvariants(t *testing.T, r *Round) {
 	}
 	tiles := 0
 	for _, p := range r.players {
-		tiles += len(p.hand) + len(p.river)
+		tiles += len(p.hand) + len(p.river) + len(p.meldTiles())
 		if p.drawn != nil {
 			tiles++
 		}

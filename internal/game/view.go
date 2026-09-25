@@ -13,7 +13,8 @@ type SeatView struct {
 	Wind      tile.Kind
 	Points    int
 	River     []RiverTile
-	HandCount int
+	Melds     []Called // public
+	HandCount int      // concealed tiles, drawn tile included
 	Hand      []tile.Tile
 	Drawn     *tile.Tile
 	Riichi    bool
@@ -67,6 +68,7 @@ func (r *Round) ViewFor(viewer int) View {
 			Wind:      r.SeatWind(s),
 			Points:    p.points,
 			River:     slices.Clone(p.river),
+			Melds:     slices.Clone(p.melds),
 			HandCount: len(p.hand),
 			Riichi:    p.riichi,
 		}
@@ -111,7 +113,7 @@ func (r *Round) LegalFor(seat int) Legal {
 	if p.riichi {
 		l.Discards = append(l.Discards, p.drawn.String())
 	} else {
-		for _, t := range p.tiles14() {
+		for _, t := range p.concealed() {
 			if !slices.Contains(l.Discards, t.String()) {
 				l.Discards = append(l.Discards, t.String())
 			}
@@ -123,8 +125,9 @@ func (r *Round) LegalFor(seat int) Legal {
 }
 
 // Visible counts the tiles the viewer can see: its own hand and drawn tile,
-// every river and the dora indicators. Unseen copies = 4 - Visible. It is
-// the one place that decides what is visible, for the CPU and the API.
+// every river and called meld, and the dora indicators. Unseen copies = 4 -
+// Visible. It is the one place that decides what is visible, for the CPU and
+// the API.
 func (v View) Visible() tile.Counts {
 	me := v.Seats[v.Viewer]
 	c := tile.CountsOf(me.Hand)
@@ -134,6 +137,11 @@ func (v View) Visible() tile.Counts {
 	for _, s := range v.Seats {
 		for _, rt := range s.River {
 			c[rt.Tile.Kind]++
+		}
+		for _, m := range s.Melds {
+			for _, t := range m.Tiles {
+				c[t.Kind]++
+			}
 		}
 	}
 	for _, d := range v.DoraIndicators {

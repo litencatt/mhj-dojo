@@ -71,9 +71,19 @@ type RiverTile struct {
 	Riichi bool
 }
 
+// Called is a meld a seat has called (or an ankan): its shape, its tiles
+// and the seat the called tile came from (-1 for an ankan). Phase 2a has no
+// calls; the engine already scores and counts them.
+type Called struct {
+	Meld  yaku.Meld
+	Tiles []tile.Tile
+	From  int
+}
+
 type player struct {
-	hand   []tile.Tile // 13 concealed tiles, sorted
-	drawn  *tile.Tile  // the 14th tile while it is this seat's turn
+	hand   []tile.Tile // concealed tiles, sorted: 13 - 3*len(melds)
+	drawn  *tile.Tile  // the tile drawn this turn, if any (none after a call)
+	melds  []Called
 	river  []RiverTile
 	points int
 
@@ -216,8 +226,8 @@ func (r *Round) Apply(a Action) error {
 	return err
 }
 
-// tiles14 returns the seat's hand plus its drawn tile.
-func (p *player) tiles14() []tile.Tile {
+// concealed returns the seat's concealed tiles plus its drawn tile, if any.
+func (p *player) concealed() []tile.Tile {
 	ts := slices.Clone(p.hand)
 	if p.drawn != nil {
 		ts = append(ts, *p.drawn)
@@ -227,7 +237,7 @@ func (p *player) tiles14() []tile.Tile {
 
 func (r *Round) discard(seat int, s string, declare bool) error {
 	p := &r.players[seat]
-	tiles := p.tiles14()
+	tiles := p.concealed()
 	idx := slices.IndexFunc(tiles, func(t tile.Tile) bool { return t.String() == s })
 	if idx < 0 {
 		return fmt.Errorf("%w: tile %q is not in seat %d's hand", ErrInvalid, s, seat)
@@ -325,7 +335,32 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 		Winds:          r.Winds(seat),
 		DoraIndicators: r.wall.DoraIndicators(),
 		UraIndicators:  r.wall.UraDoraIndicators(),
+		Melds:          p.meldShapes(),
+		MeldTiles:      p.meldTiles(),
 	}
+}
+
+// meldShapes returns the shapes of the seat's called melds.
+func (p *player) meldShapes() []yaku.Meld {
+	out := make([]yaku.Meld, len(p.melds))
+	for i, m := range p.melds {
+		out[i] = m.Meld
+	}
+	return out
+}
+
+// meldTiles returns every tile of the seat's called melds.
+func (p *player) meldTiles() []tile.Tile {
+	var out []tile.Tile
+	for _, m := range p.melds {
+		out = append(out, m.Tiles...)
+	}
+	return out
+}
+
+// open reports whether the seat has called a meld (an ankan keeps it closed).
+func (p *player) open() bool {
+	return slices.ContainsFunc(p.melds, func(m Called) bool { return m.Meld.Open })
 }
 
 // ronWin evaluates seat's hand plus the last discard.
@@ -341,7 +376,7 @@ func (r *Round) tsumoWin(seat int) (yaku.Win, bool) {
 	if p.drawn == nil {
 		return yaku.Win{}, false
 	}
-	w, ok := yaku.Evaluate(p.tiles14(), r.ctx(seat, p.drawn.Kind, false))
+	w, ok := yaku.Evaluate(p.concealed(), r.ctx(seat, p.drawn.Kind, false))
 	return w, ok && w.HasYaku()
 }
 
@@ -368,21 +403,25 @@ func (r *Round) furiten(seat int) bool {
 	return false
 }
 
-// waits returns the kinds that complete seat's 13-tile hand.
+// waits returns the kinds that complete seat's concealed tiles with its melds.
 func (r *Round) waits(seat int) []tile.Kind {
-	return Waits(tile.CountsOf(r.players[seat].hand))
+	p := &r.players[seat]
+	return WaitsWith(tile.CountsOf(p.hand), p.meldShapes())
 }
 
-// Waits returns the kinds that complete a 13-tile hand (a kind whose four
-// tiles are all in the hand cannot be waited on).
-func Waits(c tile.Counts) []tile.Kind {
+// Waits returns the kinds that complete a 13-tile closed hand.
+func Waits(c tile.Counts) []tile.Kind { return WaitsWith(c, nil) }
+
+// WaitsWith returns the kinds that complete concealed tiles c with the
+// called melds (a kind whose four tiles are all in c cannot be waited on).
+func WaitsWith(c tile.Counts, called []yaku.Meld) []tile.Kind {
 	var out []tile.Kind
 	for k := tile.Kind(0); k < tile.NumKinds; k++ {
 		if c[k] >= 4 {
 			continue
 		}
 		c[k]++
-		if yaku.IsComplete(c) {
+		if yaku.IsCompleteWith(c, called) {
 			out = append(out, k)
 		}
 		c[k]--
@@ -395,17 +434,17 @@ func Waits(c tile.Counts) []tile.Kind {
 // discard. Empty when riichi is not allowed.
 func (r *Round) riichiDiscards(seat int) []string {
 	p := &r.players[seat]
-	if p.riichi || p.drawn == nil || p.points < RiichiStick || r.DrawsLeft() < minDrawsForRiichi {
+	if p.riichi || p.open() || p.drawn == nil || p.points < RiichiStick || r.DrawsLeft() < minDrawsForRiichi {
 		return nil
 	}
-	tiles := p.tiles14()
+	tiles := p.concealed()
 	var out []string
 	for i, t := range tiles {
 		if slices.Contains(out, t.String()) {
 			continue
 		}
 		c := tile.CountsOf(slices.Delete(slices.Clone(tiles), i, i+1))
-		if len(Waits(c)) > 0 {
+		if len(WaitsWith(c, p.meldShapes())) > 0 {
 			out = append(out, t.String())
 		}
 	}

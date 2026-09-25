@@ -138,8 +138,11 @@ func (m *Match) state() State {
 	me := v.Seats[Human]
 	visible := v.Visible()
 	st.Analysis = apiview.Rows(m.analyze(tile.CountsOf(me.Hand)), &visible, m.han)
-	if me.Drawn != nil && v.Phase == game.PhaseDiscard && v.Actor == Human {
-		all := append(slices.Clone(me.Hand), *me.Drawn)
+	if v.Phase == game.PhaseDiscard && v.Actor == Human {
+		all := slices.Clone(me.Hand)
+		if me.Drawn != nil { // no drawn tile right after a call
+			all = append(all, *me.Drawn)
+		}
 		c := tile.CountsOf(all)
 		for _, t := range all {
 			key := t.String()
