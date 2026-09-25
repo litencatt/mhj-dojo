@@ -12,7 +12,7 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
-import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { useLastAnalysis, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
@@ -72,7 +72,9 @@ export function GameApp() {
     void startGame(lengthInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
-  const rowNames = useRowNames(state?.analysis);
+  // After a call the analysis is empty; the chart keeps the rows from before.
+  const chartAnalysis = useLastAnalysis(state?.analysis);
+  const rowNames = useRowNames(chartAnalysis);
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you;
@@ -182,7 +184,7 @@ export function GameApp() {
               <ShantenChart
                 sessionId={state.game_id}
                 history={state.history}
-                currentAnalysis={state.analysis}
+                currentAnalysis={chartAnalysis}
                 rowNames={rowNames}
                 onMinimize={() => minimize('chart')}
               />
