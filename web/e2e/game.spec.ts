@@ -21,6 +21,12 @@ async function clickAndWait(page: Page, locator: Locator) {
   ]);
 }
 
+/** Waits until the CPU moves have finished replaying: while they replay,
+ * the action bar holds a playback スキップ button that sends no request. */
+async function waitForPlayback(page: Page) {
+  await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
+}
+
 function handPanel(page: Page) {
   return page.getByRole('region', { name: '手牌' });
 }
@@ -31,6 +37,7 @@ function handPanel(page: Page) {
  * last hand tile). Mirrors nextMove() in games_test.go, except for the
  * discard rule, which this file's Go seed-finder used to pick SEED. */
 async function playOneStep(page: Page) {
+  await waitForPlayback(page);
   const actionBar = page.locator('.action-bar');
   await actionBar.waitFor({ state: 'visible', timeout: 15_000 });
 
@@ -58,6 +65,7 @@ async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
   const actionBar = page.locator('.action-bar');
   const result = page.getByRole('region', { name: '結果' });
   for (let i = 0; i < maxSteps; i++) {
+    await waitForPlayback(page);
     if (await result.isVisible()) {
       throw new Error(`round ended (seed ${SEED}) before a pon was ever offered`);
     }
@@ -78,6 +86,7 @@ async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
 async function playToResult(page: Page, maxSteps = 150) {
   const result = page.getByRole('region', { name: '結果' });
   for (let i = 0; i < maxSteps; i++) {
+    await waitForPlayback(page);
     if (await result.isVisible()) return;
     await playOneStep(page);
   }

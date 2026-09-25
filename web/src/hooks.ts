@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { YakuRow } from './api';
+import type { GameEvent, GameState, Seat, YakuRow } from './api';
 import { errorMessage } from './panels';
+import {
+  buildPlayback,
+  PLAYBACK_STEP_MS,
+  playbackFrame,
+  playbackHighlight,
+  type PlaybackBuild,
+  type PlaybackHighlight,
+} from './playback';
 
 /**
  * Runs one API request at a time. Every action acts on the server's current
@@ -92,4 +100,100 @@ export function useRowNames(analysis: YakuRow[] | undefined) {
     if (analysis) for (const r of analysis) map[r.key] = r.name;
     return map;
   }, [analysis]);
+}
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+export interface Playback {
+  seats: Seat[]; // the seats to render: state.seats with events not yet played hidden
+  events: GameEvent[]; // state.events, revealed up to the current step
+  playing: boolean;
+  highlight: PlaybackHighlight | null; // the tile or meld that last landed
+  skip: () => void; // jump straight to the final state
+}
+
+// The step a fresh build starts at: the human's own move, if it produced
+// the first event, was already seen happening, so it is revealed at once
+// and only the CPU events that follow are paced out. Reduced motion (or a
+// response with no events at all) reveals everything at once.
+function leadStep(build: PlaybackBuild, state: GameState): number {
+  const total = build.opsPerEvent.length;
+  if (total === 0 || prefersReducedMotion()) return total;
+  return state.events[0].seat === state.you ? 1 : 0;
+}
+
+/**
+ * Replays a game response's events (docs/api.md "events") one at a time
+ * instead of snapping straight to the final state (issue #29): each CPU
+ * discard, riichi, call and kan lands in turn, then the round result (if
+ * any) is left to the caller to reveal once `playing` goes false.
+ */
+export function usePlayback(state: GameState | null): Playback {
+  const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
+  const [step, setStep] = useState(0);
+  const timer = useRef<number | null>(null);
+  // Which build `step` was set for. Effects run after paint, so on the
+  // render right after `state` (and so `build`) changes, `step` is still
+  // whatever the *previous* build left it at - reading it as-is would flash
+  // the previous batch fully revealed for a frame, or fully un-revealed if
+  // playback had reached the end. Compared against `build` below, this lets
+  // that one render derive the correct starting step instead.
+  const stepFor = useRef<PlaybackBuild | null>(null);
+
+  const clear = () => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    clear();
+    if (!state || !build) {
+      stepFor.current = build;
+      setStep(0);
+      return;
+    }
+    const total = build.opsPerEvent.length;
+    let cur = leadStep(build, state);
+    stepFor.current = build;
+    setStep(cur);
+    const tick = () => {
+      cur += 1;
+      setStep(cur);
+      if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+    };
+    if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+    return clear;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [build]);
+
+  const skip = useCallback(() => {
+    clear();
+    if (build) {
+      stepFor.current = build;
+      setStep(build.opsPerEvent.length);
+    }
+  }, [build]);
+
+  // The render right after `build` changes but before the effect above has
+  // run: derive this render's step instead of using the stale one.
+  const step0 = stepFor.current === build ? step : build && state ? leadStep(build, state) : 0;
+
+  const total = build ? build.opsPerEvent.length : 0;
+  const playing = step0 < total;
+  const seats = useMemo(() => {
+    if (!build || !state) return state?.seats ?? [];
+    return step0 >= total ? state.seats : playbackFrame(build, step0); // nothing hidden: the server's own array
+  }, [build, step0]);
+  const highlight = build ? playbackHighlight(build, seats, step0) : null;
+  const events = state ? state.events.slice(0, step0) : [];
+
+  return { seats, events, playing, highlight, skip };
 }
