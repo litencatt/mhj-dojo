@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"errors"
 	"slices"
 	"sync"
@@ -409,5 +410,80 @@ func TestTreeIsBounded(t *testing.T) {
 	}
 	if _, err := s.Discard(*s.State().Drawn); err != nil {
 		t.Fatalf("moving to an existing child: %v", err)
+	}
+}
+
+// pruneAnalysisCache (docs/api.md "Memory") frees a node's full analysis
+// once it's no longer the current node or on its history path; revisiting
+// it must recompute the exact same state(), not just cheaper data.
+func TestStateUnchangedAfterCachePruning(t *testing.T) {
+	st := NewStore()
+	s := mustCreate(t, st, 42, wall.LiveDraws)
+
+	// Two distinct first moves from the root, so branch A and branch B
+	// below are sibling subtrees that don't share any node past the root.
+	v0 := s.State()
+	tiles := append(append([]string{}, v0.Hand...), *v0.Drawn)
+	a, b := tiles[0], tiles[len(tiles)-1]
+	if a == b {
+		t.Fatalf("need two distinct discards at the root, got only %q", a)
+	}
+
+	// Branch A: discard a, then a few more turns, remembering the node
+	// right after the first discard as "mid".
+	va, err := s.Discard(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	midID := va.NodeID
+	for i := 0; i < 3; i++ {
+		if _, err := s.Discard(*s.State().Drawn); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Branch B: back to the root, then the other discard and a few more
+	// turns, so the whole tree (both branches) exists before either
+	// snapshot below — otherwise the two state()s would legitimately
+	// differ in the tree field just because branch B didn't exist yet.
+	if _, err := s.Goto(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Discard(b); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := s.Discard(*s.State().Drawn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tipB := s.current
+
+	before, err := s.Goto(midID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantJSON, err := json.Marshal(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Move to branch B's tip and back. mid is not an ancestor of anything
+	// in branch B, so leaving it prunes its cached analysis (and the
+	// deeper branch-A nodes', by falling off the path); no nodes are
+	// added, so the tree field can't differ for that reason.
+	if _, err := s.Goto(tipB); err != nil {
+		t.Fatal(err)
+	}
+	after, err := s.Goto(midID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotJSON, err := json.Marshal(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotJSON) != string(wantJSON) {
+		t.Fatalf("state changed after cache pruning:\nbefore: %s\nafter:  %s", wantJSON, gotJSON)
 	}
 }

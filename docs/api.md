@@ -447,26 +447,42 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
   ≈ 441 MiB — under the ~500 MB rule of thumb, so the memo caps above were
   left as they are.
 - **A session's branch tree at its `MaxNodes` = 2000 cap** (reached by
-  branching into every distinct discard at every node): ~84 MiB. 256 such
-  sessions ≈ 21 GiB — alarming, and not explained by the analyzer's memo
-  above. `state()` reports every tree node's `normal_shanten` on every
-  request, and caches that node's whole per-yaku analysis (and, for the
-  current node, its per-discard preview) to avoid recomputing it — but never
-  evicts it, so a heavily branched session's cache grows with its whole tree
-  instead of resetting like the memos above.
+  branching into every distinct discard at every node): originally ~84 MiB,
+  256 such sessions ≈ 21 GiB — alarming, and not explained by the analyzer's
+  memo above. `state()` used to report every tree node's `normal_shanten` by
+  running the *whole* per-yaku analysis (30+ rows with ukeire) and caching it
+  on the node forever just to read that one field, so a heavily branched
+  session's cache grew with its whole tree instead of resetting like the
+  memos above.
 
-  A bounded LRU over that per-node cache was tried and reverted: because
-  `state()` still needs every node's `normal_shanten` on every request,
-  evicting a "cold" node's analysis just makes the *next* request recompute
-  it — against a tree near `MaxNodes` with a small cache, that turns a
-  one-time O(nodes) cost into a repeated one, and the benchmark's run time
-  went from ~30s to tens of minutes. Reaching this worst case needs a
-  session deliberately branched into thousands of alternate lines (a
-  straight played-out session stops at `max_turns` ≤ 109 nodes), so it's
-  unlikely to come up in normal single-user practice use. The lower-risk
-  fix is architectural, not a cache-size tweak: cache only the single
-  normal-form shanten integer for the tree-wide view instead of the full
-  per-yaku analysis with ukeire, and keep the expensive full analysis
-  cached only for the current node and its history path (bounded by
-  `max_turns`, not `MaxNodes`). Left as a follow-up rather than rushed in
-  here under time pressure.
+  Fixed in two parts (`internal/yakushanten/yakushanten.go`,
+  `internal/session/session.go`, `internal/session/view.go`):
+  - `Analyzer.NormalShanten` computes only the normal-form row (one target
+    family) instead of every row; `state()`'s tree-wide loop now calls it and
+    caches just that one int per node, permanently (`TestNormalShantenMatchesAnalyze`
+    checks it against `Analyze`'s "normal" row on random hands).
+  - The *full* per-yaku analysis and per-discard preview — genuinely needed
+    only for the current node and its history path (`state()`'s `analysis`
+    and `history` fields) — are now pruned once a node is no longer on that
+    path (`pruneAnalysisCache`), instead of being kept forever. A node whose
+    cache was pruned just recomputes it, from the still-memoized suit
+    tables, if it's revisited.
+
+  Result: ~2.5 MiB per maximally branched session (a 34x cut), 256 sessions
+  ≈ 634 MiB — most of what's left is the base cost of 2000 nodes' own data
+  (hand, per-node child map) rather than cached analysis, so shrinking it
+  further would mean lowering `MaxNodes` itself, not tightening a cache.
+  `TestStateUnchangedAfterCachePruning` checks that revisiting a pruned node
+  reproduces the exact same `state()` JSON.
+
+  Pruning trades a little latency for that memory: a node whose analysis was
+  pruned must be recomputed if it's visited again. `internal/session/latency_test.go`
+  times requests (`Goto`/`Discard`) against a `MaxNodes` tree under
+  `TestLargeTreeRequestLatency` (fillTree's worst case: every one of 2000
+  nodes visited once, so nothing stays cached) and against a shape closer to
+  normal play (one long line plus a few local rewinds) under
+  `TestTypicalTreeRequestLatency`. Both stay in the low tens of milliseconds
+  per request even in the adversarial case (vs. ~1.3 ms/request before this
+  fix, when everything was cached forever) — imperceptible for this tool's
+  single local user, and both tests fail if a request ever exceeds 300 ms,
+  to catch a regression back toward O(tree size) work per request.

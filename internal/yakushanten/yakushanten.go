@@ -538,6 +538,17 @@ func (a *Analyzer) Row(c tile.Counts, key string) Result {
 	return Result{Key: key}
 }
 
+// NormalShanten computes just the normal-form (4 melds + pair) row: one
+// target family, instead of Analyze's whole row set. A caller that only
+// needs this one row (e.g. a tree view listing every node's shanten) does
+// much less work, and grows the suit-table memo much less, than calling
+// Analyze and reading row 0.
+func (a *Analyzer) NormalShanten(c tile.Counts) Result {
+	r := a.family(c, targets["normal"], explicit["normal"])
+	r.Key, r.Name = "normal", "一般形（役なし）"
+	return r
+}
+
 func fromShanten(s shanten.Result) Result {
 	return Result{Possible: true, Shanten: s.Shanten, Ukeire: s.Ukeire}
 }
