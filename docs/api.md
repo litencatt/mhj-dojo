@@ -427,3 +427,46 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   "deposit": 0                  // sticks left on the table after a draw (carried to the next round)
 }
 ```
+
+## Memory
+
+The server keeps two in-memory stores, each evicting its oldest entry once full
+(`internal/store`): up to `session.MaxSessions` = 256 practice sessions and up
+to `match.MaxGames` = 256 CPU games. Each session or game owns a
+`yakushanten.Analyzer`, whose shanten memo resets once it exceeds 200,000 suit
+tables; a game's three CPU seats additionally share one `cpu.Player`, whose own
+memo resets past 100,000 tables.
+
+Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
+`internal/session/memory_test.go`'s `BenchmarkSessionMemory` (not run by
+`go test ./...`; each plays or grows N real games/sessions, then divides the
+`runtime.MemStats` `HeapAlloc` delta, after a `runtime.GC()`, by N — run with
+`go test ./internal/<pkg> -run '^$' -bench BenchmarkXMemory -benchtime=1x`):
+
+- **A finished 半荘戦 game**, played out with the real CPU: ~1.7 MiB. 256 games
+  ≈ 441 MiB — under the ~500 MB rule of thumb, so the memo caps above were
+  left as they are.
+- **A session's branch tree at its `MaxNodes` = 2000 cap** (reached by
+  branching into every distinct discard at every node): ~84 MiB. 256 such
+  sessions ≈ 21 GiB — alarming, and not explained by the analyzer's memo
+  above. `state()` reports every tree node's `normal_shanten` on every
+  request, and caches that node's whole per-yaku analysis (and, for the
+  current node, its per-discard preview) to avoid recomputing it — but never
+  evicts it, so a heavily branched session's cache grows with its whole tree
+  instead of resetting like the memos above.
+
+  A bounded LRU over that per-node cache was tried and reverted: because
+  `state()` still needs every node's `normal_shanten` on every request,
+  evicting a "cold" node's analysis just makes the *next* request recompute
+  it — against a tree near `MaxNodes` with a small cache, that turns a
+  one-time O(nodes) cost into a repeated one, and the benchmark's run time
+  went from ~30s to tens of minutes. Reaching this worst case needs a
+  session deliberately branched into thousands of alternate lines (a
+  straight played-out session stops at `max_turns` ≤ 109 nodes), so it's
+  unlikely to come up in normal single-user practice use. The lower-risk
+  fix is architectural, not a cache-size tweak: cache only the single
+  normal-form shanten integer for the tree-wide view instead of the full
+  per-yaku analysis with ukeire, and keep the expensive full analysis
+  cached only for the current node and its history path (bounded by
+  `max_turns`, not `MaxNodes`). Left as a follow-up rather than rushed in
+  here under time pressure.

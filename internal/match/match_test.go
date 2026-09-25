@@ -92,7 +92,7 @@ func move(st State, riichi *bool) game.Action {
 }
 
 // playOut plays the human with move until the round ends.
-func playOut(t *testing.T, m *Match) State {
+func playOut(t testing.TB, m *Match) State {
 	t.Helper()
 	st := m.State()
 	riichi := false
@@ -140,7 +140,7 @@ func TestHiddenUntilTheEnd(t *testing.T) {
 }
 
 // playGame plays rounds with move until the game ends.
-func playGame(t *testing.T, m *Match) State {
+func playGame(t testing.TB, m *Match) State {
 	t.Helper()
 	st := playOut(t, m)
 	for rounds := 1; !st.GameOver; rounds++ {
