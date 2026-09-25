@@ -33,29 +33,28 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
 export interface GameTableProps {
   state: GameState;
   // A playback in progress overrides what is shown: seats with events not
-  // yet revealed hidden, and the tile or meld that just landed. Omitted
-  // (or playing: false), the table just shows state as-is.
+  // yet revealed hidden, and the tile or meld that last landed. Omitted (or
+  // playing: false), the table just shows state as-is. Points, deposit,
+  // wall_remaining, dora and opponents' hand_count are always state's own
+  // final values, even mid-playback: only the river, melds and riichi badge
+  // are ever hidden, so nothing here needs to be undone if a request fails
+  // mid-round.
   seats?: Seat[];
   events?: GameEvent[];
   highlight?: PlaybackHighlight | null;
   playing?: boolean;
-  onSkip?: () => void;
 }
 
-/** The table: each seat's river, points and (hidden) hand around the round info. */
-export function GameTable({ state, seats, events, highlight, playing = false, onSkip }: GameTableProps) {
+/** The table: each seat's river, points and (hidden) hand around the round
+ * info. The skip control lives in the action bar (GameApp), not here. */
+export function GameTable({ state, seats, events, highlight, playing = false }: GameTableProps) {
   const view = seats ?? state.seats;
   const log = events ?? state.events;
   const at = (rel: number) => view[(state.you + rel) % 4];
   return (
-    <section
-      class={playing ? 'game-table game-table-playing' : 'game-table'}
-      aria-label="卓"
-      data-playing={playing ? 'true' : 'false'}
-      onClick={playing ? onSkip : undefined}
-    >
-      <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} />
-      <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} />
+    <section class="game-table" aria-label="卓" data-playing={playing ? 'true' : 'false'}>
+      <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} />
+      <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} />
       <div class="table-center">
         <div class="table-round">
           {roundName(state.round_wind, state.round_number, state.honba)}
@@ -72,14 +71,9 @@ export function GameTable({ state, seats, events, highlight, playing = false, on
             </li>
           ))}
         </ol>
-        {playing && (
-          <button type="button" class="playback-skip" onClick={onSkip}>
-            スキップ
-          </button>
-        )}
       </div>
-      <SeatBox className="seat-right" seat={at(1)} state={state} highlight={highlight} />
-      <SeatBox className="seat-bottom" seat={at(0)} state={state} highlight={highlight} />
+      <SeatBox className="seat-right" seat={at(1)} state={state} highlight={highlight} playing={playing} />
+      <SeatBox className="seat-bottom" seat={at(0)} state={state} highlight={highlight} playing={playing} />
     </section>
   );
 }
@@ -89,11 +83,14 @@ interface SeatBoxProps {
   seat: Seat;
   state: GameState;
   highlight?: PlaybackHighlight | null;
+  playing: boolean;
 }
 
-function SeatBox({ className, seat, state, highlight }: SeatBoxProps) {
+function SeatBox({ className, seat, state, highlight, playing }: SeatBoxProps) {
   const you = seat.seat === state.you;
-  const acting = state.actor === seat.seat;
+  // state.actor is who acts once the (possibly still-playing-back) events
+  // have all landed: showing it mid-playback would point at the wrong seat.
+  const acting = !playing && state.actor === seat.seat;
   const landed = highlight?.seat === seat.seat;
   const classes = ['seat-box', className];
   if (acting) classes.push('seat-acting');

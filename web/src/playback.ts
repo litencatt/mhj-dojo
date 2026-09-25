@@ -79,25 +79,35 @@ function undoCalledMeld(seats: Seat[], seat: number): Op[] {
  * (ankan, a brand-new meld) or an added kan (kakan, growing an existing pon
  * in place - see internal/game/calls.go completeKakan). Both report as
  * `{type: "kan"}` with no `tiles`, so the existing meld it grew, if any, is
- * found by matching its kind. */
+ * found by matching its kind.
+ *
+ * completeKakan runs only once the added tile passes every other seat's
+ * chankan (robbing) opportunity unclaimed: selfKan appends the `kan` event
+ * right away, before that is decided. So by the time this response's final
+ * seats are read, the meld the kakan targets may still be a 3-tile pon -
+ * either it was robbed (the round ended on someone else's ron) or the human
+ * is the one being offered chankan and this response paused right there.
+ * Either way the meld itself is unchanged by this event: nothing to reveal. */
 function undoSelfKan(seats: Seat[], seat: number, tile: Tile | undefined, resolved: Set<number>): Op[] {
   if (tile) {
     const kind = tileKind(tile);
-    const idx = seats[seat].melds.findIndex(
+    const kanIdx = seats[seat].melds.findIndex(
       (m, i) => m.type === 'kan' && m.from >= 0 && m.tiles.length === 4 && tileKind(m.tiles[0]) === kind && !resolved.has(i),
     );
-    if (idx >= 0) {
-      resolved.add(idx);
-      const m = seats[seat].melds[idx];
+    if (kanIdx >= 0) {
+      resolved.add(kanIdx);
+      const m = seats[seat].melds[kanIdx];
       const finalTiles = m.tiles;
       // The added tile sits second-to-last (the called tile stays last);
       // removing it leaves the original 3-tile pon.
       const preKakan = [...finalTiles.slice(0, -2), finalTiles[finalTiles.length - 1]];
-      seats[seat].melds[idx] = { ...m, type: 'pon', tiles: preKakan };
-      return [{ kind: 'kakan', seat, index: idx, tiles: finalTiles }];
+      seats[seat].melds[kanIdx] = { ...m, type: 'pon', tiles: preKakan };
+      return [{ kind: 'kakan', seat, index: kanIdx, tiles: finalTiles }];
     }
+    const stillPon = seats[seat].melds.some((m) => m.type === 'pon' && m.from >= 0 && tileKind(m.tiles[0]) === kind);
+    if (stillPon) return []; // robbed, or pending a chankan decision: nothing changed yet
   }
-  const meld = seats[seat].melds.pop();
+  const meld = seats[seat].melds.pop(); // a brand-new concealed kan (ankan)
   return meld ? [{ kind: 'meld', seat, meld }] : [];
 }
 
@@ -150,24 +160,29 @@ export function buildPlayback(finalSeats: Seat[], events: GameEvent[]): Playback
   return { base: seats, opsPerEvent };
 }
 
+// Ops are built once in buildPlayback and replayed on a fresh clone for
+// every frame (see playbackFrame): pushing or writing through an op's own
+// object would mutate that shared object, poisoning every earlier frame
+// too (a 'called' op flips a tile that a 'river' op from an earlier step
+// also points at). Every write below copies instead.
 function applyOps(seats: Seat[], ops: Op[]) {
   for (const op of ops) {
     const s = seats[op.seat];
     switch (op.kind) {
       case 'river':
-        s.river.push(op.tile);
+        s.river.push({ ...op.tile });
         break;
       case 'meld':
-        s.melds.push(op.meld);
+        s.melds.push({ ...op.meld, tiles: [...op.meld.tiles] });
         break;
       case 'kakan':
-        s.melds[op.index] = { ...s.melds[op.index], type: 'kan', tiles: op.tiles };
+        s.melds[op.index] = { ...s.melds[op.index], type: 'kan', tiles: [...op.tiles] };
         break;
       case 'riichi':
         s.riichi = op.value;
         break;
       case 'called':
-        s.river[op.index].called = true;
+        s.river[op.index] = { ...s.river[op.index], called: true };
         break;
     }
   }

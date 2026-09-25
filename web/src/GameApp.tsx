@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, GameLength, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
@@ -79,6 +79,26 @@ export function GameApp() {
   // Replays state.events (issue #29) before the player can act again or the
   // round result appears.
   const playback = usePlayback(state);
+  const actionAreaRef = useRef<HTMLDivElement>(null);
+  const wasPlaying = useRef(false);
+
+  // Once the replay ends (naturally or via スキップ) the action bar it was
+  // standing in for swaps back in, unmounting the スキップ button: without
+  // this the focus that was on it would drop to <body>. Move it into
+  // whatever now controls the turn instead - but only if focus was already
+  // in here (or nowhere in particular), so it never steals focus from
+  // something else on the page (the yaku table, the seed field, ...).
+  useEffect(() => {
+    if (wasPlaying.current && !playback.playing) {
+      const area = actionAreaRef.current;
+      const active = document.activeElement;
+      if (area && (active === document.body || area.contains(active))) {
+        const next = area.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]');
+        (next ?? area).focus();
+      }
+    }
+    wasPlaying.current = playback.playing;
+  }, [playback.playing]);
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
@@ -163,7 +183,6 @@ export function GameApp() {
                 events={playback.events}
                 highlight={playback.highlight}
                 playing={playback.playing}
-                onSkip={playback.skip}
               />
               <Hand
                 hand={me.hand ?? []}
@@ -176,23 +195,32 @@ export function GameApp() {
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
-              {playback.playing ? (
-                <div class="action-bar action-bar-playback" role="status" aria-live="polite">
-                  <span class="action-hint">CPUの動きを再生中…</span>
-                  <button type="button" onClick={playback.skip}>
-                    スキップ
-                  </button>
-                </div>
-              ) : (
-                <ActionBar
-                  state={state}
-                  busy={busy}
-                  myTurn={myTurn}
-                  riichiMode={riichiMode}
-                  onRiichiMode={setRiichiMode}
-                  onAction={act}
-                />
-              )}
+              {/* Persistent (not conditionally mounted) so a screen reader
+                  reliably announces the text change either way. */}
+              <p class="visually-hidden" role="status" aria-live="polite">
+                {playback.playing ? 'CPUの動きを再生中…' : ''}
+              </p>
+              <div ref={actionAreaRef} tabIndex={-1}>
+                {playback.playing ? (
+                  <div class="action-bar action-bar-playback">
+                    <span class="action-hint" aria-hidden="true">
+                      CPUの動きを再生中…
+                    </span>
+                    <button type="button" onClick={playback.skip}>
+                      スキップ
+                    </button>
+                  </div>
+                ) : (
+                  <ActionBar
+                    state={state}
+                    busy={busy}
+                    myTurn={myTurn}
+                    riichiMode={riichiMode}
+                    onRiichiMode={setRiichiMode}
+                    onAction={act}
+                  />
+                )}
+              </div>
               {!playback.playing && state.result && (
                 <ResultPanel state={state} result={state.result} busy={busy} onNext={() => act('next')} />
               )}
