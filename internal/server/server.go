@@ -85,9 +85,11 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 			if body.Tile == "" {
 				return match.State{}, errInvalid("tile is required for " + string(body.Type))
 			}
-		case game.Tsumo, game.Ron, game.Skip:
+		case game.Tsumo, game.Ron, game.Skip, game.Kyuushu:
+		case actionNext:
+			return m.Next()
 		default:
-			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron or skip")
+			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron, skip, kyuushu or next")
 		}
 		return m.Act(game.Action{Type: body.Type, Tile: body.Tile})
 	}))
@@ -142,15 +144,24 @@ type api struct {
 	games *match.Store
 }
 
+// actionNext deals the next round of a game; it is not a round move.
+const actionNext game.ActionType = "next"
+
 func (a *api) createGame(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Seed *int64 `json:"seed"`
+		Seed   *int64 `json:"seed"`
+		Length string `json:"length"`
 	}
 	if err := decode(r, &body, false); err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, a.games.Create(body.Seed).State())
+	m, err := a.games.Create(body.Seed, body.Length)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, m.State())
 }
 
 func (a *api) withGame(f func(*match.Match, *http.Request) (match.State, error)) http.HandlerFunc {

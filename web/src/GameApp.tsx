@@ -1,26 +1,34 @@
 import { useEffect, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, GameState } from './api';
+import type { ActionType, GameLength, GameState } from './api';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, WIND_NAMES } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, WIND_NAMES } from './components/GameTable';
 import { ResultPanel } from './components/ResultPanel';
+import { FinalPanel } from './components/FinalPanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
 import { useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 
-/** A closed-hand East round against three CPU players (?mode=game). */
+function parseLength(s: string | null): GameLength {
+  return s === 'hanchan' ? 'hanchan' : 'tonpuu';
+}
+
+/** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game). */
 export function GameApp() {
   const [state, setState] = useState<GameState | null>(null);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
+  const [lengthInput, setLengthInput] = useState<GameLength>(() =>
+    parseLength(new URLSearchParams(location.search).get('length')),
+  );
   const { minimized, isMin, minimize, restore } = useMinimized();
   const { busy, error, request } = useSerialRequest<GameState>((next) => {
     setState(next);
@@ -28,19 +36,25 @@ export function GameApp() {
     setRiichiMode(false);
   });
 
-  function startGame(seed?: number) {
-    return request(() => api.createGame({ seed }));
+  function startGame(length: GameLength, seed?: number) {
+    return request(() => api.createGame({ seed, length }));
   }
 
-  // The URL carries ?mode=game&game=&seed= so a reload resumes the game, or
-  // deals the same seed again after a server restart.
+  // The URL carries ?mode=game&game=&seed=&length= so a reload resumes the
+  // game, or deals the same seed and length again after a server restart.
   useUrlResume({
     idKey: 'game',
     request,
     get: api.getGame,
-    create: (params) => api.createGame({ seed: optionalInt(params.get('seed')) }),
+    create: (params) =>
+      api.createGame({ seed: optionalInt(params.get('seed')), length: parseLength(params.get('length')) }),
     // A random seed is hidden until the end: drop any seed of a previous game.
-    sync: state && { mode: 'game', game: state.game_id, seed: state.seed !== null ? String(state.seed) : null },
+    sync: state && {
+      mode: 'game',
+      game: state.game_id,
+      seed: state.seed !== null ? String(state.seed) : null,
+      length: state.length,
+    },
   });
 
   useEffect(() => {
@@ -54,7 +68,7 @@ export function GameApp() {
 
   function handleNewGame(e: Event) {
     e.preventDefault();
-    void startGame(seedInput.trim() === '' ? undefined : Number(seedInput));
+    void startGame(lengthInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
   const rowNames = useRowNames(state?.analysis);
@@ -76,6 +90,16 @@ export function GameApp() {
             </h1>
             <form class="new-game-form" onSubmit={handleNewGame}>
               <label>
+                対局
+                <select
+                  value={lengthInput}
+                  onChange={(e) => setLengthInput(parseLength((e.target as HTMLSelectElement).value))}
+                >
+                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+                </select>
+              </label>
+              <label>
                 シード
                 <input
                   type="number"
@@ -91,6 +115,17 @@ export function GameApp() {
                 <div>
                   <dt>シード</dt>
                   <dd>{state.seed ?? '終局後に表示'}</dd>
+                </div>
+                <div>
+                  <dt>対局</dt>
+                  <dd>{LENGTH_NAMES[state.length]}</dd>
+                </div>
+                <div>
+                  <dt>局</dt>
+                  <dd>
+                    {WIND_NAMES[state.round_wind]}
+                    {state.round_number}局 {state.honba}本場
+                  </dd>
                 </div>
                 <div>
                   <dt>自風</dt>
@@ -134,7 +169,12 @@ export function GameApp() {
                 onRiichiMode={setRiichiMode}
                 onAction={act}
               />
-              {state.result && <ResultPanel state={state} result={state.result} />}
+              {state.result && (
+                <ResultPanel state={state} result={state.result} busy={busy} onNext={() => act('next')} />
+              )}
+              {state.game_over && (
+                <FinalPanel state={state} busy={busy} onNewGame={() => void startGame(state.length)} />
+              )}
             </div>
             <div class="area-chart" hidden={isMin('chart')}>
               <ShantenChart
@@ -177,7 +217,7 @@ interface ActionBarProps {
   onAction: (type: ActionType) => void;
 }
 
-/** Your options right now: ron / skip on a discard, tsumo, riichi, or a hint. */
+/** Your options right now: ron / skip on a discard, tsumo, riichi, 九種九牌, or a hint. */
 function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: ActionBarProps) {
   const { legal } = state;
   if (state.phase === 'ended') return null;
@@ -204,6 +244,11 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
       {legal.tsumo && (
         <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('tsumo')}>
           ツモ
+        </button>
+      )}
+      {legal.kyuushu && (
+        <button type="button" disabled={busy} onClick={() => onAction('kyuushu')}>
+          九種九牌
         </button>
       )}
       {riichiAllowed && (

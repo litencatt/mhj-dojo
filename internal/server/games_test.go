@@ -135,15 +135,36 @@ func TestRandomSeedHiddenUntilTheEnd(t *testing.T) {
 		t.Fatalf("random seed exposed: %v", raw["seed"])
 	}
 	path := "/api/games/" + st.GameID
-	for steps := 0; st.Result == nil; steps++ {
-		if steps > 100 {
+	for steps := 0; !st.GameOver; steps++ {
+		if steps > 3000 {
 			t.Fatal("game does not end")
 		}
-		st, _ = c.game("POST", path+"/action", nextMove(st))
+		if st.Seed != nil {
+			t.Fatalf("seed %d exposed during the game", *st.Seed)
+		}
+		move := `{"type":"next"}`
+		if !st.CanNext {
+			move = nextMove(st)
+		}
+		st, _ = c.game("POST", path+"/action", move)
 	}
 	if st.Seed == nil {
-		t.Fatal("seed not revealed at the end")
+		t.Fatal("seed not revealed at the end of the game")
 	}
+}
+
+func TestGameLength(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	st, _ := c.game("POST", "/api/games", `{"seed":5,"length":"hanchan"}`)
+	if st.Length != "hanchan" || st.RoundWind != "1z" || st.RoundNumber != 1 || st.Honba != 0 || st.FirstDealer != 1 {
+		t.Fatalf("hanchan start: %+v", st.Length)
+	}
+	st, _ = c.game("POST", "/api/games", `{}`)
+	if st.Length != "tonpuu" {
+		t.Fatalf("default length %q", st.Length)
+	}
+	c.wantError("POST", "/api/games", `{"length":"west"}`, http.StatusBadRequest)
+	c.wantError("POST", "/api/games/"+st.GameID+"/action", `{"type":"next"}`, http.StatusConflict)
 }
 
 // Riichi discards made for you still land in the history, and by_discard

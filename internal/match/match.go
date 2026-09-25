@@ -40,24 +40,50 @@ type Store struct {
 // NewStore returns an empty store.
 func NewStore() *Store { return &Store{games: store.New[*Match](MaxGames)} }
 
-// Create deals a game. A nil seed picks the default or a random seed.
-func (st *Store) Create(seed *int64) *Match {
-	// A random seed is hidden until the end: 2^53 keeps it exact in JSON
-	// while making a search from the dealt tiles impractical (2^32 would
-	// take minutes).
-	m := newMatch(game.New(wall.PickSeed(seed, st.DefaultSeed, 1<<53)), seed != nil || st.DefaultSeed != nil)
+// Lengths of a game.
+const (
+	Tonpuu  = "tonpuu"  // 東風戦: the East round only
+	Hanchan = "hanchan" // 半荘戦: East and South
+)
+
+// Create deals a game of the given length ("" means Tonpuu). A nil seed
+// picks the default or a random seed.
+func (st *Store) Create(seed *int64, length string) (*Match, error) {
+	var rules game.Rules
+	switch length {
+	case "", Tonpuu:
+		length, rules = Tonpuu, game.Tonpuu
+	case Hanchan:
+		rules = game.HanchanRule
+	default:
+		return nil, fmt.Errorf("%w: length must be %q or %q", game.ErrInvalid, Tonpuu, Hanchan)
+	}
+	// A random seed is hidden until the game ends: it rebuilds every wall.
+	// 2^53 keeps it exact in JSON while making a search from the dealt tiles
+	// impractical (2^32 would take minutes).
+	h := game.NewHanchan(wall.PickSeed(seed, st.DefaultSeed, 1<<53), rules)
+	m := newMatch(h, length, seed != nil || st.DefaultSeed != nil)
 	m.id = st.games.Add(m)
+	return m, nil
+}
+
+// newMatch starts a match and plays the CPUs up to the human's first
+// decision.
+func newMatch(h *game.Hanchan, length string, seedKnown bool) *Match {
+	m := &Match{length: length, seedKnown: seedKnown}
+	m.game = game.StartHanchan(h, cpu.New())
+	m.game.OnHumanDiscard = m.recordHand
+	m.startRound()
 	return m
 }
 
-// newMatch starts a match on a dealt round and plays the CPUs up to the
-// human's first decision.
-func newMatch(r *game.Round, seedKnown bool) *Match {
-	m := &Match{analyzer: yakushanten.NewAnalyzerFor(r.Winds(Human)), seedKnown: seedKnown}
-	m.game = game.Start(r, Human, cpu.New())
-	m.game.OnHumanDiscard = m.recordHand
+// startRound resets what is kept per round: the analyzer (its wind rows
+// follow the round), the events and the history.
+func (m *Match) startRound() {
+	m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
+	m.since = 0
+	m.history = nil
 	m.recordHand()
-	return m
 }
 
 // Get returns a game by id.
@@ -82,8 +108,11 @@ type Match struct {
 	// each own discard, in order (entry i = after i discards).
 	history []apiview.HistoryEntry
 	// seedKnown is set when the player chose the seed. A random seed is
-	// revealed only at the end: it rebuilds the whole wall.
+	// revealed only when the game ends: it rebuilds every wall.
 	seedKnown bool
+	length    string
+	// rounds sums up the finished rounds.
+	rounds []RoundSummary
 }
 
 // ID returns the game id.
@@ -106,6 +135,20 @@ func (m *Match) Act(a game.Action) (State, error) {
 		return State{}, err
 	}
 	m.since = before
+	return m.state(), nil
+}
+
+// Next deals the next round once the current one has ended and plays the
+// CPUs up to the human's first decision in it.
+func (m *Match) Next() (State, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ended := m.summary()
+	if err := m.game.Next(); err != nil {
+		return State{}, err
+	}
+	m.rounds = append(m.rounds, *ended)
+	m.startRound()
 	return m.state(), nil
 }
 

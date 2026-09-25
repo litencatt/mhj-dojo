@@ -13,10 +13,18 @@ import (
 // State is the JSON view of a game for the human (docs/api.md).
 type State struct {
 	GameID            string                       `json:"game_id"`
-	Seed              *int64                       `json:"seed"` // null until the end unless you chose it
+	Seed              *int64                       `json:"seed"` // null until the game ends unless you chose it
+	Length            string                       `json:"length"`
 	You               int                          `json:"you"`
+	FirstDealer       int                          `json:"first_dealer"`
 	Dealer            int                          `json:"dealer"`
 	RoundWind         string                       `json:"round_wind"`
+	RoundNumber       int                          `json:"round_number"` // 1-4: 東1局 = round_wind 1z, round_number 1
+	Honba             int                          `json:"honba"`
+	CanNext           bool                         `json:"can_next"`  // the round has ended and another follows
+	GameOver          bool                         `json:"game_over"` // the last round has ended
+	Standings         [4]Standing                  `json:"standings"`
+	Rounds            []RoundSummary               `json:"rounds"` // finished rounds, the current one last once it ends
 	Phase             game.Phase                   `json:"phase"`
 	Actor             int                          `json:"actor"` // -1 once ended
 	WallRemaining     int                          `json:"wall_remaining"`
@@ -62,11 +70,32 @@ type Event struct {
 	Tile string          `json:"tile,omitempty"`
 }
 
+// Standing is a seat's place in the game.
+type Standing struct {
+	Seat   int     `json:"seat"`
+	Rank   int     `json:"rank"`
+	Points int     `json:"points"`
+	Score  float64 `json:"score"` // final once game_over
+}
+
+// RoundSummary is one finished round.
+type RoundSummary struct {
+	RoundWind   string `json:"round_wind"`
+	RoundNumber int    `json:"round_number"`
+	Honba       int    `json:"honba"`
+	Kind        string `json:"kind"`
+	Reason      string `json:"reason,omitempty"`
+	Winner      int    `json:"winner"`
+	From        int    `json:"from"`
+	Deltas      [4]int `json:"deltas"`
+}
+
 // Result is how the round ended.
 type Result struct {
-	Kind    string       `json:"kind"`   // tsumo, ron or draw
-	Winner  int          `json:"winner"` // -1 on a draw
-	From    int          `json:"from"`   // discarder on a ron, else -1
+	Kind    string       `json:"kind"`             // tsumo, ron, draw or abort
+	Reason  string       `json:"reason,omitempty"` // abort: kyuushu, suufon or suucha
+	Winner  int          `json:"winner"`           // -1 on a draw
+	From    int          `json:"from"`             // discarder on a ron, else -1
 	WinTile *string      `json:"win_tile"`
 	Yaku    []yaku.Yaku  `json:"yaku"`
 	Han     int          `json:"han"`
@@ -75,18 +104,29 @@ type Result struct {
 	UraDora int          `json:"ura_dora"`
 	Points  score.Points `json:"points"`
 	Deltas  [4]int       `json:"deltas"`
-	Tenpai  [4]bool      `json:"tenpai"`
-	Deposit int          `json:"deposit"`
+	// The deltas split into the hand's payments, honba and riichi sticks.
+	HandDeltas  [4]int  `json:"hand_deltas"`
+	HonbaDeltas [4]int  `json:"honba_deltas"`
+	StickDeltas [4]int  `json:"stick_deltas"`
+	Honba       int     `json:"honba"`
+	Tenpai      [4]bool `json:"tenpai"`
+	Deposit     int     `json:"deposit"`
 }
 
 func (m *Match) state() State {
-	r := m.game.Round
+	r, h := m.game.Round, m.game.H
 	v := r.ViewFor(Human)
 	st := State{
 		GameID:            m.id,
+		Length:            m.length,
 		You:               Human,
+		FirstDealer:       h.FirstDealer(),
 		Dealer:            v.Dealer,
 		RoundWind:         v.RoundWind.String(),
+		RoundNumber:       h.Number(),
+		Honba:             h.Honba(),
+		GameOver:          h.Over(),
+		Rounds:            slices.Clone(m.rounds),
 		Phase:             v.Phase,
 		Actor:             v.Actor,
 		WallRemaining:     v.DrawsLeft,
@@ -99,9 +139,19 @@ func (m *Match) state() State {
 		Events:            []Event{},
 		ByDiscard:         map[string][]apiview.YakuRow{},
 	}
-	if m.seedKnown || v.Phase == game.PhaseEnded {
-		seed := v.Seed
+	st.CanNext = v.Phase == game.PhaseEnded && !st.GameOver
+	if m.seedKnown || st.GameOver {
+		seed := h.Seed()
 		st.Seed = &seed
+	}
+	if st.Rounds == nil {
+		st.Rounds = []RoundSummary{}
+	}
+	if s := m.summary(); s != nil {
+		st.Rounds = append(st.Rounds, *s)
+	}
+	for s, sd := range h.Standings() {
+		st.Standings[s] = Standing{Seat: sd.Seat, Rank: sd.Rank, Points: sd.Points, Score: sd.Score}
 	}
 	if v.UraIndicators != nil {
 		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
@@ -179,13 +229,26 @@ func (m *Match) recordHand() {
 	})
 }
 
+// summary sums up the current round once it has ended, else nil.
+func (m *Match) summary() *RoundSummary {
+	res, h := m.game.Round.Result(), m.game.H
+	if res == nil {
+		return nil
+	}
+	return &RoundSummary{
+		RoundWind: h.RoundWind().String(), RoundNumber: h.Number(), Honba: h.Honba(),
+		Kind: res.Kind, Reason: res.Reason, Winner: res.Winner, From: res.From, Deltas: res.Deltas,
+	}
+}
+
 func result(res *game.Result) *Result {
 	if res == nil {
 		return nil
 	}
 	out := &Result{
-		Kind: res.Kind, Winner: res.Winner, From: res.From, Yaku: []yaku.Yaku{},
+		Kind: res.Kind, Reason: res.Reason, Winner: res.Winner, From: res.From, Yaku: []yaku.Yaku{},
 		Points: res.Points, Deltas: res.Deltas, Tenpai: res.Tenpai, Deposit: res.Deposit,
+		HandDeltas: res.HandDeltas, HonbaDeltas: res.HonbaDeltas, StickDeltas: res.StickDeltas, Honba: res.Honba,
 	}
 	if w := res.Win; w != nil {
 		t := res.WinTile.String()

@@ -240,26 +240,39 @@ These clarify points the contract above leaves open; none changes the JSON shape
   Every `POST` must send `Content-Type: application/json` (parameters such as `charset` allowed),
   otherwise `415`. Responses carry `X-Content-Type-Options: nosniff` and forbid framing.
 
-## Games against CPU players (Phase 2a)
+## Games against CPU players
 
-A game is one closed-hand East round: you are seat 0, three CPU players take
-seats 1–3, and every player starts with 25000 points. The dealer (East) is
-`seed mod 4`, so your seat wind depends on the seed. There are no calls (pon,
-chii, kan) and no rewinding. After each of your moves the server plays the
-CPU seats until you have a choice again or the round ends.
+A game is a 東風戦 (East round only) or 半荘戦 (East and South rounds) of
+closed hands: you are seat 0, three CPU players take seats 1–3, and every
+player starts with 25000 points. The first dealer (起家) is `seed mod 4`, so
+your seat wind depends on the seed. There are no calls (pon, chii, kan) and no
+rewinding. After each of your moves the server plays the CPU seats until you
+have a choice again or the round ends; after a round ends you send `next`.
 
-Rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after the
-discard; after riichi only the drawn tile can be discarded, and the server
+Round rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after
+the discard; after riichi only the drawn tile can be discarded, and the server
 discards it for you unless you can tsumo), double riichi, ippatsu, ura dora,
-haitei, houtei, furiten (own discards, same go-around, and after riichi),
-head bump (no double ron), 3000-point noten penalty at the exhaustive draw.
-Points: no kiriage mangan, counted yakuman at 13 han, no honba.
+haitei, houtei, furiten (own discards, same go-around, and after riichi), head
+bump (no double ron), 3000-point noten penalty at the exhaustive draw, and the
+abortive draws 九種九牌 (declared), 四風連打 and 四家立直. Points: no kiriage
+mangan, counted yakuman at 13 han, honba 300 (ron) / 100 each (tsumo).
+
+Game rules: the dealer keeps the deal after winning, after a draw where the
+dealer is tenpai, and after an abortive draw; otherwise the deal passes on.
+Honba goes up by one when the dealer keeps the deal or after a draw, and back
+to 0 when a non-dealer wins. Riichi sticks stay on the table until someone
+wins. The game ends after the last round (East 4, or South 4) unless the last
+dealer keeps the deal (no agari-yame), or as soon as someone is below 0 (no
+West round). Standings rank by points (ties to the seat nearer the first
+dealer); the score is (points − 30000) / 1000 + uma (+20 / +10 / −10 / −20)
++ oka (+20 to first), and sticks left at the end go to first place.
 
 ### `POST /api/games`
-Body (optional): `{"seed": 42}`. Returns a `GameState`. Without a seed (and
-without the server's `--seed` flag) a random seed in `[0, 2^53)` is used and
-`seed` stays `null` until the round ends, because the seed rebuilds the whole
-wall.
+Body (optional): `{"seed": 42, "length": "hanchan"}`. `length` is `"tonpuu"`
+(the default) or `"hanchan"`. Returns a `GameState`. Every round's wall is
+derived one-way from the seed. Without a seed (and without the server's
+`--seed` flag) a random seed in `[0, 2^53)` is used and `seed` stays `null`
+until the game ends, because the seed rebuilds every wall.
 
 ### `GET /api/games/{id}`
 Returns the `GameState`.
@@ -274,6 +287,8 @@ Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
 | `tsumo` | `legal.tsumo` | – |
 | `ron` | `legal.ron` (the tile is `last_discard`) | – |
 | `skip` | `legal.ron` (pass; you become furiten) | – |
+| `kyuushu` | `legal.kyuushu`: your first uninterrupted turn with nine or more different terminals and honors (九種九牌, an abortive draw) | – |
+| `next` | `can_next`: the round has ended and another follows | – |
 
 Errors: `400` malformed body, unknown type or a tile you do not hold, `404`
 unknown game, `409` a move that is not legal now.
@@ -283,10 +298,17 @@ unknown game, `409` a move that is not legal now.
 ```jsonc
 {
   "game_id": "a1b2c3",
-  "seed": 42,                   // null until the end for a random seed
+  "seed": 42,                   // null until the game ends for a random seed
+  "length": "tonpuu",           // "tonpuu" | "hanchan"
   "you": 0,
-  "dealer": 2,                  // seat of 東
-  "round_wind": "1z",
+  "first_dealer": 2,            // 起家
+  "dealer": 2,                  // seat of 東 this round
+  "round_wind": "1z", "round_number": 1, "honba": 0,   // 東1局 0本場
+  "can_next": false,            // the round has ended and another follows: send "next"
+  "game_over": false,           // the last round has ended
+  "standings": [ {"seat": 0, "rank": 1, "points": 25000, "score": 25.0} ],  // index = seat; score final once game_over
+  "rounds": [ {"round_wind": "1z", "round_number": 1, "honba": 0, "kind": "ron",
+               "winner": 1, "from": 0, "deltas": [-3900, 3900, 0, 0]} ],  // finished rounds; the current one last once it ends
   "phase": "discard",           // "discard" | "call" (a ron window) | "ended"
   "actor": 0,                   // seat to act; -1 once ended
   "wall_remaining": 69,         // live draws left (70 after the deal)
@@ -301,11 +323,11 @@ unknown game, `409` a move that is not legal now.
       "drawn": "4p" }           // your drawn tile on your turn
   ],
   "last_discard": null,         // the tile you may ron, when legal.ron
-  "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false },
+  "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false },
   "events": [ {"seat": 1, "type": "discard", "tile": "2z"} ],  // moves since your previous move
   "analysis": [YakuRow],        // your 13-tile hand; wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
-  "history": [HistoryEntry],    // your rows after each of your discards (node_id = turn)
+  "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended
 }
 ```
@@ -318,7 +340,8 @@ East, otherwise the round wind row then your seat wind row (1 han each).
 
 ```jsonc
 {
-  "kind": "ron",                // "tsumo" | "ron" | "draw"
+  "kind": "ron",                // "tsumo" | "ron" | "draw" | "abort"
+  "reason": "",                 // abort: "kyuushu" | "suufon" | "suucha" (omitted otherwise)
   "winner": 1, "from": 0,       // -1 when not applicable
   "win_tile": "5p",
   "yaku": [{"key": "riichi", "name": "立直", "han": 1}],
@@ -326,8 +349,12 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   "points": { "limit": "", "multiplier": 0, "total": 5200, "ron": 5200 },
   // on a tsumo: "from_dealer" / "from_non_dealer" instead of "ron"
   // limit: "" | "mangan" | "haneman" | "baiman" | "sanbaiman" | "yakuman"
-  "deltas": [-5200, 6200, 0, 0], // points at the end minus at the start: riichi sticks paid and received included
+  "deltas": [-5800, 6800, 0, 0], // points at the end minus at the start: the sum of the next three
+  "hand_deltas":  [-5200, 5200, 0, 0],    // the hand's payments (or the noten penalty)
+  "honba_deltas": [-600, 600, 0, 0],      // honba: 300 each from the discarder, or 100 from each seat on a tsumo
+  "stick_deltas": [0, 1000, 0, 0],        // riichi sticks paid (-1000) and received (the winner takes the table)
+  "honba": 2,
   "tenpai": [false, false, false, false],  // on a draw
-  "deposit": 0                  // sticks left on the table after a draw
+  "deposit": 0                  // sticks left on the table after a draw (carried to the next round)
 }
 ```

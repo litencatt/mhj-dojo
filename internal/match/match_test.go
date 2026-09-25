@@ -43,7 +43,7 @@ func playOut(t *testing.T, m *Match) State {
 }
 
 func TestHiddenUntilTheEnd(t *testing.T) {
-	m := newMatch(game.New(3), false)
+	m := newMatch(game.NewHanchan(3, game.Tonpuu), Tonpuu, false)
 	st := m.State()
 	if st.Seed != nil || len(st.UraDoraIndicators) != 0 {
 		t.Fatalf("seed %v ura %v before the end", st.Seed, st.UraDoraIndicators)
@@ -53,14 +53,64 @@ func TestHiddenUntilTheEnd(t *testing.T) {
 			t.Fatalf("seat %d tiles visible before the end", s.Seat)
 		}
 	}
+	// At the end of a round the hands and ura dora show, but the master seed
+	// (which would reveal the next walls) stays hidden until the game ends.
 	st = playOut(t, m)
-	if st.Seed == nil || *st.Seed != 3 || len(st.UraDoraIndicators) != 1 {
-		t.Fatalf("seed %v ura %v after the end", st.Seed, st.UraDoraIndicators)
+	if len(st.UraDoraIndicators) != 1 || (st.Seed != nil) != st.GameOver {
+		t.Fatalf("seed %v ura %v game over %v after the round", st.Seed, st.UraDoraIndicators, st.GameOver)
 	}
 	for _, s := range st.Seats {
 		if s.Hand == nil {
 			t.Fatalf("seat %d hand hidden after the end", s.Seat)
 		}
+	}
+	st = playGame(t, m)
+	if st.Seed == nil || *st.Seed != 3 {
+		t.Fatalf("seed %v after the game", st.Seed)
+	}
+}
+
+// playGame plays rounds with move until the game ends.
+func playGame(t *testing.T, m *Match) State {
+	t.Helper()
+	st := playOut(t, m)
+	for rounds := 1; !st.GameOver; rounds++ {
+		if rounds > 60 || !st.CanNext {
+			t.Fatalf("round %d: can_next %v", rounds, st.CanNext)
+		}
+		next, err := m.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if next.Result != nil || len(next.History) != 1 || next.History[0].Turn != 0 {
+			t.Fatalf("new round: result %v history %d", next.Result, len(next.History))
+		}
+		st = playOut(t, m)
+	}
+	return st
+}
+
+// A whole game: rounds and standings add up, and Next is refused at the end.
+func TestWholeGame(t *testing.T) {
+	m := newMatch(game.NewHanchan(11, game.Tonpuu), Tonpuu, true)
+	st := playGame(t, m)
+	if len(st.Rounds) < 4 || st.CanNext {
+		t.Fatalf("%d rounds, can_next %v", len(st.Rounds), st.CanNext)
+	}
+	total, ranks := 0.0, map[int]bool{}
+	for _, sd := range st.Standings {
+		total += sd.Score
+		ranks[sd.Rank] = true
+	}
+	if total < -0.5 || total > 0.5 || len(ranks) != 4 {
+		t.Fatalf("standings %+v", st.Standings)
+	}
+	last := st.Rounds[len(st.Rounds)-1]
+	if last.RoundWind != "1z" || last.RoundNumber != 4 {
+		t.Fatalf("last round %+v", last)
+	}
+	if _, err := m.Next(); !errors.Is(err, game.ErrConflict) {
+		t.Fatalf("next after the end: %v", err)
 	}
 }
 
@@ -68,8 +118,9 @@ func TestHiddenUntilTheEnd(t *testing.T) {
 // the ones played for the human in riichi.
 func TestHistoryFollowsHumanDiscards(t *testing.T) {
 	riichiSeen := false
-	for seed := int64(60); seed < 70; seed++ {
-		m := newMatch(game.New(seed), true)
+	// Check at least 10 seeds and keep going until one reaches riichi.
+	for seed := int64(0); seed < 200 && (seed < 10 || !riichiSeen); seed++ {
+		m := newMatch(game.NewHanchan(seed, game.Tonpuu), Tonpuu, true)
 		st := playOut(t, m)
 		discards := 0
 		for _, a := range m.game.Round.Log() {
@@ -93,7 +144,7 @@ func TestHistoryFollowsHumanDiscards(t *testing.T) {
 }
 
 func TestFailedActLeavesStateUnchanged(t *testing.T) {
-	m := newMatch(game.New(4), true) // dealer 0: the human moves first
+	m := newMatch(game.NewHanchan(4, game.Tonpuu), Tonpuu, true) // dealer 0: the human moves first
 	before, _ := json.Marshal(m.State())
 	if _, err := m.Act(game.Action{Type: game.Discard, Tile: "xx"}); !errors.Is(err, game.ErrInvalid) {
 		t.Fatalf("bad tile: %v", err)
@@ -109,7 +160,7 @@ func TestFailedActLeavesStateUnchanged(t *testing.T) {
 
 // Events are the moves since the human's last move, starting with it.
 func TestEventsStartWithTheHumansMove(t *testing.T) {
-	m := newMatch(game.New(4), true)
+	m := newMatch(game.NewHanchan(4, game.Tonpuu), Tonpuu, true)
 	st := m.State()
 	tile := st.Legal.Discards[0]
 	st, err := m.Act(game.Action{Type: game.Discard, Tile: tile})
