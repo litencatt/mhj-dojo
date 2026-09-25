@@ -78,6 +78,13 @@ make run          # go run ./cmd/mhj2
 cd web && npm run dev
 ```
 
+ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習と、CPU対戦（鳴き・局の結果・次局・390px幅のモバイル表示）をカバーします。ビルド済みのフロントエンドに対して専用の `mhj2` サーバを自前で起動するので、他にサーバを立てておく必要はありません。
+
+```sh
+cd web && npx playwright install --with-deps chromium   # 初回のみ
+cd web && npm run build && npm run e2e
+```
+
 ### ディレクトリ構成
 
 ```

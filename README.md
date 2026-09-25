@@ -76,6 +76,13 @@ Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep
 cd web && npm run dev
 ```
 
+Browser end-to-end tests (Playwright + Chromium) cover practice mode and a CPU game (calls, round result, next round, a mobile viewport). They start their own `mhj2` server against the built frontend, so no other server needs to be running:
+
+```sh
+cd web && npx playwright install --with-deps chromium   # once
+cd web && npm run build && npm run e2e
+```
+
 ### Layout
 
 ```
