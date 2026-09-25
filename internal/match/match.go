@@ -84,7 +84,7 @@ func (st *Store) Create(seed *int64, o Options) (*Match, error) {
 		o.CPU = cpu.Normal
 	case cpu.Normal, cpu.Weak:
 	default:
-		return nil, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Weak, cpu.Normal)
+		return nil, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
 	}
 	// A random seed is hidden until the game ends: it rebuilds every wall.
 	// 2^53 keeps it exact in JSON while making a search from the dealt tiles

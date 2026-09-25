@@ -121,3 +121,25 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test('game options from the URL: first dealer you and a weak CPU survive a reload', async ({ page }) => {
+  await page.goto(`/?mode=game&seed=${SEED}&first_dealer=you&cpu=weak`);
+  await waitForPlayback(page);
+  const status = page.locator('.game-status');
+  const expectOptions = async () => {
+    await expect(status).toContainText('東1局');
+    await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
+    await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
+    await expect(page.getByLabel('起家')).toHaveValue('you');
+    await expect(page.getByLabel('CPU')).toHaveValue('weak');
+    await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
+    await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
+    await expect(page).toHaveURL(/[?&]game=/);
+  };
+  await expectOptions();
+  const url = page.url();
+  await page.reload();
+  await waitForPlayback(page);
+  await expectOptions();
+  expect(page.url(), 'the reload resumes the same game').toBe(url);
+});

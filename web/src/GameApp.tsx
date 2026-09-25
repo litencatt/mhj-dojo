@@ -42,7 +42,13 @@ export function GameApp() {
   const [seedInput, setSeedInput] = useState('');
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   const { minimized, isMin, minimize, restore } = useMinimized();
+  // The first state may be a resumed game: its options fill the selects.
+  const optionsSynced = useRef(false);
   const { busy, error, request } = useSerialRequest<GameState>((next) => {
+    if (!optionsSynced.current) {
+      optionsSynced.current = true;
+      setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
+    }
     setState(next);
     setPreviewTile(null);
     setRiichiMode(false);

@@ -48,18 +48,21 @@ func TestCreateOptions(t *testing.T) {
 	}
 }
 
-// The same seed and options give the same game, with the weak CPU too.
+// The same seed and options give the same whole game, with the weak CPU too.
 func TestWeakGameReplays(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
 	st := NewStore()
-	for seed := range int64(4) {
-		var logs [2][]game.Action
+	for seed := range int64(3) {
+		var logs [2][][]game.Action
 		for i := range logs {
 			m, err := st.Create(&seed, Options{FirstDealer: DealerYou, CPU: cpu.Weak})
 			if err != nil {
 				t.Fatal(err)
 			}
-			playOut(t, m)
-			logs[i] = m.game.Round.Log()
+			playGame(t, m)
+			logs[i] = m.game.H.Logs()
 			if m.game.Fallbacks != 0 {
 				t.Fatalf("seed %d: %d CPU fallbacks", seed, m.game.Fallbacks)
 			}
