@@ -223,7 +223,7 @@ h2 {
   min-width: 0;
   min-height: 0;
 }
-@media (min-width: 1101px) {
+@media (width > 1100px) {
   .app {
     display: flex;
     gap: 16px;
@@ -259,7 +259,7 @@ h2 {
     overflow: auto;
   }
 }
-@media (min-width: 1501px) {
+@media (width > 1500px) {
   .app {
     max-width: 1920px;
   }
@@ -269,7 +269,7 @@ h2 {
 }
 /* One column: order the panels instead of naming areas, so a minimized
    panel leaves no empty row behind. */
-@media (max-width: 1100px) {
+@media (width <= 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
   }
