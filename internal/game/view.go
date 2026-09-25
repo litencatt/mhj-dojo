@@ -36,7 +36,10 @@ type View struct {
 	UraIndicators []tile.Tile
 	Seats         [4]SeatView
 	LastDiscard   *tile.Tile // set during PhaseCall
-	Result        *Result
+	// Robbing is set while a tile added to a kan waits to be robbed; it is
+	// LastDiscard, shown to everyone but in no river or meld yet.
+	Robbing bool
+	Result  *Result
 }
 
 // ViewFor returns what viewer may see.
@@ -60,6 +63,7 @@ func (r *Round) ViewFor(viewer int) View {
 	if r.phase == PhaseCall {
 		d := r.lastDiscard
 		v.LastDiscard = &d
+		v.Robbing = r.robbing != nil
 	}
 	for s := range r.players {
 		p := &r.players[s]
@@ -176,6 +180,9 @@ func (v View) Visible() tile.Counts {
 	}
 	for _, d := range v.DoraIndicators {
 		c[d.Kind]++
+	}
+	if v.Robbing {
+		c[v.LastDiscard.Kind]++
 	}
 	return c
 }

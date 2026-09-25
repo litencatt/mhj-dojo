@@ -191,6 +191,10 @@ func TestAddedKanCanBeRobbed(t *testing.T) {
 	if r.Phase() != PhaseCall || !r.LegalFor(2).Ron || r.LegalFor(2).Pon {
 		t.Fatalf("chankan not offered: %s %+v", r.Phase(), r.LegalFor(2))
 	}
+	// the added tile is visible while it waits to be robbed
+	if v := r.ViewFor(1); !v.Robbing || v.Visible()[tile.MakeKind(tile.Pin, 5)] != 4 {
+		t.Fatalf("robbing %v visible 5p %d", v.Robbing, v.Visible()[tile.MakeKind(tile.Pin, 5)])
+	}
 	mustApply(t, r, Action{Seat: 2, Type: Ron})
 	res := r.Result()
 	if res == nil || res.Winner != 2 || !hasYaku(res, "chankan") {
@@ -206,6 +210,9 @@ func TestAddedKanCanBeRobbed(t *testing.T) {
 	p := &r.players[0]
 	if r.Actor() != 0 || !p.melds[0].Meld.Kan || len(p.melds[0].Tiles) != 4 || !p.rinshan || !r.players[2].tempFuriten {
 		t.Fatalf("after the kan: actor %d melds %+v", r.Actor(), p.melds)
+	}
+	if called := p.melds[0].Tiles[3]; called != (tile.Tile{Kind: tile.MakeKind(tile.Pin, 5)}) || p.melds[0].From != 2 {
+		t.Fatalf("the called tile is not last: %+v", p.melds[0])
 	}
 	checkInvariants(t, r)
 }
