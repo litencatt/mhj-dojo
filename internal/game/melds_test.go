@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
 )
 
@@ -62,5 +63,20 @@ func TestTurnWithoutDrawnTile(t *testing.T) {
 	r.turn, r.phase = 0, PhaseDiscard
 	if l := r.LegalFor(0); len(l.Riichi) != 0 {
 		t.Fatalf("riichi offered to an open hand: %v", l.Riichi)
+	}
+}
+
+// A wait on a kind whose four tiles are all in the seat's hand (concealed or
+// called) is no wait: here 8p is pon'd and the fourth 8p is concealed.
+func TestNoWaitOnOwnFourthTile(t *testing.T) {
+	r := newRound(t)
+	setPon(r, 1, 3, "8p", "234m567m666s8p", "")
+	if w := r.waits(1); len(w) != 0 {
+		t.Fatalf("waits %v", w)
+	}
+	r.draws = wall.LiveDraws4
+	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "9s"})
+	if res := r.Result(); res.Tenpai[1] {
+		t.Fatal("dead wait counted as tenpai at the draw")
 	}
 }

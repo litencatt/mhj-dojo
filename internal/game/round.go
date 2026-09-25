@@ -413,11 +413,25 @@ func (r *Round) waits(seat int) []tile.Kind {
 func Waits(c tile.Counts) []tile.Kind { return WaitsWith(c, nil) }
 
 // WaitsWith returns the kinds that complete concealed tiles c with the
-// called melds (a kind whose four tiles are all in c cannot be waited on).
+// called melds. A kind whose four tiles are all in the hand, concealed or
+// in a meld, cannot be waited on.
 func WaitsWith(c tile.Counts, called []yaku.Meld) []tile.Kind {
+	held := c
+	for _, m := range called {
+		switch {
+		case m.Type == yaku.Seq:
+			held[m.Kind]++
+			held[m.Kind+1]++
+			held[m.Kind+2]++
+		case m.Kan:
+			held[m.Kind] += 4
+		default:
+			held[m.Kind] += 3
+		}
+	}
 	var out []tile.Kind
 	for k := tile.Kind(0); k < tile.NumKinds; k++ {
-		if c[k] >= 4 {
+		if held[k] >= 4 {
 			continue
 		}
 		c[k]++
