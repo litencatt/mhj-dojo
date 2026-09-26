@@ -87,6 +87,9 @@ func (st *Store) CreateWithWall(w *wall.Wall, maxTurns int) (*Session, error) {
 	return s, nil
 }
 
+// Delete removes a session, if it exists.
+func (st *Store) Delete(id string) { st.sessions.Delete(id) }
+
 // Get returns a session by id.
 func (st *Store) Get(id string) (*Session, error) {
 	s, ok := st.sessions.Get(id)

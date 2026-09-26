@@ -91,6 +91,29 @@ func TestSessionErrors(t *testing.T) {
 	}
 }
 
+// TestRestoreBodyFitsFullTree checks that the largest restore body the site
+// sends, a tree of session.MaxNodes nodes written as web/src/wasm.ts writes
+// it, is within the body limit: it must fail on its moves, not on reading.
+func TestRestoreBodyFitsFullTree(t *testing.T) {
+	moves := make([]map[string]any, session.MaxNodes-1)
+	for i := range moves {
+		moves[i] = map[string]any{"parent": session.MaxNodes - 2, "tile": "5m"}
+	}
+	b, err := json.Marshal(map[string]any{
+		"seed": int64(1<<32 - 1), "max_turns": 18, "moves": moves, "current": session.MaxNodes - 1, "used": int64(1e13),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b) > maxBody {
+		t.Fatalf("a %d-node restore body is %d bytes, over the %d limit", session.MaxNodes, len(b), maxBody)
+	}
+	status, v := Restore(session.NewStore(), strings.NewReader(string(b)))
+	if msg := v.(map[string]string)["error"]; status != statusNotFound || strings.Contains(msg, "JSON") {
+		t.Fatalf("Restore = %d %v; want the 404 of its first move's parent", status, v)
+	}
+}
+
 // TestRestore rebuilds a branched session from its moves in one call.
 func TestRestore(t *testing.T) {
 	store := session.NewStore()

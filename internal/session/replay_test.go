@@ -107,6 +107,8 @@ func TestReplayErrors(t *testing.T) {
 		{[]Move{{Parent: 0, Tile: tile("9z")}}, 0, ErrInvalid},
 		{[]Move{{Parent: 0}}, 0, ErrConflict}, // seed 1's first draw doesn't win
 		{nil, 1, ErrNotFound},
+		// Seed 1's hand holds 1m; the second move repeats the first.
+		{[]Move{{Parent: 0, Tile: tile("1m")}, {Parent: 0, Tile: tile("1m")}}, 1, ErrInvalid},
 	} {
 		if _, err := mustCreate(t, st, 1, 0).Replay(c.moves, c.current); !errors.Is(err, c.want) {
 			t.Errorf("Replay(%+v, %d) = %v, want %v", c.moves, c.current, err, c.want)

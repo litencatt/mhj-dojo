@@ -35,6 +35,22 @@ func (s *Store[T]) Add(v T) string {
 	return id
 }
 
+// Delete removes the item stored under id, if any.
+func (s *Store[T]) Delete(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.items[id]; !ok {
+		return
+	}
+	delete(s.items, id)
+	for i, x := range s.order {
+		if x == id {
+			s.order = append(s.order[:i], s.order[i+1:]...)
+			break
+		}
+	}
+}
+
 // Get returns the item stored under id.
 func (s *Store[T]) Get(id string) (T, bool) {
 	s.mu.Lock()

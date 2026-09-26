@@ -169,7 +169,11 @@ func Restore(store *session.Store, body io.Reader) (int, any) {
 	if err != nil {
 		return result(session.State{}, err)
 	}
-	return result(s.Replay(req.Moves, req.Current))
+	st, err := s.Replay(req.Moves, req.Current)
+	if err != nil {
+		store.Delete(s.ID()) // half built: nobody will ever ask for it
+	}
+	return result(st, err)
 }
 
 func result(st session.State, err error) (int, any) {

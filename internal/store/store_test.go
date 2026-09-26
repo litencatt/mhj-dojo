@@ -16,3 +16,19 @@ func TestEvictsOldest(t *testing.T) {
 		}
 	}
 }
+
+func TestDelete(t *testing.T) {
+	s := New[int](2)
+	a := s.Add(1)
+	b := s.Add(2)
+	s.Delete(a)
+	s.Delete("missing")
+	if _, ok := s.Get(a); ok {
+		t.Error("deleted item is still there")
+	}
+	// The deleted item no longer takes a place: adding one more keeps b.
+	s.Add(3)
+	if v, ok := s.Get(b); !ok || v != 2 {
+		t.Errorf("Get(b) = %d, %v; want 2", v, ok)
+	}
+}

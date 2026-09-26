@@ -178,10 +178,6 @@ func (s *Session) visibleAt(n *node, path []*node) tile.Counts {
 	return visible
 }
 
-// nodeAdvice returns the advice for a playing node's discard (nil at other
-// nodes), filling in its per-discard analysis as needed. Both stay cached on
-// the node until pruneAnalysisCache drops them. path is the node's path from
-// the root.
 // nodeReview returns the review of the discard that led to n, the last node
 // of path, computing it from the parent's advice if Replay left it pending.
 func (s *Session) nodeReview(n *node, path []*node) *advice.Review {
@@ -193,6 +189,10 @@ func (s *Session) nodeReview(n *node, path []*node) *advice.Review {
 	return n.review
 }
 
+// nodeAdvice returns the advice for a playing node's discard (nil at other
+// nodes), filling in its per-discard analysis as needed. Both stay cached on
+// the node until pruneAnalysisCache drops them. path is the node's path from
+// the root.
 func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	if n.advice != nil {
 		return n.advice
