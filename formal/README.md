@@ -1,0 +1,47 @@
+# Formal model (Lean 4 + mathlib)
+
+A Lean 4 model of the app's scoring and settlement rules (docs/api.md), with
+proofs of their invariants and a generator of golden vectors that Go tests
+compare the Go implementation against. Go's tests read the committed vectors,
+so CI and `go test ./...` never need Lean.
+
+| File | Models | Proved |
+|---|---|---|
+| `Mhj2/Score.lean` | `internal/score`: `Compute`, `Half` | `compute_dvd` (every payment is a multiple of 100), `half_dvd`, `half_bounds`, `tsumo_total_bounds` (ron ≤ tsumo total ≤ ron + 200), `tsumo_total_eq`, `basePts_mono` / `compute_mono` (more han never pays less, for a fixed fu), `limit_below_mangan`, `basePts_limits`, `basePts_below`, `yakuman_payments` |
+| `Mhj2/Settle.lean` | `internal/game` round settlement: tsumo / ron (with pao), honba, noten penalty, riichi sticks | `sum4_deltasOf` (payments sum to 0), `noten_sum`, `settle_conserves` (Σ deltas + sticks left on the table = sticks carried in, for every input), `settle_dvd` (every delta is a multiple of 100) |
+| `Mhj2/Standings.lean` | `internal/game` `Hanchan.Standings` | `rank_injective` / `rank_bijective`, `rank_points`, `rank_tie` (ties to the seat nearer the first dealer), `sum_uma`, `sum_first`, `sum_total`, `sum_score` (the final scores add up to exactly 0) |
+| `GenVectors.lean` | `lake exe gen-vectors` | writes `internal/score/testdata/lean_*.json` and `internal/game/testdata/lean_*.json` |
+
+## Running
+
+Everything runs in Docker; nothing is installed on the host. The toolchain,
+mathlib and the build live in named volumes, so no large files land in the
+repository or your home directory.
+
+```sh
+formal/run.sh build     # build the image, fetch mathlib's cache, check every proof
+formal/run.sh vectors   # also regenerate the Go golden vectors
+formal/run.sh shell     # a shell in the container
+```
+
+`run.sh` fetches from mathlib's cache only the modules the model imports (and
+their imports), not all of mathlib. The first `build` downloads the Lean
+toolchain (about 3 GB unpacked) and about 1000 mathlib files, and compiles
+the imported mathlib modules for the `gen-vectors` executable (a few minutes
+on a 2-CPU Docker VM); later builds take seconds. The volumes need about
+5 GB of the Docker VM's disk.
+
+After changing the model, run `formal/run.sh vectors` and then `go test
+./internal/score ./internal/game`.
+
+## Removing everything
+
+```sh
+formal/run.sh clean
+# which runs:
+docker image rm -f mhj2-lean
+docker volume rm mhj2-lean-elan mhj2-lean-lake mhj2-lean-cache
+```
+
+`docker builder prune` also drops the image's build cache. The empty
+`formal/.lake` directory left as a mount point is ignored by git.
