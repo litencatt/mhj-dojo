@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // satisfiesCombo is the oracle of a combo: the tile-set yaku hold for the

@@ -3,9 +3,9 @@ package cpu
 import (
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // The player calls only when the hand keeps a yaku to win with: a value

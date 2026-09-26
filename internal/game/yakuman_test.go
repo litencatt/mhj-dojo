@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/score"
+	"github.com/litencatt/mhj-dojo/internal/score"
 )
 
 // A double yakuman (四暗刻単騎) settles at twice the yakuman payments, honba

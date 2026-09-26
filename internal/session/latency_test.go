@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // requestBudget is a generous per-request latency ceiling: not a target

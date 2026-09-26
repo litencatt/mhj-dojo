@@ -3,7 +3,7 @@ package game
 import (
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // SeatView is one seat as seen by a viewer. Hand and Drawn are set only for

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // randomHand draws n tiles from a shuffled full set.

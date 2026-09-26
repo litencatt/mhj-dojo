@@ -4,9 +4,9 @@
 package apiview
 
 import (
-	"github.com/litencatt/mhj2/internal/handshape"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/handshape"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // YakuRow is one row of the per-yaku analysis.

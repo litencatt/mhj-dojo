@@ -3,7 +3,7 @@ package yaku
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 func TestFu(t *testing.T) {

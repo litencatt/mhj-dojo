@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // fixedWall returns a wall starting with the given hand (13 tiles) and draws.

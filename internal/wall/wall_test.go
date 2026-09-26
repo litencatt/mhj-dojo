@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 func TestSameSeedSameWall(t *testing.T) {

@@ -1,6 +1,6 @@
 package yaku
 
-import "github.com/litencatt/mhj2/internal/tile"
+import "github.com/litencatt/mhj-dojo/internal/tile"
 
 // chiitoitsuFu is the fixed fu of seven pairs.
 const chiitoitsuFu = 25

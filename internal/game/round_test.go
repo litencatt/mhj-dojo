@@ -6,10 +6,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // setHand replaces seat's 13 concealed tiles (and drawn tile, if given).

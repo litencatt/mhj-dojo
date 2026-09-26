@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // Kan dora timing: a concealed kan turns its indicator over at once; an open

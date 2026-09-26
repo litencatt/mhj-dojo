@@ -25,9 +25,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/litencatt/mhj2/internal/handshape"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/handshape"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // Input is one decision: 14 tiles to discard one from.

@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/score"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/score"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // Golden vectors from the Lean model in formal/ (formal/run.sh vectors).

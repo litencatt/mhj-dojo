@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/match"
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 func (c *client) game(method, path, body string) (match.State, map[string]any) {

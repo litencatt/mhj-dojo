@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 func call(t *testing.T, store *session.Store, method, path, body string) (int, []byte) {

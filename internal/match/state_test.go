@@ -3,10 +3,10 @@ package match
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // A shanpon on 55m/77z that pons 中 holds 11 complete tiles but must still

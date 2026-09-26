@@ -9,14 +9,14 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/cpu"
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/store"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
-	"github.com/litencatt/mhj2/internal/yaku"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/cpu"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/store"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // ErrNotFound is returned for an unknown game id.

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // Rules set up a game of several rounds.

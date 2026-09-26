@@ -1,6 +1,6 @@
 package shanten
 
-import "github.com/litencatt/mhj2/internal/tile"
+import "github.com/litencatt/mhj-dojo/internal/tile"
 
 // Result is a shanten value with the kinds that lower it.
 type Result struct {

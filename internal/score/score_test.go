@@ -3,7 +3,7 @@ package score
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // Standard ron tables (fu rows, han 1-4); 0 = not listed.

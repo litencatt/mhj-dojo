@@ -11,9 +11,9 @@ import (
 	"hash/fnv"
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/shanten"
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // foldShanten is the shanten from which the player folds against a riichi.

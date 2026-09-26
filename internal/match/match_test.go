@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/cpu"
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/cpu"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
 )
 
 // defaults are the options Create fills in for an empty request.

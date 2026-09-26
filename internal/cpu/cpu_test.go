@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 func view(hand, drawn string) game.View {
@@ -400,7 +400,7 @@ func TestWeakSelfPlay(t *testing.T) {
 // finish with more points.
 func TestWeakPlaysWorse(t *testing.T) {
 	if !testmode.Full() {
-		t.Skip("plays many games; run with MHJ2_FULL=1 (the nightly workflow)")
+		t.Skip("plays many games; run with MHJDOJO_FULL=1 (the nightly workflow)")
 	}
 	var wins, points [2]int // index 0 normal, 1 weak
 	for seed := range int64(40) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // claim is what one seat may do with the last discard (or a tile added to

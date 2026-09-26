@@ -20,9 +20,9 @@ import (
 	"math/bits"
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/shanten"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // RowDef names one analysis row.
