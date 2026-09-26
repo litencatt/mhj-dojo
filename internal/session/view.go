@@ -63,6 +63,7 @@ func (s *Session) state() State {
 		Turn:           cur.turn,
 		Status:         cur.status,
 		Hand:           tile.Strings(cur.hand),
+		HandGroups:     apiview.HandGroups(cur.hand, 0),
 		Discards:       append([]string{}, discards...),
 		DoraIndicators: tile.Strings(dora),
 		Dora:           apiview.DoraKinds(dora),

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/session"
 	"github.com/litencatt/mhj2/internal/tile"
@@ -89,7 +90,7 @@ func TestStateContract(t *testing.T) {
 	}
 	for _, k := range []string{
 		"session_id", "seed", "max_turns", "round_wind", "seat_wind", "node_id", "turn", "status",
-		"hand", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
+		"hand", "hand_groups", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
 		"analysis", "by_discard", "history", "tree", "win",
 	} {
 		if _, ok := raw[k]; !ok {
@@ -249,6 +250,45 @@ func TestTsumoNodeIDGuard(t *testing.T) {
 	if win.Status != session.StatusTsumo || win.Win == nil {
 		t.Fatalf("match: %+v", win)
 	}
+}
+
+// checkHandGroups fails unless groups index hand exactly once each, with
+// known block types.
+func checkHandGroups(t *testing.T, hand []string, groups []apiview.HandGroup) {
+	t.Helper()
+	seen := make([]bool, len(hand))
+	for _, g := range groups {
+		switch g.Type {
+		case "seq", "trip", "pair", "ryanmen", "kanchan", "penchan", "toitsu", "float":
+		default:
+			t.Fatalf("hand %v: group type %q", hand, g.Type)
+		}
+		if len(g.Tiles) == 0 {
+			t.Fatalf("hand %v: empty %s group", hand, g.Type)
+		}
+		for _, i := range g.Tiles {
+			if i < 0 || i >= len(hand) || seen[i] {
+				t.Fatalf("hand %v: groups %+v: index %d out of range or repeated", hand, groups, i)
+			}
+			seen[i] = true
+		}
+	}
+	for i, ok := range seen {
+		if !ok {
+			t.Fatalf("hand %v: groups %+v miss index %d", hand, groups, i)
+		}
+	}
+}
+
+func TestSessionHandGroups(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	s := c.state("POST", "/api/sessions", `{"seed": 7}`)
+	base := "/api/sessions/" + s.SessionID
+	for s.Status == session.StatusPlaying {
+		checkHandGroups(t, s.Hand, s.HandGroups)
+		s = c.state("POST", base+"/discard", `{"tile":"`+*s.Drawn+`"}`)
+	}
+	checkHandGroups(t, s.Hand, s.HandGroups)
 }
 
 func TestTsumoFlow(t *testing.T) {

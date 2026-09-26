@@ -56,7 +56,9 @@ type Seat struct {
 	Melds     []Meld      `json:"melds"`
 	HandCount int         `json:"hand_count"` // concealed tiles, drawn tile included
 	Hand      []string    `json:"hand,omitempty"`
-	Drawn     *string     `json:"drawn,omitempty"`
+	// HandGroups are the blocks of hand, for your seat only (docs/api.md).
+	HandGroups []apiview.HandGroup `json:"hand_groups,omitempty"`
+	Drawn      *string             `json:"drawn,omitempty"`
 }
 
 // Meld is a called meld or a concealed kan.
@@ -195,6 +197,9 @@ func (m *Match) state() State {
 		}
 		if sv.Hand != nil {
 			seat.Hand = tile.Strings(sv.Hand)
+			if s == Human {
+				seat.HandGroups = apiview.HandGroups(sv.Hand, len(sv.Melds))
+			}
 		}
 		if sv.Drawn != nil {
 			d := sv.Drawn.String()
