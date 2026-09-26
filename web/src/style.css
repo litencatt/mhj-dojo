@@ -484,14 +484,6 @@ section {
 .hand-heading h2 {
   margin: 0;
 }
-.hand-groups-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.8rem;
-  color: var(--muted);
-  cursor: pointer;
-}
 /* 面子表示: each block under a labelled bracket; blocks wrap as units, and
    tiles sit closer inside a block than between blocks. With 2px inside and
    6px between, up to 7 blocks take no more width than the 4px gaps of the

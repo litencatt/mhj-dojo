@@ -136,10 +136,14 @@ export function Hand(props: HandProps) {
       <div class="hand-heading">
         <h2>手牌</h2>
         {groups && (
-          <label class="hand-groups-toggle">
-            <input type="checkbox" checked={showGroups} onChange={(e) => setShowGroups(e.currentTarget.checked)} />
+          <button
+            type="button"
+            class={`filter-chip ${showGroups ? 'filter-chip-on' : ''}`}
+            aria-pressed={showGroups}
+            onClick={() => setShowGroups(!showGroups)}
+          >
             面子表示
-          </label>
+          </button>
         )}
       </div>
       <div class="hand-row">

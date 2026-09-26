@@ -98,8 +98,8 @@ test('hand groups toggle: brackets, the same tiles, restore and reload', async (
   const handPanel = page.getByRole('region', { name: '手牌' });
   const tiles = handPanel.locator('.hand-tiles .tile');
   await expect(tiles).toHaveCount(13);
-  const toggle = handPanel.getByLabel('面子表示');
-  await expect(toggle).not.toBeChecked(); // off by default
+  const toggle = handPanel.getByRole('button', { name: '面子表示' });
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false'); // off by default
   const labels = () => tiles.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''));
   const plain = await labels();
 
@@ -107,7 +107,7 @@ test('hand groups toggle: brackets, the same tiles, restore and reload', async (
   page.on('request', (req) => {
     if (req.url().includes('/api/')) requests++;
   });
-  await toggle.check();
+  await toggle.click();
   const groups = handPanel.locator('.hand-group');
   await expect(groups.first()).toBeVisible();
   await expect(tiles).toHaveCount(13);
@@ -118,10 +118,10 @@ test('hand groups toggle: brackets, the same tiles, restore and reload', async (
   expect(requests, 'the toggle sends no request').toBe(0);
 
   await page.reload();
-  await expect(toggle).toBeChecked();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(groups.first()).toBeVisible();
 
-  await toggle.uncheck();
+  await toggle.click();
   await expect(groups).toHaveCount(0);
   expect(await labels()).toEqual(plain);
 });
@@ -130,7 +130,7 @@ test('hand groups fit a 390px-wide viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?seed=1&turns=18');
   const handPanel = page.getByRole('region', { name: '手牌' });
-  await handPanel.getByLabel('面子表示').check();
+  await handPanel.getByRole('button', { name: '面子表示' }).click();
   await expect(handPanel.locator('.hand-group').first()).toBeVisible();
   await expect(handPanel.locator('.hand-tiles .tile')).toHaveCount(13);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
