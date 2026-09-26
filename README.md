@@ -113,6 +113,8 @@ It's published at https://mhj-dojo.lolipop-now.app/ (practice mode only; CPU gam
 
 Run `npx lolipop login` once (opens a browser to authorize the CLI), then `DEPLOY_PROJECT=<id> make deploy` (or `export DEPLOY_PROJECT=<id>` first) to build and publish the site; the project id isn't committed and isn't the same for everyone's own Lolipop account, so find it with `npx lolipop project list` (`make deploy` fails fast with a reminder if `DEPLOY_PROJECT` is unset). The Lolipop project was created once with `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."`; `make deploy` only pushes new builds to it. `make deploy` copies `web/dist-site/` to a fresh temporary directory outside this repo before deploying, because `web/dist-site/` and `mhj-dojo.wasm` are gitignored and the `lolipop` CLI skips gitignored files when its `--dir` is inside a git repository. Deploy Now serves `index.html` with `max-age=86400`, so a deploy can take up to a day to reach a returning visitor's cached page; `index.html` loads the engine (worker, `wasm_exec.js`, `mhj-dojo.wasm`) with a `?v=<hash>` of those files (see `web/src/wasm.ts`), so a returning visitor's stale `index.html` never mixes an old page with a new engine or vice versa.
 
+The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
+
 ### Layout
 
 ```

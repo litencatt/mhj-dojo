@@ -115,6 +115,8 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 初回のみ `npx lolipop login`（ブラウザでの認可）を実行し、あとは `DEPLOY_PROJECT=<id> make deploy`（または事前に `export DEPLOY_PROJECT=<id>`）でビルドから公開まで行います。プロジェクトIDはコミットしておらず、Lolipopアカウントごとに異なるため、`npx lolipop project list` で確認してください（`DEPLOY_PROJECT` が未設定だと `make deploy` はその旨のメッセージを出して即座に失敗します）。Lolipop のプロジェクトは `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."` で一度だけ作成済みで、`make deploy` はそのプロジェクトへビルドを送るだけです。`make deploy` は `web/dist-site/` をこのリポジトリの外の一時ディレクトリにコピーしてからデプロイします。`web/dist-site/` と `mhj-dojo.wasm` は `.gitignore` 対象で、`lolipop` CLI は `--dir` が git リポジトリ内にあると gitignore されたファイルを無視してしまうためです。Deploy Now は `index.html` を `max-age=86400` で配信するため、再訪問者のキャッシュに新しいデプロイが届くまで最大で1日かかることがあります。`index.html` はエンジン（worker、`wasm_exec.js`、`mhj-dojo.wasm`）をそれらのハッシュ値の `?v=<hash>` 付きで読み込むので（`web/src/wasm.ts` 参照）、古い `index.html` が新しいエンジンと混ざる（またはその逆）ことはありません。
 
+サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
+
 ### ディレクトリ構成
 
 ```

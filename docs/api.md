@@ -75,7 +75,8 @@ made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
 
 `version` is the first 7 hex digits of `revision`, or `"dev"` for a build without the stamp
 (`go run`, `go test`, a build outside a git checkout), where `revision` and `time` are `""`.
-`time` is the commit time (RFC 3339, UTC), `modified` whether the build had uncommitted changes.
+`time` is the commit time (RFC 3339, UTC), `modified` whether the build had uncommitted changes
+(as `git status` reports them, so untracked files that are not ignored count too).
 The static site's engine answers it too (with the WebAssembly binary's own stamp). The UI shows
 it in the header.
 
