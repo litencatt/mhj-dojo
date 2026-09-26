@@ -89,6 +89,11 @@ node still exists; the tree only grows), so `goto` takes no staleness guard.
   // (key = exact tile string, red kept distinct), analysis of the resulting 13 tiles.
   "by_discard": { "5m": [YakuRow], "...": [YakuRow] },
 
+  // Up to five yaku combinations for `hand`, best first (see Yaku combos),
+  // and, only when status == playing, for each discard candidate as in by_discard.
+  "combos": [ComboRow],
+  "combos_by_discard": { "5m": [ComboRow] },
+
   // Path from the root to the current node (inclusive), for the time-series chart.
   "history": [
     { "node_id": 0, "turn": 0, "draw": null, "discard": null,
@@ -248,6 +253,62 @@ while a plain copy of it was held: that gives up a dora for nothing, so it
 keeps rank 1 but `is_best` is false and the text says 赤ドラを失う). It is computed once, when the
 node is created, and kept with the node, so it shows again after `goto`.
 
+### Yaku combos
+
+`combos` lists combinations of two or more non-yakuman yaku that one complete
+hand can score together, with the shanten toward such a hand:
+
+`shanten_{Y1..Yn}(H) = min over complete W satisfying every Yi in one reading of |W \ H| − 1`
+
+and its ukeire (as for a single row). The yaku come from `tanyao`, `pinfu`,
+`iipeikou`, `sanshoku`, `sanshoku_doukou`, `ittsu`, `chanta`, `junchan`,
+`honroutou`, `honitsu`, `chinitsu`, `toitoi`, `shousangen`, the dragon rows,
+the value-wind rows and `chiitoitsu` (seven pairs combines only with `tanyao`,
+`honroutou`, `honitsu` and `chinitsu`). Not combined: `ryanpeikou`,
+`sanankou`, the yakuman, pairs where one yaku replaces the other (chanta /
+junchan, honitsu / chinitsu), pairs whose hands are really another yaku
+(tanyao or junchan with honitsu = chinitsu, chanta or junchan with
+honroutou), and all three dragons (daisangen). `shousangen` always counts its
+two dragon triplets: its name reads `小三元（役牌×2込み）` and it adds 4 han;
+it is not combined with the dragon rows.
+
+```jsonc
+{
+  "keys": ["tanyao", "pinfu", "sanshoku"],  // row keys, in row order
+  "name": "断么九＋平和＋三色同順",          // row names joined with ＋
+  "han": 4,                // sum of the rows' han (open-hand han after a call); dora not counted
+  "shanten": 0,            // never null: impossible combinations are not listed
+  "approx": false,         // true for a pinfu combination at shanten >= 1 (as the pinfu row)
+  "ukeire": [ { "tile": "4s", "remaining": 3 } ],
+  "ukeire_total": 3
+}
+```
+
+Pinfu combinations follow the pinfu row: exact at tenpai (a winning tile must
+give a reading with a two-sided wait that also satisfies the other yaku),
+relaxed and `approx` otherwise. With melds the combinations follow the rows
+(fixed groups, closed-only yaku dropped, kuisagari han).
+
+Ranking (`yakushanten.Combos`):
+
+1. Sort by `2 × shanten − value`, where value = han capped at 5 (mangan), +1
+   from 6 han (haneman) and +1 more from 8 han (baiman): one step toward tenpai
+   weighs as much as two han. Ties: more han, then fewer shanten, then a fixed
+   list order.
+2. Drop a combination when one with more yaku that contains it has the same
+   shanten (it scores more for the same work).
+3. Drop a combination that differs from a better-ranked one only in which
+   value tiles (dragons, winds) it uses, with the same han and shanten.
+4. Keep the first five.
+
+The server evaluates the combinations best-first by a lower bound (the largest
+shanten among each combination's own rows) and stops once no remaining one can
+enter the top five; `TestCombosPruneMatchesFull` checks this gives the same
+result as evaluating all of them, and `TestCombosMatchBruteForce` checks every
+combination against a brute-force definition. With the combos, analysing
+every discard candidate of a closed hand (`TestAnalyzeAllDiscardsP95`) takes
+p95 ~41 ms, up from ~23 ms, within the 100 ms budget.
+
 ### Rows (fixed order)
 
 | key | name | yakuman |
@@ -311,7 +372,7 @@ These clarify points the contract above leaves open; none changes the JSON shape
   session changes nothing.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
-- **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
+- **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
   **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
   (an exhausted node has one). Like `by_discard`, the full advice is kept only for the current node (see Memory);
   each node keeps just its small review. Computing the advice takes ~1.4 ms on average, ~4 ms at p95, per
@@ -557,6 +618,8 @@ unknown game, `409` a move that is not legal now.
   "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
                                 // wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
+  "combos": [ComboRow],         // yaku combos of the hand `analysis` describes ([] right after a pon or chii)
+  "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended
 }
