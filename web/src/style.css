@@ -799,8 +799,15 @@ section {
   background: var(--accent);
   color: var(--accent-fg);
 }
-.yaku-filter-count {
+/* The count and the reset stay together, at the right end of the chips' row
+   or wrapped under them. */
+.yaku-filter-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
+}
+.yaku-filter-count {
   font-size: 0.75rem;
   color: var(--muted);
 }
@@ -1144,13 +1151,26 @@ section {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.help-button {
+/* ? and × look like the panels' – button. */
+.help-button,
+.help-close {
+  flex: none;
   width: 26px;
-  height: 26px;
+  height: 24px;
   padding: 0;
-  border-radius: 50%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
   font-weight: bold;
   line-height: 1;
+  cursor: pointer;
+}
+.help-button:hover,
+.help-close:hover {
+  color: var(--fg);
+  border-color: var(--muted);
 }
 .help-dialog {
   width: min(640px, calc(100vw - 24px));
@@ -1183,13 +1203,7 @@ section {
 .help-heading h2 {
   margin: 0;
 }
-.help-close {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 1.1rem;
-  line-height: 1;
-}
+
 .help-content section {
   border: none;
   border-radius: 0;
@@ -1667,8 +1681,9 @@ section {
     margin-left: auto;
   }
   .help-button {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
   }
   .new-game-form {
     flex-basis: 100%;
@@ -1698,7 +1713,10 @@ section {
   .game-status {
     gap: 4px 14px;
   }
+  /* When the dora box wraps under the status it spans the row, so it does
+     not hang at the right end with a gap on its left. */
   .dora-box {
+    flex: 1 1 auto;
     padding: 4px 10px;
     gap: 4px 14px;
   }
@@ -1789,7 +1807,21 @@ section {
     min-height: 32px;
   }
   .filter-chip {
-    padding: 4px 12px;
+    padding: 4px 10px;
+  }
+  /* Filter bar: the search on a row of its own, the two selects sharing the
+     next one. */
+  .yaku-filter-search {
+    flex-basis: 100%;
+  }
+  .yaku-filter-row label {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .yaku-filter-row label select {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .yaku-filter-search,
   .yaku-filter select,
@@ -2008,8 +2040,9 @@ section {
     padding: 8px 14px 6px;
   }
   .help-close {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
   }
 
   /* The site's update notice sits above the dock bar. */

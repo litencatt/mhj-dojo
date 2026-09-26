@@ -49,7 +49,7 @@ export function App() {
   });
 
   useEffect(() => {
-    document.title = 'mhj-dojo - 麻雀練習';
+    document.title = 'mhj-dojo - 麻雀道場';
   }, []);
 
   function handleNewGame(e: Event) {
@@ -87,7 +87,7 @@ export function App() {
         <div class="area-header">
           <header class="app-header">
             <h1>
-              mhj-dojo <span class="app-subtitle">麻雀練習</span>
+              mhj-dojo <span class="app-subtitle">麻雀道場</span>
               {!api.WASM && (
                 <a class="mode-link" href="?mode=game">CPU対戦へ</a>
               )}

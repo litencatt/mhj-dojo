@@ -251,14 +251,16 @@ export function YakuTable(props: YakuTableProps) {
               {c.label}
             </button>
           ))}
-          <span class="yaku-filter-count">
-            {visibleCount} / {total}役を表示中
+          <span class="yaku-filter-status">
+            <span class="yaku-filter-count">
+              {visibleCount} / {total}役を表示中
+            </span>
+            {!isDefaultFilter(filter) && (
+              <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
+                条件をクリア
+              </button>
+            )}
           </span>
-          {!isDefaultFilter(filter) && (
-            <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
-              条件をクリア
-            </button>
-          )}
         </div>
       </div>
       {tip && YAKU_CONDITIONS[tip.key] && (
