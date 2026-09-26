@@ -249,3 +249,28 @@ test('unusable saved moves start over from the seed in the URL', async ({ page }
   expect(saved.sessions[id].moves).toEqual([]);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
+
+// On a phone (390px wide): no sideways page scroll, the hand on one row, the
+// minimized panels in a bar along the bottom, and the yaku table in the width.
+test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./?seed=1&turns=18');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await expect(hand.locator('.hand-drawn button')).toBeVisible();
+  const tops = await hand
+    .locator('.hand-row button.tile')
+    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
+  expect(tops).toHaveLength(14);
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(10);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // The advice starts minimized: its tab is in the bottom bar.
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const bar = await dock.boundingBox();
+  expect(bar!.y + bar!.height).toBeCloseTo(844, 0);
+  expect(bar!.width).toBeCloseTo(390, 0);
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  await expect(yaku).toBeVisible();
+  const panel = await yaku.boundingBox();
+  const table = await yaku.locator('.yaku-table').boundingBox();
+  expect(table!.x + table!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
+});
