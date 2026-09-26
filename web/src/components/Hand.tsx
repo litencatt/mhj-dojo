@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { HandGroup, HandGroupType } from '../api';
 import { useHandGroupsToggle } from '../hooks';
 import { Tile } from './Tile';
@@ -60,9 +60,16 @@ function validGroups(hand: string[], groups: HandGroup[] | undefined): HandGroup
   return n === hand.length ? groups.filter((g) => g.tiles.length > 0) : null;
 }
 
+// A selected tile: its display position, or 'drawn'.
+type Pick = number | 'drawn';
+
 /**
  * 13-tile hand + drawn tile (set apart) + discard river. Click discards; hover/focus previews.
  * With 面子表示 on, the hand is regrouped into the server's blocks, each under a labelled bracket.
+ *
+ * Touch has no hover, so a tap only selects a tile (raised, and previewed like
+ * a hovered one) and a second tap on the same tile discards it. The mouse and
+ * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
   const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, highlight, onDiscard, onPreview } = props;
@@ -80,6 +87,39 @@ export function Hand(props: HandProps) {
   // tile remounts when its position moves to another group, so focus is put
   // back at that position.
   const refocusPos = useRef<number | null>(null);
+  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'),
+  // read by the click that follows it; a keyboard click has none.
+  const pointer = useRef<string | null>(null);
+  // The tile a tap selected, with its tile, kept previewed until discarded.
+  const [picked, setPicked] = useState<{ at: Pick; tile: string } | null>(null);
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
+
+  // A new hand (or a locked one) drops the selection.
+  useEffect(() => {
+    setPicked(null);
+  }, [hand, drawn, disabled]);
+
+  // Selects on the first tap and discards on the second; true when the click
+  // should go on to discard.
+  const tapToDiscard = (at: Pick, t: string): boolean => {
+    const touch = pointer.current === 'touch' || pointer.current === 'pen';
+    pointer.current = null;
+    if (!touch) return true;
+    if (picked && picked.at === at && picked.tile === t) {
+      setPicked(null);
+      // Leave nothing focused, so the next hand is not previewed by focus.
+      (document.activeElement as HTMLElement | null)?.blur();
+      return true;
+    }
+    setPicked({ at, tile: t });
+    onPreview(t);
+    return false;
+  };
+  // Leaving a tile goes back to the selected tile's preview, if any.
+  const previewEnd = () => onPreview(pickedRef.current?.tile ?? null);
+  const pickClass = (at: Pick, t: string) => (picked && picked.at === at && picked.tile === t ? 'tile-picked' : undefined);
+  const classes = (...cs: Array<string | undefined>) => cs.filter(Boolean).join(' ') || undefined;
 
   // Tiles are buttons keyed by position, so keyboard focus stays at the clicked
   // position through the request and the new hand (or is put back there when the
@@ -122,13 +162,14 @@ export function Hand(props: HandProps) {
         button
         interactive={ok}
         dimmed={!disabled && !ok}
-        className={mark(t)}
+        className={classes(mark(t), pickClass(pos, t))}
         onClick={() => {
+          if (!tapToDiscard(pos, t)) return;
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
           onDiscard(t);
         }}
         onHoverStart={() => onPreview(t)}
-        onHoverEnd={() => onPreview(null)}
+        onHoverEnd={previewEnd}
       />
     );
   };
@@ -149,7 +190,12 @@ export function Hand(props: HandProps) {
           </button>
         )}
       </div>
-      <div class="hand-row">
+      <div
+        class="hand-row"
+        onPointerDown={(e) => {
+          pointer.current = e.pointerType;
+        }}
+      >
         <div
           class={layout ? 'hand-tiles hand-tiles-grouped' : 'hand-tiles'}
           role="group"
@@ -174,13 +220,14 @@ export function Hand(props: HandProps) {
               button
               interactive={can(drawn, true)}
               dimmed={!disabled && !can(drawn, true)}
-              className={mark(drawn)}
+              className={classes(mark(drawn), pickClass('drawn', drawn))}
               onClick={() => {
+                if (!tapToDiscard('drawn', drawn)) return;
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');
                 onDiscard(drawn);
               }}
               onHoverStart={() => onPreview(drawn)}
-              onHoverEnd={() => onPreview(null)}
+              onHoverEnd={previewEnd}
             />
           </div>
         )}
