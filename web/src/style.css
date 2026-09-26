@@ -1841,9 +1841,12 @@ section {
     width: min(280px, calc(100vw - 16px));
   }
 
-  /* Practice: the hand sticks to the top of the screen (not a win, which is
-     too tall to pin) and the yaku panel scrolls on its own in the height left
-     under it, above the bottom padding or dock bar. App.tsx sets --hand-h. */
+  /* Practice: the yaku panel fills the screen under the header and the hand,
+     down to the bottom padding or dock bar, and scrolls on its own, so the
+     page does not scroll. With more panels open, or on a screen too short
+     for a 200px panel, the page does scroll, and the hand then sticks to the
+     top (not a win, which is too tall to pin).
+     App.tsx sets --yaku-top, where the panel starts on the page. */
   .app-practice {
     --yaku-bottom: 32px;
   }
@@ -1861,8 +1864,8 @@ section {
     display: flex;
     flex-direction: column;
     height: max(
-      280px,
-      calc(100dvh - var(--hand-h, 120px) - 18px - env(safe-area-inset-top, 0px) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
+      200px,
+      calc(100dvh - var(--yaku-top, 50dvh) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
     );
   }
   .app-practice .yaku-table-panel {

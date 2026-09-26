@@ -81,19 +81,21 @@ export function App() {
   const docked = PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
 
-  // On a phone the hand stays at the top of the screen and the yaku table
-  // scrolls in the space under it (style.css): tell the CSS the hand's height.
+  // On a phone the yaku panel scrolls on its own in the height left under the
+  // header and the hand (style.css): tell the CSS where the panel starts.
   const appRef = useRef<HTMLDivElement>(null);
-  const handAreaRef = useRef<HTMLDivElement>(null);
   const hasState = !!state;
   useEffect(() => {
     const app = appRef.current;
-    const hand = handAreaRef.current;
-    if (!app || !hand) return;
+    if (!app) return;
+    // The panels above the yaku table change the app's height when they
+    // change, and so does a new window width.
     const ro = new ResizeObserver(() => {
-      app.style.setProperty('--hand-h', `${hand.offsetHeight}px`);
+      const yaku = app.querySelector('.area-yaku');
+      if (!yaku) return;
+      app.style.setProperty('--yaku-top', `${yaku.getBoundingClientRect().top + window.scrollY}px`);
     });
-    ro.observe(hand);
+    ro.observe(app);
     return () => ro.disconnect();
   }, [hasState]);
 
@@ -184,7 +186,7 @@ export function App() {
         </div>
         {state && (
           <>
-            <div ref={handAreaRef} class="area-hand">
+            <div class="area-hand">
               <Hand
                 hand={state.hand}
                 groups={state.hand_groups}
