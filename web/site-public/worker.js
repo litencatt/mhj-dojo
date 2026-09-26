@@ -3,18 +3,29 @@
 // analysis doesn't freeze the page. src/wasm.ts starts it and talks to it:
 //
 //   worker → page  {type: 'ready', initMs} | {type: 'failed', error}
-//   page → worker  {id, method, path, body}   (an HTTP API request, docs/api.md)
-//   worker → page  {id, status, body}         (the status and JSON body the server would send)
+//   page → worker  {id, fn: 'request', args: [method, path, body]}   an HTTP API request (docs/api.md)
+//                  {id, fn: 'restore', args: [body]}                 rebuild a session from its moves
+//   worker → page  {id, status, body}   the status and JSON body the server would send
 //
 // wasm_exec.js (Go's JS glue) and mhj2.wasm sit next to this file; `make
-// wasm` copies them here.
-/* global Go, mhj2Request */
-importScripts('wasm_exec.js');
+// wasm` copies them here. The page loads this file as worker.js?v=<version>,
+// a hash of the three files taken at build time, and the same ?v= goes on
+// the other two so a browser never mixes a cached copy of one with a new
+// copy of another after a deploy.
+/* global Go, mhj2Request, mhj2Restore */
+const version = new URL(self.location.href).searchParams.get('v');
+const versioned = (name) => {
+  const url = new URL(name, self.location.href);
+  if (version) url.searchParams.set('v', version);
+  return url;
+};
+
+importScripts(versioned('wasm_exec.js').href);
 
 const started = performance.now();
 
 async function instantiate(go) {
-  const url = new URL('mhj2.wasm', self.location.href);
+  const url = versioned('mhj2.wasm');
   try {
     return (await WebAssembly.instantiateStreaming(fetch(url), go.importObject)).instance;
   } catch {
@@ -28,10 +39,12 @@ async function instantiate(go) {
 const ready = (async () => {
   const go = new Go();
   const instance = await instantiate(go);
-  // Runs main until it blocks, which defines mhj2Request; the promise
-  // settles only if the program exits.
+  // Runs main until it blocks, which defines mhj2Request and mhj2Restore;
+  // the promise settles only if the program exits.
   go.run(instance);
-  if (typeof mhj2Request !== 'function') throw new Error('mhj2.wasm did not start');
+  if (typeof mhj2Request !== 'function' || typeof mhj2Restore !== 'function') {
+    throw new Error('mhj2.wasm did not start');
+  }
 })();
 
 ready.then(
@@ -40,10 +53,10 @@ ready.then(
 );
 
 self.onmessage = async (e) => {
-  const { id, method, path, body } = e.data;
+  const { id, fn, args } = e.data;
   try {
     await ready;
-    const res = mhj2Request(method, path, body ?? '');
+    const res = fn === 'restore' ? mhj2Restore(...args) : mhj2Request(...args);
     self.postMessage({ id, status: res.status, body: res.body });
   } catch (err) {
     self.postMessage({ id, status: 500, body: JSON.stringify({ error: String(err) }) });

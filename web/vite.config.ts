@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 
@@ -8,11 +9,21 @@ export default defineConfig(({ command, mode }) => {
   // be served from any subpath; site-public/ holds the worker, and `make
   // wasm` puts mhj2.wasm and Go's wasm_exec.js next to it.
   if (mode === 'site') {
-    if (command === 'build' && !existsSync(new URL('site-public/mhj2.wasm', import.meta.url))) {
-      throw new Error('site-public/mhj2.wasm is missing: run `make wasm` first (or `make site`)');
+    const engine = ['worker.js', 'wasm_exec.js', 'mhj2.wasm'].map((f) => new URL(`site-public/${f}`, import.meta.url));
+    const missing = engine.filter((f) => !existsSync(f));
+    if (command === 'build' && missing.length > 0) {
+      throw new Error(`${missing.map((f) => f.pathname).join(', ')} missing: run \`make wasm\` first (or \`make site\`)`);
     }
+    // One version for the three engine files, which keep fixed names: the
+    // page loads them with ?v=<it> so a deploy never mixes cached and new
+    // copies (src/wasm.ts, site-public/worker.js).
+    const hash = createHash('sha256');
+    for (const f of engine) if (existsSync(f)) hash.update(readFileSync(f));
     return {
       plugins: [preact()],
+      define: {
+        'import.meta.env.VITE_MHJ2_ENGINE': JSON.stringify(hash.digest('hex').slice(0, 12)),
+      },
       base: './',
       publicDir: 'site-public',
       build: {

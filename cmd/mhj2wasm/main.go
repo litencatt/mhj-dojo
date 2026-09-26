@@ -4,13 +4,18 @@
 // static site: the browser (a Web Worker, web/site-public/worker.js) runs the
 // sessions itself instead of calling the mhj2 server.
 //
-// It defines one global function,
+// It defines two global functions:
 //
 //	mhj2Request(method, path, body) -> {status, body}
 //
-// which answers a practice request of the HTTP API (docs/api.md) given as its
+// answers a practice request of the HTTP API (docs/api.md) given as its
 // method, path and JSON body, with the status and JSON body the server would
-// send.
+// send (apicall.Route), and
+//
+//	mhj2Restore(body) -> {status, body}
+//
+// rebuilds a session from its moves in one call after a page reload
+// (apicall.Restore; not an HTTP endpoint).
 package main
 
 import (
@@ -29,19 +34,30 @@ func main() {
 		if len(args) != 3 {
 			return response(400, apicall.ErrorBody("mhj2Request takes method, path and body"))
 		}
-		return request(store, args[0].String(), args[1].String(), args[2].String())
+		return safely(func() (int, any) {
+			return apicall.Route(store, args[0].String(), args[1].String(), strings.NewReader(args[2].String()))
+		})
+	}))
+	js.Global().Set("mhj2Restore", js.FuncOf(func(_ js.Value, args []js.Value) any {
+		if len(args) != 1 {
+			return response(400, apicall.ErrorBody("mhj2Restore takes a body"))
+		}
+		return safely(func() (int, any) {
+			return apicall.Restore(store, strings.NewReader(args[0].String()))
+		})
 	}))
 	select {} // keep the function callable
 }
 
-func request(store *session.Store, method, path, body string) (res any) {
-	// A panic would end the Go program and every later call with it.
+// safely runs f, turning a panic into a 500: a panic would end the Go
+// program and every later call with it.
+func safely(f func() (int, any)) (res any) {
 	defer func() {
 		if r := recover(); r != nil {
 			res = response(500, apicall.ErrorBody(fmt.Sprint("internal error: ", r)))
 		}
 	}()
-	return response(apicall.Session(store, method, path, strings.NewReader(body)))
+	return response(f())
 }
 
 func response(status int, v any) any {
