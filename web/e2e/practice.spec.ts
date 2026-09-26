@@ -186,3 +186,30 @@ test('hand groups fit a 390px-wide viewport', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+// Server error messages are English, meant for API clients, and sometimes
+// embed a raw tile code (session.go's "tile %q is not in hand or drawn").
+// errorMessage() (panels.ts) must turn a quoted or bare code into its name
+// before it reaches the error banner, but leave a longer, non-code token
+// (e.g. "18p") alone. Intercept a discard with the server's actual error
+// shape (400, {"error": "..."}) instead of provoking a real one, since a
+// real rejection (an out-of-hand tile) never reaches the client - only
+// hand tiles are clickable.
+test('a server error with a tile code shows the tile name, not the code', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  const handPanel = page.getByRole('region', { name: '手牌' });
+  const drawn = handPanel.locator('.hand-drawn button');
+  await expect(drawn).toBeVisible();
+
+  await page.route('**/api/sessions/*/discard', (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'tile "5p" is not in hand or drawn (also 5p, seat 2, 18p)' }),
+    }),
+  );
+
+  await drawn.click();
+  const banner = page.getByRole('alert');
+  await expect(banner).toHaveText('tile 5筒 is not in hand or drawn (also 5筒, seat 2, 18p)');
+});
