@@ -88,10 +88,27 @@ cd web && npx playwright install --with-deps chromium   # once
 cd web && npm run build && npm run e2e
 ```
 
+### Static site (WebAssembly, practice mode only)
+
+The practice mode can also be built as a static site that needs no server: the Go practice engine (`cmd/mhj2wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
+
+```sh
+make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj2.wasm + wasm_exec.js), then npm run build:site
+```
+
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj2.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests with `cd web && npm run e2e:site`.
+
+Differences from the local version:
+
+- Practice mode only; the CPU game (**CPU対戦へ**, `?mode=game`) is not available yet.
+- Each tab runs its own sessions, so there is no "another tab moved on" handling.
+- The current session's moves are saved in the browser (localStorage) and replayed after a reload; if that fails, the same wall is dealt again from the seed in the URL.
+
 ### Layout
 
 ```
 cmd/mhj2/            CLI entry point
+cmd/mhj2wasm/        practice engine as WebAssembly for the static site
 internal/tile/       tile representation and notation
 internal/wall/       seeded wall, deal, draws
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire
@@ -104,6 +121,7 @@ internal/game/       four-player round engine (riichi, furiten, settlement)
 internal/cpu/        CPU player
 internal/match/      games against CPU players for the API
 internal/store/      in-memory store for sessions and games
+internal/apicall/    request handling shared by the HTTP API and the WebAssembly build
 internal/server/     HTTP API and embedded frontend
 web/                 Vite + Preact + TypeScript frontend
 docs/api.md          HTTP API and definitions

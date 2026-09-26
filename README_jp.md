@@ -90,10 +90,27 @@ cd web && npx playwright install --with-deps chromium   # 初回のみ
 cd web && npm run build && npm run e2e
 ```
 
+### 静的サイト（WebAssembly、練習モードのみ）
+
+練習モードは、サーバなしで動く静的サイトとしてもビルドできます。Go の練習エンジン（`cmd/mhj2wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。HTTP API（docs/api.md）と同じリクエストに同じ JSON で答えるので、画面のコードは共通です。
+
+```sh
+make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj2.wasm と wasm_exec.js）のあと npm run build:site
+```
+
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj2.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テストは `cd web && npm run e2e:site` です。
+
+ローカル版との違い:
+
+- 練習モードのみです。CPU対戦（**CPU対戦へ**、`?mode=game`）はまだ使えません。
+- タブごとに別の状態を持つので、「別の画面で進んだ」ときの処理はありません。
+- 対局中の操作をブラウザ（localStorage）に保存し、再読み込みのときに作り直します。作り直せないときは、URL のシードから同じ山で配り直します。
+
 ### ディレクトリ構成
 
 ```
 cmd/mhj2/            CLI のエントリポイント
+cmd/mhj2wasm/        静的サイト用の練習エンジン（WebAssembly）
 internal/tile/       牌の表現と表記
 internal/wall/       シード付きの山、配牌、ツモ
 internal/shanten/    一般形・七対子・国士無双の向聴と有効牌
@@ -106,6 +123,7 @@ internal/game/       4人打ちの局の進行（リーチ・フリテン・精�
 internal/cpu/        CPU の思考
 internal/match/      API 用の CPU 対戦
 internal/store/      セッションと対局のメモリ保持
+internal/apicall/    HTTP API と WebAssembly 版で共有するリクエスト処理
 internal/server/     HTTP API と埋め込みフロントエンド
 web/                 Vite + Preact + TypeScript のフロントエンド
 docs/api.md          HTTP API と各種定義

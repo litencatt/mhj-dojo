@@ -2,6 +2,12 @@
 
 All endpoints return JSON (`Content-Type: application/json`). Errors: HTTP 4xx/5xx with `{"error": "message"}`.
 
+The static site (README, "Static site") has no server: the practice engine built as WebAssembly
+(`cmd/mhj2wasm`) defines `mhj2Request(method, path, body)` in its Web Worker, which takes a
+practice request below (`/api/sessions…`) as its method, path and JSON body and returns
+`{status, body}` with the status and JSON body the server would send (both use
+`internal/apicall`). Game endpoints answer 404 there.
+
 ## Tile notation
 
 | Notation | Meaning |
