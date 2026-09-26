@@ -50,6 +50,11 @@ export function useMinimized() {
   };
 }
 
+/** Moves focus (and so the view) to the 用語表's search box once it has rendered, after restoring it. */
+export function focusGlossary() {
+  requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.glossary-search')?.focus());
+}
+
 export function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);

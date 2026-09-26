@@ -47,6 +47,9 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 	mux.HandleFunc("POST /api/sessions/{id}/goto", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
 		return apicall.Goto(s, r.Body)
 	}))
+	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, apicall.Version())
+	})
 	mux.HandleFunc("POST /api/games", a.createGame)
 	mux.HandleFunc("GET /api/games/{id}", a.withGame(func(m *match.Match, _ *http.Request) (match.State, error) {
 		return m.State(), nil

@@ -20,6 +20,7 @@ Static site (practice mode only, CPU games not yet): https://mhj-dojo.lolipop-no
 - **Rewindable history tree** — jump back to any turn and try a different discard. New branches are added and old ones are kept, so you can compare lines of play on the same wall.
 - **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives). Yakuman count 13 han each (26 for the double yakuman 四暗刻単騎, 国士無双十三面待ち, 純正九蓮宝燈 and 大四喜) and stack; dora are shown but not added.
 - **Glossary** — a searchable list of the terms used on the page (shanten, ukeire, waits, rules, app features), shown beside the yaku table on wide screens.
+- **Help and version** — the header's **?** opens a short guide to the screen; next to it, the commit the app was built from (`GET /api/version`).
 - **Minimizable panels** — the time-series chart, history tree and glossary can be minimized into tabs on the right edge of the screen and restored with a click; the layout is remembered.
 - **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
 
@@ -111,6 +112,8 @@ It's published at https://mhj-dojo.lolipop-now.app/ (practice mode only; CPU gam
 #### Deploying
 
 Run `npx lolipop login` once (opens a browser to authorize the CLI), then `DEPLOY_PROJECT=<id> make deploy` (or `export DEPLOY_PROJECT=<id>` first) to build and publish the site; the project id isn't committed and isn't the same for everyone's own Lolipop account, so find it with `npx lolipop project list` (`make deploy` fails fast with a reminder if `DEPLOY_PROJECT` is unset). The Lolipop project was created once with `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."`; `make deploy` only pushes new builds to it. `make deploy` copies `web/dist-site/` to a fresh temporary directory outside this repo before deploying, because `web/dist-site/` and `mhj-dojo.wasm` are gitignored and the `lolipop` CLI skips gitignored files when its `--dir` is inside a git repository. Deploy Now serves `index.html` with `max-age=86400`, so a deploy can take up to a day to reach a returning visitor's cached page; `index.html` loads the engine (worker, `wasm_exec.js`, `mhj-dojo.wasm`) with a `?v=<hash>` of those files (see `web/src/wasm.ts`), so a returning visitor's stale `index.html` never mixes an old page with a new engine or vice versa.
+
+The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
 ### Layout
 

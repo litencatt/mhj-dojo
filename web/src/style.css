@@ -1099,6 +1099,141 @@ section {
   color: var(--accent);
 }
 
+/* ---- Version and help (header) ---- */
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.version-tag {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.help-button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: bold;
+  line-height: 1;
+}
+.help-dialog {
+  width: min(640px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px); /* the visible height on phones, where supported */
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  color: var(--fg);
+}
+.help-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.help-content {
+  padding: 12px 18px 18px;
+  font-size: 0.9rem;
+}
+.help-heading {
+  position: sticky;
+  top: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -12px -18px 0;
+  padding: 12px 18px 6px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+}
+.help-heading h2 {
+  margin: 0;
+}
+.help-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.help-content section {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+.help-content h3 {
+  font-size: 0.95rem;
+  margin: 16px 0 4px;
+}
+.help-content p,
+.help-content ul {
+  margin: 0;
+}
+.help-content ul {
+  padding-left: 1.2em;
+}
+.help-content li + li {
+  margin-top: 2px;
+}
+.help-content .help-lead {
+  margin-top: 8px;
+  color: var(--muted);
+}
+.help-link {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.help-tiles {
+  border-collapse: collapse;
+}
+.help-tiles th,
+.help-tiles td {
+  padding: 2px 12px 2px 0;
+  text-align: left;
+  font-weight: normal;
+}
+
+/* The static site's new-version notice, at the bottom without covering the page's controls for long. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px 8px 14px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+  font-size: 0.9rem;
+}
+.update-banner-reload {
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+.update-banner-close {
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
 /* ---- Game table (CPU mode) ----
    A 3x3 grid: 対面 on top, 上家 left, 下家 right, you at the bottom and the
    round info in the middle. Rivers wrap at six tiles like a real table. */

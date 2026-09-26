@@ -231,6 +231,19 @@ export function goto(id: string, nodeId: number): Promise<SessionState> {
   });
 }
 
+// The commit the server (or the site's engine) was built from (docs/api.md
+// "GET /api/version").
+export interface VersionInfo {
+  version: string; // 7 hex digits, or "dev" for a build without the stamp
+  revision: string; // "" when unknown
+  time: string; // the commit time (RFC 3339); "" when unknown
+  modified: boolean;
+}
+
+export function getVersion(): Promise<VersionInfo> {
+  return request<VersionInfo>('/api/version');
+}
+
 // ---- Games against CPU players (docs/api.md "Games") ----
 
 export type GamePhase = 'discard' | 'call' | 'ended';

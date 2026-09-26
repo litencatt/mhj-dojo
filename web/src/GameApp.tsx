@@ -11,7 +11,9 @@ import { GameTable, LENGTH_NAMES, WIND_NAMES, seatLabel } from './components/Gam
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
-import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
+import { Help } from './components/Help';
+import { VersionTag } from './components/VersionTag';
+import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
@@ -147,6 +149,15 @@ export function GameApp() {
               mhj-dojo <span class="app-subtitle">CPU対戦</span>
               <a class="mode-link" href="?">練習へ</a>
             </h1>
+            <div class="header-meta">
+              <VersionTag />
+              <Help
+                onShowGlossary={() => {
+                  restore('gloss');
+                  focusGlossary();
+                }}
+              />
+            </div>
             <form class="new-game-form" onSubmit={handleNewGame}>
               <label>
                 対局
