@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -76,10 +77,7 @@ func TestAnalyzeAllDiscardsP95(t *testing.T) {
 		t.Skip("timing is not meaningful under the race detector")
 	}
 	r := rand.New(rand.NewPCG(9, 10))
-	n := 200
-	if testing.Short() {
-		n = 40
-	}
+	n := testmode.N(200, 100, 40)
 	for _, open := range []bool{false, true} {
 		durs := make([]time.Duration, n)
 		for i := range durs {

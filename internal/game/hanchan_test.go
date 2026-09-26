@@ -3,6 +3,7 @@ package game
 import (
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 )
 
@@ -183,10 +184,7 @@ func TestAbortiveDraws(t *testing.T) {
 // Whole games with the trivial CPU: every game ends, points plus sticks stay
 // at 100000, and replaying the round logs gives the same standings.
 func TestHanchanSelfPlay(t *testing.T) {
-	n := int64(40)
-	if testing.Short() {
-		n = 8
-	}
+	n := testmode.N(int64(40), 12, 8)
 	for seed := range n {
 		rules := Tonpuu
 		if seed%2 == 1 {

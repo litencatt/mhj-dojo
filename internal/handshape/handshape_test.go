@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/litencatt/mhj2/internal/shanten"
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 )
@@ -70,10 +71,7 @@ func TestGroupsKnown(t *testing.T) {
 func TestGroupsShantenMatchesEngine(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
 	e := shanten.NewEngine()
-	n := 20_000
-	if testing.Short() {
-		n = 3_000
-	}
+	n := testmode.N(20_000, 6_000, 3_000)
 	for i := range n {
 		melds := i % 5
 		set := wall.FullSet()

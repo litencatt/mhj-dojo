@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 )
@@ -33,10 +34,7 @@ func quadHand(r *rand.Rand) tile.Counts {
 func TestNormalMatchesClassicRandom(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	e := NewEngine()
-	n := 100_000
-	if testing.Short() {
-		n = 10_000
-	}
+	n := testmode.N(100_000, 30_000, 10_000)
 	for i := 0; i < n; i++ {
 		c := randomHand(r, 13)
 		dp := e.Evaluate(&c, &NormalTarget).Dist - 1
@@ -228,10 +226,7 @@ func addRandom(r *rand.Rand, c *tile.Counts) {
 func TestNormalMatchesBruteForce(t *testing.T) {
 	r := rand.New(rand.NewPCG(5, 6))
 	e := NewEngine()
-	n := 400
-	if testing.Short() {
-		n = 50
-	}
+	n := testmode.N(400, 120, 50)
 	for i := 0; i < n; i++ {
 		var c tile.Counts
 		switch i % 3 {

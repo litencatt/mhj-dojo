@@ -34,9 +34,23 @@ jobs:
   # shared one key, so only the first job to save it (with or without -race)
   # found its builds there, and the cache never refreshed after a hit. Each
   # push to main saves a fresh cache; pull requests only restore it.
+  #
+  # Both test jobs split the packages into groups that run on parallel
+  # runners, balanced by measured test time. "rest" is every package not
+  # named in another group (so new packages land there): keep its grep in
+  # step with the other groups' package lists.
   go-test:
-    name: Go test
+    name: Go test (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: games
+            packages: ./internal/cpu ./internal/game ./internal/match
+          - group: oracles
+            packages: ./internal/yakushanten ./internal/shanten ./internal/handshape ./internal/advice
+          - group: rest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -46,21 +60,40 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/go-build
-          key: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
-          restore-keys: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-
+          key: go-test-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          restore-keys: go-test-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-
       # go vet runs in golangci-lint (the standard set includes govet).
-      # Full-size oracle and property tests; too slow to also run under -race.
-      - run: go test -count=1 ./...
-      - run: go build -o bin/mhj2 ./cmd/mhj2
+      # The reduced, fixed-seed subset of the oracle, property and self-play
+      # tests (internal/testmode); the nightly workflow runs the exhaustive
+      # loops with MHJ2_FULL=1.
+      - name: go test
+        env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          if [ -z "$PACKAGES" ]; then
+            PACKAGES=$(go list ./... | grep -v -E '/internal/(cpu|game|match|yakushanten|shanten|handshape|advice)$')
+          fi
+          go test -count=1 $PACKAGES
+      - if: matrix.group == 'rest'
+        run: go build -o bin/mhj2 ./cmd/mhj2
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: ~/.cache/go-build
-          key: go-test-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          key: go-test-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
 
   go-test-race:
-    name: Go test (race)
+    name: Go test race (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: games
+            packages: ./internal/cpu ./internal/game ./internal/match
+          - group: oracles
+            packages: ./internal/yakushanten ./internal/shanten ./internal/handshape ./internal/advice
+          - group: rest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -70,17 +103,24 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/go-build
-          key: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
-          restore-keys: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-
+          key: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          restore-keys: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-
       # -short shrinks the CPU-bound random/oracle loops and skips whole-game
       # playthroughs, which run on one goroutine; the race detector only adds
       # value for the concurrency paths (session, store, match via server).
-      - run: go test -race -short -count=1 ./...
+      - name: go test -race -short
+        env:
+          PACKAGES: ${{ matrix.packages }}
+        run: |
+          if [ -z "$PACKAGES" ]; then
+            PACKAGES=$(go list ./... | grep -v -E '/internal/(cpu|game|match|yakushanten|shanten|handshape|advice)$')
+          fi
+          go test -race -short -count=1 $PACKAGES
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: ~/.cache/go-build
-          key: go-test-race-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
+          key: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
 
   govulncheck:
     name: Go vulnerability check

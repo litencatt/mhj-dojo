@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yaku"
 )
@@ -200,10 +201,7 @@ func randomOpen(r *rand.Rand, c tile.Counts) *openHand {
 func TestOpenRowsMatchBruteForce(t *testing.T) {
 	r := rand.New(rand.NewPCG(31, 32))
 	a := NewAnalyzer()
-	perKey := 16
-	if testing.Short() {
-		perKey = 4
-	}
+	perKey := testmode.N(16, 8, 4)
 	for _, row := range Rows {
 		for i := 0; i < perKey; i++ {
 			key := row.Key

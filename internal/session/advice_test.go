@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/litencatt/mhj2/internal/testmode"
 )
 
 func TestAdviceAndReview(t *testing.T) {
@@ -99,7 +101,7 @@ func TestPracticeActionP95(t *testing.T) {
 	}
 	st := NewStore()
 	var took []time.Duration
-	for seed := int64(1); seed <= 8; seed++ {
+	for seed := int64(1); seed <= testmode.N(int64(8), 3, 1); seed++ {
 		s := mustCreate(t, st, seed, DefaultMaxTurns)
 		v := s.State()
 		for v.Status == StatusPlaying {
@@ -115,7 +117,7 @@ func TestPracticeActionP95(t *testing.T) {
 	}
 	p95 := took[len(took)*95/100]
 	t.Logf("%d discards: mean %v, p95 %v, max %v", len(took), sum/time.Duration(len(took)), p95, took[len(took)-1])
-	if p95 > 200*time.Millisecond {
+	if !raceEnabled && p95 > 200*time.Millisecond {
 		t.Errorf("discard p95 %v, want < 200ms", p95)
 	}
 }
