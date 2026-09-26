@@ -9,7 +9,9 @@ import { Dock } from './components/Dock';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
-import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
+import { Help } from './components/Help';
+import { VersionTag } from './components/VersionTag';
+import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import { sessionMovedOn, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 export function App() {
@@ -90,6 +92,15 @@ export function App() {
                 <a class="mode-link" href="?mode=game">CPU対戦へ</a>
               )}
             </h1>
+            <div class="header-meta">
+              <VersionTag />
+              <Help
+                onShowGlossary={() => {
+                  restore('gloss');
+                  focusGlossary();
+                }}
+              />
+            </div>
             <form class="new-game-form" onSubmit={handleNewGame}>
               <label>
                 シード

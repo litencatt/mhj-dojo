@@ -1,0 +1,195 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+export interface HelpProps {
+  onShowGlossary: () => void; // bring the 用語表 panel back from the dock and show it
+}
+
+const TILE_NOTATION: Array<[string, string]> = [
+  ['1m〜9m', '萬子（マンズ）'],
+  ['1p〜9p', '筒子（ピンズ）'],
+  ['1s〜9s', '索子（ソーズ）'],
+  ['1z〜7z', '東・南・西・北・白・發・中'],
+  ['0m・0p・0s', '赤5（赤ドラ）'],
+];
+
+/**
+ * The ヘルプ button and the help it opens: a modal <dialog>, so the rest of
+ * the page is inert while it is open, Esc closes it and focus goes back to
+ * the button.
+ */
+export function Help({ onShowGlossary }: HelpProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    else if (!open && d.open) d.close();
+  }, [open]);
+
+  const showGlossary = () => {
+    // Close now, so that the dialog's focus return to the help button comes
+    // before the glossary takes the focus.
+    ref.current?.close();
+    setOpen(false);
+    onShowGlossary();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        class="help-button"
+        aria-haspopup="dialog"
+        aria-label="ヘルプ"
+        title="ヘルプ"
+        onClick={() => setOpen(true)}
+      >
+        ?
+      </button>
+      <dialog
+        ref={ref}
+        class="help-dialog"
+        aria-labelledby="help-title"
+        onClose={() => setOpen(false)}
+        onClick={(e) => {
+          // A click on the backdrop (outside the content) closes it.
+          if (e.target === e.currentTarget) setOpen(false);
+        }}
+      >
+        {open && (
+          <div class="help-content">
+            <div class="help-heading">
+              <h2 id="help-title">ヘルプ</h2>
+              <button type="button" class="help-close" aria-label="ヘルプを閉じる" title="閉じる (Esc)" onClick={() => setOpen(false)}>
+                ×
+              </button>
+            </div>
+            <p class="help-lead">
+              画面の用語は
+              <button type="button" class="help-link" onClick={showGlossary}>
+                用語表
+              </button>
+              で調べられます。
+            </p>
+
+            <section aria-labelledby="help-about">
+              <h3 id="help-about">このアプリについて</h3>
+              <p>
+                日本式リーチ麻雀の練習アプリです。一人打ちでツモと打牌を繰り返しながら、役ごとにあと何向聴か・どの牌が有効牌かを確認できます。
+                パソコンで動かすローカル版（<code>mhj-dojo</code> コマンド）と、ブラウザだけで動く公開版があります。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-practice">
+              <h3 id="help-practice">練習モード</h3>
+              <ul>
+                <li>
+                  <b>配牌</b>：シード（空欄ならランダム）と最大巡目（既定18）を決めて「新規対局」。同じシードなら配牌もツモ順も毎回同じです。
+                </li>
+                <li>
+                  <b>打牌</b>：手牌かツモ牌をクリックすると切ります。最大巡目まで打つと流局です。
+                </li>
+                <li>
+                  <b>ツモ</b>：和了形になると「ツモ」ボタンが出ます。押すと成立役と翻数を表示します。
+                </li>
+                <li>
+                  <b>履歴ツリー</b>：行をクリックするとその局面に戻れます。戻って別の牌を切ると新しい枝ができ、元の枝も残るので、同じ山で打ち筋を比べられます。
+                </li>
+                <li>
+                  <b>時系列チャート</b>：巡目ごとの役別向聴の推移です。凡例をクリックすると役の表示を切り替えます。
+                </li>
+                <li>
+                  各パネルの「–」で画面右端のタブに最小化し、タブをクリックすると戻ります。URL にセッションとシードが入るので、再読み込みしても続きから再開できます。
+                </li>
+              </ul>
+            </section>
+
+            <section aria-labelledby="help-yaku">
+              <h3 id="help-yaku">役別向聴の表の見方</h3>
+              <ul>
+                <li>
+                  <b>向聴</b>：その役の和了形まであと何枚か。「聴牌」はあと1枚で和了、「不可」はその役にできない手です。「近似」は平和の1向聴以上の目安です。
+                </li>
+                <li>
+                  <b>有効牌</b>：引くと向聴が進む牌。牌の下の数字は、まだ見えていない残り枚数です。<b>合計枚数</b>はその合計です。
+                </li>
+                <li>
+                  <b>翻</b>：その役の翻数。役名にカーソルを合わせると成立条件を表示します。役満以外で最も聴牌に近い行は色付きです。
+                </li>
+                <li>
+                  <b>打牌ごとの比較</b>：手牌の牌にカーソルを合わせる（キーボードならフォーカス）と、その牌を切った後の表に切り替わり、今との差（−1 は前進、+1 は後退）を表示します。
+                </li>
+                <li>
+                  <b>フィルター</b>：役名・読みで検索、向聴の上限、1翻・2翻・3翻以上・役満の切り替え、並べ替え（向聴が近い順・有効牌が多い順）。「条件をクリア」で元に戻ります。設定はブラウザに保存されます。
+                </li>
+              </ul>
+            </section>
+
+            <section aria-labelledby="help-combo">
+              <h3 id="help-combo">複合役</h3>
+              <p>
+                表の上の「複合役」は、同じ和了形で同時に成立する役の組み合わせ（例：断么九＋平和）の上位5件です。翻・向聴・有効牌を表示し、「向聴1つ＝2翻」とみなした評価で並べています。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-groups">
+              <h3 id="help-groups">面子表示</h3>
+              <p>
+                手牌の見出しの「面子表示」を押すと、手牌を順子・刻子・雀頭・両面・嵌張・辺張・対子・浮き牌のまとまりに分けて表示します。もう一度押すと元の並びに戻ります。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-advice">
+              <h3 id="help-advice">アドバイス</h3>
+              <p>
+                練習モードの「アドバイス」パネルは、答えが先に見えないよう最初は画面右端のタブにしまってあります。開くと、おすすめの打牌3つ（向聴・有効牌の種類と枚数）、残りツモ、聴牌・和了までの確率の目安、方針、近い役を表示します。
+                候補にカーソルを合わせると手牌の同じ牌に印が付きます。打牌した後は、その打牌の評価を表示します。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-game">
+              <h3 id="help-game">CPU対戦</h3>
+              <p>
+                ローカル版だけの機能です（ヘッダーの「CPU対戦へ」）。CPU3人と東風戦・半荘戦を、鳴き・リーチ・点数計算ありで打てます。役別向聴の表と用語表も使えます。公開版では準備中です。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-tiles">
+              <h3 id="help-tiles">牌の表記</h3>
+              <table class="help-tiles">
+                <tbody>
+                  {TILE_NOTATION.map(([k, v]) => (
+                    <tr key={k}>
+                      <th scope="row">
+                        <code>{k}</code>
+                      </th>
+                      <td>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+            <section aria-labelledby="help-save">
+              <h3 id="help-save">公開版の保存</h3>
+              <p>
+                公開版は計算をすべてブラウザの中で行い、手順はサーバーに送りません。最近の10セッションの手順をこのブラウザに保存し、再読み込みや同じ URL を開いたときに復元します。ブラウザのデータを消すと失われます。
+                ローカル版はセッションを <code>mhj-dojo</code> のメモリに持ち、再起動した後は URL のシードから同じ山で配り直します。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-version">
+              <h3 id="help-version">バージョン表示</h3>
+              <p>
+                ヘッダーの「abc1234 · 2026-09-26」のような表示は、動いているプログラムの元になったコミットとその日付です（カーソルを合わせると詳細）。<code>dev</code> はバージョン情報なしでビルドしたものです。
+                公開版は新しい版が公開されると「新しいバージョンがあります」と表示するので、「再読み込み」で更新できます。
+              </p>
+            </section>
+          </div>
+        )}
+      </dialog>
+    </>
+  );
+}

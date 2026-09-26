@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { App } from './App';
 import { GameApp } from './GameApp';
+import { UpdateBanner } from './components/UpdateBanner';
 import { WASM } from './api';
 import './style.css';
 
@@ -9,4 +10,10 @@ if (!root) throw new Error('#app root element not found');
 // ?mode=game plays against CPU players; anything else is solo practice. The
 // static site has only practice so far (issue #67).
 const game = !WASM && new URLSearchParams(location.search).get('mode') === 'game';
-render(game ? <GameApp /> : <App />, root);
+render(
+  <>
+    {game ? <GameApp /> : <App />}
+    <UpdateBanner />
+  </>,
+  root,
+);
