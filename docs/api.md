@@ -6,7 +6,8 @@ The static site (README, "Static site") has no server: the practice engine built
 (`cmd/mhj2wasm`) defines `mhj2Request(method, path, body)` in its Web Worker, which takes a
 practice request below (`/api/sessions…`) as its method, path and JSON body and returns
 `{status, body}` with the status and JSON body the server would send (both use
-`internal/apicall`). Game endpoints answer 404 there.
+`internal/apicall`). Game endpoints answer 404 there. It also defines `mhj2Restore(body)`, not an
+HTTP endpoint, which rebuilds a session from its moves in one call after a page reload.
 
 ## Tile notation
 

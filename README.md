@@ -102,7 +102,7 @@ Differences from the local version:
 
 - Practice mode only; the CPU game (**CPU対戦へ**, `?mode=game`) is not available yet.
 - Each tab runs its own sessions, so there is no "another tab moved on" handling.
-- The current session's moves are saved in the browser (localStorage) and replayed after a reload; if that fails, the same wall is dealt again from the seed in the URL.
+- Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL.
 
 ### Layout
 
