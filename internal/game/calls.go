@@ -140,8 +140,7 @@ func (r *Round) resolveClaims() {
 // call makes seat's pon, open kan or chii on the last discard.
 func (r *Round) call(a Action) {
 	from := r.turn
-	r.acceptRiichi()  // a riichi discard that is called stands
-	r.revealKanDora() // and it has passed without a ron
+	r.acceptRiichi() // a riichi discard that is called stands
 	t := r.lastDiscard
 	rp := &r.players[from]
 	rp.river[len(rp.river)-1].Called = true
@@ -229,8 +228,8 @@ func (r *Round) canKan() bool {
 
 // drawRinshan gives seat the next replacement tile after a kan; the kan
 // takes a draw off the live wall and adds a dora indicator. A concealed kan
-// reveals it at once; an open or added kan (open) once the discard after it
-// passes without a ron, or when another kan is made before that discard.
+// turns its indicator over at once; an open or added kan (open true) waits
+// until the declarer discards, or makes another kan first.
 func (r *Round) drawRinshan(seat int, open bool) {
 	t, ok := r.wall.Rinshan(r.kans)
 	if !ok {

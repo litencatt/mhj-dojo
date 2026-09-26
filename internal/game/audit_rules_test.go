@@ -188,11 +188,11 @@ func TestAuditKanOnTheLastLiveTile(t *testing.T) {
 	}
 }
 
-// After an open kan the kan dora is revealed only once the discard after it
-// passes (後めくり, as Tenhou and M-League): a ron on that discard does not
-// count it, the next win does. The second indicator of this wall is 9m, so
-// 1m becomes dora.
-func TestAuditDaiminkanDoraCountsAfterTheNextDiscard(t *testing.T) {
+// After an open kan the kan dora is turned over when the declarer discards
+// (後めくり, as Tenhou and M-League): the rinshan tile does not count it, a
+// ron on that discard (槓振り) does, with its ura. The second indicator of
+// this wall is 9m, so 1m becomes dora.
+func TestAuditDaiminkanDoraCountsForTheDiscardRon(t *testing.T) {
 	r := newRound(t)
 	setHand(r, 0, "147m258p369s1236z", "5z")
 	setHand(r, 2, "5z5z5z147m258p369s2z", "")
@@ -203,16 +203,17 @@ func TestAuditDaiminkanDoraCountsAfterTheNextDiscard(t *testing.T) {
 		t.Fatalf("indicators %v before the discard", ind)
 	}
 	mustApply(t, r, Action{Seat: 2, Type: Discard, Tile: "1m"})
-	if r.Phase() != PhaseCall || !r.LegalFor(3).Ron {
-		t.Fatalf("phase %s claims %v", r.Phase(), claimSeats(r))
+	if r.Phase() != PhaseCall || !r.LegalFor(3).Ron || len(r.ViewFor(3).DoraIndicators) != 2 {
+		t.Fatalf("phase %s claims %v indicators %v", r.Phase(), claimSeats(r), r.doraIndicators())
 	}
 	mustApply(t, r, Action{Seat: 3, Type: Ron})
 	res := r.Result()
-	if res.Win.Dora != 0 || !hasYaku(res, "pei") || len(r.doraIndicators()) != 1 || len(r.uraIndicators()) != 1 {
-		t.Fatalf("dora %d with indicators %v ura %v: %v", res.Win.Dora, r.doraIndicators(), r.uraIndicators(), yakuKeys(res))
+	ind := r.doraIndicators()
+	if res.Win.Dora != 2 || !hasYaku(res, "pei") || len(ind) != 2 || ind[1].String() != "9m" || len(r.uraIndicators()) != 2 {
+		t.Fatalf("dora %d with indicators %v ura %v: %v", res.Win.Dora, ind, r.uraIndicators(), yakuKeys(res))
 	}
 
-	// the same discard passes: the indicator turns over, and the next ron counts it
+	// the same discard passes: the indicator stays, and the next ron counts it
 	r = newRound(t)
 	setHand(r, 0, "147m258p369s1236z", "5z")
 	setHand(r, 2, "5z5z5z147m258p369s2z", "")
@@ -220,7 +221,7 @@ func TestAuditDaiminkanDoraCountsAfterTheNextDiscard(t *testing.T) {
 	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
 	mustApply(t, r, Action{Seat: 2, Type: Kan})
 	mustApply(t, r, Action{Seat: 2, Type: Discard, Tile: "2z"})
-	ind := r.doraIndicators()
+	ind = r.doraIndicators()
 	if len(ind) != 2 || ind[1].String() != "9m" || r.Actor() != 3 {
 		t.Fatalf("indicators %v actor %d", ind, r.Actor())
 	}

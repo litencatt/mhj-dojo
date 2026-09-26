@@ -276,7 +276,7 @@ func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 +
 func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kanDora) }
 
 // revealKanDora turns over the indicators of the open and added kans
-// waiting for a discard to pass (後めくり).
+// waiting for the declarer's discard (後めくり).
 func (r *Round) revealKanDora() {
 	r.kanDora += r.pendingDora
 	r.pendingDora = 0
@@ -405,6 +405,7 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	p.kuikae = nil
 	p.ippatsu = false // a discard after the declaration ends ippatsu
 	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare})
+	r.revealKanDora() // before the claims: a ron on this discard counts it
 	kind := Discard
 	if declare {
 		kind = Riichi
@@ -446,7 +447,6 @@ func (r *Round) acceptRiichi() {
 // afterDiscard runs once nobody claims the last discard.
 func (r *Round) afterDiscard() {
 	r.acceptRiichi()
-	r.revealKanDora()
 	r.claims = nil
 	if reason := r.abortAfterDiscard(); reason != "" {
 		r.finish(&Result{Kind: "abort", Reason: reason, Winner: -1, From: -1})

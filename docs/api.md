@@ -428,15 +428,17 @@ after a chii on an end of the sequence (喰い替え). Each kan draws a replacem
 tile (嶺上開花 if it wins), adds a dora indicator and shortens the live wall by
 one; an added kan can be robbed (槍槓), a concealed kan cannot (not even for
 国士無双). A concealed kan's indicator is turned over at once, so its replacement
-tile already counts it. An open or added kan's indicator is turned over only
-once the discard after the kan passes without a ron (後めくり): a win on the
-replacement tile, or a ron on that discard, does not count it; a pon, chii or
-kan of that discard comes after it is turned over. If the seat makes another
-kan before discarding, the earlier kan's indicator is turned over when the new
-kan completes (a robbed added kan never completes, and turns over nothing).
-The ura-dora indicators are the tiles below the dora indicators turned over
-when the round ends. Calls end ippatsu and the uninterrupted first go-around.
-Open hands lose the closed-only yaku and a han on the kuisagari yaku.
+tile already counts it. An open or added kan's indicator is turned over when
+the declarer discards, before the other seats answer that discard (後めくり): a
+win on the replacement tile does not count it, a ron on that discard (槓振り)
+does, ura dora included. If the declarer makes another kan before discarding,
+the earlier kan's indicator is turned over when the new kan completes. House
+rule: a robbed added kan never completes, so neither it nor an earlier open
+kan of the same turn turns an indicator over, and the chankan scores without
+them. The ura-dora indicators are the tiles below the dora indicators turned
+over when the round ends. Calls end ippatsu and the uninterrupted first
+go-around. Open hands lose the closed-only yaku and a han on the kuisagari
+yaku.
 
 Analysis with melds: `analysis`, `by_discard` and `history` go on after a
 call. Every meld (chii, pon, kan, ankan) is a fixed group of each complete
