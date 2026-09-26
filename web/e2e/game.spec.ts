@@ -140,6 +140,49 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+// On a phone (360 and 390px wide) the table, the hand and the call buttons
+// fit the screen: no sideways page scroll, the hand on one row with the
+// called meld on a row of its own, and every action button at least 40px tall.
+for (const width of [360, 390]) {
+  test(`a CPU game fits a ${width}px-wide phone: one-row hand, 40px action buttons`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    const hand = handPanel(page);
+    await expect(hand).toBeVisible();
+    const noOverflow = async () =>
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      ).toBeLessThanOrEqual(0);
+    const rowsOf = (locator: Locator) =>
+      locator.evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
+
+    // The call offer: ポン / スキップ (and any other) buttons are big enough to tap.
+    await playUntilPonOffered(page);
+    await noOverflow();
+    expect(await rowsOf(hand.locator('.hand-tiles button.tile'))).toBe(1);
+    const buttons = page.locator('.action-bar button');
+    expect(await buttons.count()).toBeGreaterThanOrEqual(2);
+    for (const b of await buttons.all()) {
+      const bb = await b.boundingBox();
+      expect(bb!.height).toBeGreaterThanOrEqual(40);
+    }
+    // Each opponent's concealed hand stays on one row in its seat.
+    for (const seat of ['.seat-top', '.seat-left', '.seat-right']) {
+      expect(await rowsOf(page.locator(`${seat} .seat-hand .tile`))).toBe(1);
+    }
+
+    // After the pon, the hand is still one row and the meld sits below it.
+    await clickAndWait(page, page.locator('.action-bar').getByRole('button', { name: 'ポン', exact: true }));
+    await waitForPlayback(page);
+    await noOverflow();
+    const tiles = hand.locator('.hand-row > .hand-tiles button.tile, .hand-row > .hand-drawn button.tile');
+    expect(await rowsOf(tiles)).toBe(1);
+    const meld = await hand.getByRole('group', { name: 'ポン' }).boundingBox();
+    const lastTile = await tiles.last().boundingBox();
+    expect(meld!.y).toBeGreaterThanOrEqual(lastTile!.y + lastTile!.height);
+  });
+}
+
 test('game options from the URL: first dealer you and a weak CPU survive a reload', async ({ page }) => {
   await page.goto(`/?mode=game&seed=${SEED}&first_dealer=you&cpu=weak`);
   await waitForPlayback(page);

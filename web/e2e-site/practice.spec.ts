@@ -11,6 +11,13 @@ function labels(page: Page, selector: string) {
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 }
 
+/** Opens the 履歴ツリー panel, which starts in the dock, on every load of the page. */
+async function openTree(page: Page) {
+  await page.addInitScript(() =>
+    localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'advice', 'gloss'])),
+  );
+}
+
 async function discardDrawn(page: Page) {
   const hand = page.getByRole('region', { name: '手牌' });
   const river = hand.locator('.discard-river .tile');
@@ -71,6 +78,7 @@ test('?mode=game shows practice on the static site', async ({ page }) => {
 });
 
 test('a reload replays the saved moves, branches included', async ({ page }) => {
+  await openTree(page);
   await page.goto('./?seed=7&turns=18');
   const hand = page.getByRole('region', { name: '手牌' });
   await expect(hand).toBeVisible();
@@ -144,6 +152,7 @@ async function seedStorage(page: Page, id: string, current: number) {
 }
 
 test('a saved tsumo node is rebuilt with its win', async ({ page }) => {
+  await openTree(page);
   await seedStorage(page, 'e2etsumo', tsumoMoves.length);
   await page.goto('./?session=e2etsumo&seed=2&turns=18');
   await expect(page.getByRole('region', { name: '和了' })).toBeVisible();
@@ -155,6 +164,7 @@ test('a saved tsumo node is rebuilt with its win', async ({ page }) => {
 });
 
 test('a saved session resumes at an inner node', async ({ page }) => {
+  await openTree(page);
   await seedStorage(page, 'e2einner', 3);
   await page.goto('./?session=e2einner&seed=2&turns=18');
   const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
@@ -167,6 +177,7 @@ test('a saved session resumes at an inner node', async ({ page }) => {
 });
 
 test('after the engine exits, the next move restarts it and rebuilds the session', async ({ page }) => {
+  await openTree(page);
   await page.goto('./?seed=4&turns=18');
   await discardDrawn(page);
   await page.reload(); // the session now lives under a new engine id
@@ -248,4 +259,29 @@ test('unusable saved moves start over from the seed in the URL', async ({ page }
   const id = new URL(page.url()).searchParams.get('session')!;
   expect(saved.sessions[id].moves).toEqual([]);
   await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// On a phone (390px wide): no sideways page scroll, the hand on one row, the
+// minimized panels in a bar along the bottom, and the yaku table in the width.
+test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./?seed=1&turns=18');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await expect(hand.locator('.hand-drawn button')).toBeVisible();
+  const tops = await hand
+    .locator('.hand-row button.tile')
+    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
+  expect(tops).toHaveLength(14);
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(10);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // The advice starts minimized: its tab is in the bottom bar.
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const bar = await dock.boundingBox();
+  expect(bar!.y + bar!.height).toBeCloseTo(844, 0);
+  expect(bar!.width).toBeCloseTo(390, 0);
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  await expect(yaku).toBeVisible();
+  const panel = await yaku.boundingBox();
+  const table = await yaku.locator('.yaku-table').boundingBox();
+  expect(table!.x + table!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
 });

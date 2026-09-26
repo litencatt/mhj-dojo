@@ -50,9 +50,8 @@ test('practice: the header shows the version and the help opens, closes and link
   await dialog.getByRole('button', { name: 'ヘルプを閉じる' }).click();
   await expect(dialog).toBeHidden();
 
-  // The 用語表 link brings the glossary back from the dock.
+  // The 用語表 link brings the glossary back from the dock (where it starts).
   const glossary = page.getByRole('region', { name: '用語表' });
-  await glossary.getByRole('button', { name: '用語表を最小化' }).click();
   await expect(glossary).toBeHidden();
   dialog = await openHelp(page);
   await dialog.getByRole('button', { name: '用語表', exact: true }).click();
@@ -84,8 +83,8 @@ test('a click on the backdrop closes the help, a drag that ends there does not',
 test('game mode: the header shows the version, and the help links to the glossary', async ({ page }) => {
   await page.goto('/?mode=game&seed=1');
   await expect(page.locator('.app-header .version-tag')).toHaveText(VERSION);
+  // The glossary starts in the dock.
   const glossary = page.getByRole('region', { name: '用語表' });
-  await glossary.getByRole('button', { name: '用語表を最小化' }).click();
   await expect(glossary).toBeHidden();
 
   const dialog = await openHelp(page);

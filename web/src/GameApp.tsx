@@ -16,6 +16,10 @@ import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
+// A hand the state does not give yet: one array, so the Hand's selection is
+// not reset on every render.
+const NO_TILES: TileT[] = [];
+
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
 
@@ -250,7 +254,7 @@ export function GameApp() {
                 playing={playback.playing}
               />
               <Hand
-                hand={me.hand ?? []}
+                hand={me.hand ?? NO_TILES}
                 groups={me.hand_groups}
                 drawn={me.drawn ?? null}
                 discards={[]}
@@ -266,7 +270,7 @@ export function GameApp() {
               <p class="visually-hidden" role="status" aria-live="polite">
                 {playback.playing ? 'CPUの動きを再生中…' : ''}
               </p>
-              <div ref={actionAreaRef} tabIndex={-1}>
+              <div ref={actionAreaRef} class="action-area" tabIndex={-1}>
                 {playback.playing ? (
                   <div class="action-bar action-bar-playback">
                     <span class="action-hint" aria-hidden="true">
@@ -436,12 +440,30 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
         </button>
       )}
       <span class="action-hint">
-        {riichiMode
-          ? 'リーチ宣言牌をクリック（聴牌が残る牌だけ選べます）'
-          : state.seats[state.you].riichi
-            ? 'リーチ中：和了るかツモ切り'
-            : '捨てる牌をクリック'}
+        {riichiMode ? (
+          <span>
+            リーチ宣言牌を<ClickOrTap />（聴牌が残る牌だけ選べます）
+          </span>
+        ) : state.seats[state.you].riichi ? (
+          'リーチ中：和了るかツモ切り'
+        ) : (
+          <span>
+            捨てる牌を<ClickOrTap />
+          </span>
+        )}
       </span>
     </div>
+  );
+}
+
+/** 「クリック」, or on a touch screen 「タップ（もう一度で打牌）」: a tap
+ * first selects a tile and a second tap discards it (components/Hand.tsx). */
+function ClickOrTap() {
+  return (
+    <>
+      <span class="hint-mouse">クリック</span>
+      <span class="hint-touch">タップ（もう一度タップで打牌）</span>
+      <span class="hint-hybrid">（タッチでは2回タップ）</span>
+    </>
   );
 }

@@ -1,16 +1,21 @@
 import { useState } from 'preact/hooks';
 
-// Panels that can be minimized into the right-edge dock.
+// Panels that can be minimized into the dock (the right edge; a bottom bar on a phone).
 export type PanelKey = 'chart' | 'tree' | 'yaku' | 'advice' | 'gloss';
-export const PANELS: Array<{ key: PanelKey; label: string }> = [
-  { key: 'chart', label: '時系列チャート' },
-  { key: 'tree', label: '履歴ツリー' },
-  { key: 'yaku', label: '役別向聴' },
-  { key: 'advice', label: 'アドバイス' },
-  { key: 'gloss', label: '用語表' },
+// `short` names the tab in the phone's bottom bar, where five share one row.
+export const PANELS: Array<{ key: PanelKey; label: string; short: string }> = [
+  { key: 'chart', label: '時系列チャート', short: 'チャート' },
+  { key: 'tree', label: '履歴ツリー', short: '履歴' },
+  { key: 'yaku', label: '役別向聴', short: '役別向聴' },
+  { key: 'advice', label: 'アドバイス', short: 'アドバイス' },
+  { key: 'gloss', label: '用語表', short: '用語表' },
 ];
-// The advice panel starts minimized (docked) so the answer isn't shown
-// before the player has thought about the hand.
+// Without a saved layout only the 役別向聴 table is open next to the header
+// and the hand: every other panel, and any added later, starts in the dock
+// (the advice among them, so the answer isn't shown before the player has
+// thought about the hand).
+const OPEN_BY_DEFAULT: PanelKey[] = ['yaku'];
+const DEFAULT_MINIMIZED: PanelKey[] = PANELS.map((p) => p.key).filter((k) => !OPEN_BY_DEFAULT.includes(k));
 const MINIMIZED_KEY = 'mhj-dojo.minimized.v2';
 
 function parseKeys(raw: string | null): PanelKey[] | null {
@@ -21,9 +26,9 @@ function parseKeys(raw: string | null): PanelKey[] | null {
 
 function loadMinimized(): PanelKey[] {
   try {
-    return parseKeys(localStorage.getItem(MINIMIZED_KEY)) ?? ['advice'];
+    return parseKeys(localStorage.getItem(MINIMIZED_KEY)) ?? DEFAULT_MINIMIZED;
   } catch {
-    return ['advice'];
+    return DEFAULT_MINIMIZED;
   }
 }
 
@@ -46,13 +51,36 @@ export function useMinimized() {
     minimized,
     isMin: (k: PanelKey) => minimized.includes(k),
     minimize: (k: PanelKey) => update([...minimized.filter((x) => x !== k), k]),
-    restore: (k: PanelKey) => update(minimized.filter((x) => x !== k)),
+    restore: (k: PanelKey) => {
+      update(minimized.filter((x) => x !== k));
+      revealPanel(k);
+    },
   };
+}
+
+/**
+ * In the one-column layout (up to 1100px wide, e.g. a phone) a restored panel
+ * lands somewhere down the page: scroll it into view once it has rendered.
+ * The wider layouts show it in place, in a column of its own.
+ */
+const ONE_COLUMN = '(width <= 1100px)'; // style.css's one-column layout
+
+function revealPanel(k: PanelKey) {
+  if (typeof matchMedia !== 'function' || !matchMedia(ONE_COLUMN).matches) return;
+  requestAnimationFrame(() => {
+    const el = document.querySelector<HTMLElement>(`.area-${k}`);
+    if (!el || el.hidden) return;
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+  });
 }
 
 /** Moves focus (and so the view) to the 用語表's search box once it has rendered, after restoring it. */
 export function focusGlossary() {
-  requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.glossary-search')?.focus());
+  // In the one-column layout revealPanel (restore) scrolls the panel into
+  // view: focusing must not scroll again on top of that.
+  const preventScroll = typeof matchMedia === 'function' && matchMedia(ONE_COLUMN).matches;
+  requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.glossary-search')?.focus({ preventScroll }));
 }
 
 export function errorMessage(err: unknown): string {

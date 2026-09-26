@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { HandGroup, HandGroupType } from '../api';
 import { useHandGroupsToggle } from '../hooks';
 import { Tile } from './Tile';
@@ -60,9 +60,16 @@ function validGroups(hand: string[], groups: HandGroup[] | undefined): HandGroup
   return n === hand.length ? groups.filter((g) => g.tiles.length > 0) : null;
 }
 
+// A selected tile: its display position, or 'drawn'.
+type Pick = number | 'drawn';
+
 /**
  * 13-tile hand + drawn tile (set apart) + discard river. Click discards; hover/focus previews.
  * With 面子表示 on, the hand is regrouped into the server's blocks, each under a labelled bracket.
+ *
+ * Touch has no hover, so a tap only selects a tile (raised, and previewed like
+ * a hovered one) and a second tap on the same tile discards it. The mouse and
+ * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
   const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, highlight, onDiscard, onPreview } = props;
@@ -73,6 +80,7 @@ export function Hand(props: HandProps) {
   // Display position → index into hand.
   const order = useMemo(() => (layout ? layout.flatMap((g) => g.tiles) : hand.map((_, i) => i)), [layout, hand]);
   const tilesRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   // Set when the drawn tile is discarded from the keyboard: if the next state has
   // no drawn tile, its button unmounts and focus moves to the last hand tile.
   const refocus = useRef(false);
@@ -80,6 +88,58 @@ export function Hand(props: HandProps) {
   // tile remounts when its position moves to another group, so focus is put
   // back at that position.
   const refocusPos = useRef<number | null>(null);
+  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'), for
+  // a browser whose click event does not say (a PointerEvent's pointerType);
+  // cleared by a key press or a cancelled press, so it never outlives its tap.
+  const pointer = useRef<string | null>(null);
+  // The tile a tap selected, with its tile, kept previewed until discarded.
+  const [picked, setPicked] = useState<{ at: Pick; tile: string } | null>(null);
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
+
+  // A new hand, a locked one or other tiles allowed (リーチ toggled) drop the
+  // selection, so a tap made before can never confirm a different action.
+  useEffect(() => {
+    setPicked(null);
+  }, [hand, drawn, disabled, allowed, onlyDrawn]);
+
+  // A tap anywhere outside the hand drops the selection (a scroll is no tap,
+  // so the preview stays while scrolling to the yaku table).
+  useEffect(() => {
+    if (!picked) return;
+    const onClick = (e: MouseEvent) => {
+      if (rowRef.current?.contains(e.target as Node)) return;
+      setPicked(null);
+      onPreview(null);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked]);
+
+  // Selects on the first tap and discards on the second; true when the click
+  // should go on to discard. Touch and pen select first (a pen has no hover
+  // either); the mouse and the keyboard (a click with no pointer, detail 0)
+  // discard at once.
+  const tapToDiscard = (e: MouseEvent, at: Pick, t: string): boolean => {
+    const type = 'pointerType' in e && typeof e.pointerType === 'string' ? (e as PointerEvent).pointerType : pointer.current;
+    pointer.current = null;
+    const touch = e.detail !== 0 && (type === 'touch' || type === 'pen');
+    if (!touch) return true;
+    if (picked && picked.at === at && picked.tile === t) {
+      setPicked(null);
+      // Leave nothing focused, so the next hand is not previewed by focus.
+      (document.activeElement as HTMLElement | null)?.blur();
+      return true;
+    }
+    setPicked({ at, tile: t });
+    onPreview(t);
+    return false;
+  };
+  // Leaving a tile goes back to the selected tile's preview, if any.
+  const previewEnd = () => onPreview(pickedRef.current?.tile ?? null);
+  const pickClass = (at: Pick, t: string) => (picked && picked.at === at && picked.tile === t ? 'tile-picked' : undefined);
+  const classes = (...cs: Array<string | undefined>) => cs.filter(Boolean).join(' ') || undefined;
 
   // Tiles are buttons keyed by position, so keyboard focus stays at the clicked
   // position through the request and the new hand (or is put back there when the
@@ -122,13 +182,14 @@ export function Hand(props: HandProps) {
         button
         interactive={ok}
         dimmed={!disabled && !ok}
-        className={mark(t)}
-        onClick={() => {
+        className={classes(mark(t), pickClass(pos, t))}
+        onClick={(e) => {
+          if (!tapToDiscard(e, pos, t)) return;
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
           onDiscard(t);
         }}
         onHoverStart={() => onPreview(t)}
-        onHoverEnd={() => onPreview(null)}
+        onHoverEnd={previewEnd}
       />
     );
   };
@@ -149,7 +210,19 @@ export function Hand(props: HandProps) {
           </button>
         )}
       </div>
-      <div class="hand-row">
+      <div
+        class="hand-row"
+        ref={rowRef}
+        onPointerDown={(e) => {
+          pointer.current = e.pointerType;
+        }}
+        onPointerCancel={() => {
+          pointer.current = null;
+        }}
+        onKeyDown={() => {
+          pointer.current = null;
+        }}
+      >
         <div
           class={layout ? 'hand-tiles hand-tiles-grouped' : 'hand-tiles'}
           role="group"
@@ -174,18 +247,23 @@ export function Hand(props: HandProps) {
               button
               interactive={can(drawn, true)}
               dimmed={!disabled && !can(drawn, true)}
-              className={mark(drawn)}
-              onClick={() => {
+              className={classes(mark(drawn), pickClass('drawn', drawn))}
+              onClick={(e) => {
+                if (!tapToDiscard(e, 'drawn', drawn)) return;
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');
                 onDiscard(drawn);
               }}
               onHoverStart={() => onPreview(drawn)}
-              onHoverEnd={() => onPreview(null)}
+              onHoverEnd={previewEnd}
             />
           </div>
         )}
         {melds}
       </div>
+      {/* Always mounted, so a screen reader announces the selection. */}
+      <p class="visually-hidden" role="status" aria-live="polite">
+        {picked ? `選択中：${picked.tile}（もう一度タップで打牌）` : ''}
+      </p>
       {discards.length > 0 && (
         <div class="discard-river" aria-label="捨て牌">
           <span class="discard-label">捨て牌</span>
