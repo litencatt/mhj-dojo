@@ -57,23 +57,23 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 			Tile  string          `json:"tile"`
 			Tiles []string        `json:"tiles"`
 		}
-		if err := decode(r, &body, true); err != nil {
+		if err := apicall.Decode(r.Body, &body, true); err != nil {
 			return match.State{}, err
 		}
 		switch body.Type {
 		case game.Discard, game.Riichi:
 			if body.Tile == "" {
-				return match.State{}, errInvalid("tile is required for " + string(body.Type))
+				return match.State{}, apicall.Invalid("tile is required for " + string(body.Type))
 			}
 		case game.Chii:
 			if len(body.Tiles) != 2 {
-				return match.State{}, errInvalid("tiles (two) are required for chii")
+				return match.State{}, apicall.Invalid("tiles (two) are required for chii")
 			}
 		case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
 		case actionNext:
 			return m.Next()
 		default:
-			return match.State{}, errInvalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
+			return match.State{}, apicall.Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
 		}
 		return m.Act(game.Action{Type: body.Type, Tile: body.Tile, Tiles: body.Tiles})
 	}))
@@ -138,7 +138,7 @@ func (a *api) createGame(w http.ResponseWriter, r *http.Request) {
 		FirstDealer string `json:"first_dealer"`
 		CPU         string `json:"cpu"`
 	}
-	if err := decode(r, &body, false); err != nil {
+	if err := apicall.Decode(r.Body, &body, false); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -189,13 +189,6 @@ func (a *api) withSession(f func(*session.Session, *http.Request) (session.State
 		}
 		writeJSON(w, http.StatusOK, st)
 	}
-}
-
-func errInvalid(msg string) error { return apicall.Invalid(msg) }
-
-// decode reads a JSON body; an empty body is allowed unless required.
-func decode(r *http.Request, v any, required bool) error {
-	return apicall.Decode(r.Body, v, required)
 }
 
 func writeErr(w http.ResponseWriter, err error) {

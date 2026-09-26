@@ -10,7 +10,7 @@ import (
 
 func call(t *testing.T, store *session.Store, method, path, body string) (int, []byte) {
 	t.Helper()
-	status, v := Session(store, method, path, strings.NewReader(body))
+	status, v := Route(store, method, path, strings.NewReader(body))
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +87,46 @@ func TestSessionErrors(t *testing.T) {
 		}
 		if status != c.status {
 			t.Errorf("%s %s %s: status %d, want %d (%s)", c.method, c.path, c.body, status, c.status, b)
+		}
+	}
+}
+
+// TestRestore rebuilds a branched session from its moves in one call.
+func TestRestore(t *testing.T) {
+	store := session.NewStore()
+	st := state(t, store, "POST", "/api/sessions", `{"seed":2,"max_turns":6}`)
+	base := "/api/sessions/" + st.SessionID
+	state(t, store, "POST", base+"/discard", `{"tile":"`+*st.Drawn+`"}`)
+	state(t, store, "POST", base+"/goto", `{"node_id":0}`)
+	state(t, store, "POST", base+"/discard", `{"tile":"`+st.Hand[0]+`"}`)
+	want := state(t, store, "POST", base+"/goto", `{"node_id":1}`)
+
+	body := `{"seed":2,"max_turns":6,"moves":[{"parent":0,"tile":"` + *st.Drawn + `"},{"parent":0,"tile":"` + st.Hand[0] + `"}],"current":1}`
+	status, v := Restore(store, strings.NewReader(body))
+	if status != statusOK {
+		t.Fatalf("restore: %d %v", status, v)
+	}
+	got := v.(session.State)
+	if got.SessionID == want.SessionID {
+		t.Fatal("restore reused the session")
+	}
+	got.SessionID, want.SessionID = "", ""
+	a, _ := json.Marshal(got)
+	b, _ := json.Marshal(want)
+	if string(a) != string(b) {
+		t.Fatalf("restored state differs:\n got %.300s\nwant %.300s", a, b)
+	}
+
+	for body, want := range map[string]int{
+		``:                                  statusBadRequest,
+		`{"moves":[]}`:                      statusBadRequest,
+		`{"seed":2,"max_turns":999}`:        statusBadRequest,
+		`{"seed":2,"current":3}`:            statusNotFound,
+		`{"seed":2,"moves":[{"parent":5}]}`: statusNotFound,
+		`{"seed":2,"moves":[{"parent":0,"tile":"9z"}]}`: statusBadRequest,
+	} {
+		if status, v := Restore(store, strings.NewReader(body)); status != want {
+			t.Errorf("Restore(%s) = %d %v, want %d", body, status, v, want)
 		}
 	}
 }

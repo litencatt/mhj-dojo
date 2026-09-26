@@ -16,8 +16,8 @@ import (
 	"github.com/litencatt/mhj2/internal/session"
 )
 
-// MaxBody bounds a request body.
-const MaxBody = 1 << 16
+// maxBody bounds a request body.
+const maxBody = 1 << 16
 
 // HTTP statuses and methods, spelled out so that the WebAssembly build does
 // not link net/http.
@@ -37,7 +37,7 @@ func Invalid(msg string) error { return errors.Join(session.ErrInvalid, errors.N
 
 // Decode reads a JSON body into v; an empty body is allowed unless required.
 func Decode(r io.Reader, v any, required bool) error {
-	err := json.NewDecoder(io.LimitReader(r, MaxBody)).Decode(v)
+	err := json.NewDecoder(io.LimitReader(r, maxBody)).Decode(v)
 	switch {
 	case errors.Is(err, io.EOF) && !required:
 		return nil
@@ -137,34 +137,64 @@ func Goto(s *session.Session, body io.Reader) (session.State, error) {
 	return s.Goto(*req.NodeID)
 }
 
-// Session runs one practice-session request given as its HTTP method and
+// Route runs one practice-session request given as its HTTP method and
 // API path (such as "POST", "/api/sessions/{id}/discard"), for a transport
 // without an HTTP router (the WebAssembly build). It returns the status and
-// the response value the HTTP server would send.
-func Session(store *session.Store, method, path string, body io.Reader) (int, any) {
-	st, err := sessionCall(store, method, path, body)
+// the response value the HTTP server would send; any other path, game
+// endpoints included, is a 404 as for an unknown endpoint.
+func Route(store *session.Store, method, path string, body io.Reader) (int, any) {
+	return result(route(store, method, path, body))
+}
+
+// Restore rebuilds a session from its moves in one call (session.Replay)
+// and returns the status and response value of its final state. It is not
+// an HTTP endpoint: the WebAssembly build uses it to bring a session back
+// after a page reload. The body is {"seed", "max_turns", "moves",
+// "current"}, moves as [{"parent": 0, "tile": "5m"}, {"parent": 3}] (no
+// tile: tsumo).
+func Restore(store *session.Store, body io.Reader) (int, any) {
+	var req struct {
+		Seed     *int64         `json:"seed"`
+		MaxTurns int            `json:"max_turns"`
+		Moves    []session.Move `json:"moves"`
+		Current  int            `json:"current"`
+	}
+	if err := Decode(body, &req, true); err != nil {
+		return result(session.State{}, err)
+	}
+	if req.Seed == nil {
+		return result(session.State{}, Invalid("seed is required"))
+	}
+	s, err := store.Create(req.Seed, req.MaxTurns)
+	if err != nil {
+		return result(session.State{}, err)
+	}
+	return result(s.Replay(req.Moves, req.Current))
+}
+
+func result(st session.State, err error) (int, any) {
 	if err != nil {
 		return Status(err), ErrorBody(Message(err))
 	}
 	return statusOK, st
 }
 
-var errNoEndpoint = errors.Join(session.ErrNotFound, errors.New("no such endpoint"))
-
-func sessionCall(store *session.Store, method, path string, body io.Reader) (session.State, error) {
+func route(store *session.Store, method, path string, body io.Reader) (session.State, error) {
+	// The server's message for a path no endpoint matches.
+	noEndpoint := errors.Join(session.ErrNotFound, errors.New("no such endpoint: "+method+" "+path))
 	rest, ok := strings.CutPrefix(path, "/api/sessions")
 	if !ok {
-		return session.State{}, errNoEndpoint
+		return session.State{}, noEndpoint
 	}
 	if rest == "" {
 		if method != methodPost {
-			return session.State{}, errNoEndpoint
+			return session.State{}, noEndpoint
 		}
 		return CreateSession(store, body)
 	}
-	id, op, _ := strings.Cut(strings.TrimPrefix(rest, "/"), "/")
-	if id == "" || !strings.HasPrefix(rest, "/") {
-		return session.State{}, errNoEndpoint
+	id, op, sub := strings.Cut(strings.TrimPrefix(rest, "/"), "/")
+	if id == "" || !strings.HasPrefix(rest, "/") || (sub && op == "") || strings.Contains(op, "/") {
+		return session.State{}, noEndpoint
 	}
 	var f func(*session.Session, io.Reader) (session.State, error)
 	switch {
@@ -177,7 +207,7 @@ func sessionCall(store *session.Store, method, path string, body io.Reader) (ses
 	case method == methodPost && op == "goto":
 		f = Goto
 	default:
-		return session.State{}, errNoEndpoint
+		return session.State{}, noEndpoint
 	}
 	s, err := store.Get(id)
 	if err != nil {
