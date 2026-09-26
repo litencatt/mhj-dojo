@@ -1,4 +1,4 @@
-import type { Advice, AdvicePhase, DiscardReview } from '../api';
+import type { Advice, AdviceCandidate, AdvicePhase, DiscardReview } from '../api';
 import { useAdviceOpen } from '../hooks';
 import { Tile } from './Tile';
 
@@ -12,6 +12,13 @@ const PHASE_LABELS: Record<AdvicePhase, string> = { early: '序盤', middle: '�
 
 function shantenLabel(s: number): string {
   return s === 0 ? '聴牌' : `${s}向聴`;
+}
+
+/** A candidate read as one line; focusing it marks the tile in the hand. */
+function candidateLabel(c: AdviceCandidate): string {
+  const parts = [`打 ${c.tile}`, shantenLabel(c.shanten), `${c.shanten === 0 ? '待ち' : '有効牌'} ${c.ukeire_kinds}種${c.ukeire}枚`];
+  if (c.wait !== null && c.shanten > 0) parts.push(`聴牌時の待ち 平均${c.wait.toFixed(1)}枚`);
+  return `${parts.join('、')}（手牌で表示）`;
 }
 
 function percent(p: number): string {
@@ -34,7 +41,7 @@ export function AdvicePanel({ advice, review, onHighlight }: AdvicePanelProps) {
           type="button"
           class="advice-toggle"
           aria-expanded={open}
-          aria-controls="advice-body"
+          aria-controls={open ? 'advice-body' : undefined}
           onClick={() => {
             setOpen(!open);
             onHighlight(null);
@@ -45,11 +52,12 @@ export function AdvicePanel({ advice, review, onHighlight }: AdvicePanelProps) {
       </div>
       {open && (
         <div id="advice-body" class="advice-body">
-          {review && (
-            <p class={review.is_best ? 'advice-review advice-review-best' : 'advice-review'} role="status">
-              {review.text}
-            </p>
-          )}
+          {/* Mounted while open, so each new review is announced. */}
+          <div role="status" aria-live="polite">
+            {review && (
+              <p class={review.is_best ? 'advice-review advice-review-best' : 'advice-review'}>{review.text}</p>
+            )}
+          </div>
           {advice ? (
             <>
               <ol class="advice-candidates" aria-label="おすすめの打牌">
@@ -58,6 +66,7 @@ export function AdvicePanel({ advice, review, onHighlight }: AdvicePanelProps) {
                     key={c.tile}
                     class="advice-candidate"
                     tabIndex={0}
+                    aria-label={candidateLabel(c)}
                     onMouseEnter={() => onHighlight(c.tile)}
                     onMouseLeave={() => onHighlight(null)}
                     onFocus={() => onHighlight(c.tile)}
