@@ -7,8 +7,9 @@ so CI and `go test ./...` never need Lean.
 
 | File | Models | Proved |
 |---|---|---|
-| `Mhj2/Score.lean` | `internal/score`: `Compute`, `Half` | `compute_dvd` (every payment is a multiple of 100), `half_dvd`, `half_bounds`, `tsumo_total_bounds` (ron ≤ tsumo total ≤ ron + 200), `tsumo_total_eq`, `basePts_mono` / `compute_mono` (more han never pays less, for a fixed fu), `limit_below_mangan`, `basePts_limits`, `basePts_below`, `yakuman_payments` |
+| `Mhj2/Score.lean` | `internal/score`: `Compute`, `Half` | `compute_dvd` (every payment is a multiple of 100), `half_dvd`, `half_bounds`, `tsumo_total_bounds` (ron ≤ tsumo total ≤ ron + 200), `basePts_mono` / `compute_mono` (more han never pays less, for a fixed fu), `limit_below_mangan`, `basePts_limits`, `basePts_below`, `yakuman_payments` |
 | `Mhj2/Settle.lean` | `internal/game` round settlement: tsumo / ron (with pao), honba, noten penalty, riichi sticks | `sum4_deltasOf` (payments sum to 0), `noten_sum`, `settle_conserves` (Σ deltas + sticks left on the table = sticks carried in, for every input), `settle_dvd` (every delta is a multiple of 100) |
+| `Mhj2/Rules.lean` | the rules the settlement must satisfy, stated with the rule's own numbers (32000 / 48000 per yakuman, 300 per honba), not in terms of how `Settle.lean` computes them | `tsumo_pao` (under pao the winner still gets the full hand; a responsible seat pays its yakuman in full plus its normal share of the rest, any other seat just its normal share), `ron_pao` (winner gets the full hand; a responsible seat other than the discarder pays half its yakuman, the discarder the rest), `ron_pao_le` (never more than the full value), `honba_winner` (the winner always receives 300 per honba) |
 | `Mhj2/Standings.lean` | `internal/game` `Hanchan.Standings` | `rank_injective` / `rank_bijective`, `rank_points`, `rank_tie` (ties to the seat nearer the first dealer), `sum_uma`, `sum_first`, `sum_total`, `sum_score` (the final scores add up to exactly 0) |
 | `GenVectors.lean` | `lake exe gen-vectors` | writes `internal/score/testdata/lean_*.json` and `internal/game/testdata/lean_*.json` |
 

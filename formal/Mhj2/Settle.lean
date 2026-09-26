@@ -85,8 +85,8 @@ def others : List Seat := (List.finRange 4).filter (· ≠ x.winner)
 /-- Tsumo: each responsible seat pays its yakuman in full (the tsumo total
 of that many yakuman); the others share the rest of the hand as usual. -/
 def tsumoHand : List Payment :=
-  let paoPays := x.paos.map fun (p, m) =>
-    (p, x.winner, ((compute 0 0 m x.isDealer true).total : Int))
+  let paoPays := x.paos.map fun q =>
+    (q.1, x.winner, ((compute 0 0 q.2 x.isDealer true).total : Int))
   let rest := if x.paos = [] then x.points true
     else compute 0 0 (x.mult - (x.paos.map Prod.snd).sum) x.isDealer true
   paoPays ++ x.others.map fun o =>
@@ -99,8 +99,8 @@ def ronHand : List Payment :=
   let v := fun m => (compute 0 0 m x.isDealer false).ron
   let shared := x.paos.filter (·.1 ≠ x.discarder)
   (x.discarder, x.winner, ((x.points false).ron : Int) - ((shared.map fun q => (v q.2 : Int)).sum)) ::
-    shared.flatMap fun (p, m) =>
-      [(x.discarder, x.winner, (half (v m) : Int)), (p, x.winner, (half (v m) : Int))]
+    shared.flatMap fun q =>
+      [(x.discarder, x.winner, (half (v q.2) : Int)), (q.1, x.winner, (half (v q.2) : Int))]
 
 /-- The seat that pays all the honba of a tsumo: the responsible seat when
 its pao covers the whole hand. -/

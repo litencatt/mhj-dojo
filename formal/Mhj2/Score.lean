@@ -133,15 +133,6 @@ theorem tsumo_total_bounds (han fu yak : Nat) (dealer : Bool) :
       refine ⟨up100_le hd (by omega), ?_⟩
       obtain ⟨x, hx⟩ := hd; obtain ⟨y, hy⟩ := up100_dvd (6 * b); omega
 
-/-- A tsumo's total is what the winner receives: the dealer's share plus
-the others'. -/
-theorem tsumo_total_eq (han fu yak : Nat) (dealer : Bool) :
-    let p := compute han fu yak dealer true
-    p.total = (if dealer then 3 * p.fromNonDealer else p.fromDealer + 2 * p.fromNonDealer) := by
-  by_cases h : han = 0 ∧ yak = 0
-  · cases dealer <;> simp [compute, h]
-  · cases dealer <;> simp only [compute, h, ↓reduceIte, Bool.false_eq_true]
-
 /-! ### Monotonic in han -/
 
 theorem basePts_mono {h h' : Nat} (fu : Nat) (hh : h ≤ h') :
