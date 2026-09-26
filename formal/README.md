@@ -40,6 +40,27 @@ on a 2-CPU Docker VM); later builds take seconds. The volumes need about
 After changing the model, run `formal/run.sh vectors` and then `go test
 ./internal/score ./internal/game`.
 
+## CI
+
+The pull request CI (`.github/workflows/ci.yml`) never runs Lean: it only
+runs the Go tests, which read the committed vectors. A separate workflow,
+`.github/workflows/formal.yml`, checks the model on a GitHub runner (no
+Docker):
+
+- on pull requests and pushes to main that touch `formal/`,
+  `internal/score/`, `internal/game/round.go`, `internal/game/hanchan.go`,
+  the `lean_*.json` vectors or the workflow itself; every Monday at 04:17
+  UTC; and by hand (workflow_dispatch);
+- it installs the toolchain with `leanprover/lean-action`, fetches from
+  mathlib's cache only the modules the model imports (as `run.sh` does),
+  runs `lake build` (every proof must check), fails on any `sorry` or
+  `admit`, regenerates the vectors and fails if they differ from the
+  committed ones, then runs `go test ./internal/score ./internal/game -run
+  Lean`;
+- it caches nothing, so every run takes about the same time: roughly 5-8
+  minutes, most of it fetching mathlib and compiling the imported mathlib
+  modules for `gen-vectors`.
+
 ## Removing everything
 
 ```sh
