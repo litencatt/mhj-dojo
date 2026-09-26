@@ -219,9 +219,9 @@ position always gets the same advice. The text fields are Japanese.
   "draws_left": 14,               // draws after this discard: max_turns − turn − 1
   "tenpai_chance": 0.62,          // after the best discard, 0..1 (0.001 steps)
   "win_chance": 0.21,
-  "shape": "打 9m 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split
+  "shape": "打 9萬 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split
   "near_yaku": [ { "key": "tanyao", "name": "断么九", "han": 1, "shanten": 1, "kept": true } ],
-  "notes": ["打 9m と打 北 はどちらも1向聴。9m を切るほうが有効牌が4枚多い（28枚と24枚）。…"]
+  "notes": ["打 9萬 と打 北 はどちらも1向聴。9萬 を切るほうが有効牌が4枚多い（28枚と24枚）。…"]
 }
 ```
 
@@ -265,7 +265,7 @@ that shanten.
 ```jsonc
 { "tile": "5p", "best": "9m", "rank": 3, "is_best": false,
   "shanten": 1, "best_shanten": 1, "ukeire": 22, "best_ukeire": 28,
-  "text": "前巡の打 5p: 最善（打 9m）より有効牌が6枚少ない（22枚と28枚、3位）" }
+  "text": "前巡の打 5筒: 最善（打 9萬）より有効牌が6枚少ない（22枚と28枚、3位）" }
 ```
 
 The discard that led to this node, ranked among the parent's discards by the

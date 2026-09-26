@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/litencatt/mhj-dojo/internal/handshape"
@@ -515,18 +516,21 @@ func shape(gs []handshape.Group) string {
 	return s
 }
 
-var honorNames = [...]string{"東", "南", "西", "北", "白", "發", "中"}
+var (
+	honorNames = [...]string{"東", "南", "西", "北", "白", "發", "中"}
+	suitNames  = [...]string{"萬", "筒", "索"}
+)
 
-// name writes a tile for the notes: 9m, 赤5p, 北.
+// name writes a tile for the notes as the web UI does: 9萬, 赤5筒, 北.
 func name(t tile.Tile) string {
-	switch {
-	case t.Kind.IsHonor():
+	if t.Kind.IsHonor() {
 		return honorNames[t.Kind-tile.East]
-	case t.Red:
-		return "赤" + t.Kind.String()
-	default:
-		return t.Kind.String()
 	}
+	s := strconv.Itoa(t.Kind.Num()) + suitNames[t.Kind.Suit()]
+	if t.Red {
+		return "赤" + s
+	}
+	return s
 }
 
 func shantenText(s int) string {

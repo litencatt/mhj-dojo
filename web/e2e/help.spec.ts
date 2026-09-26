@@ -38,7 +38,8 @@ test('practice: the header shows the version and the help opens, closes and link
   ]) {
     await expect(dialog.getByRole('heading', { name: h, exact: true })).toBeVisible();
   }
-  await expect(dialog.getByRole('row', { name: /1z〜7z/ })).toContainText('東・南・西・北・白・發・中');
+  await expect(dialog.getByRole('row', { name: /1筒〜9筒/ })).toContainText('筒子（ピンズ）');
+  await expect(dialog.getByRole('row', { name: /東・南・西・北・白・發・中/ })).toContainText('字牌');
 
   // Esc closes it and focus goes back to the button.
   await page.keyboard.press('Escape');

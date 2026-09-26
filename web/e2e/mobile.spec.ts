@@ -107,16 +107,18 @@ for (const width of [320, 360, 390]) {
 
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
       const panel = await box(yaku);
-      for (const table of ['.yaku-table', '.combo-table']) {
-        const t = yaku.locator(table);
-        await expect(t.locator('tbody tr').first()).toBeVisible();
-        // No cell is cut off: every cell of the first rows, including the
-        // effective tiles and the 合計枚数, lies inside the panel.
-        for (const cell of await t.locator('tbody tr').first().locator('th, td').all()) {
-          const b = await box(cell);
-          expect(b.x).toBeGreaterThanOrEqual(panel.x);
-          expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
-        }
+      // A phone has no 複合役 and no name search, but keeps the rest of the filter bar.
+      await expect(yaku.locator('.combo-table')).toHaveCount(0);
+      await expect(yaku.locator('.yaku-filter')).toBeVisible();
+      await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
+      const t = yaku.locator('.yaku-table');
+      await expect(t.locator('tbody tr').first()).toBeVisible();
+      // No cell is cut off: every cell of the first rows, including the
+      // effective tiles and the 合計枚数, lies inside the panel.
+      for (const cell of await t.locator('tbody tr').first().locator('th, td').all()) {
+        const b = await box(cell);
+        expect(b.x).toBeGreaterThanOrEqual(panel.x);
+        expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
       }
       const scroll = yaku.locator('.yaku-table-scroll');
       expect(await scroll.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
@@ -232,6 +234,28 @@ test.describe('touch', () => {
     await expect(drawn).toHaveClass(/tile-picked/);
     expect(actions).toBe(0);
   });
+});
+
+test('a phone hides the name search, and 条件をクリア keeps its saved text', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // A search saved on a wide screen (it matches no yaku here, so it would empty the table).
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('e2e-filter')) {
+      localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: 'zzz', maxShanten: null, categories: ['1', '2', '3', 'yakuman'], sort: 'shanten' }));
+      sessionStorage.setItem('e2e-filter', '1');
+    }
+  });
+  await openPractice(page, []);
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
+  // The hidden search is ignored on the phone: the yaku are listed.
+  await expect(yaku.locator('.yaku-table tbody tr').nth(1)).toBeVisible();
+
+  await yaku.getByRole('button', { name: '条件をクリア' }).click();
+  await expect(yaku.getByRole('combobox').nth(1)).toHaveValue('default');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj-dojo.yakuFilter') ?? '{}'));
+  expect(saved.query).toBe('zzz');
+  expect(saved.sort).toBe('default');
 });
 
 test('a mouse click at phone width discards at once', async ({ page }) => {

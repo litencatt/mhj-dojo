@@ -4,12 +4,13 @@ export interface HelpProps {
   onShowGlossary: () => void; // bring the 用語表 panel back from the dock and show it
 }
 
+// How the UI names tiles (tiles.ts tileName); the codes (5p, 0m, 7z) stay internal.
 const TILE_NOTATION: Array<[string, string]> = [
-  ['1m〜9m', '萬子（マンズ）'],
-  ['1p〜9p', '筒子（ピンズ）'],
-  ['1s〜9s', '索子（ソーズ）'],
-  ['1z〜7z', '東・南・西・北・白・發・中'],
-  ['0m・0p・0s', '赤5（赤ドラ）'],
+  ['1萬〜9萬', '萬子（マンズ）'],
+  ['1筒〜9筒', '筒子（ピンズ）'],
+  ['1索〜9索', '索子（ソーズ）'],
+  ['東・南・西・北・白・發・中', '字牌（風牌・三元牌）'],
+  ['赤5萬・赤5筒・赤5索', '赤5（赤ドラ）'],
 ];
 
 /** Whether a pointer event hit the modal dialog's backdrop: the dialog itself, outside its box. */
@@ -177,9 +178,7 @@ export function Help({ onShowGlossary }: HelpProps) {
                 <tbody>
                   {TILE_NOTATION.map(([k, v]) => (
                     <tr key={k}>
-                      <th scope="row">
-                        <code>{k}</code>
-                      </th>
+                      <th scope="row">{k}</th>
                       <td>{v}</td>
                     </tr>
                   ))}

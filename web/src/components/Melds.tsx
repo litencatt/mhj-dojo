@@ -1,5 +1,6 @@
 import type { Meld } from '../api';
 import { Tile } from './Tile';
+import { tileName } from '../tiles';
 
 const MELD_NAMES: Record<Meld['type'], string> = { chii: 'チー', pon: 'ポン', kan: '明槓', ankan: '暗槓' };
 
@@ -29,8 +30,8 @@ export function Melds({ melds, owner, size }: MeldsProps) {
             {tiles.map((t, j) =>
               j === at ? (
                 <span key={j} class={added ? 'meld-called meld-added' : 'meld-called'}>
-                  {added && <Tile tile={added} size={size} label={`${added}（加槓した牌）`} />}
-                  <Tile tile={t} size={size} label={`${t}（鳴いた牌）`} />
+                  {added && <Tile tile={added} size={size} label={`${tileName(added)}（加槓した牌）`} />}
+                  <Tile tile={t} size={size} label={`${tileName(t)}（鳴いた牌）`} />
                 </span>
               ) : (
                 <Tile key={j} tile={t} size={size} faceDown={m.type === 'ankan' && (j === 0 || j === 3)} />

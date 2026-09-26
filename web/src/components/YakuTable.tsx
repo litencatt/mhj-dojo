@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ComboRow, UkeireEntry, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
+import { useMediaQuery } from '../hooks';
+import { tileName } from '../tiles';
 import { YAKU_CONDITIONS } from './yakuInfo';
 import {
   CATEGORIES,
@@ -111,6 +113,12 @@ export function YakuTable(props: YakuTableProps) {
     setFilterState(f);
     saveFilter(f);
   };
+  // A phone has no 複合役 and no name search, so no search text either (the
+  // saved one is kept for a wider screen).
+  const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
+  const active = phone ? { ...filter, query: '' } : filter;
+  // 条件をクリア on a phone keeps that hidden search text too.
+  const clearFilter = () => setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -142,7 +150,7 @@ export function YakuTable(props: YakuTableProps) {
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
   const base = new Map((baseline ?? []).map((r) => [r.key, r]));
-  const { keys, total } = applyYakuFilter(current, filter);
+  const { keys, total } = applyYakuFilter(current, active);
   const visibleCount = keys.length;
 
   const finiteShanten = rows
@@ -196,19 +204,21 @@ export function YakuTable(props: YakuTableProps) {
   return (
     <section class="yaku-table-panel" aria-label="役別向聴テーブル">
       <PanelHeading title="役別向聴" onMinimize={onMinimize}>
-        {previewTile && <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>}
+        {previewTile && <span class="preview-note"> — {tileName(previewTile)} を打牌した場合のプレビュー</span>}
       </PanelHeading>
-      <ComboTable combos={combos} base={baseCombos} />
+      {!phone && <ComboTable combos={combos} base={baseCombos} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
-          <input
-            type="search"
-            class="yaku-filter-search"
-            placeholder="役名で検索（例: 一色, そめ）"
-            aria-label="役名で検索"
-            value={filter.query}
-            onInput={(e) => setFilter({ ...filter, query: (e.target as HTMLInputElement).value })}
-          />
+          {!phone && (
+            <input
+              type="search"
+              class="yaku-filter-search"
+              placeholder="役名で検索（例: 一色, そめ）"
+              aria-label="役名で検索"
+              value={filter.query}
+              onInput={(e) => setFilter({ ...filter, query: (e.target as HTMLInputElement).value })}
+            />
+          )}
           <label>
             向聴
             <select
@@ -251,14 +261,16 @@ export function YakuTable(props: YakuTableProps) {
               {c.label}
             </button>
           ))}
-          <span class="yaku-filter-count">
-            {visibleCount} / {total}役を表示中
+          <span class="yaku-filter-status">
+            <span class="yaku-filter-count">
+              {visibleCount} / {total}役を表示中
+            </span>
+            {!isDefaultFilter(active) && (
+              <button type="button" class="filter-clear" onClick={clearFilter}>
+                条件をクリア
+              </button>
+            )}
           </span>
-          {!isDefaultFilter(filter) && (
-            <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
-              条件をクリア
-            </button>
-          )}
         </div>
       </div>
       {tip && YAKU_CONDITIONS[tip.key] && (
@@ -292,7 +304,7 @@ export function YakuTable(props: YakuTableProps) {
         {visibleCount === 0 && (
           <p class="yaku-filter-empty">
             該当する役がありません
-            <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
+            <button type="button" class="filter-clear" onClick={clearFilter}>
               条件をクリア
             </button>
           </p>

@@ -40,10 +40,10 @@ func TestRankTenpaiFirst(t *testing.T) {
 	if a.Junme != 4 || a.Phase != "early" || a.DrawsLeft != 14 {
 		t.Fatalf("junme %d phase %s draws %d", a.Junme, a.Phase, a.DrawsLeft)
 	}
-	if want := "打 9m 後: 面子3・両面1・雀頭あり"; a.Shape != want {
+	if want := "打 9萬 後: 面子3・両面1・雀頭あり"; a.Shape != want {
 		t.Fatalf("shape %q, want %q", a.Shape, want)
 	}
-	if len(a.Notes) == 0 || !strings.Contains(a.Notes[0], "9m を切るほうが聴牌に1歩近い") {
+	if len(a.Notes) == 0 || !strings.Contains(a.Notes[0], "9萬 を切るほうが聴牌に1歩近い") {
 		t.Fatalf("notes %q", a.Notes)
 	}
 }
@@ -84,7 +84,7 @@ func TestWaitPrefersRyanmen(t *testing.T) {
 
 func TestReview(t *testing.T) {
 	a := Compute(input(yakushanten.NewAnalyzer(), "123m456p789s23s11z9m", "", 3, 18))
-	if r := a.Review(tile.MustParseHand("9m")[0]); !r.IsBest || r.Rank != 1 || r.Text != "前巡の打 9m: 最善" {
+	if r := a.Review(tile.MustParseHand("9m")[0]); !r.IsBest || r.Rank != 1 || r.Text != "前巡の打 9萬: 最善" {
 		t.Fatalf("9m review %+v", r)
 	}
 	r := a.Review(tile.MustParseHand("1z")[0])
@@ -98,7 +98,7 @@ func TestReview(t *testing.T) {
 	}
 	// A discard tied with the best on shanten, ukeire and wait is 最善 too.
 	b := Compute(input(yakushanten.NewAnalyzer(), "234m678p13s46s55z9m1p", "", 3, 18))
-	if r := b.Review(tile.MustParseHand("1p")[0]); !r.IsBest || r.Best != "9m" || !strings.Contains(r.Text, "最善（打 9m と同等）") {
+	if r := b.Review(tile.MustParseHand("1p")[0]); !r.IsBest || r.Best != "9m" || !strings.Contains(r.Text, "最善（打 9萬 と同等）") {
 		t.Fatalf("1p review %+v", r)
 	}
 }
@@ -128,11 +128,11 @@ func TestReviewRedFive(t *testing.T) {
 	if a.Candidates[0].Tile != "5p" {
 		t.Fatalf("best %+v", a.Candidates[0])
 	}
-	if r := a.Review(tile.MustParseHand("5p")[0]); !r.IsBest || r.Text != "前巡の打 5p: 最善" {
+	if r := a.Review(tile.MustParseHand("5p")[0]); !r.IsBest || r.Text != "前巡の打 5筒: 最善" {
 		t.Fatalf("plain 5p review %+v", r)
 	}
 	r := a.Review(tile.MustParseHand("0p")[0])
-	if r.IsBest || r.Rank != 1 || r.Text != "前巡の打 赤5p: 最善と同じ牌種だが赤ドラを失う（打 5p が最善）" {
+	if r.IsBest || r.Rank != 1 || r.Text != "前巡の打 赤5筒: 最善と同じ牌種だが赤ドラを失う（打 5筒 が最善）" {
 		t.Fatalf("red 5p review %+v", r)
 	}
 }

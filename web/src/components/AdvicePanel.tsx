@@ -1,6 +1,7 @@
 import type { Advice, AdviceCandidate, AdvicePhase, DiscardReview } from '../api';
 import { PanelHeading } from './PanelHeading';
 import { Tile, mouseOnly } from './Tile';
+import { tileName } from '../tiles';
 
 export interface AdvicePanelProps {
   advice: Advice | null; // null unless a discard is pending
@@ -17,7 +18,7 @@ function shantenLabel(s: number): string {
 
 /** A candidate read as one line; focusing it marks the tile in the hand. */
 function candidateLabel(c: AdviceCandidate): string {
-  const parts = [`打 ${c.tile}`, shantenLabel(c.shanten), `${c.shanten === 0 ? '待ち' : '有効牌'} ${c.ukeire_kinds}種${c.ukeire}枚`];
+  const parts = [`打 ${tileName(c.tile)}`, shantenLabel(c.shanten), `${c.shanten === 0 ? '待ち' : '有効牌'} ${c.ukeire_kinds}種${c.ukeire}枚`];
   if (c.wait !== null && c.shanten > 0) parts.push(`聴牌時の待ち 平均${c.wait.toFixed(1)}枚`);
   return `${parts.join('、')}（手牌で表示）`;
 }

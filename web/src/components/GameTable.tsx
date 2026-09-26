@@ -1,6 +1,7 @@
 import type { AbortReason, GameEvent, GameLength, GameState, RiverTile, Seat, Tile as TileT } from '../api';
 import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
+import { tileName } from '../tiles';
 import { Melds } from './Melds';
 
 export const WIND_NAMES: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
@@ -131,5 +132,5 @@ function SeatBox({ className, seat, state, highlight, playing }: SeatBoxProps) {
 
 function riverLabel(r: RiverTile): string | undefined {
   const notes = [r.riichi && 'リーチ宣言牌', r.called && '鳴かれた牌'].filter(Boolean);
-  return notes.length > 0 ? `${r.tile}（${notes.join('・')}）` : undefined;
+  return notes.length > 0 ? `${tileName(r.tile)}（${notes.join('・')}）` : undefined;
 }

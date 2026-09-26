@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { SessionState } from './api';
 import { Hand } from './components/Hand';
@@ -49,7 +49,7 @@ export function App() {
   });
 
   useEffect(() => {
-    document.title = 'mhj-dojo - 麻雀練習';
+    document.title = 'mhj-dojo - 麻雀道場';
   }, []);
 
   function handleNewGame(e: Event) {
@@ -79,15 +79,33 @@ export function App() {
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
   const docked = PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
+  const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
+
+  // On a phone the yaku panel scrolls on its own in the height left under the
+  // header and the hand (style.css): tell the CSS where the panel starts.
+  const appRef = useRef<HTMLDivElement>(null);
+  const hasState = !!state;
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    // The panels above the yaku table change the app's height when they
+    // change, and so does a new window width.
+    const ro = new ResizeObserver(() => {
+      const yaku = app.querySelector('.area-yaku');
+      if (!yaku) return;
+      app.style.setProperty('--yaku-top', `${yaku.getBoundingClientRect().top + window.scrollY}px`);
+    });
+    ro.observe(app);
+    return () => ro.disconnect();
+  }, [hasState]);
 
   return (
-    <div class={appClass}>
+    <div ref={appRef} class={appClass}>
       <div class="area-main">
         <div class="area-header">
           <header class="app-header">
             <h1>
-              mhj-dojo <span class="app-subtitle">麻雀練習</span>
+              mhj-dojo <span class="app-subtitle">麻雀道場</span>
               {!api.WASM && (
                 <a class="mode-link" href="?mode=game">CPU対戦へ</a>
               )}

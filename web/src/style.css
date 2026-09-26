@@ -799,8 +799,15 @@ section {
   background: var(--accent);
   color: var(--accent-fg);
 }
-.yaku-filter-count {
+/* The count and the reset stay together, at the right end of the chips' row
+   or wrapped under them. */
+.yaku-filter-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
+}
+.yaku-filter-count {
   font-size: 0.75rem;
   color: var(--muted);
 }
@@ -1144,13 +1151,26 @@ section {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.help-button {
+/* ? and × look like the panels' – button. */
+.help-button,
+.help-close {
+  flex: none;
   width: 26px;
-  height: 26px;
+  height: 24px;
   padding: 0;
-  border-radius: 50%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
   font-weight: bold;
   line-height: 1;
+  cursor: pointer;
+}
+.help-button:hover,
+.help-close:hover {
+  color: var(--fg);
+  border-color: var(--muted);
 }
 .help-dialog {
   width: min(640px, calc(100vw - 24px));
@@ -1183,13 +1203,7 @@ section {
 .help-heading h2 {
   margin: 0;
 }
-.help-close {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 1.1rem;
-  line-height: 1;
-}
+
 .help-content section {
   border: none;
   border-radius: 0;
@@ -1667,8 +1681,9 @@ section {
     margin-left: auto;
   }
   .help-button {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
   }
   .new-game-form {
     flex-basis: 100%;
@@ -1692,15 +1707,37 @@ section {
     padding: 6px 12px;
     font-size: 0.9rem;
   }
+  /* The dora sit right after 残り牌 as two more status items: no box, short
+     labels, and just the arrow between indicator and dora (the tile's label
+     names it). */
   .header-status {
-    gap: 8px 12px;
+    gap: 8px 10px;
   }
   .game-status {
-    gap: 4px 14px;
+    gap: 4px 10px;
   }
   .dora-box {
-    padding: 4px 10px;
-    gap: 4px 14px;
+    margin-left: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    gap: 4px 10px;
+  }
+  .dora-indicators {
+    gap: 2px;
+  }
+  .dora-label {
+    display: none;
+  }
+  /* Just ドラ / 裏ドラ over the tiles; 表示牌 is still read out. */
+  .dora-dt-rest {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
@@ -1789,9 +1826,19 @@ section {
     min-height: 32px;
   }
   .filter-chip {
-    padding: 4px 12px;
+    padding: 4px 10px;
   }
-  .yaku-filter-search,
+  /* Filter bar: no name search (YakuTable.tsx), the two selects share the
+     first row. */
+  .yaku-filter-row label {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .yaku-filter-row label select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .yaku-filter select,
   .glossary-search {
     font-size: 16px;
@@ -1804,6 +1851,39 @@ section {
   }
   .yaku-tip {
     width: min(280px, calc(100vw - 16px));
+  }
+
+  /* Practice: the yaku panel fills the screen under the header and the hand,
+     down to the bottom padding or dock bar, and scrolls on its own, so the
+     page does not scroll. With more panels open, or on a screen too short
+     for a 200px panel, the page does scroll, and the hand then sticks to the
+     top (not a win, which is too tall to pin).
+     App.tsx sets --yaku-top, where the panel starts on the page. */
+  .app-practice {
+    --yaku-bottom: 32px;
+  }
+  .app-practice.has-dock {
+    --yaku-bottom: 84px;
+  }
+  .app-practice .area-hand:not(:has(.win-panel)) {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--bg);
+    box-shadow: 0 0 0 8px var(--bg);
+  }
+  .app-practice .area-yaku {
+    display: flex;
+    flex-direction: column;
+    height: max(
+      200px,
+      calc(100dvh - var(--yaku-top, 50dvh) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
+    );
+  }
+  .app-practice .yaku-table-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   /* The yaku and combo tables: each row on two lines, name / 翻 / 向聴 / 合計
@@ -1845,6 +1925,11 @@ section {
     top: env(safe-area-inset-top, 0px);
     z-index: 2;
     background: var(--panel-bg);
+  }
+  /* In practice the panel is its own scroller: stick to its top edge, over
+     its 10px padding, so no row shows above the header. */
+  .app-practice .yaku-table thead {
+    top: -10px;
   }
   .yaku-table th,
   .yaku-table td,
@@ -2008,8 +2093,9 @@ section {
     padding: 8px 14px 6px;
   }
   .help-close {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
   }
 
   /* The site's update notice sits above the dock bar. */
