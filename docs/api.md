@@ -6,7 +6,7 @@ The static site (README, "Static site") has no server: the practice engine built
 (`cmd/mhj-dojo-wasm`) defines `mhjDojoRequest(method, path, body)` in its Web Worker, which takes a
 practice request below (`/api/sessions…`) as its method, path and JSON body and returns
 `{status, body}` with the status and JSON body the server would send (both use
-`internal/apicall`). Game endpoints answer 404 there. It also defines `mhjDojoRestore(body)`, not an
+`internal/apicall`); it also answers `GET /api/version`. Game endpoints answer 404 there. It also defines `mhjDojoRestore(body)`, not an
 HTTP endpoint, which rebuilds a session from its moves in one call after a page reload.
 
 ## Tile notation
@@ -64,6 +64,20 @@ Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id
 names the destination explicitly, so there's no separate "acted from" node to guard: unlike
 discard/tsumo, another tab moving the session on first can't make this ambiguous (the target
 node still exists; the tree only grows), so `goto` takes no staleness guard.
+
+### `GET /api/version`
+The commit the answering binary was built from, as the go command stamps it into a build
+made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
+
+```json
+{"version": "b083fb0", "revision": "b083fb0498b732b077e4b85af931ede37292438f", "time": "2026-09-26T13:16:27Z", "modified": false}
+```
+
+`version` is the first 7 hex digits of `revision`, or `"dev"` for a build without the stamp
+(`go run`, `go test`, a build outside a git checkout), where `revision` and `time` are `""`.
+`time` is the commit time (RFC 3339, UTC), `modified` whether the build had uncommitted changes.
+The static site's engine answers it too (with the WebAssembly binary's own stamp). The UI shows
+it in the header.
 
 ## `State`
 

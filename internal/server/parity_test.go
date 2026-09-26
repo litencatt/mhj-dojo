@@ -84,6 +84,9 @@ func TestRouteMatchesServer(t *testing.T) {
 		{"POST", "/api/sessions/{id}/undo", "{}"},
 		{"GET", "/api/sessionsx", ""},
 		{"GET", "/api/nothing", ""},
+		{"GET", "/api/version", ""},
+		{"POST", "/api/version", "{}"},
+		{"GET", "/api/version/", ""},
 	} {
 		send(r.method, r.path, r.body)
 	}

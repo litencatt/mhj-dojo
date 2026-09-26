@@ -80,6 +80,29 @@ func (c *client) wantError(method, path, body string, status int) {
 	}
 }
 
+// TestVersionContract checks GET /api/version against docs/api.md. A test
+// binary carries no VCS stamp, so it reports "dev".
+func TestVersionContract(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	code, b, h := c.do("GET", "/api/version", "")
+	if code != http.StatusOK || h.Get("Content-Type") != "application/json" {
+		t.Fatalf("status %d, content-type %q: %s", code, h.Get("Content-Type"), b)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"version", "revision", "time", "modified"} {
+		if _, ok := raw[k]; !ok {
+			t.Errorf("missing key %q", k)
+		}
+	}
+	if string(raw["version"]) != `"dev"` {
+		t.Errorf("version %s, want \"dev\" in a test binary", raw["version"])
+	}
+	c.wantError("POST", "/api/version", "{}", http.StatusNotFound)
+}
+
 // TestStateContract checks the raw JSON shape against docs/api.md.
 func TestStateContract(t *testing.T) {
 	c := newClient(t, session.NewStore())
