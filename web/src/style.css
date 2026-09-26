@@ -1828,6 +1828,18 @@ section {
   .filter-chip {
     padding: 4px 10px;
   }
+  /* Filter bar: no name search (YakuTable.tsx), the two selects share the
+     first row. */
+  .yaku-filter-row label {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .yaku-filter-row label select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .yaku-filter select,
   .glossary-search {
     font-size: 16px;
   }

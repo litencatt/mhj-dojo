@@ -107,9 +107,10 @@ for (const width of [320, 360, 390]) {
 
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
       const panel = await box(yaku);
-      // A phone shows just the yaku table: no 複合役 and no filter bar.
+      // A phone has no 複合役 and no name search, but keeps the rest of the filter bar.
       await expect(yaku.locator('.combo-table')).toHaveCount(0);
-      await expect(yaku.locator('.yaku-filter')).toHaveCount(0);
+      await expect(yaku.locator('.yaku-filter')).toBeVisible();
+      await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
       const t = yaku.locator('.yaku-table');
       await expect(t.locator('tbody tr').first()).toBeVisible();
       // No cell is cut off: every cell of the first rows, including the

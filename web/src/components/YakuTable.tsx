@@ -112,9 +112,10 @@ export function YakuTable(props: YakuTableProps) {
     setFilterState(f);
     saveFilter(f);
   };
-  // A phone shows just the yaku table: no 複合役 and no filter bar, so no
-  // filter either (the saved one is kept for a wider screen).
+  // A phone has no 複合役 and no name search, so no search text either (the
+  // saved one is kept for a wider screen).
   const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
+  const active = phone ? { ...filter, query: '' } : filter;
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -146,7 +147,7 @@ export function YakuTable(props: YakuTableProps) {
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
   const base = new Map((baseline ?? []).map((r) => [r.key, r]));
-  const { keys, total } = applyYakuFilter(current, phone ? DEFAULT_FILTER : filter);
+  const { keys, total } = applyYakuFilter(current, active);
   const visibleCount = keys.length;
 
   const finiteShanten = rows
@@ -203,9 +204,9 @@ export function YakuTable(props: YakuTableProps) {
         {previewTile && <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>}
       </PanelHeading>
       {!phone && <ComboTable combos={combos} base={baseCombos} />}
-      {!phone && (
-        <div class="yaku-filter" role="group" aria-label="役の絞り込み">
-          <div class="yaku-filter-row">
+      <div class="yaku-filter" role="group" aria-label="役の絞り込み">
+        <div class="yaku-filter-row">
+          {!phone && (
             <input
               type="search"
               class="yaku-filter-search"
@@ -214,61 +215,61 @@ export function YakuTable(props: YakuTableProps) {
               value={filter.query}
               onInput={(e) => setFilter({ ...filter, query: (e.target as HTMLInputElement).value })}
             />
-            <label>
-              向聴
-              <select
-                value={filter.maxShanten === null ? '' : String(filter.maxShanten)}
-                onChange={(e) => {
-                  const v = (e.target as HTMLSelectElement).value;
-                  setFilter({ ...filter, maxShanten: v === '' ? null : Number(v) });
-                }}
-              >
-                <option value="">すべて</option>
-                <option value="0">聴牌</option>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <option key={n} value={String(n)}>
-                    {n}向聴以内
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              並べ替え
-              <select
-                value={filter.sort}
-                onChange={(e) => setFilter({ ...filter, sort: (e.target as HTMLSelectElement).value as SortOrder })}
-              >
-                <option value="default">既定順</option>
-                <option value="shanten">向聴が近い順</option>
-                <option value="ukeire">有効牌が多い順</option>
-              </select>
-            </label>
-          </div>
-          <div class="yaku-filter-row">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
-                aria-pressed={filter.categories.includes(c.key)}
-                onClick={() => toggleCategory(c.key)}
-              >
-                {c.label}
-              </button>
-            ))}
-            <span class="yaku-filter-status">
-              <span class="yaku-filter-count">
-                {visibleCount} / {total}役を表示中
-              </span>
-              {!isDefaultFilter(filter) && (
-                <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
-                  条件をクリア
-                </button>
-              )}
-            </span>
-          </div>
+          )}
+          <label>
+            向聴
+            <select
+              value={filter.maxShanten === null ? '' : String(filter.maxShanten)}
+              onChange={(e) => {
+                const v = (e.target as HTMLSelectElement).value;
+                setFilter({ ...filter, maxShanten: v === '' ? null : Number(v) });
+              }}
+            >
+              <option value="">すべて</option>
+              <option value="0">聴牌</option>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}向聴以内
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            並べ替え
+            <select
+              value={filter.sort}
+              onChange={(e) => setFilter({ ...filter, sort: (e.target as HTMLSelectElement).value as SortOrder })}
+            >
+              <option value="default">既定順</option>
+              <option value="shanten">向聴が近い順</option>
+              <option value="ukeire">有効牌が多い順</option>
+            </select>
+          </label>
         </div>
-      )}
+        <div class="yaku-filter-row">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
+              aria-pressed={filter.categories.includes(c.key)}
+              onClick={() => toggleCategory(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+          <span class="yaku-filter-status">
+            <span class="yaku-filter-count">
+              {visibleCount} / {total}役を表示中
+            </span>
+            {!isDefaultFilter(active) && (
+              <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
+                条件をクリア
+              </button>
+            )}
+          </span>
+        </div>
+      </div>
       {tip && YAKU_CONDITIONS[tip.key] && (
         <div
           id="yaku-tip"
