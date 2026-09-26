@@ -1707,18 +1707,37 @@ section {
     padding: 6px 12px;
     font-size: 0.9rem;
   }
+  /* The dora sit right after 残り牌 as two more status items: no box, short
+     labels, and just the arrow between indicator and dora (the tile's label
+     names it). */
   .header-status {
-    gap: 8px 12px;
+    gap: 8px 10px;
   }
   .game-status {
-    gap: 4px 14px;
+    gap: 4px 10px;
   }
-  /* When the dora box wraps under the status it spans the row, so it does
-     not hang at the right end with a gap on its left. */
   .dora-box {
-    flex: 1 1 auto;
-    padding: 4px 10px;
-    gap: 4px 14px;
+    margin-left: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    gap: 4px 10px;
+  }
+  .dora-indicators {
+    gap: 2px;
+  }
+  .dora-label {
+    display: none;
+  }
+  /* Just ドラ / 裏ドラ over the tiles; 表示牌 is still read out. */
+  .dora-dt-rest {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
@@ -1838,6 +1857,36 @@ section {
     width: min(280px, calc(100vw - 16px));
   }
 
+  /* Practice: the hand sticks to the top of the screen (not a win, which is
+     too tall to pin) and the yaku panel scrolls on its own in the height left
+     under it, above the bottom padding or dock bar. App.tsx sets --hand-h. */
+  .app-practice {
+    --yaku-bottom: 32px;
+  }
+  .app-practice.has-dock {
+    --yaku-bottom: 84px;
+  }
+  .app-practice .area-hand:not(:has(.win-panel)) {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--bg);
+    box-shadow: 0 0 0 8px var(--bg);
+  }
+  .app-practice .area-yaku {
+    display: flex;
+    flex-direction: column;
+    height: max(
+      280px,
+      calc(100dvh - var(--hand-h, 120px) - 18px - env(safe-area-inset-top, 0px) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
+    );
+  }
+  .app-practice .yaku-table-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   /* The yaku and combo tables: each row on two lines, name / 翻 / 向聴 / 合計
      above and the effective tiles across the whole width below, so nothing
      is cut off or needs a sideways scroll. The header row sticks to the top
@@ -1877,6 +1926,11 @@ section {
     top: env(safe-area-inset-top, 0px);
     z-index: 2;
     background: var(--panel-bg);
+  }
+  /* In practice the panel is its own scroller: stick to its top edge, over
+     its 10px padding, so no row shows above the header. */
+  .app-practice .yaku-table thead {
+    top: -10px;
   }
   .yaku-table th,
   .yaku-table td,

@@ -13,7 +13,7 @@ export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }:
   return (
     <dl class="dora-box">
       <div>
-        <dt>ドラ表示牌</dt>
+        <dt>ドラ<span class="dora-dt-rest">表示牌</span></dt>
         <dd class="dora-indicators">
           {doraIndicators.map((t, i) => (
             <Tile key={`${t}-${i}`} tile={t} size="sm" />
@@ -26,7 +26,7 @@ export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }:
         </dd>
       </div>
       <div>
-        <dt>裏ドラ表示牌</dt>
+        <dt>裏ドラ<span class="dora-dt-rest">表示牌</span></dt>
         <dd class="dora-indicators">
           {uraDoraIndicators.length > 0 ? (
             <>

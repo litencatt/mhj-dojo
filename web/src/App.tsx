@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { SessionState } from './api';
 import { Hand } from './components/Hand';
@@ -79,10 +79,26 @@ export function App() {
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
   const docked = PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
+  const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
+
+  // On a phone the hand stays at the top of the screen and the yaku table
+  // scrolls in the space under it (style.css): tell the CSS the hand's height.
+  const appRef = useRef<HTMLDivElement>(null);
+  const handAreaRef = useRef<HTMLDivElement>(null);
+  const hasState = !!state;
+  useEffect(() => {
+    const app = appRef.current;
+    const hand = handAreaRef.current;
+    if (!app || !hand) return;
+    const ro = new ResizeObserver(() => {
+      app.style.setProperty('--hand-h', `${hand.offsetHeight}px`);
+    });
+    ro.observe(hand);
+    return () => ro.disconnect();
+  }, [hasState]);
 
   return (
-    <div class={appClass}>
+    <div ref={appRef} class={appClass}>
       <div class="area-main">
         <div class="area-header">
           <header class="app-header">
@@ -168,7 +184,7 @@ export function App() {
         </div>
         {state && (
           <>
-            <div class="area-hand">
+            <div ref={handAreaRef} class="area-hand">
               <Hand
                 hand={state.hand}
                 groups={state.hand_groups}
