@@ -185,28 +185,52 @@ func TestAuditKanOnTheLastLiveTile(t *testing.T) {
 	}
 }
 
-// After an open kan the kan dora is revealed before the discard (即めくり):
-// a ron on that discard counts it. House rule; docs/api.md leaves the timing
-// open (Tenhou/M-League flip it after the discard for open and added kans).
-// The second indicator of this wall is 9m, so 1m becomes dora.
-func TestAuditDaiminkanDoraCountsForTheNextRon(t *testing.T) {
+// After an open kan the kan dora is revealed only once the discard after it
+// passes (後めくり, as Tenhou and M-League): a ron on that discard does not
+// count it, the next win does. The second indicator of this wall is 9m, so
+// 1m becomes dora.
+func TestAuditDaiminkanDoraCountsAfterTheNextDiscard(t *testing.T) {
 	r := newRound(t)
 	setHand(r, 0, "147m258p369s1236z", "5z")
 	setHand(r, 2, "5z5z5z147m258p369s2z", "")
 	setHand(r, 3, "1m456m789p444z234s", "") // tanki 1m with 北 (seat wind): two 1m after the win
 	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
 	mustApply(t, r, Action{Seat: 2, Type: Kan})
-	ind := r.doraIndicators()
-	if len(ind) != 2 || ind[1].String() != "9m" {
-		t.Fatalf("indicators %v", ind)
+	if ind := r.doraIndicators(); len(ind) != 1 {
+		t.Fatalf("indicators %v before the discard", ind)
 	}
 	mustApply(t, r, Action{Seat: 2, Type: Discard, Tile: "1m"})
 	if r.Phase() != PhaseCall || !r.LegalFor(3).Ron {
 		t.Fatalf("phase %s claims %v", r.Phase(), claimSeats(r))
 	}
 	mustApply(t, r, Action{Seat: 3, Type: Ron})
-	if res := r.Result(); res.Win.Dora != 2 || !hasYaku(res, "pei") {
-		t.Fatalf("dora %d with indicators %v: %v", res.Win.Dora, ind, yakuKeys(res))
+	res := r.Result()
+	if res.Win.Dora != 0 || !hasYaku(res, "pei") || len(r.doraIndicators()) != 1 || len(r.uraIndicators()) != 1 {
+		t.Fatalf("dora %d with indicators %v ura %v: %v", res.Win.Dora, r.doraIndicators(), r.uraIndicators(), yakuKeys(res))
+	}
+
+	// the same discard passes: the indicator turns over, and the next ron counts it
+	r = newRound(t)
+	setHand(r, 0, "147m258p369s1236z", "5z")
+	setHand(r, 2, "5z5z5z147m258p369s2z", "")
+	setHand(r, 3, "1m456m789p444z234s", "")
+	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "5z"})
+	mustApply(t, r, Action{Seat: 2, Type: Kan})
+	mustApply(t, r, Action{Seat: 2, Type: Discard, Tile: "2z"})
+	ind := r.doraIndicators()
+	if len(ind) != 2 || ind[1].String() != "9m" || r.Actor() != 3 {
+		t.Fatalf("indicators %v actor %d", ind, r.Actor())
+	}
+	setHand(r, 3, "1m456m789p444z234s", "1z")
+	mustApply(t, r, Action{Seat: 3, Type: Discard, Tile: "1z"})
+	for r.Phase() == PhaseCall {
+		mustApply(t, r, Action{Seat: r.Actor(), Type: Skip})
+	}
+	setHand(r, 0, "147m258p369s1236z", "1m")
+	mustApply(t, r, Action{Seat: 0, Type: Discard, Tile: "1m"})
+	mustApply(t, r, Action{Seat: 3, Type: Ron})
+	if res := r.Result(); res.Win.Dora != 2 || len(r.uraIndicators()) != 2 {
+		t.Fatalf("dora %d ura %v: %v", res.Win.Dora, r.uraIndicators(), yakuKeys(res))
 	}
 }
 
@@ -218,7 +242,7 @@ func TestAuditSuukaikan(t *testing.T) {
 	setHand(r, 1, "5s8s1z9p", "")
 	setHand(r, 2, "159m159p678s1234z", "")
 	setHand(r, 3, "159m159p678s1235z", "")
-	r.kans, r.kanSeats = 3, []int{1, 1, 1}
+	r.kans, r.kanDora, r.kanSeats = 3, 3, []int{1, 1, 1}
 	setHand(r, 0, "7777z147m258p136z", "2z")
 	mustApply(t, r, Action{Seat: 0, Type: Kan, Tile: "7z"})
 	if r.kans != 4 || len(r.doraIndicators()) != 5 || r.Result() != nil {

@@ -181,11 +181,15 @@ type Round struct {
 	players   [4]player
 	turn      int // seat whose PhaseDiscard it is, or who discarded last
 	draws     int // live draws taken
-	kans      int // kans made; each reveals a dora and shortens the live wall
+	kans      int // kans made; each shortens the live wall and adds a dora
 	phase     Phase
 	deposit   int
 	honba     int
 	start     [4]int // points at the start of the round
+
+	// kanDora counts the kan dora indicators turned over; pendingDora the
+	// open or added kans whose indicator waits for the discard after them.
+	kanDora, pendingDora int
 
 	// The last discard (or the tile added to a kan) and the claims on it,
 	// in turn order from the discarder.
@@ -263,11 +267,19 @@ func (r *Round) Winds(seat int) yaku.Winds {
 // end of the live wall, which moves haitei.
 func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.kans - r.draws }
 
-// doraIndicators returns the revealed dora indicators: one plus one per kan.
-func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kans) }
+// doraIndicators returns the revealed dora indicators: one plus one per
+// revealed kan dora.
+func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kanDora) }
 
 // uraIndicators returns the ura-dora indicators under the revealed ones.
-func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kans) }
+func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kanDora) }
+
+// revealKanDora turns over the indicators of the open and added kans
+// waiting for a discard to pass (後めくり).
+func (r *Round) revealKanDora() {
+	r.kanDora += r.pendingDora
+	r.pendingDora = 0
+}
 
 // Actor returns the seat that must act now, or -1 once the round has ended.
 func (r *Round) Actor() int {
@@ -433,6 +445,7 @@ func (r *Round) acceptRiichi() {
 // afterDiscard runs once nobody claims the last discard.
 func (r *Round) afterDiscard() {
 	r.acceptRiichi()
+	r.revealKanDora()
 	r.claims = nil
 	if reason := r.abortAfterDiscard(); reason != "" {
 		r.finish(&Result{Kind: "abort", Reason: reason, Winner: -1, From: -1})

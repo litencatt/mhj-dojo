@@ -423,8 +423,17 @@ discard of the round cannot be called, and a seat in riichi can only ron (or
 make a concealed kan that keeps its waits). After a pon or chii you discard
 without drawing and may not discard the called kind, nor the tile on the far
 side after a chii on an end of the sequence (喰い替え). Each kan draws a
-replacement tile (嶺上開花 if it wins), reveals another dora indicator and
-shortens the live wall by one; an added kan can be robbed (槍槓). Calls end
+replacement tile (嶺上開花 if it wins), adds a dora indicator and shortens
+the live wall by one; an added kan can be robbed (槍槓). A concealed kan's
+indicator is turned over at once, so its replacement tile already counts it.
+An open or added kan's indicator is turned over only once the discard after
+the kan passes without a ron (後めくり): a win on the replacement tile, or a
+ron on that discard, does not count it; a pon, chii or kan of that discard
+comes after it is turned over. If the seat makes another kan before
+discarding, the earlier kan's indicator is turned over when the new kan
+completes (a robbed added kan never completes, and turns over nothing). The
+ura-dora indicators are the tiles below the dora indicators turned over when
+the round ends. Calls end
 ippatsu and the uninterrupted first go-around. Open hands lose the
 closed-only yaku and a han on the kuisagari yaku.
 
