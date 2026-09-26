@@ -385,6 +385,19 @@ h2 {
 .app.has-dock {
   padding-right: 44px;
 }
+/* viewport-fit=cover lets the page run under a notch or rounded corner (a
+   phone on its side): keep content and the dock inside the safe area. The
+   insets are 0 elsewhere, so this changes nothing on a desktop. */
+.app {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app.has-dock {
+  padding-right: calc(44px + env(safe-area-inset-right, 0px));
+}
+.panel-dock {
+  right: env(safe-area-inset-right, 0px);
+}
 
 /* ---- Advice ---- */
 .advice-body {
@@ -652,8 +665,14 @@ section {
   flex-wrap: wrap;
 }
 .hand-drawn {
+  display: flex; /* no line box around the tile: it sits level with the hand */
   padding-left: 12px;
   border-left: 2px dashed var(--border);
+}
+/* With 面子表示 the brackets sit above the tiles: the drawn tile (and its
+   divider) lines up with the tiles, not with the middle of the brackets. */
+.hand-row:has(> .hand-tiles-grouped) {
+  align-items: flex-end;
 }
 .hand-heading {
   display: flex;
@@ -1598,13 +1617,23 @@ section {
    scroll, and controls big enough to tap. Tablets and desktops are unchanged. */
 .dock-tab-icon,
 .dock-tab-short,
-.hint-touch {
+.hint-touch,
+.hint-hybrid {
   display: none;
 }
-/* A touch screen taps a tile twice to discard it (components/Hand.tsx). */
-@media (hover: none) and (pointer: coarse) {
+/* A touch screen (or pen) taps a tile twice to discard it
+   (components/Hand.tsx): a touch-only device says so instead of 「クリック」,
+   one with a mouse as well adds it. */
+@media (any-pointer: coarse) and (not (any-pointer: fine)) {
   .hint-mouse { display: none; }
   .hint-touch { display: inline; }
+}
+@media (any-pointer: coarse) and (any-pointer: fine) {
+  .hint-hybrid { display: inline; }
+}
+/* No double-tap zoom on the hand: its tiles are tapped twice on purpose. */
+.hand-row {
+  touch-action: manipulation;
 }
 
 @media (width <= 760px) {
@@ -1677,7 +1706,7 @@ section {
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
      after the fixed gaps (12 of 2px, the drawn tile's 6px gap, 5px padding
      and 2px divider, rounded up; more for the 面子表示 brackets' gaps), so
-     at 360px a tile is about 20px wide. A tile's tap area reaches into the
+     at 360px a tile is about 20px wide, and 16px still fits at 320px. A tile's tap area reaches into the
      gaps and above and below it. */
   .hand-panel {
     --hand-fixed: 40px;
@@ -1686,7 +1715,7 @@ section {
     --hand-fixed: 54px;
   }
   .hand-panel .tile-md {
-    width: clamp(18px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
+    width: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
     padding: 1.5px;
     border-radius: 4px;
   }
@@ -1813,7 +1842,7 @@ section {
   }
   .yaku-table thead {
     position: sticky;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     z-index: 2;
     background: var(--panel-bg);
   }

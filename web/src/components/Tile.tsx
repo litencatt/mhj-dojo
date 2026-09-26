@@ -11,9 +11,19 @@ export interface TileProps {
   faceDown?: boolean; // show the tile's back (e.g. unrevealed ura dora)
   label?: string;
   className?: string; // extra class, e.g. a playback highlight
-  onClick?: () => void;
+  onClick?: (e: MouseEvent) => void;
+  // A mouse pointer entering or leaving, or keyboard focus. Touch never
+  // hovers: iOS would otherwise take a hover that changes the page as the
+  // tap's whole effect and drop its click.
   onHoverStart?: () => void;
   onHoverEnd?: () => void;
+}
+
+/** Runs `f` for a mouse pointer only (not touch or pen). */
+export function mouseOnly(f: () => void) {
+  return (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') f();
+  };
 }
 
 /** Renders a single mahjong tile: an ivory body (CSS) with an SVG face. */
@@ -27,8 +37,8 @@ export function Tile(props: TileProps) {
 
   const commonProps = {
     className: classes.join(' '),
-    onMouseEnter: onHoverStart,
-    onMouseLeave: onHoverEnd,
+    onPointerEnter: onHoverStart && mouseOnly(onHoverStart),
+    onPointerLeave: onHoverEnd && mouseOnly(onHoverEnd),
     onFocus: onHoverStart,
     onBlur: onHoverEnd,
     'aria-label': label ?? (faceDown ? '伏せ牌' : tile),

@@ -1,6 +1,6 @@
 import type { Advice, AdviceCandidate, AdvicePhase, DiscardReview } from '../api';
 import { PanelHeading } from './PanelHeading';
-import { Tile } from './Tile';
+import { Tile, mouseOnly } from './Tile';
 
 export interface AdvicePanelProps {
   advice: Advice | null; // null unless a discard is pending
@@ -58,8 +58,8 @@ export function AdvicePanel({ advice, review, onHighlight, onMinimize }: AdviceP
                   class="advice-candidate"
                   tabIndex={0}
                   aria-label={candidateLabel(c)}
-                  onMouseEnter={() => onHighlight(c.tile)}
-                  onMouseLeave={() => onHighlight(null)}
+                  onPointerEnter={mouseOnly(() => onHighlight(c.tile))}
+                  onPointerLeave={mouseOnly(() => onHighlight(null))}
                   onFocus={() => onHighlight(c.tile)}
                   onBlur={() => onHighlight(null)}
                 >

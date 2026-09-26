@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ComboRow, UkeireEntry, YakuRow } from '../api';
-import { Tile } from './Tile';
+import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
 import { YAKU_CONDITIONS } from './yakuInfo';
 import {
@@ -163,8 +163,10 @@ export function YakuTable(props: YakuTableProps) {
             class="yaku-name"
             tabIndex={0}
             aria-describedby={tip?.key === row.key ? 'yaku-tip' : undefined}
-            onMouseEnter={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
-            onMouseLeave={() => setTip(null)}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') showTip(row.key, e.currentTarget as HTMLElement);
+            }}
+            onPointerLeave={mouseOnly(() => setTip(null))}
             onFocus={(e) => showTip(row.key, e.currentTarget as HTMLElement)}
             onBlur={() => setTip(null)}
           >
