@@ -253,16 +253,11 @@ export function usePlayback(state: GameState | null): Playback {
   return { seats, events, playing, highlight, skip };
 }
 
-const HAND_GROUPS_KEY = 'mhj2.handGroups';
-
-/**
- * The hand panel's 「面子表示」 toggle, shared by practice and game mode and
- * kept in localStorage. Off by default and whenever storage fails.
- */
-export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
+/** An on/off setting kept in localStorage under key. Off by default and whenever storage fails. */
+function useStoredFlag(key: string): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => {
     try {
-      return localStorage.getItem(HAND_GROUPS_KEY) === '1';
+      return localStorage.getItem(key) === '1';
     } catch {
       return false;
     }
@@ -270,10 +265,20 @@ export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
   const update = (next: boolean) => {
     setOn(next);
     try {
-      localStorage.setItem(HAND_GROUPS_KEY, next ? '1' : '0');
+      localStorage.setItem(key, next ? '1' : '0');
     } catch {
       // Storage unavailable: the setting just won't persist.
     }
   };
   return [on, update];
+}
+
+/** The hand panel's 「面子表示」 toggle, shared by practice and game mode. */
+export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
+  return useStoredFlag('mhj2.handGroups');
+}
+
+/** Whether the practice advice panel is open: closed until the player opens it. */
+export function useAdviceOpen(): [boolean, (on: boolean) => void] {
+  return useStoredFlag('mhj2.adviceOpen');
 }

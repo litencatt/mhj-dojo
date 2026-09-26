@@ -87,6 +87,53 @@ export interface SessionState {
   history: HistoryEntry[];
   tree: TreeNode[];
   win: Win | null;
+  advice: Advice | null; // only while playing
+  discard_review: DiscardReview | null; // the discard that led to this node
+}
+
+// Rule-based advice for the pending discard (docs/api.md "Advice").
+export interface AdviceCandidate {
+  tile: Tile;
+  shanten: number;
+  ukeire_kinds: number;
+  ukeire: number;
+  wait: number | null; // expected tenpai wait; null above 1-shanten
+  yaku: string[];
+}
+
+export interface NearYaku {
+  key: string;
+  name: string;
+  han: number;
+  shanten: number;
+  kept: boolean;
+}
+
+export type AdvicePhase = 'early' | 'middle' | 'late';
+
+export interface Advice {
+  candidates: AdviceCandidate[];
+  junme: number;
+  phase: AdvicePhase;
+  guideline: string;
+  draws_left: number;
+  tenpai_chance: number; // 0..1
+  win_chance: number;
+  shape: string;
+  near_yaku: NearYaku[];
+  notes: string[];
+}
+
+export interface DiscardReview {
+  tile: Tile;
+  best: Tile;
+  rank: number;
+  is_best: boolean;
+  shanten: number;
+  best_shanten: number;
+  ukeire: number;
+  best_ukeire: number;
+  text: string;
 }
 
 export interface ApiErrorBody {

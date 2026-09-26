@@ -16,6 +16,7 @@ export interface HandProps {
   // Only the drawn tile can be clicked (after riichi), even if a hand tile is identical.
   onlyDrawn?: boolean;
   melds?: ComponentChildren; // called melds, shown after the hand (game mode)
+  highlight?: string | null; // tiles to mark (exact string), e.g. a hovered advice candidate
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
@@ -64,7 +65,8 @@ function validGroups(hand: string[], groups: HandGroup[] | undefined): HandGroup
  * With 面子表示 on, the hand is regrouped into the server's blocks, each under a labelled bracket.
  */
 export function Hand(props: HandProps) {
-  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, onDiscard, onPreview } = props;
+  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, highlight, onDiscard, onPreview } = props;
+  const mark = (t: string) => (highlight && t === highlight ? 'tile-advice' : undefined);
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
   const [showGroups, setShowGroups] = useHandGroupsToggle();
   const layout = useMemo(() => (showGroups ? validGroups(hand, groups) : null), [showGroups, hand, groups]);
@@ -120,6 +122,7 @@ export function Hand(props: HandProps) {
         button
         interactive={ok}
         dimmed={!disabled && !ok}
+        className={mark(t)}
         onClick={() => {
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
           onDiscard(t);
@@ -171,6 +174,7 @@ export function Hand(props: HandProps) {
               button
               interactive={can(drawn, true)}
               dimmed={!disabled && !can(drawn, true)}
+              className={mark(drawn)}
               onClick={() => {
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');
                 onDiscard(drawn);
