@@ -195,6 +195,14 @@ func (m *Match) analyze(c tile.Counts, melds []yaku.Meld) []yakushanten.Result {
 	return m.analyzer.AnalyzeWith(c, melds)
 }
 
+// combos returns the yaku combos of the hand c with melds, whose rows are res.
+func (m *Match) combos(c tile.Counts, melds []yaku.Meld, res []yakushanten.Result) []yakushanten.Combo {
+	if m.analyzer.MemoSize() > memoLimit {
+		m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
+	}
+	return m.analyzer.Combos(c, melds, res)
+}
+
 // hanFor returns the rows' han for the human's winds, lowered for an open
 // hand (kuisagari).
 func (m *Match) hanFor(melds []yaku.Meld) func(key string) int {

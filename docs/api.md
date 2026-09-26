@@ -266,11 +266,17 @@ and its ukeire (as for a single row). The yaku come from `tanyao`, `pinfu`,
 the value-wind rows and `chiitoitsu` (seven pairs combines only with `tanyao`,
 `honroutou`, `honitsu` and `chinitsu`). Not combined: `ryanpeikou`,
 `sanankou`, the yakuman, pairs where one yaku replaces the other (chanta /
-junchan, honitsu / chinitsu), pairs whose hands are really another yaku
-(tanyao or junchan with honitsu = chinitsu, chanta or junchan with
-honroutou), and all three dragons (daisangen). `shousangen` always counts its
-two dragon triplets: its name reads `小三元（役牌×2込み）` and it adds 4 han;
-it is not combined with the dragon rows.
+junchan, honitsu / chinitsu), pairs no hand scores together (chanta or
+junchan with toitoi or honroutou), pairs whose hands are really another yaku
+(tanyao or junchan with honitsu = chinitsu, chanta with chinitsu = junchan),
+and all three dragons (daisangen). In a combination `chanta` and `junchan`
+need a sequence, as the win evaluator scores them (their rows also count the
+all-triplet hands, which are honroutou or chinroutou). `shousangen` always
+counts its two dragon triplets: its name reads `小三元（役牌×2込み）` and it
+adds 4 han; it is not combined with the dragon rows. A combination counts
+only the yaku it names: an `iipeikou` combination may be completed as a
+ryanpeikou hand, and a closed `toitoi` one as a sanankou or suuankou hand,
+without that showing in its han. East/East practice has 295 combinations.
 
 ```jsonc
 {
@@ -293,8 +299,7 @@ Ranking (`yakushanten.Combos`):
 
 1. Sort by `2 × shanten − value`, where value = han capped at 5 (mangan), +1
    from 6 han (haneman) and +1 more from 8 han (baiman): one step toward tenpai
-   weighs as much as two han. Ties: more han, then fewer shanten, then a fixed
-   list order.
+   weighs as much as two han. Ties: more han, then a fixed list order.
 2. Drop a combination when one with more yaku that contains it has the same
    shanten (it scores more for the same work).
 3. Drop a combination that differs from a better-ranked one only in which
@@ -305,9 +310,18 @@ The server evaluates the combinations best-first by a lower bound (the largest
 shanten among each combination's own rows) and stops once no remaining one can
 enter the top five; `TestCombosPruneMatchesFull` checks this gives the same
 result as evaluating all of them, and `TestCombosMatchBruteForce` checks every
-combination against a brute-force definition. With the combos, analysing
-every discard candidate of a closed hand (`TestAnalyzeAllDiscardsP95`) takes
-p95 ~41 ms, up from ~23 ms, within the 100 ms budget.
+combination against a brute-force definition (for East/East and for split
+winds). With the combos, analysing every discard candidate of a random closed
+hand (`TestAnalyzeAllDiscardsP95`) takes p95 ~30 ms on a developer machine
+(the rows alone took ~23 ms before the suit-table DP skipped unreachable
+states and the rows shared the combos' fold cache), within the 100 ms budget
+(GitHub's runners are about 2.5x slower); the same test times all-sequence
+worst cases (`worstHands`) at ~18-34 ms each.
+
+Right after a pon or chii (game mode), `combos` is the list of the legal
+discard whose first combination ranks best (lowest rank, then more han, then
+the highest `ukeire_total`, then the first in `legal.discards` order), like
+`analysis` there.
 
 ### Rows (fixed order)
 
@@ -374,7 +388,7 @@ These clarify points the contract above leaves open; none changes the JSON shape
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
   **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
-  (an exhausted node has one). Like `by_discard`, the full advice is kept only for the current node (see Memory);
+  (an exhausted node has one). Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
   each node keeps just its small review. Computing the advice takes ~1.4 ms on average, ~4 ms at p95, per
   request (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
   discard p95 ~23 ms including the rest of the state).
@@ -618,7 +632,7 @@ unknown game, `409` a move that is not legal now.
   "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
                                 // wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
-  "combos": [ComboRow],         // yaku combos of the hand `analysis` describes ([] right after a pon or chii)
+  "combos": [ComboRow],         // yaku combos of your hand (right after a pon or chii: the best discard's, see Yaku combos)
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended

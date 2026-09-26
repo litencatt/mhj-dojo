@@ -85,13 +85,16 @@ func (s *Session) state() State {
 	st.WallRemaining = wall.LiveDraws - drawsTaken
 
 	st.Analysis = rows(s.nodeAnalysis(cur), &visible)
-	st.Combos = apiview.Combos(s.analyzer.Combos(tile.CountsOf(cur.hand), nil, s.nodeAnalysis(cur)), &visible)
+	st.Combos = apiview.Combos(s.nodeCombos(cur), &visible)
 	if d, ok := s.drawn(cur); ok {
 		all := append(append([]tile.Tile{}, cur.hand...), d)
 		c := tile.CountsOf(all)
 		st.CanTsumo = yaku.IsComplete(c)
 		if cur.byDiscard == nil {
 			cur.byDiscard = map[tile.Kind][]yakushanten.Result{}
+		}
+		if cur.combosByDiscard == nil {
+			cur.combosByDiscard = map[tile.Kind][]yakushanten.Combo{}
 		}
 		for _, t := range all {
 			key := t.String()
@@ -106,9 +109,14 @@ func (s *Session) state() State {
 				cur.byDiscard[t.Kind] = res
 			}
 			st.ByDiscard[key] = rows(res, &visible)
-			c[t.Kind]--
-			st.CombosByDiscard[key] = apiview.Combos(s.analyzer.Combos(c, nil, res), &visible)
-			c[t.Kind]++
+			combos, ok := cur.combosByDiscard[t.Kind]
+			if !ok {
+				c[t.Kind]--
+				combos = s.combos(c, res)
+				c[t.Kind]++
+				cur.combosByDiscard[t.Kind] = combos
+			}
+			st.CombosByDiscard[key] = apiview.Combos(combos, &visible)
 		}
 		st.Advice = s.nodeAdvice(cur, path)
 	}

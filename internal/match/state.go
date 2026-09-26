@@ -8,6 +8,7 @@ import (
 	"github.com/litencatt/mhj2/internal/score"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj2/internal/yakushanten"
 )
 
 // State is the JSON view of a game for the human (docs/api.md).
@@ -224,7 +225,7 @@ func (m *Match) state() State {
 		c := tile.CountsOf(me.Hand)
 		res := m.analyze(c, melds)
 		st.Analysis = apiview.Rows(res, &visible, han)
-		st.Combos = apiview.Combos(m.analyzer.Combos(c, melds, res), &visible)
+		st.Combos = apiview.Combos(m.combos(c, melds, res), &visible)
 	}
 	if yourTurn {
 		all := slices.Clone(me.Hand)
@@ -240,11 +241,12 @@ func (m *Match) state() State {
 			c[t.Kind]--
 			res := m.analyze(c, melds)
 			st.ByDiscard[key] = apiview.Rows(res, &visible, han)
-			st.CombosByDiscard[key] = apiview.Combos(m.analyzer.Combos(c, melds, res), &visible)
+			st.CombosByDiscard[key] = apiview.Combos(m.combos(c, melds, res), &visible)
 			c[t.Kind]++
 		}
 		if me.Drawn == nil { // right after a call: the hand must still discard
 			st.Analysis = bestRows(st.ByDiscard, st.Legal.Discards)
+			st.Combos = bestCombos(st.CombosByDiscard, st.Legal.Discards)
 		}
 	}
 	st.History = slices.Clone(m.history)
@@ -274,6 +276,33 @@ func bestRows(byDiscard map[string][]apiview.YakuRow, discards []string) []apivi
 		out = []apiview.YakuRow{}
 	}
 	return out
+}
+
+// bestCombos is the combos of a hand that must discard before it can win:
+// those of the legal discard whose first combo ranks best (lowest
+// yakushanten.ComboRank, then more han, then the highest ukeire_total, then
+// the first in discards order).
+func bestCombos(byDiscard map[string][]apiview.ComboRow, discards []string) []apiview.ComboRow {
+	var best []apiview.ComboRow
+	for _, d := range discards {
+		cs := byDiscard[d]
+		if len(cs) == 0 {
+			continue
+		}
+		if len(best) == 0 {
+			best = cs
+			continue
+		}
+		a, b := cs[0], best[0]
+		ra, rb := yakushanten.ComboRank(a.Han, a.Shanten), yakushanten.ComboRank(b.Han, b.Shanten)
+		if ra < rb || (ra == rb && (a.Han > b.Han || (a.Han == b.Han && a.UkeireTotal > b.UkeireTotal))) {
+			best = cs
+		}
+	}
+	if best == nil {
+		best = []apiview.ComboRow{}
+	}
+	return best
 }
 
 func better(a, b apiview.YakuRow) bool {
