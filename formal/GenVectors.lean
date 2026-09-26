@@ -71,7 +71,7 @@ def settleVector (x : Input) : String :=
 winner. -/
 def hands (w : Fin 4) : List (Nat × Nat × List Part) :=
   let others := (List.finRange 4).filter (· ≠ w)
-  let normal := [(1, 30), (2, 25), (3, 60), (4, 30), (4, 40), (7, 40), (13, 30)].map
+  let normal := [(1, 30), (2, 25), (3, 60), (4, 30), (4, 40), (6, 40), (7, 40), (9, 30), (13, 30)].map
     fun (h, f) => (h, f, [])
   let one := fun m p => Part.mk m p
   normal ++ [(13, 0, [one 1 none]), (26, 0, [one 2 none])] ++
@@ -84,22 +84,23 @@ def hands (w : Fin 4) : List (Nat × Nat × List Part) :=
 def settleVectors : List String := Id.run do
   let mut out := []
   let none4 : Fin 4 → Bool := fun _ => false
-  for dealer in [(0 : Fin 4), 3] do
+  -- (honba, riichi, carried sticks); each dealer gets two of them
+  let tables := [(0, 0, 0), (2, 5, 1000), (1, 10, 3000)]
+  for dealer in List.finRange 4 do
     for winner in List.finRange 4 do
-      for honba in [0, 2] do
-        for rmask in [0, 5] do
-          for (han, fu, parts) in hands winner do
-            let base : Input :=
-              { kind := .tsumo, dealer := dealer, winner := winner, discarder := winner,
-                honba := honba, deposit := 1000, riichi := bits rmask, tenpai := none4,
-                han := han, fu := fu, parts := parts }
-            out := settleVector base :: out
-            for d in (List.finRange 4).filter (· ≠ winner) do
-              out := settleVector { base with kind := .ron, discarder := d } :: out
+      for (honba, rmask, deposit) in [tables[dealer.val % 3]!, tables[(dealer.val + 1) % 3]!] do
+        for (han, fu, parts) in hands winner do
+          let base : Input :=
+            { kind := .tsumo, dealer := dealer, winner := winner, discarder := winner,
+              honba := honba, deposit := deposit, riichi := bits rmask, tenpai := none4,
+              han := han, fu := fu, parts := parts }
+          out := settleVector base :: out
+          for d in (List.finRange 4).filter (· ≠ winner) do
+            out := settleVector { base with kind := .ron, discarder := d } :: out
   for tmask in List.range 16 do
     for rmask in List.range 16 do
       for honba in [0, 1] do
-        for deposit in [0, 1000] do
+        for deposit in [0, 3000] do
           let x : Input :=
             { kind := .draw, dealer := 0, winner := 0, discarder := 0, honba := honba,
               deposit := deposit, riichi := bits rmask, tenpai := bits tmask, han := 0,
