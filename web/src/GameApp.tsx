@@ -181,37 +181,39 @@ export function GameApp() {
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
             {state && (
-              <dl class="game-status">
-                <div>
-                  <dt>シード</dt>
-                  <dd>{state.seed ?? '終局後に表示'}</dd>
-                </div>
-                <div>
-                  <dt>対局</dt>
-                  <dd>{LENGTH_NAMES[state.length]}</dd>
-                </div>
-                <div>
-                  <dt>CPU</dt>
-                  <dd>{CPU_NAMES[state.cpu]}</dd>
-                </div>
-                <div>
-                  <dt>局</dt>
-                  <dd>
-                    {WIND_NAMES[state.round_wind]}
-                    {state.round_number}局 {state.honba}本場
-                  </dd>
-                </div>
-                <div>
-                  <dt>自風</dt>
-                  <dd>{me && WIND_NAMES[me.wind]}</dd>
-                </div>
+              <div class="header-status">
+                <dl class="game-status">
+                  <div>
+                    <dt>シード</dt>
+                    <dd>{state.seed ?? '終局後に表示'}</dd>
+                  </div>
+                  <div>
+                    <dt>対局</dt>
+                    <dd>{LENGTH_NAMES[state.length]}</dd>
+                  </div>
+                  <div>
+                    <dt>CPU</dt>
+                    <dd>{CPU_NAMES[state.cpu]}</dd>
+                  </div>
+                  <div>
+                    <dt>局</dt>
+                    <dd>
+                      {WIND_NAMES[state.round_wind]}
+                      {state.round_number}局 {state.honba}本場
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>自風</dt>
+                    <dd>{me && WIND_NAMES[me.wind]}</dd>
+                  </div>
+                </dl>
                 <DoraStatus
                   doraIndicators={state.dora_indicators}
                   dora={state.dora}
                   uraDoraIndicators={state.ura_dora_indicators}
                   uraDora={state.ura_dora}
                 />
-              </dl>
+              </div>
             )}
           </header>
           {error && (
