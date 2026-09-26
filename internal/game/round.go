@@ -88,9 +88,10 @@ type Action struct {
 	Tiles []string   `json:"tiles,omitempty"`
 }
 
-// RiverTile is a discarded tile. Riichi marks the declaration tile, Called
-// a tile another seat claimed into a meld (it stays in the river for
-// furiten, but counts once, in the meld).
+// RiverTile is a discarded tile. Riichi marks the declaration tile (not one
+// that was ronned: that riichi never stood), Called a tile another seat
+// claimed into a meld (it stays in the river for furiten, but counts once,
+// in the meld).
 type RiverTile struct {
 	Tile   tile.Tile
 	Riichi bool
@@ -139,7 +140,7 @@ type Pao struct {
 // Result describes how the round ended.
 type Result struct {
 	Kind   string // "tsumo", "ron", "draw" or "abort"
-	Reason string // for "abort": AbortKyuushu, AbortSuufon or AbortSuucha
+	Reason string // for "abort": AbortKyuushu, AbortSuufon, AbortSuucha or AbortKans
 	Winner int    // -1 on a draw
 	From   int    // the discarder on a ron, else -1
 	// Win, Points and WinTile are set for tsumo and ron.
@@ -181,11 +182,15 @@ type Round struct {
 	players   [4]player
 	turn      int // seat whose PhaseDiscard it is, or who discarded last
 	draws     int // live draws taken
-	kans      int // kans made; each reveals a dora and shortens the live wall
+	kans      int // kans made; each shortens the live wall and adds a dora
 	phase     Phase
 	deposit   int
 	honba     int
 	start     [4]int // points at the start of the round
+
+	// kanDora counts the kan dora indicators turned over; pendingDora the
+	// open or added kans whose indicator waits for the discard after them.
+	kanDora, pendingDora int
 
 	// The last discard (or the tile added to a kan) and the claims on it,
 	// in turn order from the discarder.
@@ -263,11 +268,19 @@ func (r *Round) Winds(seat int) yaku.Winds {
 // end of the live wall, which moves haitei.
 func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.kans - r.draws }
 
-// doraIndicators returns the revealed dora indicators: one plus one per kan.
-func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kans) }
+// doraIndicators returns the revealed dora indicators: one plus one per
+// revealed kan dora.
+func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kanDora) }
 
 // uraIndicators returns the ura-dora indicators under the revealed ones.
-func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kans) }
+func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kanDora) }
+
+// revealKanDora turns over the indicators of the open and added kans
+// waiting for the declarer's discard (後めくり).
+func (r *Round) revealKanDora() {
+	r.kanDora += r.pendingDora
+	r.pendingDora = 0
+}
 
 // Actor returns the seat that must act now, or -1 once the round has ended.
 func (r *Round) Actor() int {
@@ -392,6 +405,7 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	p.kuikae = nil
 	p.ippatsu = false // a discard after the declaration ends ippatsu
 	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare})
+	r.revealKanDora() // before the claims: a ron on this discard counts it
 	kind := Discard
 	if declare {
 		kind = Riichi
@@ -643,9 +657,12 @@ func (r *Round) ron(seat int) error {
 	if !ok {
 		return fmt.Errorf("%w: seat %d cannot ron", ErrConflict, seat)
 	}
-	// A riichi declared on the winning discard is not accepted: no stick.
+	// A riichi declared on the winning discard is not accepted: no stick,
+	// and the tile is not laid sideways.
 	if r.pendingRiichi {
-		r.players[r.turn].doubleRiichi = false
+		p := &r.players[r.turn]
+		p.doubleRiichi = false
+		p.river[len(p.river)-1].Riichi = false
 		r.pendingRiichi = false
 	}
 	r.events = append(r.events, Action{Seat: seat, Type: Ron})

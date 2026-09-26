@@ -391,15 +391,17 @@ depends on the seed, unless you ask to be the first dealer
 rewinding. After each of your moves the server plays the CPU seats until you
 have a choice again or the round ends; after a round ends you send `next`.
 
-Round rules: riichi (closed, 1000 points, at least 4 draws left, tenpai after
-the discard; after riichi only the drawn tile can be discarded, and the server
-discards it for you unless you can tsumo), double riichi, ippatsu, ura dora,
-haitei, houtei, furiten (own discards, same go-around, and after riichi), head
-bump (no double ron), 3000-point noten penalty at the exhaustive draw, and the
-abortive draws 九種九牌 (declared), 四風連打, 四家立直 and 四開槓. Points: no
-kiriage mangan, counted yakuman at 13 han, yakuman multiples (a double yakuman or
-stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a non-dealer
-and 48000 × n to the dealer), honba 300 (ron) / 100 each (tsumo).
+Round rules: riichi (closed, costs a 1000-point stick and needs at least 1000
+points, at least 4 draws left, tenpai after the discard; after riichi only the
+drawn tile can be discarded, and the server discards it for you unless you can
+tsumo), double riichi, ippatsu, ura dora, haitei, houtei, furiten (own
+discards, same go-around, and after riichi), head bump (no double ron),
+3000-point noten penalty at the exhaustive draw, and the abortive draws 九種九牌
+(declared), 四風連打, 四家立直 and 四開槓. Points: no kiriage mangan, a pair of a wind
+that is both the round and the seat wind is 4 fu (2 per reason, as for any
+value pair), counted yakuman at 13 han, yakuman multiples (a double yakuman or
+stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a
+non-dealer and 48000 × n to the dealer), honba 300 (ron) / 100 each (tsumo).
 
 Pao (包, 責任払い): a seat whose discard the winner called (pon or open kan)
 to complete the third dragon meld (大三元), the fourth wind meld (大四喜) or
@@ -418,15 +420,25 @@ Calls: pon and open kan on any other seat's discard, chii on the discard of
 the seat to your left, and on your own turn a concealed kan or an added kan
 onto your pon. After a discard every seat that can claim it answers in turn
 order: a ron wins at once (head bump), otherwise a pon or kan beats a chii.
-Declining a ron makes you furiten; declining a call does not. The last
-discard of the round cannot be called, and a seat in riichi can only ron (or
-make a concealed kan that keeps its waits). After a pon or chii you discard
-without drawing and may not discard the called kind, nor the tile on the far
-side after a chii on an end of the sequence (喰い替え). Each kan draws a
-replacement tile (嶺上開花 if it wins), reveals another dora indicator and
-shortens the live wall by one; an added kan can be robbed (槍槓). Calls end
-ippatsu and the uninterrupted first go-around. Open hands lose the
-closed-only yaku and a han on the kuisagari yaku.
+Declining a ron makes you furiten; declining a call does not. The last discard
+of the round cannot be called, and a seat in riichi can only ron (or make a
+concealed kan that keeps its waits). After a pon or chii you discard without
+drawing and may not discard the called kind, nor the tile on the far side
+after a chii on an end of the sequence (喰い替え). Each kan draws a replacement
+tile (嶺上開花 if it wins), adds a dora indicator and shortens the live wall by
+one; an added kan can be robbed (槍槓), a concealed kan cannot (not even for
+国士無双). A concealed kan's indicator is turned over at once, so its replacement
+tile already counts it. An open or added kan's indicator is turned over when
+the declarer discards, before the other seats answer that discard (後めくり): a
+win on the replacement tile does not count it, a ron on that discard (槓振り)
+does, ura dora included. If the declarer makes another kan before discarding,
+the earlier kan's indicator is turned over when the new kan completes. House
+rule: a robbed added kan never completes, so neither it nor an earlier open
+kan of the same turn turns an indicator over, and the chankan scores without
+them. The ura-dora indicators are the tiles below the dora indicators turned
+over when the round ends. Calls end ippatsu and the uninterrupted first
+go-around. Open hands lose the closed-only yaku and a han on the kuisagari
+yaku.
 
 Analysis with melds: `analysis`, `by_discard` and `history` go on after a
 call. Every meld (chii, pon, kan, ankan) is a fixed group of each complete
@@ -529,7 +541,7 @@ unknown game, `409` a move that is not legal now.
   "ura_dora_indicators": [], "ura_dora": [],   // revealed when the round ends
   "seats": [                    // index = seat
     { "seat": 0, "wind": "3z", "points": 25000, "riichi": false,
-      "river": [{"tile": "9s", "riichi": false, "called": false}],  // called: taken into another seat's meld
+      "river": [{"tile": "9s", "riichi": false, "called": false}],  // riichi: the declaration tile (not when it was ronned); called: taken into another seat's meld
       "melds": [{"type": "pon", "tiles": ["7z", "7z", "7z"], "from": 3, "added": false}],  // "chii" | "pon" | "kan" | "ankan"; the called tile last; from -1 for an ankan
                                 // added: a kan made by adding a tile to a pon (kakan); the added tile comes just before the called tile
       "hand_count": 14,             // concealed tiles, drawn tile included
@@ -559,7 +571,7 @@ East, otherwise the round wind row then your seat wind row (1 han each).
 ```jsonc
 {
   "kind": "ron",                // "tsumo" | "ron" | "draw" | "abort"
-  "reason": "",                 // abort: "kyuushu" | "suufon" | "suucha" (omitted otherwise)
+  "reason": "",                 // abort: "kyuushu" | "suufon" | "suucha" | "suukaikan" (omitted otherwise)
   "winner": 1, "from": 0,       // -1 when not applicable
   "win_tile": "5p",
   "yaku": [{"key": "riichi", "name": "立直", "han": 1}],

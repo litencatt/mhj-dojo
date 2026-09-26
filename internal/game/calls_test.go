@@ -153,8 +153,13 @@ func TestOpenKanAndRinshan(t *testing.T) {
 	if r.kans != 1 || p.drawn == nil || *p.drawn != rin || !p.rinshan || !p.melds[0].Meld.Kan || p.melds[0].Added || len(p.melds[0].Tiles) != 4 {
 		t.Fatalf("after kan: kans %d drawn %v melds %+v", r.kans, p.drawn, p.melds)
 	}
-	if r.DrawsLeft() != left-1 || len(r.ViewFor(0).DoraIndicators) != 2 {
+	// the kan dora waits for the discard after the kan to pass
+	if r.DrawsLeft() != left-1 || len(r.ViewFor(0).DoraIndicators) != 1 {
 		t.Fatalf("draws left %d dora %d", r.DrawsLeft(), len(r.ViewFor(0).DoraIndicators))
+	}
+	passSafe(t, r, 2)
+	if len(r.ViewFor(0).DoraIndicators) != 2 {
+		t.Fatalf("dora %d after the discard", len(r.ViewFor(0).DoraIndicators))
 	}
 	checkInvariants(t, r)
 }

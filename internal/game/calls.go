@@ -175,7 +175,7 @@ func (r *Round) call(a Action) {
 	r.startTurn(a.Seat)
 	if a.Type == Kan {
 		r.kanSeats = append(r.kanSeats, a.Seat)
-		r.drawRinshan(a.Seat)
+		r.drawRinshan(a.Seat, true)
 	}
 }
 
@@ -227,13 +227,21 @@ func (r *Round) canKan() bool {
 }
 
 // drawRinshan gives seat the next replacement tile after a kan; the kan
-// reveals a dora indicator and takes a draw off the live wall.
-func (r *Round) drawRinshan(seat int) {
+// takes a draw off the live wall and adds a dora indicator. A concealed kan
+// turns its indicator over at once; an open or added kan (open true) waits
+// until the declarer discards, or makes another kan first.
+func (r *Round) drawRinshan(seat int, open bool) {
 	t, ok := r.wall.Rinshan(r.kans)
 	if !ok {
 		panic(fmt.Sprintf("game: rinshan %d past the dead wall", r.kans))
 	}
 	r.kans++
+	r.revealKanDora()
+	if open {
+		r.pendingDora++
+	} else {
+		r.kanDora++
+	}
 	p := &r.players[seat]
 	p.drawn = &t
 	p.rinshan = true
@@ -304,7 +312,7 @@ func (r *Round) selfKan(seat int, s string) error {
 	r.events = append(r.events, Action{Seat: seat, Type: Kan, Tile: s})
 	r.interrupt()
 	r.kanSeats = append(r.kanSeats, seat)
-	r.drawRinshan(seat)
+	r.drawRinshan(seat, false)
 	return nil
 }
 
@@ -319,7 +327,7 @@ func (r *Round) completeKakan(k *pendingKakan) {
 	m.Tiles = append(m.Tiles[:n-1:n-1], k.tile, m.Tiles[n-1])
 	r.interrupt()
 	r.kanSeats = append(r.kanSeats, k.seat)
-	r.drawRinshan(k.seat)
+	r.drawRinshan(k.seat, true)
 }
 
 // chiiOptions returns the concealed pairs seat can chii t with, each with a

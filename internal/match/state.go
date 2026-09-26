@@ -111,7 +111,7 @@ type RoundSummary struct {
 // Result is how the round ended.
 type Result struct {
 	Kind    string       `json:"kind"`             // tsumo, ron, draw or abort
-	Reason  string       `json:"reason,omitempty"` // abort: kyuushu, suufon or suucha
+	Reason  string       `json:"reason,omitempty"` // abort: kyuushu, suufon, suucha or suukaikan
 	Winner  int          `json:"winner"`           // -1 on a draw
 	From    int          `json:"from"`             // discarder on a ron, else -1
 	WinTile *string      `json:"win_tile"`

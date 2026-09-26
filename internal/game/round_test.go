@@ -475,11 +475,12 @@ func TestHonbaAndCarriedSticks(t *testing.T) {
 	}
 }
 
-// Each kan reveals a dora indicator and takes a draw off the live wall.
+// Each kan takes a draw off the live wall; each revealed kan dora adds an
+// indicator.
 func TestKansMoveHaiteiAndDora(t *testing.T) {
 	r := newRound(t)
 	left := r.DrawsLeft()
-	r.kans = 2
+	r.kans, r.kanDora = 2, 2
 	if r.DrawsLeft() != left-2 || len(r.ViewFor(0).DoraIndicators) != 3 {
 		t.Fatalf("draws left %d, dora %d", r.DrawsLeft(), len(r.ViewFor(0).DoraIndicators))
 	}
