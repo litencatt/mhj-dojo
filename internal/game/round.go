@@ -123,6 +123,17 @@ type player struct {
 	kuikae []tile.Kind
 	// rinshan: the drawn tile is a kan replacement (rinshan kaihou, not haitei).
 	rinshan bool
+	// pao are the seats responsible for a yakuman this seat's calls
+	// completed (責任払い), if it wins with that yakuman.
+	pao []Pao
+}
+
+// Pao is a seat responsible (包) for a yakuman of the winner: it let the
+// winner call the meld that completed 大三元, 大四喜 or 四槓子. Yaku is the
+// yakuman's key.
+type Pao struct {
+	Seat int    `json:"seat"`
+	Yaku string `json:"yaku"`
 }
 
 // Result describes how the round ended.
@@ -136,6 +147,8 @@ type Result struct {
 	Points  score.Points
 	WinTile tile.Tile
 	Tenpai  [4]bool // set on a draw
+	// Pao are the responsible seats for yakuman the win scored (責任払い).
+	Pao []Pao
 	// Deltas are points at the end minus points at the start: the sum of
 	// the hand's payments (or the noten penalty), the honba payments and
 	// the riichi sticks paid and received.
@@ -586,15 +599,30 @@ func (r *Round) tsumo(seat int) error {
 		return fmt.Errorf("%w: seat %d has no winning hand with yaku", ErrConflict, seat)
 	}
 	p := &r.players[seat]
-	pts := score.FromWin(w, seat == r.dealer, true)
-	res := &Result{Kind: "tsumo", Winner: seat, From: -1, Win: &w, Points: pts, WinTile: *p.drawn}
+	dealer := seat == r.dealer
+	pts := score.FromWin(w, dealer, true)
+	res := &Result{Kind: "tsumo", Winner: seat, From: -1, Win: &w, Points: pts, WinTile: *p.drawn, Pao: r.paoOf(seat, w)}
+	// A responsible seat pays its yakuman in full; the other seats share the
+	// rest of the hand as usual.
+	rest := pts
+	if len(res.Pao) > 0 {
+		n := pts.Multiplier
+		for _, pa := range res.Pao {
+			m := yakumanOf(w, pa.Yaku)
+			pay := score.Compute(0, 0, m, dealer, true).Total
+			res.HandDeltas[pa.Seat] -= pay
+			res.HandDeltas[seat] += pay
+			n -= m
+		}
+		rest = score.Compute(0, 0, n, dealer, true)
+	}
 	for o := range r.players {
 		if o == seat {
 			continue
 		}
-		pay := pts.FromNonDealer
+		pay := rest.FromNonDealer
 		if o == r.dealer {
-			pay = pts.FromDealer
+			pay = rest.FromDealer
 		}
 		res.HandDeltas[o] -= pay
 		res.HandDeltas[seat] += pay
@@ -615,11 +643,65 @@ func (r *Round) ron(seat int) error {
 	}
 	r.events = append(r.events, Action{Seat: seat, Type: Ron})
 	pts := score.FromWin(w, seat == r.dealer, false)
-	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard}
+	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard, Pao: r.paoOf(seat, w)}
 	res.HandDeltas[r.turn] -= pts.Ron
 	res.HandDeltas[seat] += pts.Ron
+	// A responsible seat other than the discarder pays half of its yakuman.
+	for _, pa := range res.Pao {
+		if pa.Seat == r.turn {
+			continue
+		}
+		v := score.Compute(0, 0, yakumanOf(w, pa.Yaku), seat == r.dealer, false).Ron
+		h := score.Half(v)
+		res.HandDeltas[r.turn] += v - h
+		res.HandDeltas[pa.Seat] -= h
+		res.HandDeltas[seat] += 2*h - v
+	}
 	r.finish(res)
 	return nil
+}
+
+// paoOf returns the responsible seats of seat's calls for the yakuman w
+// scored.
+func (r *Round) paoOf(seat int, w yaku.Win) []Pao {
+	var out []Pao
+	for _, pa := range r.players[seat].pao {
+		if yakumanOf(w, pa.Yaku) > 0 {
+			out = append(out, pa)
+		}
+	}
+	return out
+}
+
+// yakumanOf returns how many yakuman the yaku key scored in w (2 for a
+// double yakuman), 0 if w does not have it.
+func yakumanOf(w yaku.Win, key string) int {
+	for _, y := range w.Yaku {
+		if y.Key == key {
+			return y.Han / 13
+		}
+	}
+	return 0
+}
+
+// tsumoHonbaPayer returns the seat that pays all the honba of a tsumo: the
+// responsible seat when its pao covers the whole hand, else -1 (every other
+// seat pays its share).
+func tsumoHonbaPayer(res *Result) int {
+	if len(res.Pao) == 0 {
+		return -1
+	}
+	n := 0
+	for _, pa := range res.Pao {
+		if pa.Seat != res.Pao[0].Seat {
+			return -1
+		}
+		n += yakumanOf(*res.Win, pa.Yaku)
+	}
+	if n != res.Points.Multiplier {
+		return -1
+	}
+	return res.Pao[0].Seat
 }
 
 // finish adds the honba payments and the riichi sticks to the hand's
@@ -628,9 +710,18 @@ func (r *Round) ron(seat int) error {
 func (r *Round) finish(res *Result) {
 	res.Honba = r.honba
 	if res.Winner >= 0 && r.honba > 0 {
+		payer := -1
+		if res.Kind == "tsumo" {
+			payer = tsumoHonbaPayer(res)
+		}
 		for o := range r.players {
 			switch {
 			case o == res.Winner:
+			case payer >= 0:
+				if o == payer {
+					res.HonbaDeltas[o] -= 3 * honbaTsumo * r.honba
+					res.HonbaDeltas[res.Winner] += 3 * honbaTsumo * r.honba
+				}
 			case res.Kind == "ron" && o == res.From:
 				res.HonbaDeltas[o] -= honbaRon * r.honba
 				res.HonbaDeltas[res.Winner] += honbaRon * r.honba

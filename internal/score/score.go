@@ -80,6 +80,10 @@ func Compute(han, fu, yakuman int, dealer, tsumo bool) Points {
 
 func up100(v int) int { return (v + 99) / 100 * 100 }
 
+// Half is one side of a payment split between two players (the discarder
+// and the responsible seat of a pao ron): half of v rounded up to 100.
+func Half(v int) int { return up100((v + 1) / 2) }
+
 // FromWin scores an evaluated win. Yakuman yaku carry 13 han per yakuman (26
 // for a double yakuman) and other yaku fewer, so han/13 summed over the yaku
 // is the multiplier.

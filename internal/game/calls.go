@@ -167,12 +167,49 @@ func (r *Round) call(a Action) {
 	}
 	p.hand = removeTiles(p.hand, used)
 	p.melds = append(p.melds, Called{Meld: meld, Tiles: append(used, t), From: from})
+	if a.Type != Chii {
+		r.notePao(a.Seat, from)
+	}
 	r.interrupt()
 	r.events = append(r.events, Action{Seat: a.Seat, Type: a.Type, Tile: t.String(), Tiles: tile.Strings(used)})
 	r.startTurn(a.Seat)
 	if a.Type == Kan {
 		r.kanSeats = append(r.kanSeats, a.Seat)
 		r.drawRinshan(a.Seat)
+	}
+}
+
+// notePao makes from responsible (包) when seat's pon or open kan of its
+// discard completed the melds of a yakuman: the third dragon (大三元), the
+// fourth wind (大四喜) or, an open kan only, the fourth kan (四槓子). An ankan
+// or an added kan never makes a seat responsible, but counts towards the
+// melds.
+func (r *Round) notePao(seat, from int) {
+	p := &r.players[seat]
+	last := p.melds[len(p.melds)-1].Meld
+	dragons, winds, kans := 0, 0, 0
+	for _, m := range p.melds {
+		if m.Meld.Type != yaku.Trip {
+			continue
+		}
+		switch {
+		case m.Meld.Kind >= tile.Haku:
+			dragons++
+		case m.Meld.Kind >= tile.East:
+			winds++
+		}
+		if m.Meld.Kan {
+			kans++
+		}
+	}
+	switch {
+	case last.Kind >= tile.Haku && dragons == 3:
+		p.pao = append(p.pao, Pao{Seat: from, Yaku: "daisangen"})
+	case last.Kind >= tile.East && winds == 4:
+		p.pao = append(p.pao, Pao{Seat: from, Yaku: "daisuushii"})
+	}
+	if last.Kan && kans == 4 {
+		p.pao = append(p.pao, Pao{Seat: from, Yaku: "suukantsu"})
 	}
 }
 

@@ -270,7 +270,20 @@ bump (no double ron), 3000-point noten penalty at the exhaustive draw, and the
 abortive draws 九種九牌 (declared), 四風連打, 四家立直 and 四開槓. Points: no
 kiriage mangan, counted yakuman at 13 han, yakuman multiples (a double yakuman or
 stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a non-dealer
-and 48000 × n to the dealer), honba 300 (ron) / 100 each (tsumo). No pao (責任払い).
+and 48000 × n to the dealer), honba 300 (ron) / 100 each (tsumo).
+
+Pao (包, 責任払い): a seat whose discard the winner called (pon or open kan)
+to complete the third dragon meld (大三元), the fourth wind meld (大四喜) or
+the fourth kan (四槓子, only when that kan is an open kan) is responsible for
+that yakuman. A concealed kan or an added kan never makes a seat responsible.
+On a tsumo the responsible seat pays that yakuman in full (32000, or 48000 to a
+dealer; 大四喜 counts double), and all the honba when its pao covers the whole
+hand. On a ron by another seat's discard the discarder and the responsible seat
+pay half of that yakuman each (rounded up to 100) and the discarder pays the
+honba; when the responsible seat deals in, it pays as a normal ron. Other
+yakuman stacked in the hand are paid as usual (shared on a tsumo, by the
+discarder on a ron), and two yakuman with different responsible seats are each
+paid by their own seat. Riichi sticks go to the winner as usual.
 
 Calls: pon and open kan on any other seat's discard, chii on the discard of
 the seat to your left, and on your own turn a concealed kan or an added kan
@@ -428,11 +441,13 @@ East, otherwise the round wind row then your seat wind row (1 han each).
   // yaku[].han: 13 per yakuman, 26 for a double yakuman form; "han" is their sum
   "deltas": [-5800, 6800, 0, 0], // points at the end minus at the start: the sum of the next three
   "hand_deltas":  [-5200, 5200, 0, 0],    // the hand's payments (or the noten penalty)
-  "honba_deltas": [-600, 600, 0, 0],      // honba: 300 each from the discarder, or 100 from each seat on a tsumo
+  "honba_deltas": [-600, 600, 0, 0],      // honba: 300 each from the discarder, or 100 from each seat on a tsumo (pao: see the rules)
   "stick_deltas": [0, 1000, 0, 0],        // riichi sticks paid (-1000) and received (the winner takes the table)
   "honba": 2,
   "tenpai": [false, false, false, false],  // on a draw
-  "deposit": 0                  // sticks left on the table after a draw (carried to the next round)
+  "deposit": 0,                 // sticks left on the table after a draw (carried to the next round)
+  "pao": []                     // 包 (responsible seats) for yakuman the win scored, e.g.
+                                // [{"seat": 0, "yaku": "daisangen"}]; yaku: "daisangen" | "daisuushii" | "suukantsu"
 }
 ```
 

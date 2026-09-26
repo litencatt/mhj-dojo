@@ -248,6 +248,12 @@ export interface GameResult {
   honba: number;
   tenpai: boolean[];
   deposit: number;
+  pao: Pao[]; // seats responsible (包) for yakuman of the win
+}
+
+export interface Pao {
+  seat: number;
+  yaku: string; // the yakuman's key: daisangen, daisuushii or suukantsu
 }
 
 export interface GameState {

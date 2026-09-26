@@ -1142,6 +1142,10 @@ section {
   font-size: 0.75rem;
   color: var(--muted);
 }
+.result-pao {
+  margin: 4px 0;
+  font-weight: bold;
+}
 /* The rounds table can be wider than a phone: it scrolls on its own. */
 .table-scroll {
   overflow-x: auto;
