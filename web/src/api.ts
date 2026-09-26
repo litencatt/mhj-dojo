@@ -123,16 +123,20 @@ export function getSession(id: string): Promise<SessionState> {
   return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
-export function discard(id: string, tile: Tile): Promise<SessionState> {
+// nodeId is the node the page showed when the user acted (state.node_id):
+// the server rejects the request (409) if the session has since moved on
+// from it in another tab (docs/api.md, issue #53).
+export function discard(id: string, tile: Tile, nodeId: number): Promise<SessionState> {
   return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/discard`, {
     method: 'POST',
-    body: JSON.stringify({ tile }),
+    body: JSON.stringify({ tile, node_id: nodeId }),
   });
 }
 
-export function tsumo(id: string): Promise<SessionState> {
+export function tsumo(id: string, nodeId: number): Promise<SessionState> {
   return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/tsumo`, {
     method: 'POST',
+    body: JSON.stringify({ node_id: nodeId }),
   });
 }
 

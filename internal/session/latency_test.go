@@ -105,7 +105,7 @@ func typicalTreeFixture(tb testing.TB) *Session {
 				if v.Drawn == nil {
 					return
 				}
-				if _, err := s.Discard(*v.Drawn); err != nil {
+				if _, err := s.Discard(*v.Drawn, nil); err != nil {
 					tb.Fatal(err)
 				}
 			}
@@ -117,7 +117,7 @@ func typicalTreeFixture(tb testing.TB) *Session {
 			}
 			v := s.State()
 			tiles := append(append([]string{}, v.Hand...), *v.Drawn)
-			if _, err := s.Discard(tiles[0]); err != nil { // an alternate discard, branching here
+			if _, err := s.Discard(tiles[0], nil); err != nil { // an alternate discard, branching here
 				tb.Fatal(err)
 			}
 			play()

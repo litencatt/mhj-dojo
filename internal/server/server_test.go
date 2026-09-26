@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -184,6 +185,70 @@ func TestCreateDiscardGotoBranch(t *testing.T) {
 	}
 	c.wantError("POST", base+"/discard", `{"tile":"`+s.Hand[0]+`"}`, http.StatusConflict)
 	c.wantError("POST", base+"/tsumo", "", http.StatusConflict)
+}
+
+// TestSessionNodeIDGuard covers the optional node_id on discard/tsumo
+// (issue #53): it lets a stale tab that acted from an earlier node detect
+// that another tab already moved the session on, instead of silently
+// discarding against whatever node happens to be current.
+func TestSessionNodeIDGuard(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	root := c.state("POST", "/api/sessions", `{"seed": 1}`)
+	base := "/api/sessions/" + root.SessionID
+	drawn := *root.Drawn
+
+	// match: node_id names the current node, so the discard applies.
+	n1 := c.state("POST", base+"/discard", `{"tile":"`+drawn+`","node_id":`+strconv.Itoa(root.NodeID)+`}`)
+	if n1.NodeID != 1 {
+		t.Fatalf("match: node %d, want 1", n1.NodeID)
+	}
+
+	// mismatch: node_id still names the now-stale root node, as if another
+	// tab (this test's own first request) had already moved the session on.
+	// The server rejects it (409) and makes no change.
+	c.wantError("POST", base+"/discard", `{"tile":"`+*n1.Drawn+`","node_id":`+strconv.Itoa(root.NodeID)+`}`, http.StatusConflict)
+	unchanged := c.state("GET", base, "")
+	if unchanged.NodeID != n1.NodeID || len(unchanged.Tree) != len(n1.Tree) {
+		t.Fatalf("mismatch discard changed state: before %+v after %+v", n1, unchanged)
+	}
+
+	// absent: no node_id keeps today's behaviour (applies regardless).
+	n2 := c.state("POST", base+"/discard", `{"tile":"`+*n1.Drawn+`"}`)
+	if n2.NodeID != 2 {
+		t.Fatalf("absent: node %d, want 2", n2.NodeID)
+	}
+}
+
+// TestTsumoNodeIDGuard is TestSessionNodeIDGuard for tsumo.
+func TestTsumoNodeIDGuard(t *testing.T) {
+	store := session.NewStore()
+	w, err := wall.WithFront(1, tile.MustParseHand("123m456p789s1122z1z"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.CreateWithWall(w, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := newClient(t, store)
+	base := "/api/sessions/" + s.ID()
+	root := c.state("GET", base, "")
+	if !root.CanTsumo {
+		t.Fatalf("expected can_tsumo: %+v", root)
+	}
+
+	// mismatch: node_id names a node other than the current one.
+	c.wantError("POST", base+"/tsumo", `{"node_id":`+strconv.Itoa(root.NodeID+1)+`}`, http.StatusConflict)
+	unchanged := c.state("GET", base, "")
+	if unchanged.NodeID != root.NodeID || unchanged.Status != session.StatusPlaying {
+		t.Fatalf("mismatch tsumo changed state: before %+v after %+v", root, unchanged)
+	}
+
+	// match: node_id equals the current node, so the tsumo applies.
+	win := c.state("POST", base+"/tsumo", `{"node_id":`+strconv.Itoa(root.NodeID)+`}`)
+	if win.Status != session.StatusTsumo || win.Win == nil {
+		t.Fatalf("match: %+v", win)
+	}
 }
 
 func TestTsumoFlow(t *testing.T) {
