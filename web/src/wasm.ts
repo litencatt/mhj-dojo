@@ -28,9 +28,11 @@ const pending = new Map<number, (r: Reply) => void>();
 
 // Starts the worker on first use. The measure 'mhj2:wasm-init' records how
 // long the download, compile and start of the engine took. If the engine
-// fails to start, the next request tries again with a new worker.
+// fails to start, or exits later, the next request starts a new worker;
+// the sessions it held are rebuilt from their saves as they are asked for.
 function start(): Promise<Worker> {
-  engine ??= new Promise<Worker>((resolve, reject) => {
+  if (engine) return engine;
+  const started: Promise<Worker> = new Promise<Worker>((resolve, reject) => {
     const t0 = performance.now();
     const url = new URL('worker.js', document.baseURI);
     // A hash of the worker, wasm_exec.js and mhj2.wasm (vite.config.ts), so a
@@ -40,8 +42,12 @@ function start(): Promise<Worker> {
     const w = new Worker(url);
     const fail = (message: string) => {
       w.terminate();
+      if (engine !== started) return; // an old worker, already replaced
       engine = null;
-      reject(new Error(message));
+      engineOf.clear();
+      publicOf.clear();
+      known.clear();
+      reject(new Error(message)); // no-op once it had started
       for (const [id, done] of pending) done({ id, status: 500, body: JSON.stringify({ error: message }) });
       pending.clear();
     };
@@ -67,7 +73,8 @@ function start(): Promise<Worker> {
     };
     w.onmessageerror = () => fail('計算エンジンの応答を読めませんでした');
   });
-  return engine;
+  engine = started;
+  return started;
 }
 
 async function call(fn: 'request' | 'restore', ...args: string[]): Promise<WasmResponse> {
@@ -138,9 +145,11 @@ function forget(publicId: string) {
   storeAll(sessions);
 }
 
-// Public id ↔ engine id, for sessions replayed under a new engine id.
+// Public id ↔ engine id, for sessions replayed under a new engine id, and
+// the engine ids the current worker holds. A new worker starts them over.
 const engineOf = new Map<string, string>();
 const publicOf = new Map<string, string>();
+const known = new Set<string>();
 
 // The session id in a /api/sessions/{id}[/op] path, and the path with it
 // swapped for another.
@@ -151,36 +160,66 @@ function splitPath(path: string): { id: string; with: (id: string) => string } |
   return { id, with: (other) => `${SESSIONS}/${encodeURIComponent(other)}${m[2] ?? ''}` };
 }
 
+// Rebuilds a saved session in the engine under its public id and returns
+// the engine's response: its state, or an error. A save the engine rejects
+// (400/404/409/422) is dropped, and null returned: the request then gets
+// the engine's 404 and the page deals a fresh session from the URL's seed.
+// Any other failure (the engine broke) keeps the save for the next try.
+async function restore(publicId: string): Promise<WasmResponse | null> {
+  const saved = loadAll()[publicId];
+  if (!saved) return null;
+  const res = await call('restore', JSON.stringify(saved));
+  if (res.status === 200) {
+    const id = (res.data as SessionState).session_id;
+    engineOf.set(publicId, id);
+    publicOf.set(id, publicId);
+    known.add(id);
+  } else if ([400, 404, 409, 422].includes(res.status)) {
+    forget(publicId);
+    return null;
+  }
+  return res;
+}
+
 /**
  * Answers an API request (method, path and JSON body as for the server) from
- * the engine. A GET of a saved session that the engine doesn't have (the
- * page was reloaded) replays it from localStorage; if that fails the 404
- * stands and the page deals a fresh session from the URL's seed, as the
- * local version does after a server restart.
+ * the engine. A request for a saved session that the engine doesn't hold
+ * (the page was reloaded, or the engine restarted) first rebuilds it from
+ * localStorage; if its save is unusable the request gets the engine's 404
+ * and the page deals a fresh session from the URL's seed, as the local
+ * version does after a server restart.
  */
 export async function wasmRequest(method: string, path: string, body?: string): Promise<WasmResponse> {
   const target = splitPath(path);
-  const publicId = target?.id;
-  const engineId = publicId !== undefined ? engineOf.get(publicId) : undefined;
-  let res = await call('request', method, target && engineId ? target.with(engineId) : path, body ?? '');
-  if (res.status === 404 && method === 'GET' && publicId !== undefined && !engineId && path === target?.with(publicId)) {
-    const saved = loadAll()[publicId];
-    if (saved) {
-      const restored = await call('restore', JSON.stringify(saved)).catch(() => null);
-      if (restored?.status === 200) {
-        const id = (restored.data as SessionState).session_id;
-        engineOf.set(publicId, id);
-        publicOf.set(id, publicId);
-        res = restored;
-      } else {
-        forget(publicId);
-      }
-    }
+  const send = () => {
+    const engineId = target && engineOf.get(target.id);
+    return call('request', method, target && engineId ? target.with(engineId) : path, body ?? '');
+  };
+  const isGet = target !== null && method === 'GET' && path === target.with(target.id);
+  let res: WasmResponse | null = null;
+  if (target && !known.has(engineOf.get(target.id) ?? target.id)) {
+    const r = await restore(target.id);
+    // A GET is answered by the rebuilt state itself.
+    if (r && (r.status !== 200 || isGet)) res = r;
+  }
+  res ??= await send();
+  if (target && res.status === 404 && /^not found: session /.test((res.data as { error?: string })?.error ?? '')) {
+    // The engine no longer holds a session it had (evicted): rebuild it.
+    known.delete(engineOf.get(target.id) ?? target.id);
+    const r = await restore(target.id);
+    if (r && (r.status !== 200 || isGet)) res = r;
+    else if (r) res = await send();
   }
   if (res.status === 200 && path.startsWith(SESSIONS)) {
     const st = res.data as SessionState;
+    known.add(st.session_id);
     st.session_id = publicOf.get(st.session_id) ?? st.session_id;
     save(st.session_id, st);
+  } else if (target && res.status !== 200) {
+    // Error messages name the engine's id; show the page's instead.
+    const engineId = engineOf.get(target.id);
+    const data = res.data as { error?: string } | null;
+    if (engineId && typeof data?.error === 'string') data.error = data.error.split(engineId).join(target.id);
   }
   return res;
 }

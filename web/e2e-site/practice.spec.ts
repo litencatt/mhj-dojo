@@ -166,6 +166,57 @@ test('a saved session resumes at an inner node', async ({ page }) => {
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
+test('after the engine exits, the next move restarts it and rebuilds the session', async ({ page }) => {
+  await page.goto('./?seed=4&turns=18');
+  await discardDrawn(page);
+  await page.reload(); // the session now lives under a new engine id
+  const hand = page.getByRole('region', { name: '手牌' });
+  await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
+  const url = page.url();
+
+  // What worker.js reports when the Go program exits.
+  expect(page.workers()).toHaveLength(1);
+  await page.workers()[0].evaluate(() => self.postMessage({ type: 'failed', error: 'test exit' }));
+  await discardDrawn(page);
+  await expect(page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn')).toHaveCount(3);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  expect(page.url()).toBe(url);
+});
+
+test('an engine failure while rebuilding keeps the save for the next reload', async ({ page }) => {
+  await page.goto('./?seed=6&turns=18');
+  await discardDrawn(page);
+  const url = page.url();
+
+  // The next worker answers the rebuild with a 500, as a broken engine would.
+  // Its wasm is held back so the override is in place before any request.
+  await page.route('**/mhj2.wasm*', async (route) => {
+    await new Promise((r) => setTimeout(r, 300));
+    await route.continue();
+  });
+  page.once('worker', (w) =>
+    w.evaluate(async () => {
+      while (!self.onmessage) await new Promise((r) => setTimeout(r, 5));
+      const orig = self.onmessage;
+      self.onmessage = (e: MessageEvent) =>
+        e.data.fn === 'restore'
+          ? self.postMessage({ id: e.data.id, status: 500, body: '{"error":"boom"}' })
+          : orig.call(self, e);
+    }),
+  );
+  await page.reload();
+  await expect(page.locator('.error-banner')).toContainText('boom');
+  const id = new URL(url).searchParams.get('session')!;
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj2.site.practice')!));
+  expect(saved.sessions[id].moves).toHaveLength(1);
+
+  await page.unroute('**/mhj2.wasm*');
+  await page.reload();
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  expect(page.url()).toBe(url);
+});
+
 test('an engine that fails to load shows an error, and a new game retries', async ({ page }) => {
   await page.route('**/mhj2.wasm*', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?seed=1&turns=18');

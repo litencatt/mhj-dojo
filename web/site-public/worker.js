@@ -2,7 +2,7 @@
 // program cmd/mhj2wasm compiled to WebAssembly, off the main thread so the
 // analysis doesn't freeze the page. src/wasm.ts starts it and talks to it:
 //
-//   worker → page  {type: 'ready', initMs} | {type: 'failed', error}
+//   worker → page  {type: 'ready', initMs} | {type: 'failed', error} (at start, or later if the engine exits)
 //   page → worker  {id, fn: 'request', args: [method, path, body]}   an HTTP API request (docs/api.md)
 //                  {id, fn: 'restore', args: [body]}                 rebuild a session from its moves
 //   worker → page  {id, status, body}   the status and JSON body the server would send
@@ -39,9 +39,13 @@ async function instantiate(go) {
 const ready = (async () => {
   const go = new Go();
   const instance = await instantiate(go);
-  // Runs main until it blocks, which defines mhj2Request and mhj2Restore;
-  // the promise settles only if the program exits.
-  go.run(instance);
+  // Runs main until it blocks, which defines mhj2Request and mhj2Restore.
+  // The promise settles only if the program exits (a fatal error): every
+  // later call would fail, so tell the page to start a new worker.
+  go.run(instance).then(
+    () => self.postMessage({ type: 'failed', error: 'the engine exited' }),
+    (err) => self.postMessage({ type: 'failed', error: String(err) }),
+  );
   if (typeof mhj2Request !== 'function' || typeof mhj2Restore !== 'function') {
     throw new Error('mhj2.wasm did not start');
   }
