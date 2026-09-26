@@ -117,6 +117,8 @@ export function YakuTable(props: YakuTableProps) {
   // saved one is kept for a wider screen).
   const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
   const active = phone ? { ...filter, query: '' } : filter;
+  // 条件をクリア on a phone keeps that hidden search text too.
+  const clearFilter = () => setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -264,7 +266,7 @@ export function YakuTable(props: YakuTableProps) {
               {visibleCount} / {total}役を表示中
             </span>
             {!isDefaultFilter(active) && (
-              <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
+              <button type="button" class="filter-clear" onClick={clearFilter}>
                 条件をクリア
               </button>
             )}
@@ -302,7 +304,7 @@ export function YakuTable(props: YakuTableProps) {
         {visibleCount === 0 && (
           <p class="yaku-filter-empty">
             該当する役がありません
-            <button type="button" class="filter-clear" onClick={() => setFilter(DEFAULT_FILTER)}>
+            <button type="button" class="filter-clear" onClick={clearFilter}>
               条件をクリア
             </button>
           </p>

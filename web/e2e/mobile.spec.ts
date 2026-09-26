@@ -236,6 +236,28 @@ test.describe('touch', () => {
   });
 });
 
+test('a phone hides the name search, and 条件をクリア keeps its saved text', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // A search saved on a wide screen (it matches no yaku here, so it would empty the table).
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('e2e-filter')) {
+      localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: 'zzz', maxShanten: null, categories: ['1', '2', '3', 'yakuman'], sort: 'shanten' }));
+      sessionStorage.setItem('e2e-filter', '1');
+    }
+  });
+  await openPractice(page, []);
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
+  // The hidden search is ignored on the phone: the yaku are listed.
+  await expect(yaku.locator('.yaku-table tbody tr').nth(1)).toBeVisible();
+
+  await yaku.getByRole('button', { name: '条件をクリア' }).click();
+  await expect(yaku.getByRole('combobox').nth(1)).toHaveValue('default');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj-dojo.yakuFilter') ?? '{}'));
+  expect(saved.query).toBe('zzz');
+  expect(saved.sort).toBe('default');
+});
+
 test('a mouse click at phone width discards at once', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openPractice(page, ALL_PANELS);
