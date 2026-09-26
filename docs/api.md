@@ -106,7 +106,13 @@ node still exists; the tree only grows), so `goto` takes no staleness guard.
     "yaku": [ { "key": "tanyao", "name": "断么九", "han": 1 } ],
     "dora": 1,                                 // dora + red fives count
     "han_total": 3
-  }
+  },
+
+  // Only when status == playing: ranked discards and notes (see Advice).
+  "advice": Advice,
+  // Only at a node reached by a discard (null at the root and at tsumo
+  // nodes): that discard compared with the best one at the parent.
+  "discard_review": Review
 }
 ```
 
@@ -164,6 +170,78 @@ toitsu, more kanchan, more penchan), more floating terminals and honors, and
 finally the first split found scanning kinds 1m → 7z (at each kind:
 sequence, triplet, pair, toitsu, ryanmen/penchan, kanchan, float). Red fives
 count as fives.
+
+### Advice
+
+Rule-based advice for the pending discard (`internal/advice`): the same
+position always gets the same advice. The text fields are Japanese.
+
+```jsonc
+{
+  "candidates": [                 // the best three distinct discards, best first
+    { "tile": "9m",               // exact tile; a plain five is offered before a red one
+      "shanten": 1,               // normal-form shanten of the 13 tiles left
+      "ukeire_kinds": 8,          // tile types that lower it
+      "ukeire": 28,               // their unseen copies (as by_discard's normal row ukeire_total)
+      "wait": 5.8,                // expected tenpai wait (0.1 steps); null above 1-shanten
+      "yaku": ["断么九"] }         // near yaku of the 13 tiles left (see below)
+  ],
+  "junme": 4,                     // the discard being chosen: turn + 1
+  "phase": "early",               // early (junme 1–6) | middle (7–12) | late (13+)
+  "guideline": "序盤は受け入れの広さと好形を優先。…",
+  "draws_left": 14,               // draws after this discard: max_turns − turn − 1
+  "tenpai_chance": 0.62,          // after the best discard, 0..1 (0.001 steps)
+  "win_chance": 0.21,
+  "shape": "打 9m 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split
+  "near_yaku": [ { "key": "tanyao", "name": "断么九", "han": 1, "shanten": 1, "kept": true } ],
+  "notes": ["打 9m と打 北 はどちらも1向聴。9m を切るほうが有効牌が4枚多い（28枚と24枚）。…"]
+}
+```
+
+**Ranking.** Every distinct discard kind is compared by, in order:
+1. normal-form shanten (lower first; chiitoitsu and kokushi are not considered);
+2. `ukeire` (more first), counted like `by_discard`: 4 − visible copies;
+3. `wait` (more first), only between two discards at tenpai or 1-shanten. At
+   tenpai it is the wait itself (= `ukeire`). At 1-shanten: for each ukeire
+   type with unseen copies, draw it (it becomes visible), try every discard,
+   and take the most unseen waits of any tenpai reached; `wait` is the average
+   of those, weighted by the unseen copies of each ukeire type;
+4. near yaku of the 13 tiles left: rows other than `normal` and the yakuman
+   whose shanten is ≤ max(1, the discard's normal shanten) — more rows first,
+   then more total `han`;
+5. dora kept: a dora kind or red five is discarded last; then terminals and
+   honors before simples; then kind order.
+
+**Chances.** A step model over `draws_left` draws: from the best discard's
+shanten *s*, each draw advances one step with probability *u* / *n*, where
+*n* is the unseen tile count (136 − visible) and *u* is that discard's
+`ukeire` for the steps up to tenpai and, for the winning step, its `wait`
+(at tenpai or 1-shanten) or min(`ukeire`, 6) (further away). `tenpai_chance`
+is the probability of having made *s* steps (1 at tenpai), `win_chance` of
+*s* + 1. Later steps reuse the first step's count, so it is a rough guide
+only (no calls, riichi or other players).
+
+**Phase and notes.** `guideline` gives the phase's rule of thumb (序盤: wide
+acceptance and good shapes, isolated honors and terminals first; 中盤: speed
+to tenpai; 終盤: says so when `tenpai_chance` < 0.3). `notes[0]` explains the
+first two candidates by the first key that differs; a further note names the
+near yaku the best discard gives up. `near_yaku` lists up to 6 rows (the
+yakuman aside) whose best shanten over all discards is ≤ max(1, the best
+normal shanten), closest first; `kept` is whether the best discard keeps
+that shanten.
+
+### Review
+
+```jsonc
+{ "tile": "5p", "best": "9m", "rank": 3, "is_best": false,
+  "shanten": 1, "best_shanten": 1, "ukeire": 22, "best_ukeire": 28,
+  "text": "前巡の打 5p: 最善（打 9m）より有効牌が6枚少ない（22枚と28枚、3位）" }
+```
+
+The discard that led to this node, ranked among the parent's discards by the
+first three keys above (ties share a rank; `is_best` = rank 1, which a
+different tile tied with the best also gets). It is computed once, when the
+node is created, and kept with the node, so it shows again after `goto`.
 
 ### Rows (fixed order)
 
@@ -229,6 +307,11 @@ These clarify points the contract above leaves open; none changes the JSON shape
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
+  **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
+  (an exhausted node has one). Like `by_discard`, the full advice is kept only for the current node (see Memory);
+  each node keeps just its small review. Computing the advice takes ~1.4 ms on average, ~4 ms at p95, per
+  request (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
+  discard p95 ~23 ms including the rest of the state).
 - **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.

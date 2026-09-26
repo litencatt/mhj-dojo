@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/litencatt/mhj2/internal/advice"
 	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/yaku"
 )
@@ -30,6 +31,8 @@ type State struct {
 	History           []apiview.HistoryEntry       `json:"history"`
 	Tree              []TreeNode                   `json:"tree"`
 	Win               *Win                         `json:"win"`
+	Advice            *advice.Advice               `json:"advice"`         // only when status == playing
+	DiscardReview     *advice.Review               `json:"discard_review"` // the discard that led here, vs the best
 }
 
 // TreeNode is one node of the whole branch tree.

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/litencatt/mhj2/internal/advice"
 	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
@@ -41,17 +42,12 @@ func (s *Session) state() State {
 	path := s.path(cur)
 	dora := s.wall.DoraIndicators()
 
-	// Visible tiles: hand, pending draw (or winning tile), path discards, dora indicators.
-	visible := tile.CountsOf(cur.hand)
+	visible := s.visibleAt(cur, path)
 	var discards []string
 	for _, n := range path {
 		if n.discard != nil {
 			discards = append(discards, n.discard.String())
-			visible[n.discard.Kind]++
 		}
-	}
-	for _, d := range dora {
-		visible[d.Kind]++
 	}
 	st := State{
 		SessionID:      s.id,
@@ -81,10 +77,8 @@ func (s *Session) state() State {
 	drawsTaken := cur.turn
 	if d, ok := s.drawn(cur); ok {
 		st.Drawn = strPtr(&d)
-		visible[d.Kind]++
 		drawsTaken++
 	} else if cur.status == StatusTsumo {
-		visible[cur.draw.Kind]++
 		drawsTaken++
 	}
 	st.WallRemaining = wall.LiveDraws - drawsTaken
@@ -111,7 +105,9 @@ func (s *Session) state() State {
 			}
 			st.ByDiscard[key] = rows(res, &visible)
 		}
+		st.Advice = s.nodeAdvice(cur, path)
 	}
+	st.DiscardReview = cur.review
 
 	for _, n := range path {
 		h := apiview.HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Shanten: map[string]*int{}}
@@ -146,6 +142,63 @@ func (s *Session) state() State {
 	// the previous call (see docs/api.md "Memory").
 	s.pruneAnalysisCache(path, cur)
 	return st
+}
+
+// visibleAt returns the tiles visible at a node: hand, pending draw (or
+// winning tile), path discards and dora indicators. path is the node's path
+// from the root.
+func (s *Session) visibleAt(n *node, path []*node) tile.Counts {
+	visible := tile.CountsOf(n.hand)
+	for _, p := range path {
+		if p.discard != nil {
+			visible[p.discard.Kind]++
+		}
+	}
+	for _, d := range s.wall.DoraIndicators() {
+		visible[d.Kind]++
+	}
+	if d, ok := s.drawn(n); ok {
+		visible[d.Kind]++
+	} else if n.status == StatusTsumo {
+		visible[n.draw.Kind]++
+	}
+	return visible
+}
+
+// nodeAdvice returns the advice for a playing node's discard (nil at other
+// nodes), filling in its per-discard analysis as needed. Both stay cached on
+// the node until pruneAnalysisCache drops them. path is the node's path from
+// the root.
+func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
+	if n.advice != nil {
+		return n.advice
+	}
+	d, ok := s.drawn(n)
+	if !ok {
+		return nil
+	}
+	tiles := append(append([]tile.Tile{}, n.hand...), d)
+	c := tile.CountsOf(tiles)
+	if n.byDiscard == nil {
+		n.byDiscard = map[tile.Kind][]yakushanten.Result{}
+	}
+	for _, t := range tiles {
+		if _, ok := n.byDiscard[t.Kind]; !ok {
+			c[t.Kind]--
+			n.byDiscard[t.Kind] = s.analyze(c)
+			c[t.Kind]++
+		}
+	}
+	var dora []tile.Kind
+	for _, ind := range s.wall.DoraIndicators() {
+		dora = append(dora, tile.DoraFromIndicator(ind.Kind))
+	}
+	s.resetAnalyzerIfFull()
+	n.advice = advice.Compute(advice.Input{
+		Tiles: tiles, Visible: s.visibleAt(n, path), Dora: dora, Turn: n.turn, MaxTurns: s.maxTurns,
+		ByDiscard: n.byDiscard, Han: func(key string) int { return yaku.HanFor(key, winds) }, Analyzer: s.analyzer,
+	})
+	return n.advice
 }
 
 func shantenPtr(r yakushanten.Result) *int { return apiview.ShantenOf(r) }

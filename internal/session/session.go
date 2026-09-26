@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/litencatt/mhj2/internal/advice"
 	"github.com/litencatt/mhj2/internal/apiview"
 	"github.com/litencatt/mhj2/internal/store"
 	"github.com/litencatt/mhj2/internal/tile"
@@ -126,6 +127,11 @@ type node struct {
 	// pruneAnalysisCache clears them once a node falls off that path.
 	analysis  []yakushanten.Result
 	byDiscard map[tile.Kind][]yakushanten.Result
+	// advice is the current node's discard advice, pruned with byDiscard;
+	// review compares the discard that led to this node with the best one
+	// at its parent and, being small, is kept forever.
+	advice *advice.Advice
+	review *advice.Review
 	// normalShanten is just the normal-form row, needed for every node in
 	// the tree view (state()'s Tree field). Unlike analysis/byDiscard
 	// above it is tiny (one int) and cheap to recompute, so it is cached
@@ -210,9 +216,10 @@ func (s *Session) Discard(t string, expectedNode *int) (State, error) {
 		return State{}, err
 	}
 	disc := tiles[idx]
+	review := s.nodeAdvice(cur, s.path(cur)).Review(disc)
 	hand := append(tiles[:idx:idx], tiles[idx+1:]...)
 	tile.Sort(hand)
-	child := s.addNode(&node{parent: cur.id, turn: cur.turn + 1, hand: hand, draw: &d, discard: &disc})
+	child := s.addNode(&node{parent: cur.id, turn: cur.turn + 1, hand: hand, draw: &d, discard: &disc, review: review})
 	cur.children[t] = child.id
 	return s.state(), nil
 }
@@ -331,6 +338,7 @@ func (s *Session) pruneAnalysisCache(path []*node, cur *node) {
 		}
 		if id != cur.id {
 			n.byDiscard = nil
+			n.advice = nil
 		}
 	}
 	s.pathCache = next

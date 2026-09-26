@@ -91,7 +91,7 @@ func TestStateContract(t *testing.T) {
 	for _, k := range []string{
 		"session_id", "seed", "max_turns", "round_wind", "seat_wind", "node_id", "turn", "status",
 		"hand", "hand_groups", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
-		"analysis", "by_discard", "history", "tree", "win",
+		"analysis", "by_discard", "history", "tree", "win", "advice", "discard_review",
 	} {
 		if _, ok := raw[k]; !ok {
 			t.Errorf("missing key %q", k)
@@ -131,6 +131,63 @@ func TestStateContract(t *testing.T) {
 	}
 	if string(tree[0]["parent_id"]) != "null" {
 		t.Errorf("root parent_id = %s", tree[0]["parent_id"])
+	}
+	checkAdviceContract(t, raw)
+}
+
+// checkAdviceContract checks the keys of a playing root state's advice
+// (docs/api.md "Advice") and that it has no discard_review.
+func checkAdviceContract(t *testing.T, raw map[string]json.RawMessage) {
+	t.Helper()
+	if string(raw["discard_review"]) != "null" {
+		t.Errorf("root discard_review = %s", raw["discard_review"])
+	}
+	var adv map[string]json.RawMessage
+	if err := json.Unmarshal(raw["advice"], &adv); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"candidates", "junme", "phase", "guideline", "draws_left", "tenpai_chance", "win_chance", "shape", "near_yaku", "notes"} {
+		if _, ok := adv[k]; !ok {
+			t.Errorf("advice missing %q", k)
+		}
+	}
+	var cands []map[string]json.RawMessage
+	if err := json.Unmarshal(adv["candidates"], &cands); err != nil {
+		t.Fatal(err)
+	}
+	if len(cands) != 3 {
+		t.Fatalf("%d candidates", len(cands))
+	}
+	for _, k := range []string{"tile", "shanten", "ukeire_kinds", "ukeire", "wait", "yaku"} {
+		if _, ok := cands[0][k]; !ok {
+			t.Errorf("candidate missing %q", k)
+		}
+	}
+}
+
+func TestDiscardReviewContract(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	root := c.state("POST", "/api/sessions", `{"seed": 42, "max_turns": 1}`)
+	_, b, _ := c.do("POST", "/api/sessions/"+root.SessionID+"/discard", `{"tile": "`+root.Advice.Candidates[0].Tile+`"}`)
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	// Exhausted: no advice, but the review of the last discard.
+	if string(raw["advice"]) != "null" {
+		t.Errorf("advice = %s", raw["advice"])
+	}
+	var r map[string]json.RawMessage
+	if err := json.Unmarshal(raw["discard_review"], &r); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"tile", "best", "rank", "is_best", "shanten", "best_shanten", "ukeire", "best_ukeire", "text"} {
+		if _, ok := r[k]; !ok {
+			t.Errorf("discard_review missing %q", k)
+		}
+	}
+	if string(r["is_best"]) != "true" || string(r["rank"]) != "1" {
+		t.Errorf("review of the recommended discard: %s", raw["discard_review"])
 	}
 }
 
