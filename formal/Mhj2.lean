@@ -1,0 +1,1 @@
+-- The formal model of the rules; see README.md.

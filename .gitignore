@@ -2,3 +2,4 @@ bin/
 web/node_modules/
 .omc/
 web/.omc/
+formal/.lake/
