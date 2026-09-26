@@ -1,21 +1,36 @@
 import { useState } from 'preact/hooks';
 
 // Panels that can be minimized into the right-edge dock.
-export type PanelKey = 'chart' | 'tree' | 'yaku' | 'gloss';
+export type PanelKey = 'chart' | 'tree' | 'yaku' | 'advice' | 'gloss';
 export const PANELS: Array<{ key: PanelKey; label: string }> = [
   { key: 'chart', label: '時系列チャート' },
   { key: 'tree', label: '履歴ツリー' },
   { key: 'yaku', label: '役別向聴' },
+  { key: 'advice', label: 'アドバイス' },
   { key: 'gloss', label: '用語表' },
 ];
-const MINIMIZED_KEY = 'mhj2.minimized';
+// v2 adds the advice panel, which starts minimized (docked) so the answer
+// isn't shown before the player has thought about the hand.
+const MINIMIZED_KEY = 'mhj2.minimized.v2';
+const OLD_MINIMIZED_KEY = 'mhj2.minimized';
+const OLD_ADVICE_OPEN_KEY = 'mhj2.adviceOpen';
+
+function parseKeys(raw: string | null): PanelKey[] | null {
+  if (raw === null) return null;
+  const v: unknown = JSON.parse(raw);
+  return Array.isArray(v) ? PANELS.map((p) => p.key).filter((k) => v.includes(k)) : [];
+}
 
 function loadMinimized(): PanelKey[] {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(MINIMIZED_KEY) ?? '[]');
-    return Array.isArray(v) ? PANELS.map((p) => p.key).filter((k) => v.includes(k)) : [];
+    const keys = parseKeys(localStorage.getItem(MINIMIZED_KEY));
+    if (keys) return keys;
+    // First load after v2: keep the old layout, and the advice docked unless
+    // it had been opened with the old 開く/閉じる toggle.
+    const old = parseKeys(localStorage.getItem(OLD_MINIMIZED_KEY)) ?? [];
+    return localStorage.getItem(OLD_ADVICE_OPEN_KEY) === '1' ? old : [...old, 'advice'];
   } catch {
-    return [];
+    return ['advice'];
   }
 }
 

@@ -277,8 +277,3 @@ function useStoredFlag(key: string): [boolean, (on: boolean) => void] {
 export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
   return useStoredFlag('mhj2.handGroups');
 }
-
-/** Whether the practice advice panel is open: closed until the player opens it. */
-export function useAdviceOpen(): [boolean, (on: boolean) => void] {
-  return useStoredFlag('mhj2.adviceOpen');
-}
