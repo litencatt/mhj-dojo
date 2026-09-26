@@ -1,5 +1,12 @@
 // API client + types mirroring docs/api.md.
 
+import { wasmRequest } from './wasm';
+
+// The static site (`npm run build:site`, issue #67) answers requests from the
+// practice engine compiled to WebAssembly instead of the mhj2 server. Fixed
+// at build time, so the default build leaves the WASM transport out.
+export const WASM = import.meta.env.VITE_MHJ2_TARGET === 'wasm';
+
 export type Tile = string; // e.g. "1m", "0m" (red five), "7z"
 
 export interface UkeireEntry {
@@ -161,6 +168,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (WASM) {
+    const res = await wasmRequest(init?.method ?? 'GET', path, init?.body as string | undefined);
+    if (res.status !== 200) {
+      const message = (res.data as ApiErrorBody | null)?.error || `${res.status}`;
+      throw new ApiError(message, res.status);
+    }
+    return res.data as T;
+  }
   const res = await fetch(path, {
     ...init,
     headers: {
