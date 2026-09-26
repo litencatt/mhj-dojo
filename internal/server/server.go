@@ -5,8 +5,6 @@ package server
 import (
 	"embed"
 	"encoding/json"
-	"errors"
-	"io"
 	"io/fs"
 	"mime"
 	"net"
@@ -14,6 +12,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/litencatt/mhj2/internal/apicall"
 	"github.com/litencatt/mhj2/internal/game"
 	"github.com/litencatt/mhj2/internal/match"
 	"github.com/litencatt/mhj2/internal/session"
@@ -21,8 +20,6 @@ import (
 
 //go:embed all:static
 var staticFS embed.FS
-
-const maxBody = 1 << 16
 
 // New returns the HTTP handler for the API and the embedded frontend.
 func New(store *session.Store, games *match.Store) http.Handler {
@@ -42,38 +39,13 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 		return s.State(), nil
 	}))
 	mux.HandleFunc("POST /api/sessions/{id}/discard", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		var body struct {
-			Tile   *string `json:"tile"`
-			NodeID *int    `json:"node_id"`
-		}
-		if err := decode(r, &body, true); err != nil {
-			return session.State{}, err
-		}
-		if body.Tile == nil {
-			return session.State{}, errInvalid("tile is required")
-		}
-		return s.Discard(*body.Tile, body.NodeID)
+		return apicall.Discard(s, r.Body)
 	}))
 	mux.HandleFunc("POST /api/sessions/{id}/tsumo", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		var body struct {
-			NodeID *int `json:"node_id"`
-		}
-		if err := decode(r, &body, false); err != nil {
-			return session.State{}, err
-		}
-		return s.Tsumo(body.NodeID)
+		return apicall.Tsumo(s, r.Body)
 	}))
 	mux.HandleFunc("POST /api/sessions/{id}/goto", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		var body struct {
-			NodeID *int `json:"node_id"`
-		}
-		if err := decode(r, &body, true); err != nil {
-			return session.State{}, err
-		}
-		if body.NodeID == nil {
-			return session.State{}, errInvalid("node_id is required")
-		}
-		return s.Goto(*body.NodeID)
+		return apicall.Goto(s, r.Body)
 	}))
 	mux.HandleFunc("POST /api/games", a.createGame)
 	mux.HandleFunc("GET /api/games/{id}", a.withGame(func(m *match.Match, _ *http.Request) (match.State, error) {
@@ -195,20 +167,12 @@ func (a *api) withGame(f func(*match.Match, *http.Request) (match.State, error))
 }
 
 func (a *api) create(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Seed     *int64 `json:"seed"`
-		MaxTurns int    `json:"max_turns"`
-	}
-	if err := decode(r, &body, false); err != nil {
-		writeErr(w, err)
-		return
-	}
-	s, err := a.store.Create(body.Seed, body.MaxTurns)
+	st, err := apicall.CreateSession(a.store, r.Body)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.State())
+	writeJSON(w, http.StatusOK, st)
 }
 
 func (a *api) withSession(f func(*session.Session, *http.Request) (session.State, error)) http.HandlerFunc {
@@ -227,47 +191,19 @@ func (a *api) withSession(f func(*session.Session, *http.Request) (session.State
 	}
 }
 
-func errInvalid(msg string) error { return errors.Join(session.ErrInvalid, errors.New(msg)) }
+func errInvalid(msg string) error { return apicall.Invalid(msg) }
 
 // decode reads a JSON body; an empty body is allowed unless required.
 func decode(r *http.Request, v any, required bool) error {
-	err := json.NewDecoder(io.LimitReader(r.Body, maxBody)).Decode(v)
-	switch {
-	case errors.Is(err, io.EOF) && !required:
-		return nil
-	case errors.Is(err, io.EOF):
-		return errInvalid("request body is required")
-	case err != nil:
-		return errInvalid("invalid JSON body: " + err.Error())
-	}
-	return nil
+	return apicall.Decode(r.Body, v, required)
 }
 
 func writeErr(w http.ResponseWriter, err error) {
-	status := http.StatusInternalServerError
-	switch {
-	case errors.Is(err, session.ErrNotFound), errors.Is(err, match.ErrNotFound):
-		status = http.StatusNotFound
-	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
-		status = http.StatusBadRequest
-	case errors.Is(err, session.ErrTreeFull):
-		// Not a state conflict (the current node is fine); a client that
-		// re-fetches on 409 to recover from another tab's progress must
-		// not treat this the same way, since re-fetching changes nothing.
-		status = http.StatusUnprocessableEntity
-	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
-		status = http.StatusConflict
-	}
-	msg := err.Error()
-	// errors.Join renders one line per error; keep the specific message.
-	if i := strings.LastIndexByte(msg, '\n'); i >= 0 {
-		msg = msg[i+1:]
-	}
-	writeError(w, status, msg)
+	writeError(w, apicall.Status(err), apicall.Message(err))
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+	writeJSON(w, status, apicall.ErrorBody(msg))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

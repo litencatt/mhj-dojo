@@ -1,0 +1,92 @@
+package apicall
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/litencatt/mhj2/internal/session"
+)
+
+func call(t *testing.T, store *session.Store, method, path, body string) (int, []byte) {
+	t.Helper()
+	status, v := Session(store, method, path, strings.NewReader(body))
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return status, b
+}
+
+func state(t *testing.T, store *session.Store, method, path, body string) session.State {
+	t.Helper()
+	status, b := call(t, store, method, path, body)
+	if status != statusOK {
+		t.Fatalf("%s %s: %d %s", method, path, status, b)
+	}
+	var st session.State
+	if err := json.Unmarshal(b, &st); err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
+
+// TestSessionRoutes drives a session through every practice operation by
+// method and path, as the WebAssembly build does.
+func TestSessionRoutes(t *testing.T) {
+	store := session.NewStore()
+	st := state(t, store, "POST", "/api/sessions", `{"seed":1,"max_turns":5}`)
+	if st.Seed != 1 || st.MaxTurns != 5 || st.NodeID != 0 {
+		t.Fatalf("create: seed %d, max_turns %d, node %d", st.Seed, st.MaxTurns, st.NodeID)
+	}
+	base := "/api/sessions/" + st.SessionID
+	if got := state(t, store, "GET", base, ""); got.SessionID != st.SessionID {
+		t.Fatalf("get: session %q", got.SessionID)
+	}
+	d := state(t, store, "POST", base+"/discard", `{"tile":"`+*st.Drawn+`","node_id":0}`)
+	if d.NodeID != 1 || len(d.Discards) != 1 {
+		t.Fatalf("discard: node %d, discards %v", d.NodeID, d.Discards)
+	}
+	if g := state(t, store, "POST", base+"/goto", `{"node_id":0}`); g.NodeID != 0 {
+		t.Fatalf("goto: node %d", g.NodeID)
+	}
+	// Seed 1's first draw does not complete the hand.
+	if status, _ := call(t, store, "POST", base+"/tsumo", ""); status != statusConflict {
+		t.Fatalf("tsumo: status %d, want %d", status, statusConflict)
+	}
+}
+
+func TestSessionErrors(t *testing.T) {
+	store := session.NewStore()
+	st := state(t, store, "POST", "/api/sessions", `{"seed":1}`)
+	base := "/api/sessions/" + st.SessionID
+	for _, c := range []struct {
+		method, path, body string
+		status             int
+	}{
+		{"GET", "/api/sessions/nope", "", statusNotFound},
+		{"POST", "/api/sessions/nope/discard", `{"tile":"1m"}`, statusNotFound},
+		{"GET", "/api/sessions", "", statusNotFound},
+		{"GET", "/api/sessionsx", "", statusNotFound},
+		{"GET", "/api/sessions/", "", statusNotFound},
+		{"POST", base + "/unknown", "{}", statusNotFound},
+		{"POST", base + "/discard/x", "{}", statusNotFound},
+		{"GET", "/api/games", "", statusNotFound},
+		{"POST", "/api/sessions", `{"max_turns":999}`, statusBadRequest},
+		{"POST", base + "/discard", "", statusBadRequest},
+		{"POST", base + "/discard", "{}", statusBadRequest},
+		{"POST", base + "/discard", `{"tile":"9z9"}`, statusBadRequest},
+		{"POST", base + "/goto", "{}", statusBadRequest},
+		{"POST", base + "/goto", `{"node_id":99}`, statusNotFound},
+		{"POST", base + "/discard", `{"tile":"` + *st.Drawn + `","node_id":3}`, statusConflict},
+	} {
+		status, b := call(t, store, c.method, c.path, c.body)
+		var e map[string]string
+		if err := json.Unmarshal(b, &e); err != nil || e["error"] == "" || strings.Contains(e["error"], "\n") {
+			t.Errorf("%s %s: error body %s", c.method, c.path, b)
+		}
+		if status != c.status {
+			t.Errorf("%s %s %s: status %d, want %d (%s)", c.method, c.path, c.body, status, c.status, b)
+		}
+	}
+}
