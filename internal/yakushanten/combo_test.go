@@ -148,6 +148,33 @@ func bruteComboPinfuWaits(keys []string, c tile.Counts) []tile.Kind {
 	return out
 }
 
+// bruteFallbackUkeire is the pinfu fallback by brute force: the draws t
+// after which some discard x != t leaves a hand with two-sided waits
+// (bruteComboPinfuWaits) for the combo keys.
+func bruteFallbackUkeire(keys []string, c tile.Counts) []tile.Kind {
+	var out []tile.Kind
+	for t := tile.Kind(0); t < tile.NumKinds; t++ {
+		if c[t] >= 4 {
+			continue
+		}
+		c[t]++
+		found := false
+		for x := tile.Kind(0); x < tile.NumKinds && !found; x++ {
+			if c[x] == 0 || x == t {
+				continue
+			}
+			c[x]--
+			found = len(bruteComboPinfuWaits(keys, c)) > 0
+			c[x]++
+		}
+		if found {
+			out = append(out, t)
+		}
+		c[t]--
+	}
+	return out
+}
+
 // TestCombosMatchBruteForce compares every combo's shanten and ukeire with
 // the brute-force definition on near-target and random hands; pinfu combos
 // are compared on the relaxed shape and, at tenpai, on the exact waits. It
@@ -202,6 +229,11 @@ func checkCombosBruteForce(t *testing.T, w Winds) {
 					if cd.shanten != want || (want == 0 && !slices.Equal(cd.waits, waits)) || cd.approx != (want == 1) {
 						t.Fatalf("%s %s: exact %d approx=%v waits %v, brute waits %v", key, c, cd.shanten, cd.approx, names(cd.waits), names(waits))
 					}
+					if want == 1 {
+						if got, wantU := a.comboUkeire(&cd, c, dd), bruteFallbackUkeire(d.keys, c); !slices.Equal(got, wantU) {
+							t.Fatalf("%s %s: fallback ukeire %v, brute %v", key, c, names(got), names(wantU))
+						}
+					}
 				}
 			}
 			want := bruteDist(key, c)
@@ -246,6 +278,20 @@ func TestCombosPruneMatchesFull(t *testing.T) {
 	}
 }
 
+// Near-pinfu hands whose pinfu row is 1 (relaxed tenpai, no two-sided wait)
+// while the relaxed distance is 1: the early stop must not treat the row as
+// a distance bound (regression), so the fast path matches the full search.
+func TestCombosPinfuFallbackHands(t *testing.T) {
+	for _, hand := range []string{"22m34557p334455s", "3456m566677788p", "455566677p8999s"} {
+		a := NewAnalyzer()
+		c := tile.MustCounts(hand)
+		rows := a.Analyze(c)
+		if got, want := a.combos(c, nil, rows, true), a.combos(c, nil, rows, false); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: got %+v, want %+v", hand, got, want)
+		}
+	}
+}
+
 func TestCombosHandWritten(t *testing.T) {
 	a := NewAnalyzer()
 	for _, tc := range []struct {
@@ -259,6 +305,10 @@ func TestCombosHandWritten(t *testing.T) {
 		{"112233m456p78s99p", "平和＋一盃口", 2, 0, "6s9s"},
 		// honitsu with a triplet of haku, waiting on 1m or 6z: only 6z adds hatsu.
 		{"123456m11m555z66z", "混一色＋役牌 白＋役牌 發", 5, 0, "6z"},
+		// Relaxed pinfu tenpai without a two-sided wait (the pinfu row is
+		// shanten 1): the ukeire must come from the pinfu fallback.
+		{"22m34557p334455s", "断么九＋平和＋一盃口", 3, 1, "4p6p8p"},
+		{"455566677p8999s", "平和＋一盃口", 2, 1, "7s"},
 		// six pairs of manzu and honors and a single honor.
 		{"1133557799m112z", "混一色＋七対子", 5, 0, "2z"},
 	} {

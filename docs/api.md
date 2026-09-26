@@ -308,7 +308,10 @@ Ranking (`yakushanten.Combos`):
 
 The server evaluates the combinations best-first by a lower bound (the largest
 shanten among each combination's own rows) and stops once no remaining one can
-enter the top five; `TestCombosPruneMatchesFull` checks this gives the same
+enter the top five; within a combination's target family it also stops at the
+first member that reaches the distance that bound implies (for pinfu the
+bound uses 0 when its row is 1 from the fallback: a relaxed tenpai without a
+two-sided wait still has distance 1); `TestCombosPruneMatchesFull` checks this gives the same
 result as evaluating all of them, and `TestCombosMatchBruteForce` checks every
 combination against a brute-force definition (for East/East and for split
 winds). With the combos, analysing every discard candidate of a random closed

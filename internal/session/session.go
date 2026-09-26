@@ -313,7 +313,8 @@ func (s *Session) combos(c tile.Counts, res []yakushanten.Result) []yakushanten.
 // until pruneAnalysisCache drops them.
 func (s *Session) nodeCombos(n *node) []yakushanten.Combo {
 	if n.combos == nil {
-		n.combos = s.combos(tile.CountsOf(n.hand), s.nodeAnalysis(n))
+		// non-nil even when empty, so an empty result is not recomputed
+		n.combos = append([]yakushanten.Combo{}, s.combos(tile.CountsOf(n.hand), s.nodeAnalysis(n))...)
 	}
 	return n.combos
 }

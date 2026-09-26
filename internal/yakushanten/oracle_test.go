@@ -593,6 +593,9 @@ func TestPinfuExactWaits(t *testing.T) {
 			if res.Shanten != 1 || !res.Approx {
 				t.Fatalf("%s: relaxed tenpai without ryanmen should be 1 (approx), got %d", c, res.Shanten)
 			}
+			if want := bruteFallbackUkeire([]string{"pinfu"}, c); !slices.Equal(res.Ukeire, want) {
+				t.Fatalf("%s: fallback ukeire %v, brute %v", c, names(res.Ukeire), names(want))
+			}
 		default:
 			if res.Shanten != relaxed.Shanten || !res.Approx || res.Shanten < 1 {
 				t.Fatalf("%s: got %d approx=%v, relaxed %d", c, res.Shanten, res.Approx, relaxed.Shanten)

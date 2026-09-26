@@ -374,7 +374,11 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 	var todo []pending
 	for i := range defs {
 		d := &defs[i]
-		han, lb, ok := 0, -1, true
+		// lb bounds the combo's shanten (its rank), dlb its relaxed
+		// distance minus one, which the family search may stop at. They
+		// differ for pinfu: a relaxed tenpai without a two-sided wait is
+		// row shanten 1 but distance 1.
+		han, lb, dlb, ok := 0, -1, -1, true
 		for _, k := range d.keys {
 			if (len(melds) > 0 && needNoMelds[k]) || (open && needClosed[k]) {
 				ok = false
@@ -389,10 +393,17 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			}
 			if d.pairs == nil || k == "chiitoitsu" || k == "honroutou" {
 				lb = max(lb, s)
+				if k == "pinfu" && s == 1 {
+					s = 0
+				}
+				dlb = max(dlb, s)
 			}
 		}
+		if !prune {
+			dlb = -1 // no early stop: the reference for TestCombosPruneMatchesFull
+		}
 		if ok {
-			todo = append(todo, pending{i: i, han: han, lb: ComboRank(han, lb), minDist: lb + 1})
+			todo = append(todo, pending{i: i, han: han, lb: ComboRank(han, lb), minDist: dlb + 1})
 		}
 	}
 	if prune {
