@@ -1,6 +1,16 @@
 import { BUNDLE, SITE_BUILD, useVersion } from '../version';
 
-/** The build in the header, e.g. "abc1234 · 2026-09-26" (the commit and its date), with details in its title. */
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** An RFC 3339 time (UTC from Go and the site build) as the viewer's local
+ * date and minute, e.g. "2026-09-27 07:57"; unparsable input as given. */
+function localTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** The build in the header, e.g. "abc1234 · 2026-09-26" (the commit and its date, in the viewer's time zone), with details in its title. */
 export function VersionTag() {
   const v = useVersion();
   if (!v) return null;
@@ -8,10 +18,11 @@ export function VersionTag() {
   // own build still knows its commit (or MHJDOJO_VERSION), and its build date.
   const site = v.version === 'dev' && SITE_BUILD && SITE_BUILD.version !== 'dev' ? SITE_BUILD : null;
   const version = site ? site.version : v.version;
-  const date = (site ? site.built : v.time).slice(0, 10);
+  const time = site ? site.built : v.time;
+  const date = time && localTime(time).slice(0, 10);
   const details = [
-    `エンジン: ${v.revision || v.version}${v.time ? `（${v.time}）` : ''}${v.modified ? '（未コミットの変更を含む）' : ''}`,
-    SITE_BUILD && `公開版のビルド: ${SITE_BUILD.version}（${SITE_BUILD.built}、${SITE_BUILD.id}）`,
+    `エンジン: ${v.revision || v.version}${v.time ? `（${localTime(v.time)}）` : ''}${v.modified ? '（未コミットの変更を含む）' : ''}`,
+    SITE_BUILD && `公開版のビルド: ${SITE_BUILD.version}（${localTime(SITE_BUILD.built)}、${SITE_BUILD.id}）`,
     BUNDLE && `画面: ${BUNDLE}`,
   ].filter(Boolean);
   return (
