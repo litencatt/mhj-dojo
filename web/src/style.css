@@ -1784,8 +1784,17 @@ section {
     flex-basis: 100%;
     justify-content: center;
   }
+  /* Discards a little smaller than the hand's tiles, which shrink with the
+     screen, instead of a fixed 26px that dwarfs them on a phone. */
   .discard-river {
     gap: 2px;
+  }
+  .discard-river .tile-sm {
+    width: clamp(14px, calc((100cqw - var(--hand-fixed)) / 14 * 0.85), 26px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
   }
   .tsumo-button,
   .next-round-button {
