@@ -53,6 +53,32 @@ func Rows(res []yakushanten.Result, visible *tile.Counts, han func(key string) i
 	return out
 }
 
+// ComboRow is one combination of yaku (docs/api.md "Yaku combos").
+type ComboRow struct {
+	Keys        []string `json:"keys"`
+	Name        string   `json:"name"`
+	Han         int      `json:"han"`
+	Shanten     int      `json:"shanten"`
+	Approx      bool     `json:"approx"`
+	Ukeire      []Ukeire `json:"ukeire"`
+	UkeireTotal int      `json:"ukeire_total"`
+}
+
+// Combos converts combos to API rows, counting remaining tiles as Rows does.
+func Combos(combos []yakushanten.Combo, visible *tile.Counts) []ComboRow {
+	out := make([]ComboRow, len(combos))
+	for i, c := range combos {
+		row := ComboRow{Keys: c.Keys, Name: c.Name, Han: c.Han, Shanten: c.Shanten, Approx: c.Approx, Ukeire: []Ukeire{}}
+		for _, k := range c.Ukeire {
+			rem := max(4-visible[k], 0)
+			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
+			row.UkeireTotal += rem
+		}
+		out[i] = row
+	}
+	return out
+}
+
 // ShantenOf returns a row's shanten, or nil when the yaku is impossible.
 func ShantenOf(r yakushanten.Result) *int {
 	if !r.Possible {
