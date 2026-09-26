@@ -71,6 +71,7 @@ node still exists; the tree only grows), so `goto` takes no staleness guard.
   "turn": 3,
   "status": "playing",         // playing | tsumo | exhausted
   "hand": ["1m", "..."],       // 13 tiles, sorted
+  "hand_groups": [HandGroup],  // how `hand` splits into blocks (drawn tile excluded)
   "drawn": "5s",               // null unless status == playing
   "discards": ["9z", "..."],   // path discards, in order
   "dora_indicators": ["3z"],
@@ -127,6 +128,42 @@ node still exists; the tree only grows), so `goto` takes no staleness guard.
 `remaining` = 4 − copies visible to the player at this node: `hand` + `drawn` (if any) +
 `discards` + `dora_indicators`. The same visible set is used for `analysis` and every `by_discard` entry.
 A tile type can appear with `remaining: 0` (空聴).
+
+### `HandGroup`
+
+```jsonc
+{ "type": "seq", "tiles": [0, 3, 5] }   // tiles: indexes into `hand`
+```
+
+`hand_groups` split the concealed `hand` (the drawn tile is never included)
+into blocks for display. Each index of `hand` appears in exactly one group,
+so equal tiles are told apart. `type` is one of:
+
+| type | block |
+|---|---|
+| `seq` | sequence (順子) |
+| `trip` | triplet (刻子) |
+| `pair` | the pair (雀頭) |
+| `ryanmen` | two-sided taatsu (両面), e.g. 34m |
+| `kanchan` | closed taatsu (嵌張), e.g. 35m |
+| `penchan` | edge taatsu (辺張), 12 or 89 |
+| `toitsu` | a pair other than the pair (対子) |
+| `float` | every tile in no block (浮き牌), as one group |
+
+Groups come melds first (in tile order), then the pair, the taatsu (in tile
+order) and last the float group; empty classes are left out. The split is one
+normal-form (4 melds + 1 pair) decomposition only; chiitoitsu and kokushi
+shapes are not considered. Among all splits it picks the one with the lowest
+normal shanten, `8 − 2 × (melds + called melds) − taatsu − pair` with
+melds + taatsu ≤ 4 − called melds, using the same 4-copy rules as the
+`normal` row (a taatsu whose waits are all in the hand does not count, and a
+hand without a pair needs a floating tile it does not hold four of), so it
+always has the `normal` row's shanten for the concealed tiles. Ties go, in
+order, to more melds, having a pair, better taatsu (more ryanmen, then more
+toitsu, more kanchan, more penchan), more floating terminals and honors, and
+finally the first split found scanning kinds 1m → 7z (at each kind:
+sequence, triplet, pair, toitsu, ryanmen/penchan, kanchan, float). Red fives
+count as fives.
 
 ### Rows (fixed order)
 
@@ -409,6 +446,7 @@ unknown game, `409` a move that is not legal now.
                                 // added: a kan made by adding a tile to a pon (kakan); the added tile comes just before the called tile
       "hand_count": 14,             // concealed tiles, drawn tile included
       "hand": ["1m", "..."],    // present only for you, and for every seat once ended
+      "hand_groups": [HandGroup],  // your seat only: blocks of hand, melds counted as called melds
       "drawn": "4p" }           // your drawn tile on your turn
   ],
   "last_discard": null,         // the tile you may claim, in the call phase
