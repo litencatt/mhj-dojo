@@ -61,16 +61,42 @@ test('practice: the header shows the version and the help opens, closes and link
   await expect(glossary.getByRole('searchbox', { name: '用語を検索' })).toBeFocused();
 });
 
-test('game mode: the header shows the version and the help', async ({ page }) => {
-  await page.goto('/?mode=game&seed=1');
-  await expect(page.locator('.app-header .version-tag')).toHaveText(VERSION);
+test('a click on the backdrop closes the help, a drag that ends there does not', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/?seed=1&turns=18');
+  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+
+  // Selecting text inside and letting go over the backdrop.
   const dialog = await openHelp(page);
-  await expect(dialog.getByRole('heading', { name: 'CPU対戦', exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const text = await dialog.getByText('日本式リーチ麻雀の練習アプリです', { exact: false }).boundingBox();
+  expect(text).not.toBeNull();
+  await page.mouse.move(text!.x + 5, text!.y + text!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(10, 10, { steps: 5 });
+  await page.mouse.up();
+  await expect(dialog).toBeVisible();
+
+  // A plain click outside it.
+  await page.mouse.click(10, 10);
   await expect(dialog).toBeHidden();
 });
 
-test('the help fits a phone screen', async ({ page }) => {
+test('game mode: the header shows the version, and the help links to the glossary', async ({ page }) => {
+  await page.goto('/?mode=game&seed=1');
+  await expect(page.locator('.app-header .version-tag')).toHaveText(VERSION);
+  const glossary = page.getByRole('region', { name: '用語表' });
+  await glossary.getByRole('button', { name: '用語表を最小化' }).click();
+  await expect(glossary).toBeHidden();
+
+  const dialog = await openHelp(page);
+  await expect(dialog.getByRole('heading', { name: 'CPU対戦', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '用語表', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(glossary).toBeVisible();
+  await expect(glossary.getByRole('searchbox', { name: '用語を検索' })).toBeFocused();
+});
+
+test('the help fits a phone screen and scrolls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?seed=1&turns=18');
   const dialog = await openHelp(page);
@@ -78,6 +104,14 @@ test('the help fits a phone screen', async ({ page }) => {
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  // Its bottom edge is on screen, and the content scrolls inside it.
+  expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+  expect(await dialog.evaluate((d) => d.scrollHeight > d.clientHeight)).toBe(true);
+  const last = dialog.getByRole('heading', { name: 'バージョン表示', exact: true });
+  await last.scrollIntoViewIfNeeded();
+  await expect(last).toBeInViewport();
+  // The close button stays reachable at the top.
+  await expect(dialog.getByRole('button', { name: 'ヘルプを閉じる' })).toBeInViewport();
   // The page behind scrolls no wider than the screen.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

@@ -3,7 +3,9 @@ import { expect, test, type Page } from '@playwright/test';
 // The static site's version: the header shows it, the help opens, and a
 // banner offers a reload once version.json names another build.
 
-type Build = { version: string; built: string };
+type Build = { version: string; id: string; built: string };
+
+const NEWER: Build = { version: 'fffffff', id: 'ffffffffffffffff', built: '2099-01-01T00:00:00.000Z' };
 
 // The build being served, as its version.json says.
 async function servedBuild(page: Page): Promise<Build> {
@@ -12,7 +14,7 @@ async function servedBuild(page: Page): Promise<Build> {
   return (await res.json()) as Build;
 }
 
-// Answers version.json with build, and counts the checks.
+// Answers version.json with build(), and records the checks.
 async function routeVersion(page: Page, build: () => Build) {
   const seen: string[] = [];
   await page.route('**/version.json*', (route) => {
@@ -22,13 +24,25 @@ async function routeVersion(page: Page, build: () => Build) {
   return seen;
 }
 
+async function loaded(page: Page) {
+  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+}
+
+// A check the page makes on its own schedule: past the one-a-minute limit,
+// when the tab comes back into view.
+async function recheck(page: Page) {
+  await page.clock.fastForward('01:01');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+}
+
 test('the header shows the version and the help opens', async ({ page }) => {
   const served = await servedBuild(page);
   expect(served.version).toMatch(/^(dev|[0-9a-f]{7})$/);
+  expect(served.id).toMatch(/^[0-9a-f]{16}$/);
   expect(Number.isNaN(Date.parse(served.built))).toBe(false);
   await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect(page.locator('.app-header .version-tag')).toHaveText(/^(dev|[0-9a-f]{7}) · \d{4}-\d{2}-\d{2}$/);
+  await loaded(page);
+  await expect(page.locator('.app-header .version-tag')).toHaveText(/^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/);
 
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
@@ -37,38 +51,102 @@ test('the header shows the version and the help opens', async ({ page }) => {
   await expect(dialog).toBeHidden();
 });
 
-test('no banner while version.json names the running build', async ({ page }) => {
+test('no banner for the running build, even redeployed at another time', async ({ page }) => {
   const served = await servedBuild(page);
-  const seen = await routeVersion(page, () => served);
-  await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect.poll(() => seen.length).toBeGreaterThan(0);
-  // Fetched past every cache.
-  expect(new URL(seen[0]).searchParams.get('t')).toMatch(/^\d+$/);
-  await expect(page.locator('.update-banner')).toHaveCount(0);
-});
-
-test('a banner offers a reload once a newer build is deployed', async ({ page }) => {
-  const served = await servedBuild(page);
+  await page.clock.install();
   let current = served;
   const seen = await routeVersion(page, () => current);
   await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect.poll(() => seen.length).toBeGreaterThan(0);
+  await loaded(page);
+  await expect.poll(() => seen.length).toBe(1);
+  // Fetched past every cache.
+  expect(new URL(seen[0]).searchParams.get('t')).toMatch(/^\d+$/);
+
+  // The same sources deployed again: another build time only.
+  current = { ...served, built: '2099-01-01T00:00:00.000Z' };
+  await recheck(page);
+  await expect.poll(() => seen.length).toBe(2);
   await expect(page.locator('.update-banner')).toHaveCount(0);
 
-  // A deploy while the page is open: the next check (here, the tab coming
-  // back into view) notices it.
-  current = { version: 'fffffff', built: '2099-01-01T00:00:00.000Z' };
-  const checks = seen.length;
+  // At most one check a minute.
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect.poll(() => seen.length).toBeGreaterThan(checks);
-  const banner = page.getByRole('status').filter({ hasText: '新しいバージョンがあります' });
-  await expect(banner).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(seen.length).toBe(2);
+});
 
-  // 再読み込み reloads the page.
-  await Promise.all([page.waitForEvent('load'), banner.getByRole('button', { name: '再読み込み' }).click()]);
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+test('no checks while the tab is hidden', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+  });
+  const served = await servedBuild(page);
+  const seen = await routeVersion(page, () => served);
+  await page.goto('./?seed=1&turns=18');
+  await loaded(page);
+  await page.waitForTimeout(300);
+  expect(seen).toHaveLength(0);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect.poll(() => seen.length).toBe(1);
+});
+
+test('a newer build: banner, reload past the cache, and no loop if the old page comes back', async ({ page }) => {
+  const served = await servedBuild(page);
+  await page.clock.install();
+  let current = served;
+  const seen = await routeVersion(page, () => current);
+  await page.goto('./?seed=1&turns=18');
+  await loaded(page);
+  await expect.poll(() => seen.length).toBe(1);
+  await expect(page.locator('.update-banner')).toHaveCount(0);
+
+  // A deploy while the page is open: the next check notices it.
+  current = NEWER;
+  await recheck(page);
+  const banner = page.getByRole('status').locator('.update-banner').filter({ hasText: '新しいバージョンがあります' });
+  await expect(banner).toBeVisible();
+  const reload = banner.getByRole('button', { name: '再読み込み' });
+  await expect(reload).toBeVisible();
+
+  // Checking stops once a newer build is found.
+  const checks = seen.length;
+  await page.clock.fastForward('11:00');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(300);
+  expect(seen.length).toBe(checks);
+
+  // 再読み込み loads the same page (its session and seed kept) with the new
+  // id added, which the cached index.html doesn't answer.
+  const session = new URL(page.url()).searchParams.get('session');
+  expect(session).toBeTruthy();
+  const nav = page.waitForRequest((req) => req.isNavigationRequest());
+  await reload.click();
+  const url = new URL((await nav).url());
+  expect(url.searchParams.get('_v')).toBe(NEWER.id);
+  expect(url.searchParams.get('seed')).toBe('1');
+  expect(url.searchParams.get('session')).toBe(session);
+  await loaded(page);
+  // The parameter doesn't stay in the address bar; the rest does.
+  await expect.poll(() => new URL(page.url()).searchParams.has('_v')).toBe(false);
+  expect(new URL(page.url()).searchParams.get('session')).toBe(session);
+
+  // The CDN still served the old page (this test serves the same build
+  // again): say that it can take a while, without offering the reload again.
+  await expect(page.getByRole('status').locator('.update-banner').filter({ hasText: '更新の反映まで時間がかかることがあります' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '再読み込み' })).toHaveCount(0);
+});
+
+test('the banner can be dismissed', async ({ page }) => {
+  await routeVersion(page, () => NEWER);
+  await page.goto('./?seed=1&turns=18');
+  await loaded(page);
+  const banner = page.locator('.update-banner');
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: '閉じる' }).click();
+  await expect(banner).toHaveCount(0);
+  // The status region stays, empty, for the next announcement.
+  await expect(page.locator('.update-status')).toHaveCount(1);
 });
 
 test('a failing version.json shows nothing', async ({ page }) => {
@@ -78,7 +156,7 @@ test('a failing version.json shows nothing', async ({ page }) => {
     return route.abort();
   });
   await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
   await expect.poll(() => failed).toBeGreaterThan(0);
   await expect(page.locator('.update-banner')).toHaveCount(0);
   await expect(page.locator('.error-banner')).toHaveCount(0);
