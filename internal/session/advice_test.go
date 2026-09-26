@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/litencatt/mhj2/internal/testmode"
 )
 
 func TestAdviceAndReview(t *testing.T) {
@@ -99,7 +101,7 @@ func TestPracticeActionP95(t *testing.T) {
 	}
 	st := NewStore()
 	var took []time.Duration
-	for seed := int64(1); seed <= 8; seed++ {
+	for seed := int64(1); seed <= testmode.N(int64(8), 3, 0); seed++ {
 		s := mustCreate(t, st, seed, DefaultMaxTurns)
 		v := s.State()
 		for v.Status == StatusPlaying {

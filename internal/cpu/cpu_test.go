@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/litencatt/mhj2/internal/game"
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yaku"
 )
@@ -160,10 +161,7 @@ func TestDanger(t *testing.T) {
 // All four seats are CPU players: every move is legal, the points stay
 // balanced, rounds end with both wins and draws, and a decision is fast.
 func TestSelfPlay(t *testing.T) {
-	n := 1000
-	if testing.Short() {
-		n = 100
-	}
+	n := testmode.N(1000, 200, 100)
 	const workers = 8
 	var mu sync.Mutex
 	kinds := map[string]int{}
@@ -187,7 +185,7 @@ func TestSelfPlay(t *testing.T) {
 	}
 	// Time decisions on one goroutine, so waiting for a core is not counted.
 	p := New()
-	for seed := int64(0); seed < 50; seed++ {
+	for seed := range testmode.N(int64(50), 20, 50) {
 		_, times := playSeed(t, p, seed)
 		took = append(took, times...)
 	}
@@ -232,10 +230,7 @@ func playSeed(t *testing.T, p *Player, seed int64) (string, []time.Duration) {
 // Two games from the same seed with the same human moves play out exactly
 // the same with the real CPU, and the log replays onto a fresh round.
 func TestGameReplaysWithCPU(t *testing.T) {
-	n := int64(30)
-	if testing.Short() {
-		n = 5
-	}
+	n := testmode.N(int64(30), 10, 5)
 	for seed := range n {
 		a, b := playGame(t, seed), playGame(t, seed)
 		if !reflect.DeepEqual(a.Round.Log(), b.Round.Log()) {
@@ -296,10 +291,7 @@ func TestDecideAfterACall(t *testing.T) {
 // stay at 100000 at the end of each round, every game ends, and the logs
 // replay to the same standings.
 func TestHanchanSelfPlay(t *testing.T) {
-	n := 64
-	if testing.Short() {
-		n = 8
-	}
+	n := testmode.N(64, 16, 8)
 	const workers = 8
 	for w := range workers {
 		t.Run(strconv.Itoa(w), func(t *testing.T) {
@@ -365,10 +357,7 @@ func playHanchan(t *testing.T, h *game.Hanchan, players [4]*Player) {
 // player never calls, and a game played twice from the same seed gives the
 // same logs, which replay onto a fresh game.
 func TestWeakSelfPlay(t *testing.T) {
-	n := int64(12)
-	if testing.Short() {
-		n = 4
-	}
+	n := testmode.N(int64(12), 4, 4)
 	rounds := 0
 	for seed := range n {
 		var logs [2][][]game.Action
@@ -410,8 +399,8 @@ func TestWeakSelfPlay(t *testing.T) {
 // (seats swapped every other game), the normal players win more rounds and
 // finish with more points.
 func TestWeakPlaysWorse(t *testing.T) {
-	if testing.Short() {
-		t.Skip("plays many games; run without -short")
+	if !testmode.Full() {
+		t.Skip("plays many games; run with MHJ2_FULL=1 (the nightly workflow)")
 	}
 	var wins, points [2]int // index 0 normal, 1 weak
 	for seed := range int64(40) {
@@ -501,10 +490,7 @@ func TestCallDecisions(t *testing.T) {
 // Whole rounds with four CPU players now include calls and wins on open
 // hands, with every move legal.
 func TestSelfPlayCalls(t *testing.T) {
-	n := int64(150)
-	if testing.Short() {
-		n = 30
-	}
+	n := testmode.N(int64(150), 60, 30)
 	p := New()
 	calls, openWins := 0, 0
 	for seed := range n {

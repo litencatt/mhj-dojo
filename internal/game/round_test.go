@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -97,12 +98,15 @@ func checkInvariants(t *testing.T, r *Round) {
 }
 
 func TestSelfPlay(t *testing.T) {
-	n := 1000
-	if testing.Short() {
-		n = 100
+	var seeds []int64
+	for seed := range testmode.N(int64(1000), 200, 100) {
+		seeds = append(seeds, seed)
+	}
+	if !testmode.Full() && !testing.Short() {
+		seeds = append(seeds, 961) // the only win below seed 1000
 	}
 	kinds := map[string]int{}
-	for seed := int64(0); seed < int64(n); seed++ {
+	for _, seed := range seeds {
 		r := New(seed)
 		playAll(t, r, Tsumogiri{})
 		kinds[r.Result().Kind]++

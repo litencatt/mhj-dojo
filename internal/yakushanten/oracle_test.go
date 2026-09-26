@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/litencatt/mhj2/internal/shanten"
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -515,10 +516,7 @@ func randomHand(r *rand.Rand) tile.Counts {
 func TestRowsMatchBruteForce(t *testing.T) {
 	r := rand.New(rand.NewPCG(11, 12))
 	a := NewAnalyzer()
-	perKey := 24
-	if testing.Short() {
-		perKey = 6
-	}
+	perKey := testmode.N(24, 12, 6)
 	for _, row := range Rows {
 		for i := 0; i < perKey; i++ {
 			var c tile.Counts
@@ -556,10 +554,7 @@ func TestRowsMatchBruteForce(t *testing.T) {
 func TestPinfuExactWaits(t *testing.T) {
 	r := rand.New(rand.NewPCG(13, 14))
 	a := NewAnalyzer()
-	n := 300
-	if testing.Short() {
-		n = 50
-	}
+	n := testmode.N(300, 100, 50)
 	for i := 0; i < n; i++ {
 		c := perturb(r, randomTarget(r, "pinfu"))
 		res := a.Row(c, "pinfu")
@@ -601,10 +596,7 @@ func TestPinfuExactWaits(t *testing.T) {
 func TestPropertiesRandom(t *testing.T) {
 	r := rand.New(rand.NewPCG(21, 22))
 	a := NewAnalyzer()
-	n := 3000
-	if testing.Short() {
-		n = 300
-	}
+	n := testmode.N(3000, 1000, 300)
 	for i := 0; i < n; i++ {
 		c := randomHand(r)
 		rows := a.Analyze(c)
@@ -678,10 +670,7 @@ func TestPropertiesRandom(t *testing.T) {
 func TestNormalShantenMatchesAnalyze(t *testing.T) {
 	r := rand.New(rand.NewPCG(31, 32))
 	a := NewAnalyzer()
-	n := 2000
-	if testing.Short() {
-		n = 200
-	}
+	n := testmode.N(2000, 600, 200)
 	for i := 0; i < n; i++ {
 		c := randomHand(r)
 		want := a.Row(c, "normal")

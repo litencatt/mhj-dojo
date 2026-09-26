@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/litencatt/mhj2/internal/testmode"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/wall"
 	"github.com/litencatt/mhj2/internal/yaku"
@@ -274,10 +275,7 @@ func (greedy) Decide(v View, l Legal) Action {
 }
 
 func TestSelfPlayWithCalls(t *testing.T) {
-	n := 500
-	if testing.Short() {
-		n = 50
-	}
+	n := testmode.N(500, 150, 50)
 	var calls, kans, aborts int
 	for seed := int64(0); seed < int64(n); seed++ {
 		r := New(seed)

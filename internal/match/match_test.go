@@ -8,6 +8,7 @@ import (
 
 	"github.com/litencatt/mhj2/internal/cpu"
 	"github.com/litencatt/mhj2/internal/game"
+	"github.com/litencatt/mhj2/internal/testmode"
 )
 
 // defaults are the options Create fills in for an empty request.
@@ -54,7 +55,7 @@ func TestWeakGameReplays(t *testing.T) {
 		t.Skip("plays whole games on one goroutine; run without -short")
 	}
 	st := NewStore()
-	for seed := range int64(3) {
+	for seed := range testmode.N(int64(3), 1, 0) {
 		var logs [2][][]game.Action
 		for i := range logs {
 			m, err := st.Create(&seed, Options{FirstDealer: DealerYou, CPU: cpu.Weak})
