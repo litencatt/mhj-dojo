@@ -197,3 +197,56 @@ jobs:
           name: playwright-report
           path: web/playwright-report/
           retention-days: 7
+
+  # The static site (issue #67): the practice engine built as WebAssembly
+  # and the site built on it, then its E2E tests in the browser with no
+  # mhj2 server (vite preview serves web/dist-site).
+  site:
+    name: Static site (WASM) build + E2E
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: go vet (js/wasm)
+        working-directory: .
+        run: GOOS=js GOARCH=wasm go vet ./cmd/mhj2wasm/...
+      - name: Build the WASM engine
+        working-directory: .
+        run: make wasm
+      - name: WASM size
+        working-directory: .
+        run: |
+          echo "mhj2.wasm: $(wc -c < web/site-public/mhj2.wasm) bytes, gzip -9 $(gzip -9c web/site-public/mhj2.wasm | wc -c) bytes" >> "$GITHUB_STEP_SUMMARY"
+      - run: npm ci
+      - run: npm run build:site
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright's OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run e2e:site
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report-site
+          path: web/playwright-report-site/
+          retention-days: 7
