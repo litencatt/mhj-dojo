@@ -41,14 +41,22 @@ If `seed` is omitted, a random seed is chosen. Returns a `State`.
 Returns the `State` at the current node.
 
 ### `POST /api/sessions/{id}/discard`
-Body: `{"tile": "5m"}` – exact tile string from hand or `drawn` (red matters: `0m` vs `5m`).
+Body: `{"tile": "5m", "node_id": 3}` – `tile` is the exact tile string from hand or `drawn`
+(red matters: `0m` vs `5m`). `node_id` is optional: the node the client acted from (its
+current `state.node_id`); if it doesn't match the session's current node, the request is
+rejected with `409` and nothing changes (another tab has moved the session on first – see
+Errors below). Omitting it keeps the old behaviour of acting on whatever node is current.
 Creates the child node, or moves to it if the same discard already exists. Returns the `State`.
 
 ### `POST /api/sessions/{id}/tsumo`
-Allowed only when `can_tsumo` is true. Creates a terminal `tsumo` child node. Returns the `State`.
+Body (optional): `{"node_id": 3}`, as `discard` above. Allowed only when `can_tsumo` is true.
+Creates a terminal `tsumo` child node. Returns the `State`.
 
 ### `POST /api/sessions/{id}/goto`
-Body: `{"node_id": 3}` – moves the current node. Returns the `State`.
+Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id` here already
+names the destination explicitly, so there's no separate "acted from" node to guard: unlike
+discard/tsumo, another tab moving the session on first can't make this ambiguous (the target
+node still exists; the tree only grows), so `goto` takes no staleness guard.
 
 ## `State`
 
@@ -176,15 +184,11 @@ These clarify points the contract above leaves open; none changes the JSON shape
 
 - **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
   session/node/endpoint, `415` POST without a JSON content type, `409` action not
-  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand),
-  `422` a session's tree is already at its node cap (see below) — not a state conflict, since the
-  current node itself is fine to act on, so unlike a `409` re-fetching the session changes nothing.
-- **Follow-up (not implemented)**: unlike games, a session has no way to detect that another tab
-  moved its current node first — `discard`/`tsumo`/`goto` just act on whatever node is current
-  server-side, silently, instead of returning `409` the way an actually-stale game request does.
-  Two tabs on the same session racing each other can currently see a discard silently land on a
-  node other than the one they thought they were acting from. The fix would be to accept an
-  expected `node_id` on those endpoints and `409` when it doesn't match the current one.
+  allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand,
+  or a `node_id` that no longer matches the current node because another tab moved the session
+  on first), `422` a session's tree is already at its node cap (see below) — not a state
+  conflict, since the current node itself is fine to act on, so unlike a `409` re-fetching the
+  session changes nothing.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** is always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.

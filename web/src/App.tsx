@@ -54,12 +54,12 @@ export function App() {
 
   function handleDiscard(tile: string) {
     if (!state) return;
-    void request(() => api.discard(state.session_id, tile));
+    void request(() => api.discard(state.session_id, tile, state.node_id));
   }
 
   function handleTsumo() {
     if (!state) return;
-    void request(() => api.tsumo(state.session_id));
+    void request(() => api.tsumo(state.session_id, state.node_id));
   }
 
   function handleGoto(nodeId: number) {
