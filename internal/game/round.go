@@ -139,7 +139,7 @@ type Pao struct {
 // Result describes how the round ended.
 type Result struct {
 	Kind   string // "tsumo", "ron", "draw" or "abort"
-	Reason string // for "abort": AbortKyuushu, AbortSuufon or AbortSuucha
+	Reason string // for "abort": AbortKyuushu, AbortSuufon, AbortSuucha or AbortKans
 	Winner int    // -1 on a draw
 	From   int    // the discarder on a ron, else -1
 	// Win, Points and WinTile are set for tsumo and ron.
