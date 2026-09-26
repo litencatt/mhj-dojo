@@ -14,9 +14,9 @@ docs/api.md says:
   yakuman and never more than its full value (`ron_pao`, `ron_pao_le`);
 * the winner receives 300 per honba, whoever pays it (`honba_winner`).
 -/
-import Mhj2.Settle
+import MhjDojo.Settle
 
-namespace Mhj2
+namespace MhjDojo
 
 /-- One yakuman: 32000 for a non-dealer, 48000 for the dealer. -/
 def yakUnit (dealer : Bool) : Int := if dealer then 48000 else 32000
@@ -331,4 +331,4 @@ theorem honba_winner (hk : x.kind = .tsumo ∨ x.kind = .ron) (hpw : ∀ q ∈ x
 
 end Input
 
-end Mhj2
+end MhjDojo

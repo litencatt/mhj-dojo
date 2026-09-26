@@ -11,7 +11,7 @@ import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Ring
 import Mathlib.Tactic.Choose
 
-namespace Mhj2.Standings
+namespace MhjDojo.Standings
 
 open Finset
 
@@ -152,4 +152,4 @@ theorem sum_score (hover : x.over = true) (hsum : ∑ s, x.points s + x.deposit 
 
 end Input
 
-end Mhj2.Standings
+end MhjDojo.Standings

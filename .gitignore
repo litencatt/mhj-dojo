@@ -4,6 +4,6 @@ web/node_modules/
 web/.omc/
 formal/.lake/
 web/dist-site/
-web/site-public/mhj2.wasm
+web/site-public/mhj-dojo.wasm
 web/site-public/wasm_exec.js
 playwright-report-site/

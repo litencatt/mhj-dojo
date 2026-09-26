@@ -3,12 +3,12 @@ Round settlement, as in internal/game round.go (tsumo, ron, finish,
 exhaustiveDraw): the hand's payments (with pao), the honba, the noten
 penalty and the riichi sticks. Rules from docs/api.md.
 -/
-import Mhj2.Score
+import MhjDojo.Score
 import Mathlib.Tactic.FinCases
 import Mathlib.Tactic.Linarith
 import Mathlib.Data.Fintype.Card
 
-namespace Mhj2
+namespace MhjDojo
 
 abbrev Seat := Fin 4
 
@@ -259,4 +259,4 @@ theorem settle_dvd (hd : 100 ∣ x.deposit) (i : Seat) :
 
 end Input
 
-end Mhj2
+end MhjDojo

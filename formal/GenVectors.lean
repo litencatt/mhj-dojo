@@ -4,9 +4,9 @@ for Go tests that compare the Go implementation against the model:
 
   lake exe gen-vectors <repo root>
 -/
-import Mhj2
+import MhjDojo
 
-open Mhj2
+open MhjDojo
 
 def jbool (b : Bool) : String := if b then "true" else "false"
 

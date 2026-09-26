@@ -57,7 +57,7 @@ jobs:
       - name: Fetch the mathlib cache for the imported modules
         working-directory: formal
         run: |
-          mods=$(grep -hs "^import Mathlib" ./*.lean Mhj2/*.lean | sed "s/^import //" | sort -u)
+          mods=$(grep -hs "^import Mathlib" ./*.lean MhjDojo/*.lean | sed "s/^import //" | sort -u)
           lake exe cache get $mods
       - name: Build (check the proofs)
         working-directory: formal
