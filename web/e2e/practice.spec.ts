@@ -57,7 +57,9 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(handA).toBeVisible();
 
   // Page B: the same session, fetched fresh before either tab has acted -
-  // it sees the same root node as page A.
+  // it sees the same root node as page A. The URL gets ?session= in an
+  // effect after the first paint, so wait for it.
+  await expect(page).toHaveURL(/[?&]session=/);
   const sessionId = new URL(page.url()).searchParams.get('session');
   expect(sessionId, 'the URL should carry the server-assigned session id').toBeTruthy();
   const pageB = await context.newPage();

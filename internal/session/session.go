@@ -259,7 +259,7 @@ func (s *Session) Tsumo(expectedNode *int) (State, error) {
 // that don't send one keep today's behaviour).
 func (s *Session) checkExpectedNode(expectedNode *int) error {
 	if expectedNode != nil && *expectedNode != s.current {
-		return fmt.Errorf("%w: node %d moved to node %d in another tab", ErrConflict, *expectedNode, s.current)
+		return fmt.Errorf("%w: stale node_id %d: the current node is %d", ErrConflict, *expectedNode, s.current)
 	}
 	return nil
 }
