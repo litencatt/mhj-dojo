@@ -113,6 +113,30 @@ func TestRedFiveKept(t *testing.T) {
 	}
 }
 
+func TestWaitTiesAtShownPrecision(t *testing.T) {
+	a := cand{shanten: 1, ukeire: 20, wait: 4.04, hasWait: true}
+	b := cand{shanten: 1, ukeire: 20, wait: 4.01, hasWait: true}
+	if primary(a, b) != 0 || !strings.Contains(versus(a, b), "待ちは同じ") {
+		t.Fatalf("4.04 vs 4.01 should tie: %d %q", primary(a, b), versus(a, b))
+	}
+}
+
+func TestReviewRedFive(t *testing.T) {
+	// 4p0p waits on 3p-6p: the best discard is the plain 5p; discarding the red
+	// one gives up a dora for nothing, so it is not 最善.
+	a := Compute(input(yakushanten.NewAnalyzer(), "123m456s789s11z4p05p", "", 0, 18))
+	if a.Candidates[0].Tile != "5p" {
+		t.Fatalf("best %+v", a.Candidates[0])
+	}
+	if r := a.Review(tile.MustParseHand("5p")[0]); !r.IsBest || r.Text != "前巡の打 5p: 最善" {
+		t.Fatalf("plain 5p review %+v", r)
+	}
+	r := a.Review(tile.MustParseHand("0p")[0])
+	if r.IsBest || r.Rank != 1 || r.Text != "前巡の打 赤5p: 最善と同じ牌種だが赤ドラを失う（打 5p が最善）" {
+		t.Fatalf("red 5p review %+v", r)
+	}
+}
+
 func TestDoraDiscardedLast(t *testing.T) {
 	// 1z and 7z are equally useless floats; 7z is dora.
 	in := input(yakushanten.NewAnalyzer(), "123m456p789s23s1z7z9p", "", 0, 18)
@@ -132,6 +156,14 @@ func TestPhase(t *testing.T) {
 		if a.Phase != tc.want || a.Junme != tc.turn+1 || a.DrawsLeft != 18-tc.turn-1 {
 			t.Errorf("turn %d: phase %s junme %d draws %d, want %s", tc.turn, a.Phase, a.Junme, a.DrawsLeft, tc.want)
 		}
+	}
+	// A short game: the last 5 draws are late from the first junme.
+	if a := Compute(input(yakushanten.NewAnalyzer(), "123m456p789s23s11z9m", "", 0, 6)); a.Phase != "late" || a.DrawsLeft != 5 {
+		t.Errorf("short game: phase %s draws %d", a.Phase, a.DrawsLeft)
+	}
+	// The last discard: no draws follow.
+	if a := Compute(input(yakushanten.NewAnalyzer(), "123m456p789s23s11z9m", "", 17, 18)); a.Guideline != "最後の打牌。聴牌を保って流局を迎える。" {
+		t.Errorf("last discard guideline %q", a.Guideline)
 	}
 	// Late and far from tenpai: the guideline says so.
 	a := Compute(input(yakushanten.NewAnalyzer(), "159m159p159s1234z5z", "", 16, 18))

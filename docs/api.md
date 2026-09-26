@@ -187,7 +187,7 @@ position always gets the same advice. The text fields are Japanese.
       "yaku": ["断么九"] }         // near yaku of the 13 tiles left (see below)
   ],
   "junme": 4,                     // the discard being chosen: turn + 1
-  "phase": "early",               // early (junme 1–6) | middle (7–12) | late (13+)
+  "phase": "early",               // early (junme 1–6) | middle (7–12) | late (13+, or draws_left ≤ 5)
   "guideline": "序盤は受け入れの広さと好形を優先。…",
   "draws_left": 14,               // draws after this discard: max_turns − turn − 1
   "tenpai_chance": 0.62,          // after the best discard, 0..1 (0.001 steps)
@@ -205,7 +205,8 @@ position always gets the same advice. The text fields are Japanese.
    tenpai it is the wait itself (= `ukeire`). At 1-shanten: for each ukeire
    type with unseen copies, draw it (it becomes visible), try every discard,
    and take the most unseen waits of any tenpai reached; `wait` is the average
-   of those, weighted by the unseen copies of each ukeire type;
+   of those, weighted by the unseen copies of each ukeire type. Waits are
+   compared as shown, rounded to 0.1, so closer ones tie;
 4. near yaku of the 13 tiles left: rows other than `normal` and the yakuman
    whose shanten is ≤ max(1, the discard's normal shanten) — more rows first,
    then more total `han`;
@@ -223,7 +224,9 @@ only (no calls, riichi or other players).
 
 **Phase and notes.** `guideline` gives the phase's rule of thumb (序盤: wide
 acceptance and good shapes, isolated honors and terminals first; 中盤: speed
-to tenpai; 終盤: says so when `tenpai_chance` < 0.3). `notes[0]` explains the
+to tenpai; 終盤: says so when `tenpai_chance` < 0.3, and at the last discard,
+`draws_left` = 0, says no draw follows). The last 5 draws are 終盤 whatever
+the junme, so a short game (small `max_turns`) never shows 序盤 advice at its end. `notes[0]` explains the
 first two candidates by the first key that differs; a further note names the
 near yaku the best discard gives up. `near_yaku` lists up to 6 rows (the
 yakuman aside) whose best shanten over all discards is ≤ max(1, the best
@@ -240,7 +243,9 @@ that shanten.
 
 The discard that led to this node, ranked among the parent's discards by the
 first three keys above (ties share a rank; `is_best` = rank 1, which a
-different tile tied with the best also gets). It is computed once, when the
+different tile tied with the best also gets — except a red five discarded
+while a plain copy of it was held: that gives up a dora for nothing, so it
+keeps rank 1 but `is_best` is false and the text says 赤ドラを失う). It is computed once, when the
 node is created, and kept with the node, so it shows again after `goto`.
 
 ### Rows (fixed order)

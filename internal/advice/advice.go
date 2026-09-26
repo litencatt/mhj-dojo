@@ -93,10 +93,13 @@ type Review struct {
 	Text        string `json:"text"`
 }
 
-// Phase bounds: 序盤 up to junme 6, 中盤 up to 12, 終盤 after.
+// Phase bounds: 序盤 up to junme 6, 中盤 up to 12, 終盤 after (or with
+// lateDraws draws left).
 const (
 	earlyEnd  = 6
 	middleEnd = 12
+	// lateDraws: with this many draws left or fewer it is 終盤 anyway.
+	lateDraws = 5
 	// typicalWait stands in for the tenpai wait of a hand two or more steps
 	// away, whose waits are not known yet.
 	typicalWait = 6
@@ -222,6 +225,13 @@ func (a *Advice) Review(t tile.Tile) *Review {
 	}
 	head := "前巡の打 " + name(t) + ": "
 	switch {
+	case r.IsBest && t.Red && !c.t.Red && best.t.Kind == t.Kind:
+		// A plain copy was held: the red five gave up a dora for nothing.
+		r.IsBest = false
+		r.Text = head + "最善と同じ牌種だが赤ドラを失う（打 " + name(best.t) + " が最善）"
+	case r.IsBest && t.Red && !c.t.Red:
+		r.IsBest = false
+		r.Text = head + "最善（打 " + name(best.t) + "）と同等だが赤ドラを失う"
 	case r.IsBest && best.t.Kind == t.Kind:
 		r.Text = head + "最善"
 	case r.IsBest:
@@ -231,7 +241,7 @@ func (a *Advice) Review(t tile.Tile) *Review {
 	case c.ukeire < best.ukeire:
 		r.Text = fmt.Sprintf("%s最善（打 %s）より%sが%d枚少ない（%d枚と%d枚、%d位）", head, name(best.t), ukeTerm(c.shanten), best.ukeire-c.ukeire, c.ukeire, best.ukeire, rank)
 	default:
-		r.Text = fmt.Sprintf("%s最善（打 %s）より聴牌時の待ちが平均%.1f枚少ない（%d位）", head, name(best.t), best.wait-c.wait, rank)
+		r.Text = fmt.Sprintf("%s最善（打 %s）より聴牌時の待ちが平均%.1f枚少ない（%d位）", head, name(best.t), waitKey(best)-waitKey(c), rank)
 	}
 	return r
 }
@@ -256,11 +266,15 @@ func primary(a, b cand) int {
 	if d := cmp.Compare(b.ukeire, a.ukeire); d != 0 {
 		return d
 	}
-	if a.hasWait && b.hasWait && math.Abs(a.wait-b.wait) > 1e-9 {
-		return cmp.Compare(b.wait, a.wait)
+	if a.hasWait && b.hasWait {
+		return cmp.Compare(waitKey(b), waitKey(a))
 	}
 	return 0
 }
+
+// waitKey is the expected wait as shown (0.1 steps): closer waits tie, so
+// no text ever reports a difference of 0.0.
+func waitKey(c cand) float64 { return round(c.wait, 10) }
 
 // compare orders discards best first (see the package comment).
 func compare(a, b cand) int {
@@ -371,12 +385,18 @@ func chances(shanten, ukeire int, wait float64, unseen, draws int) (tenpai, win 
 	return tenpai, dist[steps]
 }
 
+// phase names the stage of the game: by junme, except that the last
+// lateDraws draws are 終盤 however short the game is.
 func phase(junme, shanten int, tenpai float64, draws int) (string, string) {
 	switch {
-	case junme <= earlyEnd:
-		return "early", "序盤は受け入れの広さと好形を優先。浮いた字牌・么九牌から切る。"
-	case junme <= middleEnd:
+	case draws > lateDraws && junme <= earlyEnd:
+		return "early", "序盤は受け入れの広さと好形を優先。浮いた字牌・端牌から切る。"
+	case draws > lateDraws && junme <= middleEnd:
 		return "middle", "中盤は聴牌までの速さを優先。"
+	case draws == 0 && shanten == 0:
+		return "late", "最後の打牌。聴牌を保って流局を迎える。"
+	case draws == 0:
+		return "late", "最後の打牌。この後のツモはない。"
 	case shanten == 0:
 		return "late", fmt.Sprintf("終盤。聴牌を保って残りツモ%d回で和了を待つ。", draws)
 	case tenpai < lowChance:
@@ -434,13 +454,15 @@ func versus(a, b cand) string {
 		}
 		return s
 	}
-	if a.hasWait && b.hasWait && math.Abs(a.wait-b.wait) > 1e-9 {
-		return fmt.Sprintf("%s%sは同じ%d枚だが、%s を切るほうが聴牌時の待ちが平均%.1f枚多い。", head, term, a.ukeire, A, a.wait-b.wait)
+	if a.hasWait && b.hasWait && waitKey(a) != waitKey(b) {
+		return fmt.Sprintf("%s%sは同じ%d枚だが、%s を切るほうが聴牌時の待ちが平均%.1f枚多い。", head, term, a.ukeire, A, waitKey(a)-waitKey(b))
 	}
 	same := head + term + "・待ちは同じ。"
 	switch {
-	case a.yakuN != b.yakuN || a.yakuHan != b.yakuHan:
+	case a.yakuN != b.yakuN:
 		return same + fmt.Sprintf("%s を切るほうが近い役が多い（%s）。", A, strings.Join(a.yaku, "・"))
+	case a.yakuHan != b.yakuHan:
+		return same + fmt.Sprintf("%s を切るほうが近い役の翻数が高い（%s）。", A, strings.Join(a.yaku, "・"))
 	case a.dora != b.dora:
 		return same + fmt.Sprintf("%s はドラなので %s から切る。", B, A)
 	default:
