@@ -25,7 +25,9 @@ export function App() {
       setPreviewTile(null);
       setHighlightTile(null);
     },
-    state ? () => api.getSession(state.session_id) : undefined,
+    // The static site runs the session in this tab alone: nothing else can
+    // move it on, so a 409 is never another tab's doing.
+    state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
     sessionMovedOn,
   );
 
@@ -84,7 +86,9 @@ export function App() {
           <header class="app-header">
             <h1>
               mhj2 <span class="app-subtitle">麻雀練習</span>
-              <a class="mode-link" href="?mode=game">CPU対戦へ</a>
+              {!api.WASM && (
+                <a class="mode-link" href="?mode=game">CPU対戦へ</a>
+              )}
             </h1>
             <form class="new-game-form" onSubmit={handleNewGame}>
               <label>
@@ -145,7 +149,11 @@ export function App() {
             </div>
           )}
 
-          {!state && !error && <p class="muted">対局を準備しています…</p>}
+          {!state && !error && (
+            <p class="muted">
+              {api.WASM ? '計算エンジンを読み込んでいます…' : '対局を準備しています…'}
+            </p>
+          )}
         </div>
         {state && (
           <>
