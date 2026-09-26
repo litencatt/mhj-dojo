@@ -1,7 +1,5 @@
 # mhj-dojo
 
-(formerly `mhj2`)
-
 A local web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
 
 [日本語版 README](README_jp.md)
