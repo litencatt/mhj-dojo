@@ -1,5 +1,6 @@
 import type { Tile as TileT } from '../api';
 import { Tile } from './Tile';
+import { tileName } from '../tiles';
 
 export interface DoraStatusProps {
   doraIndicators: TileT[];
@@ -21,7 +22,7 @@ export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }:
           <span class="dora-arrow" aria-hidden="true">→</span>
           <span class="dora-label">ドラ</span>
           {dora.map((t, i) => (
-            <Tile key={`d-${t}-${i}`} tile={t} size="sm" label={`ドラ ${t}`} />
+            <Tile key={`d-${t}-${i}`} tile={t} size="sm" label={`ドラ ${tileName(t)}`} />
           ))}
         </dd>
       </div>
@@ -36,7 +37,7 @@ export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }:
               <span class="dora-arrow" aria-hidden="true">→</span>
               <span class="dora-label">裏ドラ</span>
               {uraDora.map((t, i) => (
-                <Tile key={`ud-${t}-${i}`} tile={t} size="sm" label={`裏ドラ ${t}`} />
+                <Tile key={`ud-${t}-${i}`} tile={t} size="sm" label={`裏ドラ ${tileName(t)}`} />
               ))}
             </>
           ) : (

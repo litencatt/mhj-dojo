@@ -1,4 +1,5 @@
 import { TileFace } from './TileFace';
+import { tileName } from '../tiles';
 
 export interface TileProps {
   tile: string;
@@ -41,7 +42,7 @@ export function Tile(props: TileProps) {
     onPointerLeave: onHoverEnd && mouseOnly(onHoverEnd),
     onFocus: onHoverStart,
     onBlur: onHoverEnd,
-    'aria-label': label ?? (faceDown ? '伏せ牌' : tile),
+    'aria-label': label ?? (faceDown ? '伏せ牌' : tileName(tile)),
   };
 
   const content = faceDown ? null : <TileFace tile={tile} />;

@@ -15,6 +15,7 @@ import { Help } from './components/Help';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { tileName } from './tiles';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
 // not reset on every render.
@@ -377,7 +378,7 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
             key={pair.join()}
             type="button"
             class="action-call"
-            aria-label={`チー ${pair.join(' ')} + ${state.last_discard ?? ''}`}
+            aria-label={`チー ${pair.map(tileName).join(' ')} + ${state.last_discard ? tileName(state.last_discard) : ''}`}
             disabled={busy}
             onClick={() => onAction('chii', undefined, pair)}
           >
@@ -413,7 +414,7 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
           key={t}
           type="button"
           class="action-call"
-          aria-label={`カン ${t}`}
+          aria-label={`カン ${tileName(t)}`}
           disabled={busy}
           onClick={() => onAction('kan', t)}
         >

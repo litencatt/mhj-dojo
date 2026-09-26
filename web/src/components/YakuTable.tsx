@@ -3,6 +3,7 @@ import type { ComboRow, UkeireEntry, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
 import { useMediaQuery } from '../hooks';
+import { tileName } from '../tiles';
 import { YAKU_CONDITIONS } from './yakuInfo';
 import {
   CATEGORIES,
@@ -201,7 +202,7 @@ export function YakuTable(props: YakuTableProps) {
   return (
     <section class="yaku-table-panel" aria-label="役別向聴テーブル">
       <PanelHeading title="役別向聴" onMinimize={onMinimize}>
-        {previewTile && <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>}
+        {previewTile && <span class="preview-note"> — {tileName(previewTile)} を打牌した場合のプレビュー</span>}
       </PanelHeading>
       {!phone && <ComboTable combos={combos} base={baseCombos} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">

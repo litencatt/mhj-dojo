@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { HandGroup, HandGroupType } from '../api';
 import { useHandGroupsToggle } from '../hooks';
 import { Tile } from './Tile';
+import { tileName } from '../tiles';
 
 export interface HandProps {
   hand: string[];
@@ -262,7 +263,7 @@ export function Hand(props: HandProps) {
       </div>
       {/* Always mounted, so a screen reader announces the selection. */}
       <p class="visually-hidden" role="status" aria-live="polite">
-        {picked ? `選択中：${picked.tile}（もう一度タップで打牌）` : ''}
+        {picked ? `選択中：${tileName(picked.tile)}（もう一度タップで打牌）` : ''}
       </p>
       {discards.length > 0 && (
         <div class="discard-river" aria-label="捨て牌">

@@ -1,6 +1,7 @@
 import type { GameResult, GameState, Limit, Points } from '../api';
 import { ABORT_NAMES, seatLabel, WIND_NAMES } from './GameTable';
 import { Tile } from './Tile';
+import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { yakuHanText, yakumanName } from '../yakumanLabel';
 
@@ -81,7 +82,7 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
               <Tile key={`${t}-${i}`} tile={t} />
             ))}
             <span class="result-win-tile">
-              <Tile tile={result.win_tile} label={`和了牌 ${result.win_tile}`} />
+              <Tile tile={result.win_tile} label={`和了牌 ${tileName(result.win_tile)}`} />
             </span>
             <Melds melds={winner.melds} owner={winner.seat} size="sm" />
           </div>

@@ -42,7 +42,7 @@ func TestAdviceAndReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := good.DiscardReview; r == nil || !r.IsBest || r.Text != "前巡の打 9m: 最善" {
+	if r := good.DiscardReview; r == nil || !r.IsBest || r.Text != "前巡の打 9萬: 最善" {
 		t.Fatalf("review after 9m: %+v", r)
 	}
 
