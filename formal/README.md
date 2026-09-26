@@ -25,6 +25,11 @@ formal/run.sh vectors   # also regenerate the Go golden vectors
 formal/run.sh shell     # a shell in the container
 ```
 
+The container runs as root, which owns the volumes. It writes into the
+repository only the vector files, which `run.sh vectors` hands back to your
+user (on Linux, a bind mount keeps the container's owner; Docker Desktop on
+macOS maps it to you anyway). The build output stays on the volumes.
+
 `run.sh` fetches from mathlib's cache only the modules the model imports (and
 their imports), not all of mathlib. The first `build` downloads the Lean
 toolchain (about 3 GB unpacked) and about 1000 mathlib files, and compiles

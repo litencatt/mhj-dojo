@@ -10,9 +10,17 @@ IMAGE=mhj2-lean
 VOLUMES="mhj2-lean-elan mhj2-lean-lake mhj2-lean-cache"
 repo=$(cd "$(dirname "$0")/.." && pwd)
 
+# run [-it] CMD runs CMD in the container. It runs as root, which owns the
+# volumes; files it writes into the repository (the vectors) are handed back
+# to the calling user, which matters on Linux.
 run() {
+	interactive=
+	if [ "$1" = -it ]; then
+		interactive=-it
+		shift
+	fi
 	# shellcheck disable=SC2086
-	docker run --rm ${TTY:-} \
+	docker run --rm $interactive \
 		-v "$repo":/work \
 		-v mhj2-lean-elan:/root/.elan \
 		-v mhj2-lean-lake:/work/formal/.lake \
@@ -34,11 +42,12 @@ build)
 	;;
 vectors)
 	image
-	run "$CACHE && lake build && lake exe gen-vectors /work"
+	run "$CACHE && lake build && lake exe gen-vectors /work &&
+		chown $(id -u):$(id -g) /work/internal/score/testdata/lean_*.json /work/internal/game/testdata/lean_*.json"
 	;;
 shell)
 	image
-	TTY=-it run bash
+	run -it bash
 	;;
 clean)
 	docker image rm -f "$IMAGE" || true

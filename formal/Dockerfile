@@ -9,7 +9,7 @@ RUN apt-get update \
 
 ENV ELAN_HOME=/root/.elan
 ENV PATH=/root/.elan/bin:$PATH
-RUN curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+RUN curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.2.4/elan-init.sh \
     | sh -s -- --default-toolchain none -y
 
 WORKDIR /work/formal
