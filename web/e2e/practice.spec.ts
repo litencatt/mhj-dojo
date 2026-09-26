@@ -89,3 +89,50 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(pageB.locator('.error-banner')).toBeHidden();
   await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
 });
+
+// The 面子表示 toggle regroups the hand under labelled brackets without a
+// request, keeps every tile, restores the plain order when turned off, and
+// is remembered across a reload.
+test('hand groups toggle: brackets, the same tiles, restore and reload', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  const handPanel = page.getByRole('region', { name: '手牌' });
+  const tiles = handPanel.locator('.hand-tiles .tile');
+  await expect(tiles).toHaveCount(13);
+  const toggle = handPanel.getByLabel('面子表示');
+  await expect(toggle).not.toBeChecked(); // off by default
+  const labels = () => tiles.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''));
+  const plain = await labels();
+
+  let requests = 0;
+  page.on('request', (req) => {
+    if (req.url().includes('/api/')) requests++;
+  });
+  await toggle.check();
+  const groups = handPanel.locator('.hand-group');
+  await expect(groups.first()).toBeVisible();
+  await expect(tiles).toHaveCount(13);
+  expect([...(await labels())].sort()).toEqual([...plain].sort());
+  const names = await handPanel.locator('.hand-group-label').allInnerTexts();
+  expect(names.length).toBe(await groups.count());
+  for (const n of names) expect(['順子', '刻子', '雀頭', '両面', '嵌張', '辺張', '対子', '浮き']).toContain(n);
+  expect(requests, 'the toggle sends no request').toBe(0);
+
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await expect(groups.first()).toBeVisible();
+
+  await toggle.uncheck();
+  await expect(groups).toHaveCount(0);
+  expect(await labels()).toEqual(plain);
+});
+
+test('hand groups fit a 390px-wide viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?seed=1&turns=18');
+  const handPanel = page.getByRole('region', { name: '手牌' });
+  await handPanel.getByLabel('面子表示').check();
+  await expect(handPanel.locator('.hand-group').first()).toBeVisible();
+  await expect(handPanel.locator('.hand-tiles .tile')).toHaveCount(13);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});

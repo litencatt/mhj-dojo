@@ -55,6 +55,14 @@ export interface Win {
   han_total: number;
 }
 
+// A block of the hand's split (docs/api.md "HandGroup"): its type and the
+// indexes of its tiles in `hand`.
+export type HandGroupType = 'seq' | 'trip' | 'pair' | 'ryanmen' | 'kanchan' | 'penchan' | 'toitsu' | 'float';
+export interface HandGroup {
+  type: HandGroupType;
+  tiles: number[];
+}
+
 export interface SessionState {
   session_id: string;
   seed: number;
@@ -65,6 +73,7 @@ export interface SessionState {
   turn: number;
   status: NodeStatus;
   hand: Tile[];
+  hand_groups: HandGroup[]; // blocks of hand, drawn tile excluded
   drawn: Tile | null;
   discards: Tile[];
   dora_indicators: Tile[];
@@ -180,6 +189,7 @@ export interface Seat {
   melds: Meld[];
   hand_count: number;
   hand?: Tile[]; // yours, or everyone's once the round has ended
+  hand_groups?: HandGroup[]; // yours only: blocks of hand
   drawn?: Tile;
 }
 
