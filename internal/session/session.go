@@ -177,9 +177,15 @@ func (s *Session) State() State {
 }
 
 // Discard discards an exact tile (red distinguished) from hand+drawn.
-func (s *Session) Discard(t string) (State, error) {
+// expectedNode, when non-nil, must match the current node: it lets a client
+// detect that another tab moved the session on first (ErrConflict) instead
+// of silently acting on whatever node happens to be current.
+func (s *Session) Discard(t string, expectedNode *int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.checkExpectedNode(expectedNode); err != nil {
+		return State{}, err
+	}
 	cur := s.nodes[s.current]
 	d, ok := s.drawn(cur)
 	if !ok {
@@ -211,10 +217,13 @@ func (s *Session) Discard(t string) (State, error) {
 	return s.state(), nil
 }
 
-// Tsumo declares a win with the pending draw.
-func (s *Session) Tsumo() (State, error) {
+// Tsumo declares a win with the pending draw. expectedNode is as in Discard.
+func (s *Session) Tsumo(expectedNode *int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.checkExpectedNode(expectedNode); err != nil {
+		return State{}, err
+	}
 	cur := s.nodes[s.current]
 	if id, ok := cur.children[StatusTsumo]; ok {
 		s.current = id
@@ -244,7 +253,22 @@ func (s *Session) Tsumo() (State, error) {
 	return s.state(), nil
 }
 
-// Goto moves the current node.
+// checkExpectedNode returns ErrConflict if expectedNode is non-nil and does
+// not match the current node (another tab moved it on first). Callers hold
+// s.mu already; a nil expectedNode always passes (older or same-tab clients
+// that don't send one keep today's behaviour).
+func (s *Session) checkExpectedNode(expectedNode *int) error {
+	if expectedNode != nil && *expectedNode != s.current {
+		return fmt.Errorf("%w: node %d moved to node %d in another tab", ErrConflict, *expectedNode, s.current)
+	}
+	return nil
+}
+
+// Goto moves the current node. Unlike Discard/Tsumo it names its target node
+// explicitly rather than acting on "whatever is current", so another tab
+// moving the session on first doesn't make it ambiguous: it either still
+// exists (it does; the tree only grows) or doesn't (ErrNotFound already).
+// It has no expectedNode guard.
 func (s *Session) Goto(id int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -42,7 +42,7 @@ func fillTree(tb testing.TB, s *Session, target int) {
 				continue
 			}
 			s.current = id
-			if _, err := s.Discard(t); err != nil {
+			if _, err := s.Discard(t, nil); err != nil {
 				tb.Fatal(err)
 			}
 			queue = append(queue, s.current)

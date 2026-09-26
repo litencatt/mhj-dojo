@@ -43,7 +43,8 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 	}))
 	mux.HandleFunc("POST /api/sessions/{id}/discard", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
 		var body struct {
-			Tile *string `json:"tile"`
+			Tile   *string `json:"tile"`
+			NodeID *int    `json:"node_id"`
 		}
 		if err := decode(r, &body, true); err != nil {
 			return session.State{}, err
@@ -51,10 +52,16 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 		if body.Tile == nil {
 			return session.State{}, errInvalid("tile is required")
 		}
-		return s.Discard(*body.Tile)
+		return s.Discard(*body.Tile, body.NodeID)
 	}))
-	mux.HandleFunc("POST /api/sessions/{id}/tsumo", a.withSession(func(s *session.Session, _ *http.Request) (session.State, error) {
-		return s.Tsumo()
+	mux.HandleFunc("POST /api/sessions/{id}/tsumo", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
+		var body struct {
+			NodeID *int `json:"node_id"`
+		}
+		if err := decode(r, &body, false); err != nil {
+			return session.State{}, err
+		}
+		return s.Tsumo(body.NodeID)
 	}))
 	mux.HandleFunc("POST /api/sessions/{id}/goto", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
 		var body struct {

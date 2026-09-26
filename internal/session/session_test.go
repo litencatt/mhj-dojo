@@ -105,7 +105,7 @@ func TestDiscardGotoBranch(t *testing.T) {
 	root := s.State()
 	drawn := *root.Drawn
 
-	v, err := s.Discard(drawn)
+	v, err := s.Discard(drawn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestDiscardGotoBranch(t *testing.T) {
 	if other == drawn {
 		other = root.Hand[12]
 	}
-	b, err := s.Discard(other)
+	b, err := s.Discard(other, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestDiscardGotoBranch(t *testing.T) {
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := s.Discard(drawn)
+	again, _ := s.Discard(drawn, nil)
 	if again.NodeID != 1 || len(again.Tree) != 3 {
 		t.Fatalf("expected to revisit node 1, got %d (tree %d)", again.NodeID, len(again.Tree))
 	}
@@ -151,12 +151,84 @@ func TestDiscardGotoBranch(t *testing.T) {
 	}
 }
 
+// TestExpectedNodeGuard covers Discard/Tsumo's expectedNode parameter: it
+// lets a client detect that another tab moved the session on first (issue
+// #53), the way a stale game action already does.
+func TestExpectedNodeGuard(t *testing.T) {
+	st := NewStore()
+	s := mustCreate(t, st, 1, 0)
+	root := s.State()
+	drawn := *root.Drawn
+
+	// match: expectedNode equals the current node, so the discard applies.
+	v, err := s.Discard(drawn, intPtr(root.NodeID))
+	if err != nil {
+		t.Fatalf("match: %v", err)
+	}
+	if v.NodeID != 1 {
+		t.Fatalf("match: node %d, want 1", v.NodeID)
+	}
+
+	// mismatch: expectedNode still names the now-stale root node, as if
+	// another tab had already moved the session on to node 1. The request
+	// is rejected and makes no change.
+	before := s.State()
+	if _, err := s.Discard(*v.Drawn, intPtr(root.NodeID)); !errors.Is(err, ErrConflict) {
+		t.Fatalf("mismatch discard: %v", err)
+	}
+	after := s.State()
+	if after.NodeID != before.NodeID || len(after.Tree) != len(before.Tree) {
+		t.Fatalf("mismatch discard changed state: before %+v after %+v", before, after)
+	}
+
+	// absent: no expectedNode keeps today's behaviour (applies regardless).
+	again, err := s.Discard(*v.Drawn, nil)
+	if err != nil {
+		t.Fatalf("absent: %v", err)
+	}
+	if again.NodeID != 2 {
+		t.Fatalf("absent: node %d, want 2", again.NodeID)
+	}
+}
+
+// TestExpectedNodeGuardTsumo is TestExpectedNodeGuard for Tsumo, which needs
+// a hand that can actually win.
+func TestExpectedNodeGuardTsumo(t *testing.T) {
+	st := NewStore()
+	s, err := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := s.State()
+	if !root.CanTsumo {
+		t.Fatalf("expected can_tsumo: %+v", root)
+	}
+
+	// mismatch: expectedNode names a node other than the current one.
+	if _, err := s.Tsumo(intPtr(root.NodeID + 1)); !errors.Is(err, ErrConflict) {
+		t.Fatalf("mismatch tsumo: %v", err)
+	}
+	after := s.State()
+	if after.NodeID != root.NodeID || len(after.Tree) != len(root.Tree) || !after.CanTsumo {
+		t.Fatalf("mismatch tsumo changed state: before %+v after %+v", root, after)
+	}
+
+	// match: expectedNode equals the current node, so the tsumo applies.
+	w, err := s.Tsumo(intPtr(root.NodeID))
+	if err != nil {
+		t.Fatalf("match: %v", err)
+	}
+	if w.Status != StatusTsumo || w.Win == nil {
+		t.Fatalf("match tsumo: %+v", w)
+	}
+}
+
 func TestExhausted(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 3, 2)
 	for i := 0; i < 2; i++ {
 		v := s.State()
-		if _, err := s.Discard(*v.Drawn); err != nil {
+		if _, err := s.Discard(*v.Drawn, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -167,10 +239,10 @@ func TestExhausted(t *testing.T) {
 	if v.WallRemaining != wall.LiveDraws-2 {
 		t.Fatalf("wall_remaining %d", v.WallRemaining)
 	}
-	if _, err := s.Discard(v.Hand[0]); !errors.Is(err, ErrConflict) {
+	if _, err := s.Discard(v.Hand[0], nil); !errors.Is(err, ErrConflict) {
 		t.Fatalf("discard at exhausted node: %v", err)
 	}
-	if _, err := s.Tsumo(); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(nil); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tsumo at exhausted node: %v", err)
 	}
 }
@@ -185,7 +257,7 @@ func TestTsumo(t *testing.T) {
 	if !v.CanTsumo || *v.Drawn != "5s" {
 		t.Fatalf("can_tsumo=%v drawn=%v", v.CanTsumo, *v.Drawn)
 	}
-	w, err := s.Tsumo()
+	w, err := s.Tsumo(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,14 +278,14 @@ func TestTsumo(t *testing.T) {
 	if *w.Tree[1].NormalShanten != -1 || w.Tree[1].Discard != nil || *w.Tree[1].Draw != "5s" {
 		t.Fatalf("tree tsumo node: %+v", w.Tree[1])
 	}
-	if _, err := s.Discard("5s"); !errors.Is(err, ErrConflict) {
+	if _, err := s.Discard("5s", nil); !errors.Is(err, ErrConflict) {
 		t.Fatalf("discard after tsumo: %v", err)
 	}
 	// Declaring again from the parent revisits the same node.
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := s.Tsumo()
+	again, _ := s.Tsumo(nil)
 	if again.NodeID != w.NodeID || len(again.Tree) != 2 {
 		t.Fatal("tsumo should reuse the existing node")
 	}
@@ -221,10 +293,10 @@ func TestTsumo(t *testing.T) {
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard("5s"); err != nil {
+	if _, err := s.Discard("5s", nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Tsumo(); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(nil); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tsumo with incomplete hand: %v", err)
 	}
 }
@@ -238,7 +310,7 @@ func TestErrors(t *testing.T) {
 		t.Fatal("max_turns out of range should fail")
 	}
 	s := mustCreate(t, st, 5, 0)
-	if _, err := s.Discard("8z"); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Discard("8z", nil); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("invalid tile: %v", err)
 	}
 	if _, err := s.Goto(99); !errors.Is(err, ErrNotFound) {
@@ -256,7 +328,7 @@ func TestRedFiveDiscardIsExact(t *testing.T) {
 	if _, ok := v.ByDiscard["5m"]; !ok {
 		t.Fatal("plain 5m candidate missing")
 	}
-	a, err := s.Discard("0m")
+	a, err := s.Discard("0m", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +338,7 @@ func TestRedFiveDiscardIsExact(t *testing.T) {
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := s.Discard("5m")
+	b, _ := s.Discard("5m", nil)
 	if b.NodeID == a.NodeID || !slices.Contains(b.Hand, "0m") {
 		t.Fatal("0m and 5m discards must be distinct children")
 	}
@@ -294,7 +366,7 @@ func TestConcurrentUse(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				v := s.State()
 				if v.Drawn != nil {
-					_, _ = s.Discard(*v.Drawn) // conflicts between goroutines are expected
+					_, _ = s.Discard(*v.Drawn, nil) // conflicts between goroutines are expected
 				}
 				_, _ = s.Goto(g % 2)
 			}
@@ -313,7 +385,7 @@ func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := s.Tsumo()
+	w, err := s.Tsumo(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,13 +402,13 @@ func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
 func TestDiscardCannotReachTsumoChild(t *testing.T) {
 	st := NewStore()
 	s, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s"), 0)
-	if _, err := s.Tsumo(); err != nil {
+	if _, err := s.Tsumo(nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard("tsumo"); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Discard("tsumo", nil); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("discard \"tsumo\": %v", err)
 	}
 	if v := s.State(); v.NodeID != 0 {
@@ -358,7 +430,7 @@ func TestDoraAndUraDora(t *testing.T) {
 	if len(v.UraDoraIndicators) != 0 || len(v.UraDora) != 0 {
 		t.Fatalf("ura dora revealed while playing: %v %v", v.UraDoraIndicators, v.UraDora)
 	}
-	if _, err := s.Discard(*v.Drawn); err != nil {
+	if _, err := s.Discard(*v.Drawn, nil); err != nil {
 		t.Fatal(err)
 	}
 	v = s.State()
@@ -387,11 +459,11 @@ func TestTreeIsBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	for len(s.nodes) < maxNodes {
-		if _, err := s.Discard(*s.State().Drawn); err != nil {
+		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.Discard(*s.State().Drawn); !errors.Is(err, ErrTreeFull) {
+	if _, err := s.Discard(*s.State().Drawn, nil); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("discard past the node limit: %v", err)
 	}
 	// Tsumo creates a node too, so it is capped as well.
@@ -400,7 +472,7 @@ func TestTreeIsBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	maxNodes = 1
-	if _, err := full.Tsumo(); !errors.Is(err, ErrTreeFull) {
+	if _, err := full.Tsumo(nil); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("tsumo past the node limit: %v", err)
 	}
 	maxNodes = 10
@@ -408,7 +480,7 @@ func TestTreeIsBounded(t *testing.T) {
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard(*s.State().Drawn); err != nil {
+	if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
 		t.Fatalf("moving to an existing child: %v", err)
 	}
 }
@@ -431,13 +503,13 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 
 	// Branch A: discard a, then a few more turns, remembering the node
 	// right after the first discard as "mid".
-	va, err := s.Discard(a)
+	va, err := s.Discard(a, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	midID := va.NodeID
 	for i := 0; i < 3; i++ {
-		if _, err := s.Discard(*s.State().Drawn); err != nil {
+		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -449,11 +521,11 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 	if _, err := s.Goto(0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard(b); err != nil {
+	if _, err := s.Discard(b, nil); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
-		if _, err := s.Discard(*s.State().Drawn); err != nil {
+		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
