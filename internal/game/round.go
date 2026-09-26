@@ -88,9 +88,10 @@ type Action struct {
 	Tiles []string   `json:"tiles,omitempty"`
 }
 
-// RiverTile is a discarded tile. Riichi marks the declaration tile, Called
-// a tile another seat claimed into a meld (it stays in the river for
-// furiten, but counts once, in the meld).
+// RiverTile is a discarded tile. Riichi marks the declaration tile (not one
+// that was ronned: that riichi never stood), Called a tile another seat
+// claimed into a meld (it stays in the river for furiten, but counts once,
+// in the meld).
 type RiverTile struct {
 	Tile   tile.Tile
 	Riichi bool
@@ -656,9 +657,12 @@ func (r *Round) ron(seat int) error {
 	if !ok {
 		return fmt.Errorf("%w: seat %d cannot ron", ErrConflict, seat)
 	}
-	// A riichi declared on the winning discard is not accepted: no stick.
+	// A riichi declared on the winning discard is not accepted: no stick,
+	// and the tile is not laid sideways.
 	if r.pendingRiichi {
-		r.players[r.turn].doubleRiichi = false
+		p := &r.players[r.turn]
+		p.doubleRiichi = false
+		p.river[len(p.river)-1].Riichi = false
 		r.pendingRiichi = false
 	}
 	r.events = append(r.events, Action{Seat: seat, Type: Ron})

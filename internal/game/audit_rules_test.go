@@ -113,8 +113,8 @@ func TestAuditCalledRiichiDiscardStands(t *testing.T) {
 	checkInvariants(t, r)
 }
 
-// A ron on the riichi discard: the riichi is not established and no stick
-// is paid.
+// A ron on the riichi discard: the riichi is not established, no stick is
+// paid and the tile is not marked as the declaration.
 func TestAuditRonOnRiichiDiscardTakesNoStick(t *testing.T) {
 	r := tenpai0(t)
 	setHand(r, 1, "123m456p789s78s33z", "") // 9s: pinfu + iipeikou
@@ -126,6 +126,9 @@ func TestAuditRonOnRiichiDiscardTakesNoStick(t *testing.T) {
 	res := r.Result()
 	if r.players[0].riichi || r.deposit != 0 || res.StickDeltas != [4]int{} || res.Deltas[0] != -res.Points.Ron {
 		t.Fatalf("riichi %v deposit %d sticks %v deltas %v", r.players[0].riichi, r.deposit, res.StickDeltas, res.Deltas)
+	}
+	if rt := r.players[0].river; len(rt) != 1 || rt[0].Riichi {
+		t.Fatalf("river %+v", rt)
 	}
 	checkDeltas(t, r, res)
 }

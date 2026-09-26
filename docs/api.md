@@ -539,7 +539,7 @@ unknown game, `409` a move that is not legal now.
   "ura_dora_indicators": [], "ura_dora": [],   // revealed when the round ends
   "seats": [                    // index = seat
     { "seat": 0, "wind": "3z", "points": 25000, "riichi": false,
-      "river": [{"tile": "9s", "riichi": false, "called": false}],  // called: taken into another seat's meld
+      "river": [{"tile": "9s", "riichi": false, "called": false}],  // riichi: the declaration tile (not when it was ronned); called: taken into another seat's meld
       "melds": [{"type": "pon", "tiles": ["7z", "7z", "7z"], "from": 3, "added": false}],  // "chii" | "pon" | "kan" | "ankan"; the called tile last; from -1 for an ankan
                                 // added: a kan made by adding a tile to a pon (kakan); the added tile comes just before the called tile
       "hand_count": 14,             // concealed tiles, drawn tile included
