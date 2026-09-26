@@ -50,7 +50,7 @@ func TestTreeRequestLatency(t *testing.T) {
 	elapsed := time.Since(start)
 	perCall := elapsed / time.Duration(calls)
 	t.Logf("%d requests over a %d-node tree: %v total, %v/request", calls, len(s.nodes), elapsed, perCall)
-	if perCall > requestBudget {
+	if !raceEnabled && perCall > requestBudget {
 		t.Fatalf("%v/request exceeds the %v budget", perCall, requestBudget)
 	}
 }

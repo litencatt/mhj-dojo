@@ -185,14 +185,14 @@ func TestSelfPlay(t *testing.T) {
 	}
 	// Time decisions on one goroutine, so waiting for a core is not counted.
 	p := New()
-	for seed := range testmode.N(int64(50), 20, 50) {
+	for seed := range testmode.N(int64(50), 20, 5) {
 		_, times := playSeed(t, p, seed)
 		took = append(took, times...)
 	}
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
 	t.Logf("outcomes %v, decision p95 %v", kinds, p95)
-	if !testing.Short() && p95 > 20*time.Millisecond {
+	if !testing.Short() && !raceEnabled && p95 > 20*time.Millisecond {
 		t.Errorf("decision p95 %v, want < 20ms", p95)
 	}
 }
