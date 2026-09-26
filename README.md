@@ -4,6 +4,8 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI a
 
 [日本語版 README](README_jp.md)
 
+Static site (practice mode only, CPU games not yet): https://mhj-dojo.lolipop-now.app/
+
 ## Practice mode
 
 - **Solo practice** — draw and discard on a seeded wall (the same seed always gives the same starting hand and draws). A game ends on tsumo or after 18 turns by default.
@@ -104,6 +106,12 @@ Differences from the local version:
 - Practice mode only; the CPU game (**CPU対戦へ**, `?mode=game`) is not available yet.
 - Each tab runs its own sessions, so there is no "another tab moved on" handling.
 - Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL.
+
+It's published at https://mhj-dojo.lolipop-now.app/ (practice mode only; CPU games not yet) on Lolipop Deploy Now.
+
+#### Deploying
+
+Run `npx lolipop login` once (opens a browser to authorize the CLI), then `DEPLOY_PROJECT=<id> make deploy` (or `export DEPLOY_PROJECT=<id>` first) to build and publish the site; the project id isn't committed and isn't the same for everyone's own Lolipop account, so find it with `npx lolipop project list` (`make deploy` fails fast with a reminder if `DEPLOY_PROJECT` is unset). The Lolipop project was created once with `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."`; `make deploy` only pushes new builds to it. `make deploy` copies `web/dist-site/` to a fresh temporary directory outside this repo before deploying, because `web/dist-site/` and `mhj-dojo.wasm` are gitignored and the `lolipop` CLI skips gitignored files when its `--dir` is inside a git repository. Deploy Now serves `index.html` with `max-age=86400`, so a deploy can take up to a day to reach a returning visitor's cached page; `index.html` loads the engine (worker, `wasm_exec.js`, `mhj-dojo.wasm`) with a `?v=<hash>` of those files (see `web/src/wasm.ts`), so a returning visitor's stale `index.html` never mixes an old page with a new engine or vice versa.
 
 ### Layout
 
