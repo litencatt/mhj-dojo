@@ -605,11 +605,25 @@ section {
 .tile-interactive {
   cursor: pointer;
 }
-.tile-interactive:hover,
 .tile-interactive:focus-visible {
   transform: translateY(-4px);
   border-color: var(--accent);
   outline: none;
+}
+/* Only a real pointer hovers: on touch the raise would stick to the last tapped tile. */
+@media (hover: hover) {
+  .tile-interactive:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    outline: none;
+  }
+}
+/* A tile a tap selected (touch: the second tap discards it). */
+.tile.tile-picked {
+  transform: translateY(-6px);
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ---- Hand ---- */
@@ -1573,5 +1587,413 @@ section {
       "left right"
       "center center"
       "bottom bottom";
+  }
+}
+
+/* ---- Phones (up to 760px wide) ----
+   The one-column layout (above) tightened for a phone: the hand's 14 tiles on
+   one row, the dock as a tab bar along the bottom (clear of the page and of
+   the home indicator), the yaku tables as two-line rows instead of a sideways
+   scroll, and controls big enough to tap. Tablets and desktops are unchanged. */
+.dock-tab-icon,
+.dock-tab-short,
+.hint-touch {
+  display: none;
+}
+/* A touch screen taps a tile twice to discard it (components/Hand.tsx). */
+@media (hover: none) and (pointer: coarse) {
+  .hint-mouse { display: none; }
+  .hint-touch { display: inline; }
+}
+
+@media (width <= 760px) {
+  .app {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    row-gap: 10px;
+  }
+  section {
+    padding: 10px;
+  }
+
+  /* Header: the title with the version and help on its right, then the form
+     on a row of its own with the button at the end. 16px inputs keep iOS
+     from zooming in on focus. */
+  .app-header {
+    gap: 6px 10px;
+    padding: 8px;
+  }
+  .app-header h1 {
+    font-size: 1.1rem;
+  }
+  .mode-link {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 4px 0;
+  }
+  .header-meta {
+    margin-left: auto;
+  }
+  .help-button {
+    width: 34px;
+    height: 34px;
+  }
+  .new-game-form {
+    flex-basis: 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
+  .new-game-form input,
+  .new-game-form select {
+    font-size: 16px;
+    padding: 5px 6px;
+  }
+  .new-game-form input {
+    width: 5.5em;
+  }
+  .new-game-form input.input-narrow {
+    width: 3em;
+  }
+  .new-game-form button {
+    min-height: 40px;
+    margin-left: auto;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+  .header-status {
+    gap: 8px 12px;
+  }
+  .game-status {
+    gap: 4px 14px;
+  }
+  .dora-box {
+    padding: 4px 10px;
+    gap: 4px 14px;
+  }
+
+  /* Hand: 14 tiles on one row. The tile width is what is left of the panel
+     after the fixed gaps (12 of 2px, the drawn tile's 6px gap, 5px padding
+     and 2px divider, rounded up; more for the 面子表示 brackets' gaps), so
+     at 360px a tile is about 20px wide. A tile's tap area reaches into the
+     gaps and above and below it. */
+  .hand-panel {
+    --hand-fixed: 40px;
+  }
+  .hand-panel:has(.hand-tiles-grouped) {
+    --hand-fixed: 54px;
+  }
+  .hand-panel .tile-md {
+    width: clamp(18px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
+    padding: 1.5px;
+    border-radius: 4px;
+  }
+  .hand-row {
+    gap: 6px;
+  }
+  .hand-tiles {
+    gap: 2px;
+  }
+  .hand-tiles-grouped {
+    gap: 4px;
+  }
+  .hand-group-tiles {
+    gap: 2px;
+  }
+  .hand-group-label {
+    font-size: 0.6rem;
+  }
+  .hand-drawn {
+    padding-left: 5px;
+  }
+  .hand-panel button.tile::after {
+    content: "";
+    position: absolute;
+    inset: -8px -1px;
+  }
+  /* Called melds (CPU game) get a row of their own under the hand. */
+  .hand-row > .melds {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .discard-river {
+    gap: 2px;
+  }
+  .tsumo-button,
+  .next-round-button {
+    min-height: 44px;
+    padding: 8px 20px;
+    font-size: 1rem;
+  }
+  .tsumo-button {
+    width: 100%;
+  }
+  /* A win's 14 tiles on one row too. */
+  .win-panel,
+  .result-panel {
+    container-type: inline-size;
+  }
+  .win-tiles {
+    gap: 2px;
+  }
+  .win-tiles .tile-md {
+    width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1.5px;
+  }
+  .result-win-tile {
+    margin-left: 4px;
+    padding-left: 4px;
+  }
+
+  /* Panels: bigger minimize buttons, filter chips and legend items. */
+  .panel-minimize {
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  .filter-chip,
+  .legend-item {
+    min-height: 32px;
+  }
+  .filter-chip {
+    padding: 4px 12px;
+  }
+  .yaku-filter-search,
+  .yaku-filter select,
+  .glossary-search {
+    font-size: 16px;
+  }
+  .tree-flat {
+    max-height: 50vh;
+  }
+  .tree-node-btn {
+    min-height: 36px;
+  }
+  .yaku-tip {
+    width: min(280px, calc(100vw - 16px));
+  }
+
+  /* The yaku and combo tables: each row on two lines, name / 翻 / 向聴 / 合計
+     above and the effective tiles across the whole width below, so nothing
+     is cut off or needs a sideways scroll. The header row sticks to the top
+     of the screen while the long yaku table scrolls by. */
+  .yaku-table-scroll,
+  .combo-section {
+    overflow: visible;
+  }
+  .yaku-table,
+  .combo-table,
+  .yaku-table thead,
+  .yaku-table tbody,
+  .combo-table thead,
+  .combo-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .yaku-table tr,
+  .combo-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.9em 5.8em 3.4em;
+    grid-template-areas:
+      "name han shanten total"
+      "ukeire ukeire ukeire ukeire";
+    align-items: center;
+    column-gap: 6px;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .yaku-table thead tr,
+  .combo-table thead tr {
+    grid-template-areas: "name han shanten total";
+    padding: 4px;
+  }
+  .yaku-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel-bg);
+  }
+  .yaku-table th,
+  .yaku-table td,
+  .combo-table th,
+  .combo-table td {
+    padding: 0;
+    border: none;
+  }
+  .yaku-table thead th,
+  .combo-table thead th {
+    position: static;
+    box-shadow: none;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .yaku-table tr > :nth-child(1),
+  .combo-table tr > :nth-child(1) { grid-area: name; }
+  .yaku-table tr > :nth-child(2),
+  .combo-table tr > :nth-child(2) { grid-area: han; }
+  .yaku-table tr > :nth-child(3),
+  .combo-table tr > :nth-child(3) { grid-area: shanten; }
+  .yaku-table tr > :nth-child(4),
+  .combo-table tr > :nth-child(4) { grid-area: ukeire; }
+  .yaku-table tr > :nth-child(5),
+  .combo-table tr > :nth-child(5) { grid-area: total; text-align: right; }
+  /* The 有効牌 header has no column to head: it is kept for screen readers only. */
+  .yaku-table thead th:nth-child(4),
+  .combo-table thead th:nth-child(4) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .yaku-name-cell,
+  .shanten-cell {
+    white-space: normal;
+  }
+  .combo-name-cell {
+    min-width: 0;
+  }
+  .delta {
+    margin-left: 3px;
+  }
+  .yaku-table td.ukeire-cell,
+  .combo-table td.ukeire-cell {
+    padding-top: 6px;
+  }
+  /* No effective tiles (a 「—」): no second line. */
+  .ukeire-cell:has(> .muted) {
+    display: none;
+  }
+
+  /* CPU game: the opponents' hands shrink to one row inside their seat. */
+  .game-table {
+    gap: 4px;
+    padding: 6px;
+  }
+  .seat-box {
+    padding: 5px;
+    container-type: inline-size;
+  }
+  .seat-hand .tile-xs {
+    width: min(18px, calc((100cqw - 13px) / 14));
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 0.5px;
+  }
+  .seat-head {
+    gap: 4px;
+  }
+  .action-bar {
+    gap: 8px;
+  }
+  /* Focus lands on the action area after a CPU playback: no ring round it. */
+  .action-area:focus {
+    outline: none;
+  }
+  .action-bar button {
+    min-height: 44px;
+    min-width: 64px;
+    padding: 8px 16px;
+    font-size: 1rem;
+  }
+
+  /* Minimized panels: a tab bar along the bottom, one equal-width tab per
+     panel (up to five), above the home indicator. */
+  .panel-dock {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 96px);
+    justify-content: center;
+    gap: 4px;
+    padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 14px rgb(0 0 0 / 0.1);
+  }
+  .dock-tab {
+    writing-mode: horizontal-tb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 4px 2px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    box-shadow: none;
+    font-size: 0.7rem;
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+  .dock-tab-label {
+    display: none;
+  }
+  .dock-tab-short {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dock-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .app.has-dock {
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  /* Help: nearly the whole screen, with a bigger close button. */
+  .help-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 32px);
+  }
+  .help-content {
+    padding: 12px 14px 16px;
+  }
+  .help-heading {
+    margin: -12px -14px 0;
+    padding: 8px 14px 6px;
+  }
+  .help-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* The site's update notice sits above the dock bar. */
+  .update-banner {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    font-size: 0.85rem;
+  }
+  body:has(.panel-dock) .update-banner {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  .update-banner-reload,
+  .update-banner-close {
+    min-height: 36px;
   }
 }

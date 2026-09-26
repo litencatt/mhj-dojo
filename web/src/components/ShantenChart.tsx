@@ -1,5 +1,5 @@
 import { Fragment } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import type { HistoryEntry, YakuRow } from '../api';
 import { PanelHeading } from './PanelHeading';
 
@@ -38,6 +38,26 @@ const NORMAL_COLOR = '#64748b';
 const WIDTH = 720;
 const HEIGHT = 320;
 const MARGIN = { top: 16, right: 16, bottom: 32, left: 48 };
+// Narrower than this (a phone), the 720-wide drawing scaled down would shrink
+// its labels to a few pixels: the chart is drawn at its real width instead.
+const NARROW = 560;
+const PHONE = '(width <= 760px)';
+const NARROW_MARGIN = { top: 12, right: 10, bottom: 30, left: 34 };
+
+/** The element's content width, following resizes (0 until measured or while hidden). */
+function useWidth() {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (!el) return;
+    setWidth(el.clientWidth);
+    if (typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, width] as const;
+}
 
 /** 時系列チャート: x = turn, y = shanten (low = top; win=-1 tenpai=0 labeled). */
 export function ShantenChart(props: ShantenChartProps) {
@@ -53,6 +73,7 @@ export function ShantenChart(props: ShantenChartProps) {
   }, [rowNames, yakumanKeys]);
 
   const [visible, setVisible] = useState<Set<string>>(() => defaultVisibleKeys(currentAnalysis));
+  const [boxRef, boxWidth] = useWidth();
 
   // Reset to the default (normal + best 5, tie-broken by ukeire_total) only
   // when a new game starts; toggles persist across discards/goto within a game.
@@ -69,6 +90,12 @@ export function ShantenChart(props: ShantenChartProps) {
       return next;
     });
   }
+
+  // Phones only (style.css's phone width): a narrow desktop column keeps the scaled drawing.
+  const narrow = boxWidth > 0 && boxWidth < NARROW && typeof matchMedia === 'function' && matchMedia(PHONE).matches;
+  const W = narrow ? boxWidth : WIDTH;
+  const H = narrow ? Math.round(Math.max(200, boxWidth * 0.62)) : HEIGHT;
+  const M = narrow ? NARROW_MARGIN : MARGIN;
 
   if (history.length === 0) {
     return (
@@ -97,10 +124,10 @@ export function ShantenChart(props: ShantenChartProps) {
     }
   }
 
-  const innerW = WIDTH - MARGIN.left - MARGIN.right;
-  const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
-  const xScale = (turn: number) => MARGIN.left + ((turn - minTurn) / Math.max(1, maxTurn - minTurn)) * innerW;
-  const yScale = (v: number) => MARGIN.top + ((v - minV) / Math.max(1, maxV - minV)) * innerH;
+  const innerW = W - M.left - M.right;
+  const innerH = H - M.top - M.bottom;
+  const xScale = (turn: number) => M.left + ((turn - minTurn) / Math.max(1, maxTurn - minTurn)) * innerW;
+  const yScale = (v: number) => M.top + ((v - minV) / Math.max(1, maxV - minV)) * innerH;
 
   const currentNodeId = history[history.length - 1]?.node_id;
 
@@ -129,23 +156,24 @@ export function ShantenChart(props: ShantenChartProps) {
   return (
     <section class="chart-panel" aria-label="時系列チャート">
       <PanelHeading title="時系列チャート" onMinimize={onMinimize} />
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} class="shanten-chart" role="img" aria-label="向聴の時系列推移">
+      <div class="shanten-chart-box" ref={boxRef}>
+      <svg viewBox={`0 0 ${W} ${H}`} class="shanten-chart" role="img" aria-label="向聴の時系列推移">
         {/* gridlines + y labels */}
         {yTicks.map((v) => (
           <g key={v}>
-            <line x1={MARGIN.left} x2={WIDTH - MARGIN.right} y1={yScale(v)} y2={yScale(v)} class="chart-grid" />
-            <text x={MARGIN.left - 8} y={yScale(v)} class="chart-axis-label" text-anchor="end" dominant-baseline="middle">
+            <line x1={M.left} x2={W - M.right} y1={yScale(v)} y2={yScale(v)} class="chart-grid" />
+            <text x={M.left - 8} y={yScale(v)} class="chart-axis-label" text-anchor="end" dominant-baseline="middle">
               {v === -1 ? '和了' : v === 0 ? '聴牌' : v}
             </text>
           </g>
         ))}
         {/* x labels */}
         {turns.map((t) => (
-          <text key={t} x={xScale(t)} y={HEIGHT - MARGIN.bottom + 16} class="chart-axis-label" text-anchor="middle">
+          <text key={t} x={xScale(t)} y={H - M.bottom + 16} class="chart-axis-label" text-anchor="middle">
             {t}
           </text>
         ))}
-        <text x={WIDTH / 2} y={HEIGHT - 4} class="chart-axis-title" text-anchor="middle">
+        <text x={W / 2} y={H - 4} class="chart-axis-title" text-anchor="middle">
           巡目
         </text>
 
@@ -196,6 +224,7 @@ export function ShantenChart(props: ShantenChartProps) {
           );
         })}
       </svg>
+      </div>
       <div class="chart-legend" role="group" aria-label="凡例（クリックで表示切り替え）">
         {allKeys.map((key, i) => {
           const yakuman = yakumanKeys.has(key);
