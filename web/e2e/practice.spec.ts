@@ -126,21 +126,22 @@ test('hand groups toggle: brackets, the same tiles, restore and reload', async (
   expect(await labels()).toEqual(plain);
 });
 
-// The advice panel stays closed until opened (so the answer isn't shown
-// before the player has thought), lists three candidates, highlights a
-// hovered candidate in the hand, stays open across a reload, and after a
-// discard reviews it against the best one.
-test('advice panel: closed by default, three candidates, remembered, review after a discard', async ({ page }) => {
+// The advice panel starts minimized in the right-edge dock (so the answer
+// isn't shown before the player has thought), opens from its dock tab, lists
+// three candidates, highlights a hovered candidate in the hand, stays open
+// across a reload, minimizes back to the dock, and after a discard reviews it
+// against the best one.
+test('advice panel: docked by default, three candidates, remembered, review after a discard', async ({ page }) => {
   await page.goto('/?seed=1&turns=18');
   const panel = page.getByRole('region', { name: 'アドバイス' });
-  await expect(panel).toBeVisible();
-  const toggle = panel.getByRole('button', { name: '開く' });
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const dockTab = page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' });
+  await expect(panel).toBeHidden();
+  await expect(dockTab).toBeVisible();
   const candidates = panel.locator('.advice-candidate');
-  await expect(candidates).toHaveCount(0);
 
-  await toggle.click();
-  await expect(panel.getByRole('button', { name: '閉じる' })).toHaveAttribute('aria-expanded', 'true');
+  await dockTab.click();
+  await expect(panel).toBeVisible();
+  await expect(dockTab).toBeHidden();
   await expect(candidates).toHaveCount(3);
   await expect(panel.locator('.advice-outlook')).toContainText('1巡目');
 
@@ -152,7 +153,7 @@ test('advice panel: closed by default, three candidates, remembered, review afte
   await expect(hand.locator('.tile-advice').first()).toHaveAttribute('aria-label', best!);
 
   await page.reload();
-  await expect(panel.getByRole('button', { name: '閉じる' })).toBeVisible();
+  await expect(panel).toBeVisible();
   await expect(candidates).toHaveCount(3);
 
   // Discard the recommended tile: the next node reviews it as the best.
@@ -163,6 +164,11 @@ test('advice panel: closed by default, three candidates, remembered, review afte
   ]);
   await expect(panel.locator('.advice-review')).toHaveText(/^前巡の打 .+: 最善/);
   await expect(candidates).toHaveCount(3);
+
+  // The – button sends it back to the dock.
+  await panel.getByRole('button', { name: 'アドバイスを最小化' }).click();
+  await expect(panel).toBeHidden();
+  await expect(dockTab).toBeVisible();
 });
 
 test('hand groups fit a 390px-wide viewport', async ({ page }) => {

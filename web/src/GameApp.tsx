@@ -15,7 +15,7 @@ import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
 import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 // Game mode has no branch tree: the round only moves forward.
-const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
+const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
@@ -134,7 +134,7 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
-  // The tree may be minimized from practice mode, but game mode has no tree tab.
+  // The tree and advice may be minimized from practice mode, but game mode has neither.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
 

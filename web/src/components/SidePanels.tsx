@@ -18,8 +18,9 @@ export interface SidePanelsProps {
 export function SidePanels({ analysis, byDiscard, previewTile, mode, isMin, onMinimize, advice }: SidePanelsProps) {
   // Preview only tiles the server analysed, so the title never outruns the table.
   const previewRows = previewTile ? byDiscard[previewTile] : undefined;
+  const adviceShown = !!advice && !isMin('advice');
   return (
-    <div class="area-side" hidden={isMin('yaku') && isMin('gloss') && !advice}>
+    <div class="area-side" hidden={isMin('yaku') && isMin('gloss') && !adviceShown}>
       <div class="area-yaku" hidden={isMin('yaku')}>
         <YakuTable
           rows={previewRows ?? analysis}
@@ -28,8 +29,12 @@ export function SidePanels({ analysis, byDiscard, previewTile, mode, isMin, onMi
           onMinimize={() => onMinimize('yaku')}
         />
       </div>
-      <div class="area-notes" hidden={isMin('gloss') && !advice}>
-        {advice && <div class="area-advice">{advice}</div>}
+      <div class="area-notes" hidden={isMin('gloss') && !adviceShown}>
+        {advice && (
+          <div class="area-advice" hidden={!adviceShown}>
+            {advice}
+          </div>
+        )}
         <div class="area-gloss" hidden={isMin('gloss')}>
           <Glossary mode={mode} onMinimize={() => onMinimize('gloss')} />
         </div>

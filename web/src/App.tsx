@@ -74,7 +74,8 @@ export function App() {
 
   // Minimized panels stay mounted (hidden) so they keep their own state,
   // such as the chart's legend selection and the glossary search.
-  const appClass = state && minimized.length > 0 ? 'app has-dock' : 'app';
+  const docked = PANELS.filter((p) => minimized.includes(p.key));
+  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
 
   return (
     <div class={appClass}>
@@ -198,12 +199,19 @@ export function App() {
           mode="practice"
           isMin={isMin}
           onMinimize={minimize}
-          advice={<AdvicePanel advice={state.advice} review={state.discard_review} onHighlight={setHighlightTile} />}
+          advice={
+            <AdvicePanel
+              advice={state.advice}
+              review={state.discard_review}
+              onHighlight={setHighlightTile}
+              onMinimize={() => minimize('advice')}
+            />
+          }
         />
       )}
       {state && (
         <Dock
-          items={PANELS.filter((p) => minimized.includes(p.key))}
+          items={docked}
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}

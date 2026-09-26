@@ -387,21 +387,6 @@ h2 {
 }
 
 /* ---- Advice ---- */
-.advice-toggle {
-  flex: none;
-  margin: 0 0 8px;
-  padding: 2px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-.advice-toggle:hover {
-  border-color: var(--accent);
-}
 .advice-body {
   display: flex;
   flex-direction: column;
