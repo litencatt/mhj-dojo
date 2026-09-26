@@ -146,6 +146,7 @@ export function App() {
             <div class="area-hand">
               <Hand
                 hand={state.hand}
+                groups={state.hand_groups}
                 drawn={state.drawn}
                 discards={state.discards}
                 disabled={busy || state.status !== 'playing'}

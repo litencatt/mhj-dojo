@@ -16,6 +16,7 @@ type State struct {
 	Turn              int                          `json:"turn"`
 	Status            string                       `json:"status"`
 	Hand              []string                     `json:"hand"`
+	HandGroups        []apiview.HandGroup          `json:"hand_groups"` // blocks of hand (docs/api.md)
 	Drawn             *string                      `json:"drawn"`
 	Discards          []string                     `json:"discards"`
 	DoraIndicators    []string                     `json:"dora_indicators"`

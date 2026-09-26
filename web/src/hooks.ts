@@ -252,3 +252,28 @@ export function usePlayback(state: GameState | null): Playback {
 
   return { seats, events, playing, highlight, skip };
 }
+
+const HAND_GROUPS_KEY = 'mhj2.handGroups';
+
+/**
+ * The hand panel's 「面子表示」 toggle, shared by practice and game mode and
+ * kept in localStorage. Off by default and whenever storage fails.
+ */
+export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(HAND_GROUPS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const update = (next: boolean) => {
+    setOn(next);
+    try {
+      localStorage.setItem(HAND_GROUPS_KEY, next ? '1' : '0');
+    } catch {
+      // Storage unavailable: the setting just won't persist.
+    }
+  };
+  return [on, update];
+}

@@ -59,6 +59,7 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 			t.Fatal("game does not end")
 		}
 		checkHidden(t, raw)
+		checkHandGroups(t, st.Seats[0].Hand, st.Seats[0].HandGroups)
 		if len(st.Analysis) != 31 { // seat wind 西 differs from the round wind 東
 			t.Fatalf("analysis has %d rows", len(st.Analysis))
 		}
@@ -77,9 +78,13 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 		t.Fatal("result pao is null, want an array")
 	}
 	sum := st.Result.Deposit
+	checkHandGroups(t, st.Seats[0].Hand, st.Seats[0].HandGroups)
 	for _, s := range st.Seats {
 		if len(s.Hand) == 0 {
 			t.Fatalf("seat %d hand hidden after the end", s.Seat)
+		}
+		if s.Seat != 0 && s.HandGroups != nil {
+			t.Fatalf("seat %d hand_groups shown", s.Seat)
 		}
 		sum += s.Points
 	}
@@ -284,6 +289,7 @@ func TestHumanPon(t *testing.T) {
 			if slices.Contains(st.Legal.Discards, called) || len(st.Legal.Discards) == 0 || me.Drawn != nil {
 				t.Fatalf("seed %d: after the pon: legal %+v", seed, st.Legal)
 			}
+			checkHandGroups(t, me.Hand, me.HandGroups)
 			last := st.Events[len(st.Events)-1]
 			if last.Type != "pon" || last.Seat != 0 || last.Tile != called {
 				t.Fatalf("seed %d: events %+v", seed, st.Events)
@@ -308,6 +314,7 @@ func TestHumanPon(t *testing.T) {
 			// The history goes on after the call: one entry per own discard.
 			before := len(st.History)
 			st, _ = c.game("POST", path, nextMove(st))
+			checkHandGroups(t, st.Seats[0].Hand, st.Seats[0].HandGroups)
 			if len(st.History) != before+1 || st.History[before].Turn != before || len(st.History[before].Shanten) != len(st.Analysis) {
 				t.Fatalf("seed %d: history after the pon: %d entries (was %d)", seed, len(st.History), before)
 			}

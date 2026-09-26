@@ -238,6 +238,7 @@ export function GameApp() {
               />
               <Hand
                 hand={me.hand ?? []}
+                groups={me.hand_groups}
                 drawn={me.drawn ?? null}
                 discards={[]}
                 disabled={busy || !myTurn}

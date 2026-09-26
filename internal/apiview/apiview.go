@@ -1,8 +1,10 @@
 // Package apiview holds the JSON pieces shared by the practice and game APIs
-// (docs/api.md): per-yaku analysis rows, the shanten history and dora kinds.
+// (docs/api.md): per-yaku analysis rows, the shanten history, dora kinds and
+// the hand's blocks.
 package apiview
 
 import (
+	"github.com/litencatt/mhj2/internal/handshape"
 	"github.com/litencatt/mhj2/internal/tile"
 	"github.com/litencatt/mhj2/internal/yakushanten"
 )
@@ -75,6 +77,35 @@ func DoraKinds(indicators []tile.Tile) []string {
 	out := make([]string, len(indicators))
 	for i, ind := range indicators {
 		out[i] = tile.DoraFromIndicator(ind.Kind).String()
+	}
+	return out
+}
+
+// HandGroup is one block of the hand's split (package handshape): its type
+// and the indexes of its tiles in the hand array.
+type HandGroup struct {
+	Type  handshape.Type `json:"type"`
+	Tiles []int          `json:"tiles"`
+}
+
+// HandGroups splits the concealed hand (drawn tile excluded) of a hand with
+// fixedMelds called melds and maps each block's kinds to distinct hand
+// indexes, first unused index first. Every index appears exactly once.
+func HandGroups(hand []tile.Tile, fixedMelds int) []HandGroup {
+	out := []HandGroup{}
+	used := make([]bool, len(hand))
+	for _, g := range handshape.Groups(tile.CountsOf(hand), fixedMelds) {
+		hg := HandGroup{Type: g.Type, Tiles: make([]int, 0, len(g.Kinds))}
+		for _, k := range g.Kinds {
+			for i, t := range hand {
+				if !used[i] && t.Kind == k {
+					used[i] = true
+					hg.Tiles = append(hg.Tiles, i)
+					break
+				}
+			}
+		}
+		out = append(out, hg)
 	}
 	return out
 }
