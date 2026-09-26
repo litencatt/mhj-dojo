@@ -115,11 +115,12 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   await expect(hand.locator(`.meld-called [aria-label^="${calledTile}"]`)).toBeVisible();
 
   // 面子表示 groups the 11 concealed tiles left after the pon.
-  const toggle = hand.getByLabel('面子表示');
-  await toggle.check();
+  const toggle = hand.getByRole('button', { name: '面子表示' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(hand.locator('.hand-group').first()).toBeVisible();
   await expect(hand.locator('.hand-group .tile')).toHaveCount(11);
-  await toggle.uncheck();
+  await toggle.click();
   await expect(hand.locator('.hand-group')).toHaveCount(0);
 
   // Play the round out to its result panel, then start the next round.
