@@ -48,6 +48,9 @@ func TestRouteMatchesServer(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatalf("create:\nserver %.300s\nroute  %.300s", a, b)
 	}
+	if len(st.Combos) == 0 || len(st.CombosByDiscard) == 0 {
+		t.Fatal("the compared states should carry combos")
+	}
 	drawn, first := *st.Drawn, st.Hand[0]
 
 	for _, r := range []struct{ method, path, body string }{

@@ -37,6 +37,7 @@ func movesOf(st State) []Move {
 // TestReplayMatchesPlay plays random branching games move by move, then
 // replays the tree's moves on a fresh session: the state must be the same.
 func TestReplayMatchesPlay(t *testing.T) {
+	combos := 0
 	for seed := int64(1); seed <= testmode.N(int64(20), 4, 2); seed++ {
 		rng := rand.New(rand.NewPCG(uint64(seed), 0))
 		st := NewStore()
@@ -74,7 +75,12 @@ func TestReplayMatchesPlay(t *testing.T) {
 			if stateJSON(t, got) != stateJSON(t, want) {
 				t.Fatalf("seed %d: replayed node %d differs", seed, id)
 			}
+			combos += len(got.Combos) + len(got.CombosByDiscard)
 		}
+	}
+	// The comparisons cover the whole state, the combos included.
+	if combos == 0 {
+		t.Fatal("no compared state had combos")
 	}
 }
 
