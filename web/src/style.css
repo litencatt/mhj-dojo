@@ -1122,6 +1122,7 @@ section {
 .help-dialog {
   width: min(640px, calc(100vw - 24px));
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px); /* the visible height on phones, where supported */
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1175,8 +1176,8 @@ section {
 .help-content li + li {
   margin-top: 2px;
 }
-.help-lead {
-  margin-top: 8px !important;
+.help-content .help-lead {
+  margin-top: 8px;
   color: var(--muted);
 }
 .help-link {

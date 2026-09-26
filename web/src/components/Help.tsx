@@ -12,6 +12,14 @@ const TILE_NOTATION: Array<[string, string]> = [
   ['0m・0p・0s', '赤5（赤ドラ）'],
 ];
 
+/** Whether a pointer event hit the modal dialog's backdrop: the dialog itself, outside its box. */
+function onBackdrop(e: MouseEvent): boolean {
+  const d = e.currentTarget as HTMLElement;
+  if (e.target !== d) return false;
+  const r = d.getBoundingClientRect();
+  return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+}
+
 /**
  * The ヘルプ button and the help it opens: a modal <dialog>, so the rest of
  * the page is inert while it is open, Esc closes it and focus goes back to
@@ -20,6 +28,7 @@ const TILE_NOTATION: Array<[string, string]> = [
 export function Help({ onShowGlossary }: HelpProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
+  const pressedOnBackdrop = useRef(false);
 
   useEffect(() => {
     const d = ref.current;
@@ -53,9 +62,15 @@ export function Help({ onShowGlossary }: HelpProps) {
         class="help-dialog"
         aria-labelledby="help-title"
         onClose={() => setOpen(false)}
+        onPointerDown={(e) => {
+          pressedOnBackdrop.current = onBackdrop(e);
+        }}
         onClick={(e) => {
-          // A click on the backdrop (outside the content) closes it.
-          if (e.target === e.currentTarget) setOpen(false);
+          // A click on the backdrop closes it, but not a drag (such as a
+          // text selection) that only ends there, nor a click on the
+          // dialog's own scrollbar (inside its box).
+          if (pressedOnBackdrop.current && onBackdrop(e)) setOpen(false);
+          pressedOnBackdrop.current = false;
         }}
       >
         {open && (
@@ -110,13 +125,13 @@ export function Help({ onShowGlossary }: HelpProps) {
               <h3 id="help-yaku">役別向聴の表の見方</h3>
               <ul>
                 <li>
-                  <b>向聴</b>：その役の和了形まであと何枚か。「聴牌」はあと1枚で和了、「不可」はその役にできない手です。「近似」は平和の1向聴以上の目安です。
+                  <b>向聴</b>：その役で聴牌するまでに、あと何枚の有効牌が必要か。0 は「聴牌」（あと1枚で和了）、和了した手は「和了」（−1）と表示します。「不可」はその役にできない手、「近似」は平和の1向聴以上の目安です。
                 </li>
                 <li>
-                  <b>有効牌</b>：引くと向聴が進む牌。牌の下の数字は、まだ見えていない残り枚数です。<b>合計枚数</b>はその合計です。
+                  <b>有効牌</b>：引くと向聴数が1つ減る牌。牌の下の数字は残り枚数（4枚から、手牌・ツモ牌・捨て牌・ドラ表示牌で見えている枚数を引いた数）です。<b>合計枚数</b>はその合計です。
                 </li>
                 <li>
-                  <b>翻</b>：その役の翻数。役名にカーソルを合わせると成立条件を表示します。役満以外で最も聴牌に近い行は色付きです。
+                  <b>翻</b>：その役の翻数。役名にカーソルを合わせる（キーボードならフォーカス）と成立条件を表示します。役満以外で最も聴牌に近い行は色付きです。
                 </li>
                 <li>
                   <b>打牌ごとの比較</b>：手牌の牌にカーソルを合わせる（キーボードならフォーカス）と、その牌を切った後の表に切り替わり、今との差（−1 は前進、+1 は後退）を表示します。
@@ -145,7 +160,7 @@ export function Help({ onShowGlossary }: HelpProps) {
               <h3 id="help-advice">アドバイス</h3>
               <p>
                 練習モードの「アドバイス」パネルは、答えが先に見えないよう最初は画面右端のタブにしまってあります。開くと、おすすめの打牌3つ（向聴・有効牌の種類と枚数）、残りツモ、聴牌・和了までの確率の目安、方針、近い役を表示します。
-                候補にカーソルを合わせると手牌の同じ牌に印が付きます。打牌した後は、その打牌の評価を表示します。
+                候補にカーソルを合わせる（キーボードならフォーカス）と手牌の同じ牌に印が付きます。打牌した後は、その打牌の評価を表示します。
               </p>
             </section>
 
@@ -183,8 +198,8 @@ export function Help({ onShowGlossary }: HelpProps) {
             <section aria-labelledby="help-version">
               <h3 id="help-version">バージョン表示</h3>
               <p>
-                ヘッダーの「abc1234 · 2026-09-26」のような表示は、動いているプログラムの元になったコミットとその日付です（カーソルを合わせると詳細）。<code>dev</code> はバージョン情報なしでビルドしたものです。
-                公開版は新しい版が公開されると「新しいバージョンがあります」と表示するので、「再読み込み」で更新できます。
+                ヘッダーの「abc1234 · 2026-09-26」のような表示は、動いているプログラムの元になったコミットと、コミット（またはビルド）の日付です。<code>dev</code> はバージョン情報なしでビルドしたもので、日付は付きません。
+                公開版は新しい版が公開されると「新しいバージョンがあります」と表示するので、「再読み込み」で更新できます（配信側の反映が遅れているときは、その旨を表示します）。
               </p>
             </section>
           </div>
