@@ -105,26 +105,28 @@ export function App() {
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
             {state && (
-              <dl class="game-status">
-                <div>
-                  <dt>シード</dt>
-                  <dd>{state.seed}</dd>
-                </div>
-                <div>
-                  <dt>巡目</dt>
-                  <dd>{state.turn} / {state.max_turns}</dd>
-                </div>
-                <div>
-                  <dt>残り牌</dt>
-                  <dd>{state.wall_remaining}</dd>
-                </div>
+              <div class="header-status">
+                <dl class="game-status">
+                  <div>
+                    <dt>シード</dt>
+                    <dd>{state.seed}</dd>
+                  </div>
+                  <div>
+                    <dt>巡目</dt>
+                    <dd>{state.turn} / {state.max_turns}</dd>
+                  </div>
+                  <div>
+                    <dt>残り牌</dt>
+                    <dd>{state.wall_remaining}</dd>
+                  </div>
+                </dl>
                 <DoraStatus
                   doraIndicators={state.dora_indicators}
                   dora={state.dora}
                   uraDoraIndicators={state.ura_dora_indicators}
                   uraDora={state.ura_dora}
                 />
-              </dl>
+              </div>
             )}
           </header>
 

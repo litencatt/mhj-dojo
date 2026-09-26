@@ -93,11 +93,13 @@ h2 {
   margin: 0;
 }
 
+/* The new-game form sits at the right end of the first row. */
 .new-game-form {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
 }
 .new-game-form label {
   display: flex;
@@ -146,24 +148,44 @@ h2 {
   cursor: default;
 }
 
-.game-status {
+/* Second row, under a divider: the round's status on the left (small label
+   over its value), the dora indicators boxed at the right end. */
+.header-status {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 18px;
+  gap: 8px 18px;
   flex-basis: 100%;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.game-status,
+.dora-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 20px;
   margin: 0;
 }
-.game-status > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.dora-box {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
-.game-status dt {
-  font-size: 0.75rem;
+.game-status > div,
+.dora-box > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.game-status dt,
+.dora-box dt {
+  font-size: 0.7rem;
   color: var(--muted);
 }
-.game-status dd {
+.game-status dd,
+.dora-box dd {
   margin: 0;
   font-weight: 600;
 }

@@ -8,10 +8,10 @@ export interface DoraStatusProps {
   uraDora: TileT[];
 }
 
-/** The dora and ura-dora rows of the header's game-status list. */
+/** The dora and ura-dora indicators, boxed at the right of the header's status row. */
 export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }: DoraStatusProps) {
   return (
-    <>
+    <dl class="dora-box">
       <div>
         <dt>ドラ表示牌</dt>
         <dd class="dora-indicators">
@@ -45,6 +45,6 @@ export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }:
           )}
         </dd>
       </div>
-    </>
+    </dl>
   );
 }
