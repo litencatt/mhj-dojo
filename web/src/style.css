@@ -1828,22 +1828,6 @@ section {
   .filter-chip {
     padding: 4px 10px;
   }
-  /* Filter bar: the search on a row of its own, the two selects sharing the
-     next one. */
-  .yaku-filter-search {
-    flex-basis: 100%;
-  }
-  .yaku-filter-row label {
-    flex: 1 1 0;
-    min-width: 0;
-    white-space: nowrap;
-  }
-  .yaku-filter-row label select {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .yaku-filter-search,
-  .yaku-filter select,
   .glossary-search {
     font-size: 16px;
   }

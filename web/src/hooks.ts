@@ -277,3 +277,18 @@ function useStoredFlag(key: string): [boolean, (on: boolean) => void] {
 export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
   return useStoredFlag('mhj-dojo.handGroups');
 }
+
+/** Whether a CSS media query matches, kept up to date as the window changes. */
+export function useMediaQuery(query: string): boolean {
+  const get = () => typeof matchMedia === 'function' && matchMedia(query).matches;
+  const [matches, setMatches] = useState(get);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const mql = matchMedia(query);
+    const update = () => setMatches(mql.matches);
+    update();
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
+  }, [query]);
+  return matches;
+}

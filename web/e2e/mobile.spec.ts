@@ -107,16 +107,17 @@ for (const width of [320, 360, 390]) {
 
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
       const panel = await box(yaku);
-      for (const table of ['.yaku-table', '.combo-table']) {
-        const t = yaku.locator(table);
-        await expect(t.locator('tbody tr').first()).toBeVisible();
-        // No cell is cut off: every cell of the first rows, including the
-        // effective tiles and the 合計枚数, lies inside the panel.
-        for (const cell of await t.locator('tbody tr').first().locator('th, td').all()) {
-          const b = await box(cell);
-          expect(b.x).toBeGreaterThanOrEqual(panel.x);
-          expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
-        }
+      // A phone shows just the yaku table: no 複合役 and no filter bar.
+      await expect(yaku.locator('.combo-table')).toHaveCount(0);
+      await expect(yaku.locator('.yaku-filter')).toHaveCount(0);
+      const t = yaku.locator('.yaku-table');
+      await expect(t.locator('tbody tr').first()).toBeVisible();
+      // No cell is cut off: every cell of the first rows, including the
+      // effective tiles and the 合計枚数, lies inside the panel.
+      for (const cell of await t.locator('tbody tr').first().locator('th, td').all()) {
+        const b = await box(cell);
+        expect(b.x).toBeGreaterThanOrEqual(panel.x);
+        expect(b.x + b.width).toBeLessThanOrEqual(panel.x + panel.width + 0.5);
       }
       const scroll = yaku.locator('.yaku-table-scroll');
       expect(await scroll.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
