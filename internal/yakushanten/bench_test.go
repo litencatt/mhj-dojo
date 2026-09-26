@@ -41,8 +41,8 @@ func randomOpen14(r *rand.Rand) (tile.Counts, []yaku.Meld) {
 	return tile.CountsOf(left[:8]), melds
 }
 
-// analyzeAllDiscards is the per-turn workload: every row for every discard
-// candidate of a 14-tile hand, with a fresh memo.
+// analyzeAllDiscards is the per-turn workload: every row and the combos for
+// every discard candidate of a 14-tile hand, with a fresh memo.
 func analyzeAllDiscards(c tile.Counts, melds ...yaku.Meld) int {
 	a := NewAnalyzer()
 	n := 0
@@ -51,7 +51,8 @@ func analyzeAllDiscards(c tile.Counts, melds ...yaku.Meld) int {
 			continue
 		}
 		c[k]--
-		n += len(a.AnalyzeWith(c, melds))
+		rows := a.AnalyzeWith(c, melds)
+		n += len(rows) + len(a.Combos(c, melds, rows))
 		c[k]++
 	}
 	return n
@@ -69,7 +70,8 @@ func BenchmarkAnalyzeAllDiscards(b *testing.B) {
 	}
 }
 
-// p95Limit is the per-move budget from the plan: every discard candidate x every row.
+// p95Limit is the per-move budget from the plan: every discard candidate x
+// every row and the combos.
 const p95Limit = 100 * time.Millisecond
 
 func TestAnalyzeAllDiscardsP95(t *testing.T) {

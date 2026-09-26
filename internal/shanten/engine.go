@@ -297,6 +297,18 @@ func (e *Engine) Evaluate(c *tile.Counts, target *Target) *Eval {
 	return ev
 }
 
+// Dist is Evaluate(c, target).Dist without the per-suit folds that ukeire
+// needs.
+func (e *Engine) Dist(c *tile.Counts, target *Target) int {
+	var t [4]*Table
+	for s := 0; s < 4; s++ {
+		v, n := SuitCounts(c, s)
+		t[s] = e.Suit(v, n, target.Rules[s])
+	}
+	ab, cd := Fold(t[0], t[1]), Fold(t[2], t[3])
+	return FinalPair(&ab, &cd, target.Melds, target.MinTrips)
+}
+
 // DistWith returns the distance after adding one tile of kind k.
 func (ev *Eval) DistWith(k tile.Kind) int {
 	s := k.Suit()

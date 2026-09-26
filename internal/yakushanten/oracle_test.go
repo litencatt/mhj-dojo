@@ -15,8 +15,12 @@ import (
 
 // satisfies is an independent, decomposition-based definition of "W satisfies
 // Y" for a 14-tile hand, used as the brute-force oracle. Pinfu here is the
-// relaxed shape (the wait is checked separately).
+// relaxed shape (the wait is checked separately). A key joining several
+// keys with "+" is a combo (satisfiesCombo).
 func satisfies(key string, c tile.Counts) bool {
+	if strings.Contains(key, "+") {
+		return satisfiesCombo(strings.Split(key, "+"), c)
+	}
 	// tile-set predicates
 	suits := map[int]bool{}
 	honors, yaochuTile, allYaochu, allHonors, allTerminal, allGreen := false, false, true, true, true, true

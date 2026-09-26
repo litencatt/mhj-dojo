@@ -339,6 +339,10 @@ type Analyzer struct {
 	// AnalyzeWith saw: every discard candidate of a turn shares them.
 	melds       []yaku.Meld
 	meldTargets map[string][]shanten.Target
+	// comboMelds and comboTargets cache the combo target families (in
+	// combosFor order) for the last melds Combos saw.
+	comboMelds   []yaku.Meld
+	comboTargets [][]shanten.Target
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
