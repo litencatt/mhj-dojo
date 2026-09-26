@@ -38,7 +38,15 @@ deploy-check:
 # are gitignored, and the lolipop CLI skips gitignored files when its --dir
 # is inside a git repo, so the build is copied to a temp dir outside the
 # repo first. Run `npx lolipop login` once beforehand.
-deploy: deploy-check site
+#
+# `site` is invoked as a recipe command (not a prerequisite) so that under
+# `make -j` it can't start in parallel with deploy-check: a prerequisite
+# (even order-only, `deploy-check |`) only orders deploy-check before site,
+# it doesn't stop make from scheduling both once deploy-check finishes, nor
+# does it stop -j from starting site's own sub-recipes concurrently with an
+# unrelated goal; recipe commands within a single target always run in order.
+deploy: deploy-check
+	+@$(MAKE) --no-print-directory site
 	@set -e; \
 	tmp_dir="$$(mktemp -d)" || exit 1; \
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
