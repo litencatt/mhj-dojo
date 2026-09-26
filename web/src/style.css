@@ -530,6 +530,10 @@ section {
   display: flex;
   gap: 2px;
 }
+/* Floats can be up to 13 tiles: let them wrap inside the group on phones. */
+.hand-group-float .hand-group-tiles {
+  flex-wrap: wrap;
+}
 .discard-label {
   margin-right: 6px;
   font-size: 0.75rem;
@@ -567,7 +571,7 @@ section {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 10px;
 }
 .yaku-filter label {
   display: flex;
