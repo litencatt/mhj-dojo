@@ -246,6 +246,8 @@ h2 {
 .area-header,
 .area-hand,
 .area-yaku,
+.area-notes,
+.area-advice,
 .area-gloss,
 .area-chart,
 .area-tree {
@@ -274,10 +276,20 @@ h2 {
     overflow: auto;
   }
   .area-side { flex: 1 1 0; }
-  /* The yaku table and glossary share the side column 3:2. */
+  /* The yaku table and the advice + glossary share the side column 3:2;
+     without the glossary the advice keeps its own height. The advice
+     scrolls past 60% so the glossary under it stays in view. */
   .area-yaku { flex: 3 1 0; }
+  .area-notes { flex: 2 1 0; }
+  .area-notes:has(> .area-gloss[hidden]) { flex: 0 1 auto; }
+  .area-advice {
+    flex: 0 1 auto;
+    max-height: 60%;
+    overflow-y: auto;
+  }
+  .area-notes:has(> .area-gloss[hidden]) .area-advice { max-height: none; }
   .area-gloss {
-    flex: 2 1 0;
+    flex: 1 1 0;
     overflow-y: auto;
   }
   .yaku-table-panel {
@@ -297,7 +309,8 @@ h2 {
   }
   .area-side { display: contents; }
   .area-yaku { flex: 1 1 0; }
-  .area-gloss { flex: 0 1 320px; min-width: 260px; }
+  .area-notes,
+  .area-notes:has(> .area-gloss[hidden]) { flex: 0 1 320px; min-width: 260px; }
 }
 /* One column: order the panels instead of naming areas, so a minimized
    panel leaves no empty row behind. */
@@ -306,9 +319,11 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
   .area-main,
-  .area-side { display: contents; }
+  .area-side,
+  .area-notes { display: contents; }
   .area-header { order: 1; }
   .area-hand { order: 2; }
+  .area-advice { order: 2; }
   .area-tree { order: 3; }
   .area-yaku { order: 4; }
   .area-chart { order: 5; }
@@ -369,6 +384,151 @@ h2 {
 /* Keep content clear of the docked tabs. */
 .app.has-dock {
   padding-right: 44px;
+}
+
+/* ---- Advice ---- */
+.advice-toggle {
+  flex: none;
+  margin: 0 0 8px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.advice-toggle:hover {
+  border-color: var(--accent);
+}
+.advice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.advice-body p {
+  margin: 0;
+}
+.advice-review {
+  padding: 6px 10px;
+  border-left: 3px solid var(--group-taatsu);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.advice-review-best {
+  border-left-color: var(--success-border);
+  color: var(--success);
+}
+.advice-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.advice-candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: default;
+}
+.advice-candidate:first-child {
+  background: var(--row-best-bg);
+}
+.advice-candidate:hover,
+.advice-candidate:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.advice-rank {
+  flex: none;
+  width: 1.2em;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+.advice-candidate .tile {
+  flex: none;
+}
+.advice-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  min-width: 0;
+}
+.advice-shanten {
+  font-weight: 700;
+}
+.advice-outlook {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+}
+.advice-outlook div {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.advice-outlook dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.advice-outlook dd {
+  margin: 0;
+  font-weight: 700;
+}
+.advice-guideline {
+  font-weight: 700;
+}
+.advice-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.6;
+}
+.advice-yaku {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.advice-yaku-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.advice-yaku ul {
+  display: contents;
+}
+.advice-yaku li {
+  list-style: none;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+.advice-yaku-lost {
+  color: var(--muted);
+}
+.advice-yaku-mark {
+  font-size: 0.7rem;
+}
+.advice-caveat {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+/* A hand tile named by a hovered advice candidate. */
+.tile.tile-advice {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ---- Glossary ---- */

@@ -8,12 +8,14 @@ import { WinPanel } from './components/WinPanel';
 import { Dock } from './components/Dock';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
+import { AdvicePanel } from './components/AdvicePanel';
 import { PANELS, optionalInt, useMinimized, type PanelKey } from './panels';
 import { sessionMovedOn, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
+  const [highlightTile, setHighlightTile] = useState<string | null>(null);
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
@@ -21,6 +23,7 @@ export function App() {
     (next) => {
       setState(next);
       setPreviewTile(null);
+      setHighlightTile(null);
     },
     state ? () => api.getSession(state.session_id) : undefined,
     sessionMovedOn,
@@ -152,6 +155,7 @@ export function App() {
                 drawn={state.drawn}
                 discards={state.discards}
                 disabled={busy || state.status !== 'playing'}
+                highlight={highlightTile}
                 onDiscard={handleDiscard}
                 onPreview={setPreviewTile}
               />
@@ -194,6 +198,7 @@ export function App() {
           mode="practice"
           isMin={isMin}
           onMinimize={minimize}
+          advice={<AdvicePanel advice={state.advice} review={state.discard_review} onHighlight={setHighlightTile} />}
         />
       )}
       {state && (

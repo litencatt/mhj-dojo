@@ -126,6 +126,45 @@ test('hand groups toggle: brackets, the same tiles, restore and reload', async (
   expect(await labels()).toEqual(plain);
 });
 
+// The advice panel stays closed until opened (so the answer isn't shown
+// before the player has thought), lists three candidates, highlights a
+// hovered candidate in the hand, stays open across a reload, and after a
+// discard reviews it against the best one.
+test('advice panel: closed by default, three candidates, remembered, review after a discard', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  await expect(panel).toBeVisible();
+  const toggle = panel.getByRole('button', { name: '開く' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const candidates = panel.locator('.advice-candidate');
+  await expect(candidates).toHaveCount(0);
+
+  await toggle.click();
+  await expect(panel.getByRole('button', { name: '閉じる' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(candidates).toHaveCount(3);
+  await expect(panel.locator('.advice-outlook')).toContainText('1巡目');
+
+  // Hovering a candidate marks that tile in the hand.
+  const best = await candidates.first().locator('.tile').getAttribute('aria-label');
+  expect(best).toBeTruthy();
+  await candidates.first().hover();
+  const hand = page.getByRole('region', { name: '手牌' });
+  await expect(hand.locator('.tile-advice').first()).toHaveAttribute('aria-label', best!);
+
+  await page.reload();
+  await expect(panel.getByRole('button', { name: '閉じる' })).toBeVisible();
+  await expect(candidates).toHaveCount(3);
+
+  // Discard the recommended tile: the next node reviews it as the best.
+  const tile = hand.locator(`.hand-tiles [aria-label="${best}"], .hand-drawn [aria-label="${best}"]`).first();
+  await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/discard')),
+    tile.click(),
+  ]);
+  await expect(panel.locator('.advice-review')).toHaveText(/^前巡の打 .+: 最善/);
+  await expect(candidates).toHaveCount(3);
+});
+
 test('hand groups fit a 390px-wide viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?seed=1&turns=18');
