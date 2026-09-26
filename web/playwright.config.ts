@@ -14,6 +14,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // The default (half the cores) is one worker on a 2-vCPU runner, which
+  // leaves the tests waiting on the CPU game's playback one after another.
+  // Every test starts its own game or session, so two can share the server.
+  workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [['html', { open: 'never' }]] : 'list',
   timeout: 30_000,
   use: {
