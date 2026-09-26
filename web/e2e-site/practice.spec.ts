@@ -11,6 +11,13 @@ function labels(page: Page, selector: string) {
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 }
 
+/** Opens the 履歴ツリー panel, which starts in the dock, on every load of the page. */
+async function openTree(page: Page) {
+  await page.addInitScript(() =>
+    localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'advice', 'gloss'])),
+  );
+}
+
 async function discardDrawn(page: Page) {
   const hand = page.getByRole('region', { name: '手牌' });
   const river = hand.locator('.discard-river .tile');
@@ -71,6 +78,7 @@ test('?mode=game shows practice on the static site', async ({ page }) => {
 });
 
 test('a reload replays the saved moves, branches included', async ({ page }) => {
+  await openTree(page);
   await page.goto('./?seed=7&turns=18');
   const hand = page.getByRole('region', { name: '手牌' });
   await expect(hand).toBeVisible();
@@ -144,6 +152,7 @@ async function seedStorage(page: Page, id: string, current: number) {
 }
 
 test('a saved tsumo node is rebuilt with its win', async ({ page }) => {
+  await openTree(page);
   await seedStorage(page, 'e2etsumo', tsumoMoves.length);
   await page.goto('./?session=e2etsumo&seed=2&turns=18');
   await expect(page.getByRole('region', { name: '和了' })).toBeVisible();
@@ -155,6 +164,7 @@ test('a saved tsumo node is rebuilt with its win', async ({ page }) => {
 });
 
 test('a saved session resumes at an inner node', async ({ page }) => {
+  await openTree(page);
   await seedStorage(page, 'e2einner', 3);
   await page.goto('./?session=e2einner&seed=2&turns=18');
   const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
@@ -167,6 +177,7 @@ test('a saved session resumes at an inner node', async ({ page }) => {
 });
 
 test('after the engine exits, the next move restarts it and rebuilds the session', async ({ page }) => {
+  await openTree(page);
   await page.goto('./?seed=4&turns=18');
   await discardDrawn(page);
   await page.reload(); // the session now lives under a new engine id
