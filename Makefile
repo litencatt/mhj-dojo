@@ -1,4 +1,6 @@
-.PHONY: web build test run vet wasm site
+.PHONY: web build test run vet wasm site deploy
+
+DEPLOY_PROJECT ?= 01M3EY63A2EQPZG0KRRA8H8PHC
 
 web:
 	cd web && npm ci && npm run build
@@ -24,3 +26,13 @@ wasm:
 # The static site (practice mode only) into web/dist-site/ (not committed).
 site: wasm
 	cd web && npm ci && npm run build:site
+
+# Deploy the static site to Lolipop Deploy Now. web/dist-site/ and the .wasm
+# are gitignored, and the lolipop CLI skips gitignored files when its --dir
+# is inside a git repo, so the build is copied to a temp dir outside the
+# repo first. Run `npx lolipop login` once beforehand.
+deploy: site
+	@tmp_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	cp -R web/dist-site/. "$$tmp_dir"/; \
+	npx -y lolipop deploy --project $(DEPLOY_PROJECT) --dir "$$tmp_dir"

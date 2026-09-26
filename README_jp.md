@@ -4,6 +4,8 @@
 
 [English README](README.md)
 
+静的サイト（練習モードのみ、CPU対戦は未対応）: https://mhj-dojo.lolipop-now.app/
+
 ## 練習モード
 
 - **一人打ち練習**：シード付きの山でツモと打牌を繰り返します。同じシードなら、配牌もツモ順も毎回同じです。ツモ和了するか、既定の18巡で終局します。
@@ -105,6 +107,12 @@ make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo
 - 練習モードのみです。CPU対戦（**CPU対戦へ**、`?mode=game`）はまだ使えません。
 - タブごとに別の状態を持つので、「別の画面で進んだ」ときの処理はありません。
 - セッションごとの操作をブラウザ（localStorage、最近使った 10 セッションまで）に保存し、再読み込みのときに同じ URL のまま作り直します。作り直せないときは、URL のシードから同じ山で配り直します。
+
+Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードのみ、CPU対戦は未対応）に公開しています。
+
+#### デプロイ
+
+初回のみ `npx lolipop login`（ブラウザでの認可）を実行し、あとは `make deploy` でビルドから公開まで行います。Lolipop のプロジェクトは `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."` で一度だけ作成済みで、`make deploy` はそのプロジェクトへビルドを送るだけです。`make deploy` は `web/dist-site/` をこのリポジトリの外の一時ディレクトリにコピーしてからデプロイします。`web/dist-site/` と `mhj-dojo.wasm` は `.gitignore` 対象で、`lolipop` CLI は `--dir` が git リポジトリ内にあると gitignore されたファイルを無視してしまうためです。Deploy Now は `index.html` を `max-age=86400` で配信するため、再訪問者のキャッシュに新しいデプロイが届くまで最大で1日かかることがあります。`index.html` はエンジン（worker、`wasm_exec.js`、`mhj-dojo.wasm`）をそれらのハッシュ値の `?v=<hash>` 付きで読み込むので（`web/src/wasm.ts` 参照）、古い `index.html` が新しいエンジンと混ざる（またはその逆）ことはありません。
 
 ### ディレクトリ構成
 
