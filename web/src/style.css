@@ -787,7 +787,8 @@ section {
 .yaku-table-scroll {
   overflow-x: auto;
 }
-.yaku-table {
+.yaku-table,
+.combo-table {
   border-collapse: collapse;
   width: 100%;
   min-width: 480px; /* below this, scroll sideways rather than squeezing the ukeire column */
@@ -802,7 +803,9 @@ section {
   box-shadow: inset 0 -1px 0 var(--border); /* collapsed borders do not stick */
 }
 .yaku-table th,
-.yaku-table td {
+.yaku-table td,
+.combo-table th,
+.combo-table td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   text-align: left;
@@ -810,6 +813,25 @@ section {
 }
 .yaku-name-cell {
   white-space: nowrap;
+}
+.combo-section {
+  margin: 0 0 8px;
+  overflow-x: auto;
+  flex: 0 0 auto;
+}
+.combo-section summary {
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+.combo-table thead th {
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.combo-name-cell {
+  min-width: 8em;
+  font-weight: normal;
 }
 .han-cell {
   white-space: nowrap;

@@ -65,3 +65,23 @@ func TestAnalysisAfterPonIsBestDiscard(t *testing.T) {
 		t.Error("no discards: want an empty, non-nil analysis")
 	}
 }
+
+// After a call the combos are those of the discard whose first combo ranks
+// best: lower rank first, then more han, then more ukeire.
+func TestCombosAfterCallAreBestDiscard(t *testing.T) {
+	row := func(han, shanten, ukeire int) apiview.ComboRow {
+		return apiview.ComboRow{Name: "x", Han: han, Shanten: shanten, UkeireTotal: ukeire}
+	}
+	by := map[string][]apiview.ComboRow{
+		"1m": {row(2, 1, 20)},               // rank 0
+		"2m": {row(4, 2, 10)},               // rank 0, more han
+		"3m": {row(4, 2, 12), row(2, 3, 0)}, // the same, more ukeire
+		"4m": {},
+	}
+	if got := bestCombos(by, []string{"4m", "1m", "2m", "3m"}); len(got) != 2 || got[0].UkeireTotal != 12 {
+		t.Errorf("got %+v, want the 3m combos", got)
+	}
+	if got := bestCombos(nil, nil); got == nil || len(got) != 0 {
+		t.Errorf("no discards: %+v, want empty non-nil", got)
+	}
+}

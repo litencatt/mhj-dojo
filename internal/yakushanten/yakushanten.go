@@ -339,6 +339,11 @@ type Analyzer struct {
 	// AnalyzeWith saw: every discard candidate of a turn shares them.
 	melds       []yaku.Meld
 	meldTargets map[string][]shanten.Target
+	// comboMelds and comboTargets cache the combo target families (in
+	// combosFor order) for the last melds Combos saw.
+	comboMelds   []yaku.Meld
+	comboTargets [][]shanten.Target
+	folds        map[[2]*shanten.Table]*shanten.Table // see comboDist
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -554,18 +559,24 @@ func fromShanten(s shanten.Result) Result {
 }
 
 // dist returns the minimum distance over a target family and the evals
-// achieving it.
+// achieving it. The distances come from the shared fold cache (comboDist);
+// only the members at the minimum get a full Eval, for their ukeire.
 func (a *Analyzer) dist(c *tile.Counts, ts []shanten.Target) (int, []*shanten.Eval) {
+	dd := a.comboDist(c)
 	best := shanten.Inf
-	var at []*shanten.Eval
+	var idx []int
 	for i := range ts {
-		ev := a.eng.Evaluate(c, &ts[i])
+		d := dd.dist(&ts[i])
 		switch {
-		case ev.Dist < best:
-			best, at = ev.Dist, []*shanten.Eval{ev}
-		case ev.Dist == best && best != shanten.Inf:
-			at = append(at, ev)
+		case d < best:
+			best, idx = d, append(idx[:0], i)
+		case d == best && best != shanten.Inf:
+			idx = append(idx, i)
 		}
+	}
+	at := make([]*shanten.Eval, len(idx))
+	for j, i := range idx {
+		at[j] = a.eng.Evaluate(c, &ts[i])
 	}
 	return best, at
 }
@@ -635,25 +646,7 @@ func (a *Analyzer) pinfu(c tile.Counts) Result {
 	}
 	// All-sequence tenpai without a two-sided pinfu wait: one more exchange is
 	// needed. Ukeire = draws after which some discard reaches exact pinfu tenpai.
-	var set [tile.NumKinds]bool
-	for t := tile.Kind(0); t < tile.NumKinds; t++ {
-		if c[t] >= 4 {
-			continue
-		}
-		c[t]++
-		for x := tile.Kind(0); x < tile.NumKinds && !set[t]; x++ {
-			if c[x] == 0 || x == t {
-				continue
-			}
-			c[x]--
-			if d, _ := a.dist(&c, a.pinfuT); d == 1 && len(PinfuWaitsFor(c, a.winds)) > 0 {
-				set[t] = true
-			}
-			c[x]++
-		}
-		c[t]--
-	}
-	return Result{Possible: true, Shanten: 1, Approx: true, Ukeire: kindsOf(&set)}
+	return Result{Possible: true, Shanten: 1, Approx: true, Ukeire: a.pinfuUkeire(c, a.pinfuT)}
 }
 
 // PinfuWaits is PinfuWaitsFor with the practice-mode winds (East, East).

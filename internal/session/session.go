@@ -127,6 +127,10 @@ type node struct {
 	// pruneAnalysisCache clears them once a node falls off that path.
 	analysis  []yakushanten.Result
 	byDiscard map[tile.Kind][]yakushanten.Result
+	// combos and combosByDiscard are the yaku combos of the hand and of
+	// each discard; like byDiscard they are kept for the current node only.
+	combos          []yakushanten.Combo
+	combosByDiscard map[tile.Kind][]yakushanten.Combo
 	// advice is the current node's discard advice, pruned with byDiscard;
 	// review compares the discard that led to this node with the best one
 	// at its parent and, being small, is kept forever.
@@ -299,6 +303,22 @@ func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
 	return s.analyzer.Analyze(c)
 }
 
+// combos returns the yaku combos of the 13 tiles c, whose rows are res.
+func (s *Session) combos(c tile.Counts, res []yakushanten.Result) []yakushanten.Combo {
+	s.resetAnalyzerIfFull()
+	return s.analyzer.Combos(c, nil, res)
+}
+
+// nodeCombos returns the yaku combos of a node's hand, cached on the node
+// until pruneAnalysisCache drops them.
+func (s *Session) nodeCombos(n *node) []yakushanten.Combo {
+	if n.combos == nil {
+		// non-nil even when empty, so an empty result is not recomputed
+		n.combos = append([]yakushanten.Combo{}, s.combos(tile.CountsOf(n.hand), s.nodeAnalysis(n))...)
+	}
+	return n.combos
+}
+
 func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
 	if n.analysis == nil {
 		n.analysis = s.analyze(tile.CountsOf(n.hand))
@@ -339,6 +359,8 @@ func (s *Session) pruneAnalysisCache(path []*node, cur *node) {
 		if id != cur.id {
 			n.byDiscard = nil
 			n.advice = nil
+			n.combos = nil
+			n.combosByDiscard = nil
 		}
 	}
 	s.pathCache = next

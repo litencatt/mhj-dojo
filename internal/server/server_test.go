@@ -91,7 +91,7 @@ func TestStateContract(t *testing.T) {
 	for _, k := range []string{
 		"session_id", "seed", "max_turns", "round_wind", "seat_wind", "node_id", "turn", "status",
 		"hand", "hand_groups", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
-		"analysis", "by_discard", "history", "tree", "win", "advice", "discard_review",
+		"analysis", "by_discard", "combos", "combos_by_discard", "history", "tree", "win", "advice", "discard_review",
 	} {
 		if _, ok := raw[k]; !ok {
 			t.Errorf("missing key %q", k)
@@ -117,6 +117,22 @@ func TestStateContract(t *testing.T) {
 	}
 	if string(rows[0]["yakuman"]) != "false" || string(rows[21]["key"]) != `"kokushi"` || string(rows[21]["yakuman"]) != "true" {
 		t.Errorf("yakuman flags: %s %s %s", rows[0]["yakuman"], rows[21]["key"], rows[21]["yakuman"])
+	}
+	var combos []map[string]json.RawMessage
+	if err := json.Unmarshal(raw["combos"], &combos); err != nil {
+		t.Fatal(err)
+	}
+	if len(combos) == 0 || len(combos) > 5 {
+		t.Fatalf("%d combos", len(combos))
+	}
+	for _, k := range []string{"keys", "name", "han", "shanten", "approx", "ukeire", "ukeire_total"} {
+		if _, ok := combos[0][k]; !ok {
+			t.Errorf("combo missing %q", k)
+		}
+	}
+	var combosBy map[string][]map[string]json.RawMessage
+	if err := json.Unmarshal(raw["combos_by_discard"], &combosBy); err != nil || len(combosBy) == 0 {
+		t.Errorf("combos_by_discard = %s (%v)", raw["combos_by_discard"], err)
 	}
 	var hist []map[string]json.RawMessage
 	if err := json.Unmarshal(raw["history"], &hist); err != nil {

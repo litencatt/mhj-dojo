@@ -11,6 +11,7 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and i
   normal form, tanyao, pinfu, iipeikou, ryanpeikou, sanshoku, sanshoku doukou, ittsu, chanta, junchan, honroutou, honitsu, chinitsu, toitoi, sanankou, shousangen, yakuhai (haku / hatsu / chun / ton), chiitoitsu,
   and the yakuman kokushi, suuankou, daisangen, tsuuiisou, shousuushii, daisuushii, ryuuiisou, chinroutou and chuuren.
 - **Yaku table tools** — a 翻 column, a tooltip with each yaku's winning conditions, and filters: search by name or reading, limit by shanten, toggle 1翻 / 2翻 / 3翻以上 / 役満, and sort by shanten or ukeire.
+- **Yaku combos** — the top five combinations of yaku one complete hand can score together (e.g. tanyao + pinfu + sanshoku), with their han, shanten and effective tiles, ranked so that one step toward tenpai weighs as much as two han (see [docs/api.md](docs/api.md)).
 - **Dora and ura dora** — the header shows the dora indicator and its dora; the ura-dora indicator stays face down until the game ends.
 - **Discard preview** — hover a tile to see the table as it would be after discarding it, with differences from the current values.
 - **Time-series chart** — shanten per yaku across turns; toggle series from the legend (yakuman series are grouped at the end and hidden by default).

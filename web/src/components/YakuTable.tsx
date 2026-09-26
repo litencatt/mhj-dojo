@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { YakuRow } from '../api';
+import type { ComboRow, UkeireEntry, YakuRow } from '../api';
 import { Tile } from './Tile';
 import { PanelHeading } from './PanelHeading';
 import { YAKU_CONDITIONS } from './yakuInfo';
@@ -19,6 +19,8 @@ export interface YakuTableProps {
   rows: YakuRow[];
   baseline: YakuRow[] | null; // non-null while previewing a discard candidate
   previewTile: string | null;
+  combos: ComboRow[]; // yaku combinations of the shown hand (the preview while previewing)
+  baseCombos: ComboRow[] | null; // the current node's combos while previewing
   onMinimize?: () => void;
 }
 
@@ -37,12 +39,73 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
   return { text: d < 0 ? `${d}` : `+${d}`, cls: d < 0 ? 'delta-improve' : d > 0 ? 'delta-worse' : 'delta-flat' };
 }
 
+function UkeireCell({ ukeire }: { ukeire: UkeireEntry[] }) {
+  if (ukeire.length === 0) return <span class="muted">—</span>;
+  return (
+    <div class="ukeire-tiles">
+      {ukeire.map((u) => (
+        <div key={u.tile} class={`ukeire-item ${u.remaining === 0 ? 'ukeire-item-zero' : ''}`}>
+          <Tile tile={u.tile} size="xs" dimmed={u.remaining === 0} />
+          <span class="ukeire-count">{u.remaining}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 複合役: the best combinations of yaku one hand can score together, ranked
+ * by the server (docs/api.md "Yaku combos"). While previewing, a combination
+ * the current node also lists shows its shanten delta. */
+function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | null }) {
+  if (combos.length === 0) return null;
+  const baseByName = new Map((base ?? []).map((c) => [c.name, c]));
+  return (
+    <details class="combo-section" open>
+      <summary>複合役（上位{combos.length}件）</summary>
+      <table class="combo-table">
+        <thead>
+          <tr>
+            <th scope="col">役の組み合わせ</th>
+            <th scope="col">翻</th>
+            <th scope="col">向聴</th>
+            <th scope="col">有効牌</th>
+            <th scope="col">合計枚数</th>
+          </tr>
+        </thead>
+        <tbody>
+          {combos.map((c) => {
+            const b = baseByName.get(c.name);
+            const delta = base && b ? deltaLabel(c.shanten, b.shanten) : null;
+            return (
+              <tr key={c.name}>
+                <th scope="row" class="combo-name-cell">
+                  {c.name}
+                  {c.approx && <span class="badge-approx">近似</span>}
+                </th>
+                <td class="han-cell">{c.han}翻</td>
+                <td class="shanten-cell">
+                  <span>{shantenLabel(c.shanten)}</span>
+                  {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
+                </td>
+                <td class="ukeire-cell">
+                  <UkeireCell ukeire={c.ukeire} />
+                </td>
+                <td class="ukeire-total-cell">{c.ukeire_total}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
 /** 役別向聴テーブル: shows either the current-node analysis, or (while previewing a
  * discard) that candidate's resulting analysis with deltas vs the current node.
  * A filter bar narrows and sorts the rows by the current values, so rows do not
  * jump while previewing. The normal row always comes first. */
 export function YakuTable(props: YakuTableProps) {
-  const { rows, baseline, previewTile, onMinimize } = props;
+  const { rows, baseline, previewTile, combos, baseCombos, onMinimize } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
   const setFilter = (f: YakuFilter) => {
     setFilterState(f);
@@ -115,18 +178,7 @@ export function YakuTable(props: YakuTableProps) {
           {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
         </td>
         <td class="ukeire-cell">
-          {row.ukeire.length === 0 ? (
-            <span class="muted">—</span>
-          ) : (
-            <div class="ukeire-tiles">
-              {row.ukeire.map((u) => (
-                <div key={u.tile} class={`ukeire-item ${u.remaining === 0 ? 'ukeire-item-zero' : ''}`}>
-                  <Tile tile={u.tile} size="xs" dimmed={u.remaining === 0} />
-                  <span class="ukeire-count">{u.remaining}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <UkeireCell ukeire={row.ukeire} />
         </td>
         <td class="ukeire-total-cell">{row.ukeire_total}</td>
       </tr>
@@ -144,6 +196,7 @@ export function YakuTable(props: YakuTableProps) {
       <PanelHeading title="役別向聴" onMinimize={onMinimize}>
         {previewTile && <span class="preview-note"> — {previewTile} を打牌した場合のプレビュー</span>}
       </PanelHeading>
+      <ComboTable combos={combos} base={baseCombos} />
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
           <input

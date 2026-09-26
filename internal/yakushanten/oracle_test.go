@@ -15,8 +15,12 @@ import (
 
 // satisfies is an independent, decomposition-based definition of "W satisfies
 // Y" for a 14-tile hand, used as the brute-force oracle. Pinfu here is the
-// relaxed shape (the wait is checked separately).
+// relaxed shape (the wait is checked separately). A key joining several
+// keys with "+" is a combo (satisfiesCombo).
 func satisfies(key string, c tile.Counts) bool {
+	if strings.Contains(key, "+") {
+		return satisfiesCombo(strings.Split(key, "+"), c)
+	}
 	// tile-set predicates
 	suits := map[int]bool{}
 	honors, yaochuTile, allYaochu, allHonors, allTerminal, allGreen := false, false, true, true, true, true
@@ -84,6 +88,10 @@ func satisfies(key string, c tile.Counts) bool {
 	return false
 }
 
+// oracleWinds are the winds readingSatisfies uses for the pinfu pair; tests
+// that change it restore East/East.
+var oracleWinds = EastEast
+
 func readingSatisfies(key string, d yaku.Decomposition) bool {
 	seqs, trips := 0, 0
 	var seqCount [tile.NumKinds]int
@@ -120,7 +128,7 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 	}
 	switch key {
 	case "pinfu":
-		return seqs == 4 && d.Pair != tile.East && d.Pair < tile.Haku
+		return seqs == 4 && d.Pair < tile.Haku && oracleWinds.Count(d.Pair) == 0
 	case "iipeikou":
 		return slices.ContainsFunc(seqCount[:], func(n int) bool { return n >= 2 })
 	case "sanshoku":
@@ -168,8 +176,8 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 		return has(tile.Hatsu, yaku.Trip)
 	case "chun":
 		return has(tile.Chun, yaku.Trip)
-	case "ton":
-		return has(tile.East, yaku.Trip)
+	case "ton", "nan", "shaa", "pei":
+		return has(tile.East+tile.Kind(slices.Index(yaku.WindKeys[:], key)), yaku.Trip)
 	}
 	panic("unknown key " + key)
 }
@@ -584,6 +592,9 @@ func TestPinfuExactWaits(t *testing.T) {
 		case relaxed.Shanten == 0:
 			if res.Shanten != 1 || !res.Approx {
 				t.Fatalf("%s: relaxed tenpai without ryanmen should be 1 (approx), got %d", c, res.Shanten)
+			}
+			if want := bruteFallbackUkeire([]string{"pinfu"}, c); !slices.Equal(res.Ukeire, want) {
+				t.Fatalf("%s: fallback ukeire %v, brute %v", c, names(res.Ukeire), names(want))
 			}
 		default:
 			if res.Shanten != relaxed.Shanten || !res.Approx || res.Shanten < 1 {
