@@ -12,10 +12,10 @@ import (
 	"path"
 	"strings"
 
-	"github.com/litencatt/mhj2/internal/apicall"
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/match"
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/apicall"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 //go:embed all:static

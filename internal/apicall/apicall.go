@@ -1,7 +1,7 @@
 // Package apicall is the transport-independent part of the JSON API
 // (docs/api.md): decoding request bodies, running the practice operations
 // and mapping errors to HTTP statuses. The HTTP server (internal/server) and
-// the WebAssembly build (cmd/mhj2wasm) share it, so both answer the same
+// the WebAssembly build (cmd/mhj-dojo-wasm) share it, so both answer the same
 // request with the same JSON.
 package apicall
 
@@ -11,9 +11,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/match"
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 // maxBody bounds a request body.

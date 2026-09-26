@@ -1,4 +1,4 @@
-// Command mhj2 starts the local mahjong practice server and opens the browser.
+// Command mhj-dojo starts the local mahjong practice server and opens the browser.
 package main
 
 import (
@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/litencatt/mhj2/internal/match"
-	"github.com/litencatt/mhj2/internal/server"
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/server"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 func main() {
@@ -53,7 +53,7 @@ func run(host string, port int, open bool, store *session.Store, games *match.St
 		urlHost = "127.0.0.1"
 	}
 	url := fmt.Sprintf("http://%s/", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
-	fmt.Printf("mhj2 listening on %s (Ctrl+C to quit)\n", url)
+	fmt.Printf("mhj-dojo listening on %s (Ctrl+C to quit)\n", url)
 	if addr := ln.Addr().(*net.TCPAddr); !addr.IP.IsLoopback() {
 		fmt.Fprintf(os.Stderr, "warning: bound to %s: the API has no authentication and the Host check only stops browsers, so other machines on the network can use it\n", addr)
 	}

@@ -1,7 +1,7 @@
 name: Nightly
 
 # The exhaustive suites that pull requests skip to keep CI fast: the full
-# oracle, property and self-play loops (MHJ2_FULL=1, see internal/testmode),
+# oracle, property and self-play loops (MHJDOJO_FULL=1, see internal/testmode),
 # the whole-game playthroughs under the race detector, and the E2E tests
 # repeated to find flaky ones.
 on:
@@ -25,7 +25,7 @@ jobs:
           cache: false
       - run: go test -count=1 ./...
         env:
-          MHJ2_FULL: "1"
+          MHJDOJO_FULL: "1"
 
   # Without -short: the pull request's loop sizes plus the whole-game
   # playthroughs that the race job skips. The exhaustive loops stay out, as

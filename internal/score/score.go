@@ -1,7 +1,7 @@
 // Package score turns han and fu into points (no honba; kiriage mangan off).
 package score
 
-import "github.com/litencatt/mhj2/internal/yaku"
+import "github.com/litencatt/mhj-dojo/internal/yaku"
 
 // Limit names a limit hand; "" is a hand scored by fu.
 type Limit string

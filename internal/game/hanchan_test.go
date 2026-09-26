@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // endRound ends h's current round with res and the given points.

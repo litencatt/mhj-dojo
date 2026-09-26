@@ -1,6 +1,6 @@
-# mhj2
+# mhj-dojo
 
-A local web app for practicing Japanese riichi mahjong. Run the `mhj2` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
+A local web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
 
 [日本語版 README](README_jp.md)
 
@@ -51,8 +51,8 @@ For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H t
 ## Quick start
 
 ```sh
-make build        # builds bin/mhj2 (frontend is embedded)
-./bin/mhj2        # serves http://127.0.0.1:8765 and opens the browser
+make build        # builds bin/mhj-dojo (frontend is embedded)
+./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
 
 ### Flags
@@ -72,16 +72,16 @@ The server only accepts requests whose `Host` header names localhost. That stops
 make test         # go test ./...
 make vet          # go vet ./...
 make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj2
+make run          # go run ./cmd/mhj-dojo
 ```
 
-Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj2` running):
+Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj-dojo` running):
 
 ```sh
 cd web && npm run dev
 ```
 
-Browser end-to-end tests (Playwright + Chromium) cover practice mode and a CPU game (calls, round result, next round, a mobile viewport). They start their own `mhj2` server against the built frontend, so no other server needs to be running:
+Browser end-to-end tests (Playwright + Chromium) cover practice mode and a CPU game (calls, round result, next round, a mobile viewport). They start their own `mhj-dojo` server against the built frontend, so no other server needs to be running:
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # once
@@ -90,13 +90,13 @@ cd web && npm run build && npm run e2e
 
 ### Static site (WebAssembly, practice mode only)
 
-The practice mode can also be built as a static site that needs no server: the Go practice engine (`cmd/mhj2wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
+The practice mode can also be built as a static site that needs no server: the Go practice engine (`cmd/mhj-dojo-wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
 
 ```sh
-make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj2.wasm + wasm_exec.js), then npm run build:site
+make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj2.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests with `cd web && npm run e2e:site`.
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests with `cd web && npm run e2e:site`.
 
 Differences from the local version:
 
@@ -107,8 +107,8 @@ Differences from the local version:
 ### Layout
 
 ```
-cmd/mhj2/            CLI entry point
-cmd/mhj2wasm/        practice engine as WebAssembly for the static site
+cmd/mhj-dojo/        CLI entry point
+cmd/mhj-dojo-wasm/   practice engine as WebAssembly for the static site
 internal/tile/       tile representation and notation
 internal/wall/       seeded wall, deal, draws
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire

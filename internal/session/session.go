@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/litencatt/mhj2/internal/advice"
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/store"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
-	"github.com/litencatt/mhj2/internal/yaku"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/advice"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/store"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // Errors returned by sessions; the server maps them to HTTP statuses.

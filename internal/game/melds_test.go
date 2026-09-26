@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // setPon gives seat a called pon of kind s from seat from and replaces its

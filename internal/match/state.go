@@ -3,12 +3,12 @@ package match
 import (
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/game"
-	"github.com/litencatt/mhj2/internal/score"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/score"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // State is the JSON view of a game for the human (docs/api.md).

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yakushanten"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 func find(t *testing.T, a *Advice, s string) cand {

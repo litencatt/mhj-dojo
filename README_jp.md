@@ -1,6 +1,6 @@
-# mhj2
+# mhj-dojo
 
-日本式リーチ麻雀を練習するためのローカルWebアプリです。CLI `mhj2` を起動するとローカルWebサーバが立ち上がり、ブラウザで練習画面が開きます。一人打ちで役別向聴を見ながら練習することも、鳴きとリーチのある東風戦・半荘戦をCPU3人と打つこともできます。
+日本式リーチ麻雀を練習するためのローカルWebアプリです。CLI `mhj-dojo` を起動するとローカルWebサーバが立ち上がり、ブラウザで練習画面が開きます。一人打ちで役別向聴を見ながら練習することも、鳴きとリーチのある東風戦・半荘戦をCPU3人と打つこともできます。
 
 [English README](README.md)
 
@@ -53,8 +53,8 @@
 ## クイックスタート
 
 ```sh
-make build        # bin/mhj2 をビルド（フロントエンドを埋め込み済み）
-./bin/mhj2        # http://127.0.0.1:8765 で起動し、ブラウザを開く
+make build        # bin/mhj-dojo をビルド（フロントエンドを埋め込み済み）
+./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
 
 ### オプション
@@ -74,16 +74,16 @@ make build        # bin/mhj2 をビルド（フロントエンドを埋め込み
 make test         # go test ./...
 make vet          # go vet ./...
 make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj2
+make run          # go run ./cmd/mhj-dojo
 ```
 
-ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。`/api` を `127.0.0.1:8765` に中継するので、`mhj2` も起動しておいてください。
+ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。`/api` を `127.0.0.1:8765` に中継するので、`mhj-dojo` も起動しておいてください。
 
 ```sh
 cd web && npm run dev
 ```
 
-ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習と、CPU対戦（鳴き・局の結果・次局・390px幅のモバイル表示）をカバーします。ビルド済みのフロントエンドに対して専用の `mhj2` サーバを自前で起動するので、他にサーバを立てておく必要はありません。
+ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習と、CPU対戦（鳴き・局の結果・次局・390px幅のモバイル表示）をカバーします。ビルド済みのフロントエンドに対して専用の `mhj-dojo` サーバを自前で起動するので、他にサーバを立てておく必要はありません。
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # 初回のみ
@@ -92,13 +92,13 @@ cd web && npm run build && npm run e2e
 
 ### 静的サイト（WebAssembly、練習モードのみ）
 
-練習モードは、サーバなしで動く静的サイトとしてもビルドできます。Go の練習エンジン（`cmd/mhj2wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。HTTP API（docs/api.md）と同じリクエストに同じ JSON で答えるので、画面のコードは共通です。
+練習モードは、サーバなしで動く静的サイトとしてもビルドできます。Go の練習エンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。HTTP API（docs/api.md）と同じリクエストに同じ JSON で答えるので、画面のコードは共通です。
 
 ```sh
-make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj2.wasm と wasm_exec.js）のあと npm run build:site
+make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj2.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テストは `cd web && npm run e2e:site` です。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テストは `cd web && npm run e2e:site` です。
 
 ローカル版との違い:
 
@@ -109,8 +109,8 @@ make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj2.was
 ### ディレクトリ構成
 
 ```
-cmd/mhj2/            CLI のエントリポイント
-cmd/mhj2wasm/        静的サイト用の練習エンジン（WebAssembly）
+cmd/mhj-dojo/        CLI のエントリポイント
+cmd/mhj-dojo-wasm/   静的サイト用の練習エンジン（WebAssembly）
 internal/tile/       牌の表現と表記
 internal/wall/       シード付きの山、配牌、ツモ
 internal/shanten/    一般形・七対子・国士無双の向聴と有効牌

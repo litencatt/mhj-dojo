@@ -6,7 +6,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
 )
 
 // stateJSON is the state's JSON without the session id, for comparing two

@@ -7,7 +7,7 @@
 // package yakushanten expresses yaku constraints on the same engine.
 package shanten
 
-import "github.com/litencatt/mhj2/internal/tile"
+import "github.com/litencatt/mhj-dojo/internal/tile"
 
 // Inf marks an unreachable cost.
 const Inf = 255

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/apicall"
-	"github.com/litencatt/mhj2/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/apicall"
+	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 // TestRouteMatchesServer sends the same practice requests to the HTTP server

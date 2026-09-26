@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/litencatt/mhj2/internal/shanten"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // Combo is the shanten toward a complete hand that satisfies several yaku at

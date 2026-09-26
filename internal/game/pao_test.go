@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // called is a meld of three (or four, kan) tiles of kind s called from seat

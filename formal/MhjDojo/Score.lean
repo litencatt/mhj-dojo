@@ -6,7 +6,7 @@ kiriage mangan, counted yakuman at 13 han, yakuman multiples.
 import Mathlib.Tactic.Ring
 import Mathlib.Tactic.NormNum
 
-namespace Mhj2
+namespace MhjDojo
 
 /-- `v` rounded up to a multiple of 100. -/
 def up100 (v : Nat) : Nat := (v + 99) / 100 * 100
@@ -200,4 +200,4 @@ theorem yakuman_payments (han fu n : Nat) (hn : 0 < n) :
   simp only [compute, basePts, hc, hn, ↓reduceIte, up100]
   omega
 
-end Mhj2
+end MhjDojo

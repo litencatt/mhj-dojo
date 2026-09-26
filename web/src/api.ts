@@ -3,9 +3,9 @@
 import { wasmRequest } from './wasm';
 
 // The static site (`npm run build:site`, issue #67) answers requests from the
-// practice engine compiled to WebAssembly instead of the mhj2 server. Fixed
+// practice engine compiled to WebAssembly instead of the mhj-dojo server. Fixed
 // at build time, so the default build leaves the WASM transport out.
-export const WASM = import.meta.env.VITE_MHJ2_TARGET === 'wasm';
+export const WASM = import.meta.env.VITE_MHJDOJO_TARGET === 'wasm';
 
 export type Tile = string; // e.g. "1m", "0m" (red five), "7z"
 

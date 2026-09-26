@@ -6,7 +6,7 @@ package yaku
 import (
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // GroupType is the shape of a group.

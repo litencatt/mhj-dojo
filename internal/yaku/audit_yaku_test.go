@@ -3,7 +3,7 @@ package yaku
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // Rules audit for the yaku and fu evaluation (the round flow is audited in

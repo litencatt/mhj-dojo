@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 const (
@@ -70,7 +70,7 @@ func PickSeed(explicit, def *int64, bound int64) int64 {
 // New shuffles a full set with a PCG generator seeded from seed.
 func New(seed int64) *Wall {
 	w := &Wall{seed: seed, tiles: FullSet()}
-	r := rand.New(rand.NewPCG(uint64(seed), 0x6d686a32)) // "mhj2"
+	r := rand.New(rand.NewPCG(uint64(seed), 0x6d686a32)) // arbitrary PCG stream constant
 	r.Shuffle(Size, func(i, j int) { w.tiles[i], w.tiles[j] = w.tiles[j], w.tiles[i] })
 	return w
 }

@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // fillTree grows a session's branch tree to target nodes (at most MaxNodes)

@@ -65,7 +65,7 @@ jobs:
       # go vet runs in golangci-lint (the standard set includes govet).
       # The reduced, fixed-seed subset of the oracle, property and self-play
       # tests (internal/testmode); the nightly workflow runs the exhaustive
-      # loops with MHJ2_FULL=1.
+      # loops with MHJDOJO_FULL=1.
       - name: go test
         env:
           PACKAGES: ${{ matrix.packages }}
@@ -75,7 +75,7 @@ jobs:
           fi
           go test -count=1 $PACKAGES
       - if: matrix.group == 'rest'
-        run: go build -o bin/mhj2 ./cmd/mhj2
+        run: go build -o bin/mhj-dojo ./cmd/mhj-dojo
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
@@ -200,7 +200,7 @@ jobs:
 
   # The static site (issue #67): the practice engine built as WebAssembly
   # and the site built on it, then its E2E tests in the browser with no
-  # mhj2 server (vite preview serves web/dist-site).
+  # mhj-dojo server (vite preview serves web/dist-site).
   site:
     name: Static site (WASM) build + E2E
     runs-on: ubuntu-latest
@@ -219,14 +219,14 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: go vet (js/wasm)
         working-directory: .
-        run: GOOS=js GOARCH=wasm go vet ./cmd/mhj2wasm/...
+        run: GOOS=js GOARCH=wasm go vet ./cmd/mhj-dojo-wasm/...
       - name: Build the WASM engine
         working-directory: .
         run: make wasm
       - name: WASM size
         working-directory: .
         run: |
-          echo "mhj2.wasm: $(wc -c < web/site-public/mhj2.wasm) bytes, gzip -9 $(gzip -9c web/site-public/mhj2.wasm | wc -c) bytes" >> "$GITHUB_STEP_SUMMARY"
+          echo "mhj-dojo.wasm: $(wc -c < web/site-public/mhj-dojo.wasm) bytes, gzip -9 $(gzip -9c web/site-public/mhj-dojo.wasm | wc -c) bytes" >> "$GITHUB_STEP_SUMMARY"
       - run: npm ci
       - run: npm run build:site
       - name: Get installed Playwright version

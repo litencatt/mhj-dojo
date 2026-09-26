@@ -16,7 +16,7 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // Type is the kind of a block.

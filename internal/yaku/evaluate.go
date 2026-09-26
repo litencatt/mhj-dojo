@@ -3,7 +3,7 @@ package yaku
 import (
 	"slices"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
 // Yaku is one scoring element of a win.

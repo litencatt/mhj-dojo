@@ -9,11 +9,9 @@ export const PANELS: Array<{ key: PanelKey; label: string }> = [
   { key: 'advice', label: 'アドバイス' },
   { key: 'gloss', label: '用語表' },
 ];
-// v2 adds the advice panel, which starts minimized (docked) so the answer
-// isn't shown before the player has thought about the hand.
-const MINIMIZED_KEY = 'mhj2.minimized.v2';
-const OLD_MINIMIZED_KEY = 'mhj2.minimized';
-const OLD_ADVICE_OPEN_KEY = 'mhj2.adviceOpen';
+// The advice panel starts minimized (docked) so the answer isn't shown
+// before the player has thought about the hand.
+const MINIMIZED_KEY = 'mhj-dojo.minimized.v2';
 
 function parseKeys(raw: string | null): PanelKey[] | null {
   if (raw === null) return null;
@@ -23,12 +21,7 @@ function parseKeys(raw: string | null): PanelKey[] | null {
 
 function loadMinimized(): PanelKey[] {
   try {
-    const keys = parseKeys(localStorage.getItem(MINIMIZED_KEY));
-    if (keys) return keys;
-    // First load after v2: keep the old layout, and the advice docked unless
-    // it had been opened with the old 開く/閉じる toggle.
-    const old = parseKeys(localStorage.getItem(OLD_MINIMIZED_KEY)) ?? [];
-    return localStorage.getItem(OLD_ADVICE_OPEN_KEY) === '1' ? old : [...old, 'advice'];
+    return parseKeys(localStorage.getItem(MINIMIZED_KEY)) ?? ['advice'];
   } catch {
     return ['advice'];
   }

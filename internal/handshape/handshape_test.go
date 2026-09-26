@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/shanten"
-	"github.com/litencatt/mhj2/internal/testmode"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // format writes groups as "type:tiles" separated by spaces, e.g. "seq:123m".

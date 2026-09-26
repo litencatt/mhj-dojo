@@ -11,11 +11,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/match"
-	"github.com/litencatt/mhj2/internal/session"
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 type client struct {
@@ -25,7 +25,7 @@ type client struct {
 
 func newClient(t *testing.T, store *session.Store) *client {
 	static := fstest.MapFS{
-		"index.html":    {Data: []byte("<!doctype html><title>mhj2</title>")},
+		"index.html":    {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
 		"assets/app.js": {Data: []byte("console.log(1)")},
 	}
 	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))

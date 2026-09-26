@@ -1,9 +1,9 @@
 package session
 
 import (
-	"github.com/litencatt/mhj2/internal/advice"
-	"github.com/litencatt/mhj2/internal/apiview"
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/advice"
+	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // State is the JSON view of a session at its current node (docs/api.md).

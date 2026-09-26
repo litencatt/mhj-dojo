@@ -31,7 +31,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `go run ./cmd/mhj2 --port ${PORT} --host 127.0.0.1 --open=false`,
+    command: `go run ./cmd/mhj-dojo --port ${PORT} --host 127.0.0.1 --open=false`,
     cwd: path.resolve(__dirname, '..'),
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,

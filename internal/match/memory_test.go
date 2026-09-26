@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/game"
 )
 
 // BenchmarkGameMemory estimates the heap held by one finished 半荘 Match —

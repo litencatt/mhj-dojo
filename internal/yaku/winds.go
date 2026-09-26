@@ -1,6 +1,6 @@
 package yaku
 
-import "github.com/litencatt/mhj2/internal/tile"
+import "github.com/litencatt/mhj-dojo/internal/tile"
 
 // Winds are the round wind and a seat's wind. They decide which wind
 // triplets are yakuhai and which pairs are value pairs.

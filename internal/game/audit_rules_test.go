@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
-	"github.com/litencatt/mhj2/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // Rules audit: scenario tests for the round flow against standard riichi

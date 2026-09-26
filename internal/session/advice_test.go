@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/litencatt/mhj2/internal/testmode"
+	"github.com/litencatt/mhj-dojo/internal/testmode"
 )
 
 func TestAdviceAndReview(t *testing.T) {

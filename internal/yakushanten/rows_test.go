@@ -3,9 +3,9 @@ package yakushanten
 import (
 	"testing"
 
-	"github.com/litencatt/mhj2/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/tile"
 
-	"github.com/litencatt/mhj2/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // Every row's han comes from the win evaluator, so the table and the

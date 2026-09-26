@@ -1,6 +1,6 @@
 package shanten
 
-import "github.com/litencatt/mhj2/internal/tile"
+import "github.com/litencatt/mhj-dojo/internal/tile"
 
 // ClassicNormal computes the normal shanten with the classic block
 // decomposition formula 8 - 2*melds - min(taatsu, 4-melds) - head.

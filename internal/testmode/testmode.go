@@ -3,9 +3,9 @@
 //
 //   - go test -short ./...       the race job: the smallest loops
 //   - go test ./...              pull requests: a reduced, fixed-seed subset
-//   - MHJ2_FULL=1 go test ./...  the nightly workflow: the exhaustive loops
+//   - MHJDOJO_FULL=1 go test ./...  the nightly workflow: the exhaustive loops
 //
-// -short wins over MHJ2_FULL, so -short means the same with or without it.
+// -short wins over MHJDOJO_FULL, so -short means the same with or without it.
 package testmode
 
 import (
@@ -13,12 +13,12 @@ import (
 	"testing"
 )
 
-// Full reports whether the exhaustive loops run: MHJ2_FULL=1 without -short.
+// Full reports whether the exhaustive loops run: MHJDOJO_FULL=1 without -short.
 func Full() bool {
-	return os.Getenv("MHJ2_FULL") == "1" && !testing.Short()
+	return os.Getenv("MHJDOJO_FULL") == "1" && !testing.Short()
 }
 
-// N picks a loop size: short under -short, full under MHJ2_FULL=1 and pr
+// N picks a loop size: short under -short, full under MHJDOJO_FULL=1 and pr
 // otherwise.
 func N[T ~int | ~int64](full, pr, short T) T {
 	switch {
