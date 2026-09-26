@@ -12,6 +12,11 @@ test('practice mode loads and a discard updates the table and analysis', async (
   const yakuPanel = page.getByRole('region', { name: '役別向聴テーブル' });
   await expect(yakuPanel).toBeVisible();
   await expect(yakuPanel.locator('.yaku-table tbody tr')).not.toHaveCount(0);
+  // The 複合役 section lists up to five yaku combinations, named with ＋.
+  const comboRows = yakuPanel.locator('.combo-table tbody tr');
+  await expect(comboRows).not.toHaveCount(0);
+  expect(await comboRows.count()).toBeLessThanOrEqual(5);
+  await expect(comboRows.first().locator('th')).toContainText('＋');
 
   // 13 hand tiles + 1 drawn tile, nothing discarded yet.
   await expect(handPanel.locator('.hand-tiles .tile')).toHaveCount(13);

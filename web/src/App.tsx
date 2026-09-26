@@ -195,6 +195,8 @@ export function App() {
         <SidePanels
           analysis={state.analysis}
           byDiscard={state.by_discard}
+          combos={state.combos}
+          combosByDiscard={state.combos_by_discard}
           previewTile={previewTile}
           mode="practice"
           isMin={isMin}

@@ -18,6 +18,17 @@ export interface YakuRow {
   ukeire_total: number;
 }
 
+// A combination of yaku one complete hand scores together (docs/api.md "Yaku combos").
+export interface ComboRow {
+  keys: string[];
+  name: string; // row names joined with ＋
+  han: number; // sum of the rows' han (open-hand han after a call)
+  shanten: number; // 0 = tenpai
+  approx: boolean;
+  ukeire: UkeireEntry[];
+  ukeire_total: number;
+}
+
 export interface HistoryShantenMap {
   [yakuKey: string]: number | null;
 }
@@ -84,6 +95,8 @@ export interface SessionState {
   can_tsumo: boolean;
   analysis: YakuRow[];
   by_discard: Record<Tile, YakuRow[]>;
+  combos: ComboRow[]; // best yaku combinations, at most 5
+  combos_by_discard: Record<Tile, ComboRow[]>;
   history: HistoryEntry[];
   tree: TreeNode[];
   win: Win | null;
@@ -347,6 +360,8 @@ export interface GameState {
   events: GameEvent[];
   analysis: YakuRow[];
   by_discard: Record<Tile, YakuRow[]>;
+  combos: ComboRow[]; // best yaku combinations, at most 5
+  combos_by_discard: Record<Tile, ComboRow[]>;
   history: HistoryEntry[];
   result: GameResult | null;
 }
