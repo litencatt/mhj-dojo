@@ -602,8 +602,17 @@ func (r *Round) tsumo(seat int) error {
 	dealer := seat == r.dealer
 	pts := score.FromWin(w, dealer, true)
 	res := &Result{Kind: "tsumo", Winner: seat, From: -1, Win: &w, Points: pts, WinTile: *p.drawn, Pao: r.paoOf(seat, w)}
-	// A responsible seat pays its yakuman in full; the other seats share the
-	// rest of the hand as usual.
+	payTsumo(res, r.dealer)
+	r.finish(res)
+	return nil
+}
+
+// payTsumo sets the hand payments of a tsumo by res.Winner. A responsible
+// seat pays its yakuman in full; the other seats share the rest of the hand
+// as usual.
+func payTsumo(res *Result, dealerSeat int) {
+	seat, w, pts := res.Winner, *res.Win, res.Points
+	dealer := seat == dealerSeat
 	rest := pts
 	if len(res.Pao) > 0 {
 		n := pts.Multiplier
@@ -616,19 +625,17 @@ func (r *Round) tsumo(seat int) error {
 		}
 		rest = score.Compute(0, 0, n, dealer, true)
 	}
-	for o := range r.players {
+	for o := range res.HandDeltas {
 		if o == seat {
 			continue
 		}
 		pay := rest.FromNonDealer
-		if o == r.dealer {
+		if o == dealerSeat {
 			pay = rest.FromDealer
 		}
 		res.HandDeltas[o] -= pay
 		res.HandDeltas[seat] += pay
 	}
-	r.finish(res)
-	return nil
 }
 
 func (r *Round) ron(seat int) error {
@@ -644,21 +651,28 @@ func (r *Round) ron(seat int) error {
 	r.events = append(r.events, Action{Seat: seat, Type: Ron})
 	pts := score.FromWin(w, seat == r.dealer, false)
 	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard, Pao: r.paoOf(seat, w)}
-	res.HandDeltas[r.turn] -= pts.Ron
-	res.HandDeltas[seat] += pts.Ron
-	// A responsible seat other than the discarder pays half of its yakuman.
+	payRon(res, r.dealer)
+	r.finish(res)
+	return nil
+}
+
+// payRon sets the hand payments of a ron by res.Winner on res.From's
+// discard. A responsible seat other than the discarder pays half of its
+// yakuman.
+func payRon(res *Result, dealerSeat int) {
+	seat, from, w := res.Winner, res.From, *res.Win
+	res.HandDeltas[from] -= res.Points.Ron
+	res.HandDeltas[seat] += res.Points.Ron
 	for _, pa := range res.Pao {
-		if pa.Seat == r.turn {
+		if pa.Seat == from {
 			continue
 		}
-		v := score.Compute(0, 0, yakumanOf(w, pa.Yaku), seat == r.dealer, false).Ron
+		v := score.Compute(0, 0, yakumanOf(w, pa.Yaku), seat == dealerSeat, false).Ron
 		h := score.Half(v)
-		res.HandDeltas[r.turn] += v - h
+		res.HandDeltas[from] += v - h
 		res.HandDeltas[pa.Seat] -= h
 		res.HandDeltas[seat] += 2*h - v
 	}
-	r.finish(res)
-	return nil
 }
 
 // paoOf returns the responsible seats of seat's calls for the yakuman w
@@ -805,10 +819,19 @@ func (r *Round) abortAfterDiscard() string {
 
 func (r *Round) exhaustiveDraw() {
 	res := &Result{Kind: "draw", Winner: -1, From: -1}
-	n := 0
 	for s := range r.players {
 		res.Tenpai[s] = len(r.waits(s)) > 0
-		if res.Tenpai[s] {
+	}
+	payNoten(res)
+	r.finish(res)
+}
+
+// payNoten sets the noten penalty of an exhaustive draw from res.Tenpai:
+// the noten seats pay 3000 in all, shared by the tenpai seats.
+func payNoten(res *Result) {
+	n := 0
+	for _, t := range res.Tenpai {
+		if t {
 			n++
 		}
 	}
@@ -821,5 +844,4 @@ func (r *Round) exhaustiveDraw() {
 			}
 		}
 	}
-	r.finish(res)
 }

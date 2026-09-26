@@ -1,0 +1,81 @@
+name: Formal model
+
+# Checks the Lean model in formal/ (proofs, no sorry) and that the golden
+# vectors committed for the Go tests are what the model generates. Kept out
+# of ci.yml so pull requests that do not touch the rules never run Lean.
+on:
+  push:
+    branches: [main]
+    paths:
+      - formal/**
+      - internal/score/**
+      - internal/game/round.go
+      - internal/game/hanchan.go
+      - internal/game/testdata/lean_*.json
+      - internal/score/testdata/lean_*.json
+      - .github/workflows/formal.yml
+  pull_request:
+    paths:
+      - formal/**
+      - internal/score/**
+      - internal/game/round.go
+      - internal/game/hanchan.go
+      - internal/game/testdata/lean_*.json
+      - internal/score/testdata/lean_*.json
+      - .github/workflows/formal.yml
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lean:
+    name: Lean model
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Installs elan and the toolchain in formal/lean-toolchain only: the
+      # mathlib cache and the build are the steps below, so that only the
+      # modules the model imports are downloaded (not all of mathlib), and
+      # the multi-GB .lake is not saved to the GitHub cache.
+      - uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1.6.0
+        with:
+          lake-package-directory: formal
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-mathlib-cache: false
+          use-github-cache: false
+      - name: Fetch the mathlib cache for the imported modules
+        working-directory: formal
+        run: |
+          mods=$(grep -hs "^import Mathlib" ./*.lean Mhj2/*.lean | sed "s/^import //" | sort -u)
+          lake exe cache get $mods
+      - name: Build (check the proofs)
+        working-directory: formal
+        run: lake build
+      - name: No sorry or admit
+        run: |
+          if grep -rnwE 'sorry|admit' formal --include='*.lean' --exclude-dir=.lake; then
+            echo "::error::sorry or admit in the formal model"
+            exit 1
+          fi
+      - name: Generate the golden vectors
+        working-directory: formal
+        run: lake exe gen-vectors "$GITHUB_WORKSPACE"
+      - name: Committed vectors match the model
+        run: git diff --exit-code -- internal/score/testdata internal/game/testdata
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Go matches the vectors
+        run: go test ./internal/score ./internal/game -run Lean
