@@ -134,7 +134,7 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
 
   // The page stays usable at a 390px-wide mobile viewport.
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('heading', { name: /mhj2/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /mhj-dojo/ })).toBeVisible();
   await expect(hand).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);

@@ -1,4 +1,4 @@
-// The static site's transport (issue #67): instead of calling the mhj2
+// The static site's transport (issue #67): instead of calling the mhj-dojo
 // server, API requests go to the practice engine compiled to WebAssembly,
 // running in a Web Worker (site-public/worker.js). Only built into the site
 // (`npm run build:site`); see api.ts.
@@ -26,7 +26,7 @@ let engine: Promise<Worker> | null = null;
 let nextId = 1;
 const pending = new Map<number, (r: Reply) => void>();
 
-// Starts the worker on first use. The measure 'mhj2:wasm-init' records how
+// Starts the worker on first use. The measure 'mhj-dojo:wasm-init' records how
 // long the download, compile and start of the engine took. If the engine
 // fails to start, or exits later, the next request starts a new worker;
 // the sessions it held are rebuilt from their saves as they are asked for.
@@ -35,9 +35,9 @@ function start(): Promise<Worker> {
   const started: Promise<Worker> = new Promise<Worker>((resolve, reject) => {
     const t0 = performance.now();
     const url = new URL('worker.js', document.baseURI);
-    // A hash of the worker, wasm_exec.js and mhj2.wasm (vite.config.ts), so a
+    // A hash of the worker, wasm_exec.js and mhj-dojo.wasm (vite.config.ts), so a
     // deploy never mixes cached and new copies of them.
-    const version = import.meta.env.VITE_MHJ2_ENGINE as string | undefined;
+    const version = import.meta.env.VITE_MHJDOJO_ENGINE as string | undefined;
     if (version) url.searchParams.set('v', version);
     const w = new Worker(url);
     const fail = (message: string) => {
@@ -55,7 +55,7 @@ function start(): Promise<Worker> {
       const m = e.data as { type?: string; error?: string } & Partial<Reply>;
       if (m.type === 'ready') {
         try {
-          performance.measure('mhj2:wasm-init', { start: t0, end: performance.now() });
+          performance.measure('mhj-dojo:wasm-init', { start: t0, end: performance.now() });
         } catch {
           // measuring is best effort
         }
@@ -88,7 +88,7 @@ async function call(fn: 'request' | 'restore', ...args: string[]): Promise<WasmR
 }
 
 const SESSIONS = '/api/sessions';
-const STORAGE_KEY = 'mhj2.site.practice';
+const STORAGE_KEY = 'mhj-dojo.site.practice';
 const MAX_SAVED = 10; // sessions kept; the least recently used goes first
 
 // A session as its moves: node i+1 was made from moves[i], from its parent

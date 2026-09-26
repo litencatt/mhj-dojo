@@ -11,9 +11,9 @@ export const PANELS: Array<{ key: PanelKey; label: string }> = [
 ];
 // v2 adds the advice panel, which starts minimized (docked) so the answer
 // isn't shown before the player has thought about the hand.
-const MINIMIZED_KEY = 'mhj2.minimized.v2';
-const OLD_MINIMIZED_KEY = 'mhj2.minimized';
-const OLD_ADVICE_OPEN_KEY = 'mhj2.adviceOpen';
+const MINIMIZED_KEY = 'mhj-dojo.minimized.v2';
+const OLD_MINIMIZED_KEY = 'mhj-dojo.minimized';
+const OLD_ADVICE_OPEN_KEY = 'mhj-dojo.adviceOpen';
 
 function parseKeys(raw: string | null): PanelKey[] | null {
   if (raw === null) return null;

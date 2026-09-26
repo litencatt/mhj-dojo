@@ -1,5 +1,5 @@
 // The static site's Web Worker (issue #67): runs the practice engine, the Go
-// program cmd/mhj2wasm compiled to WebAssembly, off the main thread so the
+// program cmd/mhj-dojo-wasm compiled to WebAssembly, off the main thread so the
 // analysis doesn't freeze the page. src/wasm.ts starts it and talks to it:
 //
 //   worker → page  {type: 'ready', initMs} | {type: 'failed', error} (at start, or later if the engine exits)
@@ -7,12 +7,12 @@
 //                  {id, fn: 'restore', args: [body]}                 rebuild a session from its moves
 //   worker → page  {id, status, body}   the status and JSON body the server would send
 //
-// wasm_exec.js (Go's JS glue) and mhj2.wasm sit next to this file; `make
+// wasm_exec.js (Go's JS glue) and mhj-dojo.wasm sit next to this file; `make
 // wasm` copies them here. The page loads this file as worker.js?v=<version>,
 // a hash of the three files taken at build time, and the same ?v= goes on
 // the other two so a browser never mixes a cached copy of one with a new
 // copy of another after a deploy.
-/* global Go, mhj2Request, mhj2Restore */
+/* global Go, mhjDojoRequest, mhjDojoRestore */
 const version = new URL(self.location.href).searchParams.get('v');
 const versioned = (name) => {
   const url = new URL(name, self.location.href);
@@ -25,13 +25,13 @@ importScripts(versioned('wasm_exec.js').href);
 const started = performance.now();
 
 async function instantiate(go) {
-  const url = versioned('mhj2.wasm');
+  const url = versioned('mhj-dojo.wasm');
   try {
     return (await WebAssembly.instantiateStreaming(fetch(url), go.importObject)).instance;
   } catch {
     // A host that doesn't serve .wasm as application/wasm: compile from bytes.
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`mhj2.wasm: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`mhj-dojo.wasm: ${res.status} ${res.statusText}`);
     return (await WebAssembly.instantiate(await res.arrayBuffer(), go.importObject)).instance;
   }
 }
@@ -39,15 +39,15 @@ async function instantiate(go) {
 const ready = (async () => {
   const go = new Go();
   const instance = await instantiate(go);
-  // Runs main until it blocks, which defines mhj2Request and mhj2Restore.
+  // Runs main until it blocks, which defines mhjDojoRequest and mhjDojoRestore.
   // The promise settles only if the program exits (a fatal error): every
   // later call would fail, so tell the page to start a new worker.
   go.run(instance).then(
     () => self.postMessage({ type: 'failed', error: 'the engine exited' }),
     (err) => self.postMessage({ type: 'failed', error: String(err) }),
   );
-  if (typeof mhj2Request !== 'function' || typeof mhj2Restore !== 'function') {
-    throw new Error('mhj2.wasm did not start');
+  if (typeof mhjDojoRequest !== 'function' || typeof mhjDojoRestore !== 'function') {
+    throw new Error('mhj-dojo.wasm did not start');
   }
 })();
 
@@ -60,7 +60,7 @@ self.onmessage = async (e) => {
   const { id, fn, args } = e.data;
   try {
     await ready;
-    const res = fn === 'restore' ? mhj2Restore(...args) : mhj2Request(...args);
+    const res = fn === 'restore' ? mhjDojoRestore(...args) : mhjDojoRequest(...args);
     self.postMessage({ id, status: res.status, body: res.body });
   } catch (err) {
     self.postMessage({ id, status: 500, body: JSON.stringify({ error: String(err) }) });

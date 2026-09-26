@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // The static site (issue #67): practice mode with the engine running as
-// WebAssembly in a Web Worker, no mhj2 server behind it.
+// WebAssembly in a Web Worker, no mhj-dojo server behind it.
 
 // The tiles' names in a hand or river, in order.
 function labels(page: Page, selector: string) {
@@ -30,7 +30,7 @@ test('practice runs in the browser: load, discard, no server requests, no CPU mo
   });
   const engineFile = (name: string) =>
     page.waitForResponse((res) => new URL(res.url()).pathname.endsWith(`/${name}`));
-  const files = ['worker.js', 'wasm_exec.js', 'mhj2.wasm'].map(engineFile);
+  const files = ['worker.js', 'wasm_exec.js', 'mhj-dojo.wasm'].map(engineFile);
   await page.goto('./?seed=1&turns=18');
 
   // The three engine files are loaded with one version (cache busting).
@@ -43,7 +43,7 @@ test('practice runs in the browser: load, discard, no server requests, no CPU mo
   const hand = page.getByRole('region', { name: '手牌' });
   await expect(hand).toBeVisible();
   await expect(hand.locator('.hand-tiles .tile')).toHaveCount(13);
-  const init = await page.evaluate(() => performance.getEntriesByName('mhj2:wasm-init')[0]?.duration ?? -1);
+  const init = await page.evaluate(() => performance.getEntriesByName('mhj-dojo:wasm-init')[0]?.duration ?? -1);
   expect(init).toBeGreaterThan(0);
   test.info().annotations.push({ type: 'wasm init (ms)', description: init.toFixed(0) });
 
@@ -137,7 +137,7 @@ async function seedStorage(page: Page, id: string, current: number) {
   const saved = { v: 2, sessions: { [id]: { seed: 2, max_turns: 18, moves: tsumoMoves, current, used: 1 } } };
   await page.addInitScript((s) => {
     if (!sessionStorage.getItem('seeded')) {
-      localStorage.setItem('mhj2.site.practice', s);
+      localStorage.setItem('mhj-dojo.site.practice', s);
       sessionStorage.setItem('seeded', '1');
     }
   }, JSON.stringify(saved));
@@ -190,7 +190,7 @@ test('an engine failure while rebuilding keeps the save for the next reload', as
 
   // The next worker answers the rebuild with a 500, as a broken engine would.
   // Its wasm is held back so the override is in place before any request.
-  await page.route('**/mhj2.wasm*', async (route) => {
+  await page.route('**/mhj-dojo.wasm*', async (route) => {
     await new Promise((r) => setTimeout(r, 300));
     await route.continue();
   });
@@ -207,10 +207,10 @@ test('an engine failure while rebuilding keeps the save for the next reload', as
   await page.reload();
   await expect(page.locator('.error-banner')).toContainText('boom');
   const id = new URL(url).searchParams.get('session')!;
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj2.site.practice')!));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!));
   expect(saved.sessions[id].moves).toHaveLength(1);
 
-  await page.unroute('**/mhj2.wasm*');
+  await page.unroute('**/mhj-dojo.wasm*');
   await page.reload();
   await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
   await expect(page.locator('.error-banner')).toHaveCount(0);
@@ -218,10 +218,10 @@ test('an engine failure while rebuilding keeps the save for the next reload', as
 });
 
 test('an engine that fails to load shows an error, and a new game retries', async ({ page }) => {
-  await page.route('**/mhj2.wasm*', (route) => route.fulfill({ status: 404, body: 'not found' }));
+  await page.route('**/mhj-dojo.wasm*', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('./?seed=1&turns=18');
   await expect(page.locator('.error-banner')).toContainText('計算エンジン');
-  await page.unroute('**/mhj2.wasm*');
+  await page.unroute('**/mhj-dojo.wasm*');
   await page.getByRole('button', { name: '新規対局' }).click();
   await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-tiles .tile')).toHaveCount(13);
   await expect(page.locator('.error-banner')).toHaveCount(0);
@@ -234,17 +234,17 @@ test('unusable saved moves start over from the seed in the URL', async ({ page }
   const start = await labels(page, '.hand-tiles');
   await discardDrawn(page);
   await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('mhj2.site.practice')!);
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!);
     const id = new URL(location.href).searchParams.get('session')!;
     s.sessions[id].moves[0].tile = '9z'; // not a tile that can be discarded
-    localStorage.setItem('mhj2.site.practice', JSON.stringify(s));
+    localStorage.setItem('mhj-dojo.site.practice', JSON.stringify(s));
   });
   await page.reload();
   await expect(hand.locator('.hand-tiles .tile')).toHaveCount(13);
   await expect(hand.locator('.discard-river .tile')).toHaveCount(0);
   expect(await labels(page, '.hand-tiles')).toEqual(start);
   // The unusable save is dropped; the fresh session is saved instead.
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj2.site.practice')!));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!));
   const id = new URL(page.url()).searchParams.get('session')!;
   expect(saved.sessions[id].moves).toEqual([]);
   await expect(page.locator('.error-banner')).toHaveCount(0);

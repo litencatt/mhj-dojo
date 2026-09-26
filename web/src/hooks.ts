@@ -275,5 +275,5 @@ function useStoredFlag(key: string): [boolean, (on: boolean) => void] {
 
 /** The hand panel's 「面子表示」 toggle, shared by practice and game mode. */
 export function useHandGroupsToggle(): [boolean, (on: boolean) => void] {
-  return useStoredFlag('mhj2.handGroups');
+  return useStoredFlag('mhj-dojo.handGroups');
 }

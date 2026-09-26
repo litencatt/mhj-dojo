@@ -123,7 +123,7 @@ export function applyYakuFilter(rows: YakuRow[], f: YakuFilter): FilteredKeys {
   return { keys: kept.sort(cmp).map((r) => r.key), total: yakuRows.length };
 }
 
-const STORAGE_KEY = 'mhj2.yakuFilter';
+const STORAGE_KEY = 'mhj-dojo.yakuFilter';
 
 /** Reads the saved filter; storage may be unavailable (private mode etc.). */
 export function loadFilter(): YakuFilter {

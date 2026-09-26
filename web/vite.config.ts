@@ -7,9 +7,9 @@ export default defineConfig(({ command, mode }) => {
   // `--mode site` (npm run build:site): the static site that runs the
   // practice engine as WebAssembly (issue #67). Relative asset paths let it
   // be served from any subpath; site-public/ holds the worker, and `make
-  // wasm` puts mhj2.wasm and Go's wasm_exec.js next to it.
+  // wasm` puts mhj-dojo.wasm and Go's wasm_exec.js next to it.
   if (mode === 'site') {
-    const engine = ['worker.js', 'wasm_exec.js', 'mhj2.wasm'].map((f) => new URL(`site-public/${f}`, import.meta.url));
+    const engine = ['worker.js', 'wasm_exec.js', 'mhj-dojo.wasm'].map((f) => new URL(`site-public/${f}`, import.meta.url));
     const missing = engine.filter((f) => !existsSync(f));
     if (command === 'build' && missing.length > 0) {
       throw new Error(`${missing.map((f) => f.pathname).join(', ')} missing: run \`make wasm\` first (or \`make site\`)`);
@@ -22,7 +22,7 @@ export default defineConfig(({ command, mode }) => {
     return {
       plugins: [preact()],
       define: {
-        'import.meta.env.VITE_MHJ2_ENGINE': JSON.stringify(hash.digest('hex').slice(0, 12)),
+        'import.meta.env.VITE_MHJDOJO_ENGINE': JSON.stringify(hash.digest('hex').slice(0, 12)),
       },
       base: './',
       publicDir: 'site-public',

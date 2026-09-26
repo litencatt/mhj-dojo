@@ -91,7 +91,7 @@ export function GameApp() {
   });
 
   useEffect(() => {
-    document.title = 'mhj2 - CPU対戦';
+    document.title = 'mhj-dojo - CPU対戦';
   }, []);
 
   function act(type: ActionType, tile?: TileT, tiles?: TileT[]) {
@@ -144,7 +144,7 @@ export function GameApp() {
         <div class="area-header">
           <header class="app-header">
             <h1>
-              mhj2 <span class="app-subtitle">CPU対戦</span>
+              mhj-dojo <span class="app-subtitle">CPU対戦</span>
               <a class="mode-link" href="?">練習へ</a>
             </h1>
             <form class="new-game-form" onSubmit={handleNewGame}>
