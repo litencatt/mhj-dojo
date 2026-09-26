@@ -1,10 +1,10 @@
 package yakushanten
 
 import (
-	"fmt"
 	"math"
 	"math/bits"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -38,15 +38,34 @@ var comboYaku = []string{
 }
 
 // comboRedundant are pairs never combined: one would be scored in place of the
-// other (junchan over chanta, chinitsu over honitsu), every hand satisfying
-// both is really a different yaku (a tanyao or junchan honitsu is a
-// chinitsu, an honroutou chanta is honroutou alone), or one is part of the
+// other (junchan over chanta, chinitsu over honitsu), no hand scores both
+// (chanta and junchan need a sequence, so they exclude toitoi and honroutou),
+// every hand satisfying both is really a different yaku (a tanyao or junchan
+// honitsu is a chinitsu, a chanta chinitsu a junchan), or one is part of the
 // other (shousangen always holds two dragon triplets, counted with it).
 var comboRedundant = map[[2]string]bool{
 	{"chanta", "junchan"}: true, {"honitsu", "chinitsu"}: true, {"junchan", "honitsu"}: true,
 	{"chanta", "chinitsu"}: true, {"tanyao", "honitsu"}: true, {"chanta", "honroutou"}: true,
-	{"junchan", "honroutou"}: true, {"shousangen", "haku"}: true, {"shousangen", "hatsu"}: true,
-	{"shousangen", "chun"}: true,
+	{"junchan", "honroutou"}: true, {"chanta", "toitoi"}: true, {"junchan", "toitoi"}: true,
+	{"shousangen", "haku"}: true, {"shousangen", "hatsu"}: true, {"shousangen", "chun"}: true,
+}
+
+// withTerminalSeq returns fam with one terminal sequence (123 or 789 of a
+// number suit) fixed: chanta and junchan score only with a sequence, unlike
+// their rows, which also count the all-triplet (honroutou) hands.
+func withTerminalSeq(fam []shanten.Target) []shanten.Target {
+	var out []shanten.Target
+	for _, t := range fam {
+		for s := 0; s < 3; s++ {
+			for _, rank := range []int{0, 6} {
+				u := t
+				u.Rules[s] = withForcedSeq(u.Rules[s], rank, 1)
+				u.Melds--
+				out = append(out, u)
+			}
+		}
+	}
+	return out
 }
 
 // shousangenYakuhai is the han of the two dragon triplets every shousangen
@@ -96,8 +115,11 @@ func buildCombos(w Winds) []comboDef {
 	var cands []cand
 	for _, key := range comboYaku {
 		fam := targets[key]
-		if key == "pinfu" {
+		switch key {
+		case "pinfu":
 			fam = pinfuTargets(w)
+		case "chanta", "junchan":
+			fam = withTerminalSeq(fam)
 		}
 		cands = append(cands, cand{key, fam})
 	}
@@ -293,10 +315,10 @@ type comboCand struct {
 	noWait bool
 }
 
-// comboRank orders combos: one step toward tenpai weighs as much as two han,
+// ComboRank orders combos: one step toward tenpai weighs as much as two han,
 // with han valued up to mangan (5) plus one step each for haneman (6) and
 // baiman (8). Lower is better.
-func comboRank(han, shanten int) int {
+func ComboRank(han, shanten int) int {
 	v := min(han, 5)
 	if han >= 6 {
 		v++
@@ -312,7 +334,7 @@ func comboRank(han, shanten int) int {
 // result for the same hand. Every combo satisfies all its yaku in one
 // reading. The ranking (docs/api.md "Yaku combos"):
 //
-//  1. combos sort by comboRank, then more han, fewer shanten and list order;
+//  1. combos sort by comboRank, then more han and list order;
 //  2. a combo is dropped when a combo of more yaku containing it has the
 //     same shanten (it scores more for the same work);
 //  3. a combo that differs from a better-ranked one only in which value
@@ -348,11 +370,11 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			rowShanten[r.Key] = r.Shanten
 		}
 	}
-	type pending struct{ i, han, lb int }
+	type pending struct{ i, han, lb, minDist int }
 	var todo []pending
 	for i := range defs {
 		d := &defs[i]
-		han, lb, ok := 0, 0, true
+		han, lb, ok := 0, -1, true
 		for _, k := range d.keys {
 			if (len(melds) > 0 && needNoMelds[k]) || (open && needClosed[k]) {
 				ok = false
@@ -370,19 +392,23 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			}
 		}
 		if ok {
-			todo = append(todo, pending{i: i, han: han, lb: comboRank(han, lb)})
+			todo = append(todo, pending{i: i, han: han, lb: ComboRank(han, lb), minDist: lb + 1})
 		}
 	}
 	if prune {
 		slices.SortStableFunc(todo, func(x, y pending) int { return x.lb - y.lb })
 	}
 	var evald []comboCand
-	bound, level := math.MaxInt, math.MinInt
+	dd := a.comboDist(&full)
+	bound, level, seen := math.MaxInt, math.MinInt, 0
 	for _, p := range todo {
 		if prune && p.lb != level {
 			level = p.lb
-			if sel := selectCombos(evald); len(sel) == MaxCombos {
-				bound = comboRank(sel[MaxCombos-1].han, sel[MaxCombos-1].shanten)
+			if len(evald) >= MaxCombos && len(evald) != seen {
+				seen = len(evald)
+				if sel := selectCombos(evald); len(sel) == MaxCombos {
+					bound = ComboRank(sel[MaxCombos-1].han, sel[MaxCombos-1].shanten)
+				}
 			}
 		}
 		if p.lb > bound {
@@ -392,7 +418,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 		if len(melds) > 0 {
 			fam = a.comboTargets[p.i]
 		}
-		if cd, ok := a.evalCombo(&defs[p.i], fam, c, &full); ok {
+		if cd, ok := a.evalCombo(&defs[p.i], fam, c, dd, p.minDist); ok {
 			cd.han = p.han
 			evald = append(evald, cd)
 		}
@@ -409,16 +435,68 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			ns = append(ns, names[k])
 		}
 		co := Combo{Keys: cd.def.keys, Name: strings.Join(ns, "＋"), Han: cd.han, Shanten: cd.shanten, Approx: cd.approx}
-		co.Ukeire = a.comboUkeire(&cd, c, &full)
+		co.Ukeire = a.comboUkeire(&cd, c, dd)
 		out = append(out, co)
 	}
 	return out
 }
 
+// comboDist computes target distances for one hand (with its meld tiles),
+// reusing the folds of suit pairs that many targets share. The folds are
+// keyed by the engine's memoized tables, so they stay valid across hands
+// (the discard candidates of a turn share most suits) while the engine lives.
+type comboDist struct {
+	eng   *shanten.Engine
+	full  *tile.Counts
+	v     [4][9]int8
+	n     [4]int
+	folds map[[2]*shanten.Table]*shanten.Table
+}
+
+// maxFolds bounds the fold cache an analyzer keeps across hands (~100 bytes
+// per entry).
+const maxFolds = 50_000
+
+// comboDist returns the distances of full, sharing the analyzer's fold cache.
+func (a *Analyzer) comboDist(full *tile.Counts) *comboDist {
+	if a.folds == nil || len(a.folds) > maxFolds {
+		a.folds = map[[2]*shanten.Table]*shanten.Table{}
+	}
+	return newComboDist(a.eng, full, a.folds)
+}
+
+func newComboDist(eng *shanten.Engine, full *tile.Counts, folds map[[2]*shanten.Table]*shanten.Table) *comboDist {
+	d := &comboDist{eng: eng, full: full, folds: folds}
+	for s := range 4 {
+		d.v[s], d.n[s] = shanten.SuitCounts(full, s)
+	}
+	return d
+}
+
+func (d *comboDist) fold(a, b *shanten.Table) *shanten.Table {
+	key := [2]*shanten.Table{a, b}
+	if t, ok := d.folds[key]; ok {
+		return t
+	}
+	t := shanten.Fold(a, b)
+	d.folds[key] = &t
+	return &t
+}
+
+// dist is shanten.Engine.Dist for the hand.
+func (d *comboDist) dist(t *shanten.Target) int {
+	var tb [4]*shanten.Table
+	for s := range 4 {
+		tb[s] = d.eng.Suit(d.v[s], d.n[s], t.Rules[s])
+	}
+	return shanten.FinalPair(d.fold(tb[0], tb[1]), d.fold(tb[2], tb[3]), t.Melds, t.MinTrips)
+}
+
 // evalCombo computes the shanten of combo d for the concealed tiles c; fam
-// is d's target family with the melds, full c with the meld tiles. ok is
-// false when no complete hand fits.
-func (a *Analyzer) evalCombo(d *comboDef, fam []shanten.Target, c tile.Counts, full *tile.Counts) (comboCand, bool) {
+// is d's target family with the melds, dd the distances of c with the meld
+// tiles. minDist is a lower bound of the distance: the search over the family
+// stops once it is reached. ok is false when no complete hand fits.
+func (a *Analyzer) evalCombo(d *comboDef, fam []shanten.Target, c tile.Counts, dd *comboDist, minDist int) (comboCand, bool) {
 	cd := comboCand{def: d, fam: fam}
 	dist := shanten.Inf
 	if d.pairs != nil {
@@ -426,8 +504,8 @@ func (a *Analyzer) evalCombo(d *comboDef, fam []shanten.Target, c tile.Counts, f
 			dist = min(dist, pairsDist(&c, m))
 		}
 	}
-	for j := range fam {
-		dist = min(dist, a.eng.Dist(full, &fam[j]))
+	for j := 0; j < len(fam) && dist > minDist; j++ {
+		dist = min(dist, dd.dist(&fam[j]))
 	}
 	if dist == shanten.Inf {
 		return cd, false
@@ -447,39 +525,36 @@ func (a *Analyzer) evalCombo(d *comboDef, fam []shanten.Target, c tile.Counts, f
 }
 
 // comboUkeire returns the kinds that lower the shanten of an evaluated combo.
-func (a *Analyzer) comboUkeire(cd *comboCand, c tile.Counts, full *tile.Counts) []tile.Kind {
+func (a *Analyzer) comboUkeire(cd *comboCand, c tile.Counts, dd *comboDist) []tile.Kind {
 	switch {
 	case cd.def.pairs != nil:
 		return pairsUkeire(c, cd.def.pairs, cd.shanten+1)
 	case cd.waits != nil:
 		return cd.waits
 	case cd.noWait:
-		return a.comboPinfuUkeire(c, cd.fam)
+		return a.pinfuUkeire(c, cd.fam)
 	}
 	// Only the targets at the combo's distance can yield ukeire.
 	var at []shanten.Target
 	for i := range cd.fam {
-		if a.eng.Dist(full, &cd.fam[i]) == cd.shanten+1 {
+		if dd.dist(&cd.fam[i]) == cd.shanten+1 {
 			at = append(at, cd.fam[i])
 		}
 	}
-	return a.target(*full, at).Ukeire
+	return a.target(*dd.full, at).Ukeire
 }
 
 // selectCombos applies the ranking of Combos to the evaluated combos.
 func selectCombos(evald []comboCand) []comboCand {
 	sorted := slices.Clone(evald)
 	slices.SortStableFunc(sorted, func(x, y comboCand) int {
-		if d := comboRank(x.han, x.shanten) - comboRank(y.han, y.shanten); d != 0 {
+		if d := ComboRank(x.han, x.shanten) - ComboRank(y.han, y.shanten); d != 0 {
 			return d
 		}
 		if x.han != y.han {
 			return y.han - x.han
 		}
-		if x.shanten != y.shanten {
-			return x.shanten - y.shanten
-		}
-		return x.def.order - y.def.order
+		return x.def.order - y.def.order // equal rank and han: equal shanten too
 	})
 	var out []comboCand
 	seen := map[string]bool{}
@@ -495,7 +570,7 @@ func selectCombos(evald []comboCand) []comboCand {
 				shape = append(shape, k)
 			}
 		}
-		sig := fmt.Sprint(shape, x.han, x.shanten)
+		sig := strings.Join(shape, "+") + "/" + strconv.Itoa(x.han) + "/" + strconv.Itoa(x.shanten)
 		if seen[sig] {
 			continue
 		}
@@ -565,28 +640,42 @@ func pairsUkeire(c tile.Counts, masks []uint64, dist int) []tile.Kind {
 // comboPinfuWaits returns the kinds that complete the closed 13-tile hand c
 // into a pinfu reading (two-sided wait) that fits one of the targets ts.
 func (a *Analyzer) comboPinfuWaits(c tile.Counts, ts []shanten.Target) []tile.Kind {
-	ctx := yaku.Context{Winds: a.winds}
 	var set [tile.NumKinds]bool
-	for t := tile.Kind(0); t < tile.NumKinds; t++ {
-		if c[t] >= 4 {
-			continue
-		}
-		c[t]++
-		for _, r := range yaku.Readings(c, t) {
-			if yaku.IsPinfu(r, ctx) && slices.ContainsFunc(ts, func(x shanten.Target) bool { return fits(&r.Decomposition, &x) }) {
-				set[t] = true
-				break
-			}
-		}
-		c[t]--
+	for w := tile.Kind(0); w < tile.NumKinds; w++ {
+		set[w] = a.pinfuWait(&c, w, ts)
 	}
 	return kindsOf(&set)
 }
 
-// comboPinfuUkeire is the pinfu row's fallback for a combo whose relaxed shape
-// is tenpai without a two-sided wait: the draws after which some discard
-// reaches exact tenpai.
-func (a *Analyzer) comboPinfuUkeire(c tile.Counts, ts []shanten.Target) []tile.Kind {
+// pinfuWait reports whether w completes the 13 tiles c into a pinfu reading
+// with w on a two-sided wait that fits one of the targets ts. A two-sided
+// wait needs two held tiles of w's suit next to it, which rules out most
+// kinds before any decomposition.
+func (a *Analyzer) pinfuWait(c *tile.Counts, w tile.Kind, ts []shanten.Target) bool {
+	if c[w] >= 4 || w.IsHonor() {
+		return false
+	}
+	n := w.Num()
+	lo := n >= 3 && c[w-1] > 0 && c[w-2] > 0
+	hi := n <= 7 && c[w+1] > 0 && c[w+2] > 0
+	if !lo && !hi {
+		return false
+	}
+	ctx := yaku.Context{Winds: a.winds}
+	c[w]++
+	defer func() { c[w]-- }()
+	for _, r := range yaku.Readings(*c, w) {
+		if yaku.IsPinfu(r, ctx) && slices.ContainsFunc(ts, func(x shanten.Target) bool { return fits(&r.Decomposition, &x) }) {
+			return true
+		}
+	}
+	return false
+}
+
+// pinfuUkeire is the fallback of the pinfu row and combos whose relaxed shape
+// is tenpai without a two-sided wait: the draws t after which some discard x
+// reaches exact tenpai, i.e. some w completes c+t-x with a two-sided wait.
+func (a *Analyzer) pinfuUkeire(c tile.Counts, ts []shanten.Target) []tile.Kind {
 	var set [tile.NumKinds]bool
 	for t := tile.Kind(0); t < tile.NumKinds; t++ {
 		if c[t] >= 4 {
@@ -598,8 +687,8 @@ func (a *Analyzer) comboPinfuUkeire(c tile.Counts, ts []shanten.Target) []tile.K
 				continue
 			}
 			c[x]--
-			if d, _ := a.dist(&c, ts); d == 1 && len(a.comboPinfuWaits(c, ts)) > 0 {
-				set[t] = true
+			for w := tile.Kind(0); w < tile.NumKinds && !set[t]; w++ {
+				set[t] = a.pinfuWait(&c, w, ts)
 			}
 			c[x]++
 		}

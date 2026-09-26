@@ -113,8 +113,15 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 	var bufA, bufB state
 	cur, nxt := &bufA, &bufB
 	cur[0][0][0][0][0] = 1
+	// live[x][y] marks the (x, y) with a reachable state, and maxK the most
+	// free melds reached: the scan skips the rest (most of the state space).
+	var live, nlive [5][5]bool
+	live[0][0] = true
+	maxK := 0
 	for i := 0; i < n; i++ {
 		*nxt = state{}
+		nlive = [5][5]bool{}
+		nMaxK := 0
 		ci := int(c[i])
 		f := int(rule.Forced[i])
 		canSeq := i+2 < n && rule.Seq>>i&1 == 1
@@ -123,10 +130,10 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 		for x := 0; x <= 4; x++ {
 			for y := 0; x+y <= 4; y++ {
 				base := x + y + f
-				if base > 4 {
+				if base > 4 || !live[x][y] {
 					continue
 				}
-				for k := 0; k <= 4; k++ {
+				for k := 0; k <= maxK; k++ {
 					for p := 0; p <= 1; p++ {
 						for r := 0; r <= rMax; r++ {
 							v := cur[x][y][k][p][r]
@@ -165,6 +172,8 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 										nv := int(v) + cost
 										if old := nxt[y][z][nk][p+q][nr]; old == 0 || nv < int(old) {
 											nxt[y][z][nk][p+q][nr] = uint8(nv)
+											nlive[y][z] = true
+											nMaxK = max(nMaxK, nk)
 										}
 									}
 								}
@@ -175,6 +184,7 @@ func suitDP(c *[9]int8, n int, rule *SuitRule) *Table {
 			}
 		}
 		cur, nxt = nxt, cur
+		live, maxK = nlive, nMaxK
 	}
 	t := new(Table)
 	for k := range t {

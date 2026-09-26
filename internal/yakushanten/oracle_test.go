@@ -88,6 +88,10 @@ func satisfies(key string, c tile.Counts) bool {
 	return false
 }
 
+// oracleWinds are the winds readingSatisfies uses for the pinfu pair; tests
+// that change it restore East/East.
+var oracleWinds = EastEast
+
 func readingSatisfies(key string, d yaku.Decomposition) bool {
 	seqs, trips := 0, 0
 	var seqCount [tile.NumKinds]int
@@ -124,7 +128,7 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 	}
 	switch key {
 	case "pinfu":
-		return seqs == 4 && d.Pair != tile.East && d.Pair < tile.Haku
+		return seqs == 4 && d.Pair < tile.Haku && oracleWinds.Count(d.Pair) == 0
 	case "iipeikou":
 		return slices.ContainsFunc(seqCount[:], func(n int) bool { return n >= 2 })
 	case "sanshoku":
@@ -172,8 +176,8 @@ func readingSatisfies(key string, d yaku.Decomposition) bool {
 		return has(tile.Hatsu, yaku.Trip)
 	case "chun":
 		return has(tile.Chun, yaku.Trip)
-	case "ton":
-		return has(tile.East, yaku.Trip)
+	case "ton", "nan", "shaa", "pei":
+		return has(tile.East+tile.Kind(slices.Index(yaku.WindKeys[:], key)), yaku.Trip)
 	}
 	panic("unknown key " + key)
 }

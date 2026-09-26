@@ -98,4 +98,31 @@ func TestAnalyzeAllDiscardsP95(t *testing.T) {
 			t.Fatalf("open=%v: p95 %v exceeds %v", open, p95, p95Limit)
 		}
 	}
+	// Worst cases for the combos: all-sequence hands near pinfu tenpai, many
+	// with iipeikou and ittsu shapes, where the pinfu combos need their
+	// exact-wait checks. Each must stay within the same budget.
+	for _, hand := range worstHands {
+		c := tile.MustCounts(hand)
+		durs := make([]time.Duration, 5)
+		for i := range durs {
+			start := time.Now()
+			analyzeAllDiscards(c)
+			durs[i] = time.Since(start)
+		}
+		slices.Sort(durs)
+		t.Logf("%s all discards x all rows: median %v (limit %v)", hand, durs[2], p95Limit)
+		if durs[2] > p95Limit {
+			t.Errorf("%s: median %v exceeds %v", hand, durs[2], p95Limit)
+		}
+	}
+}
+
+// worstHands are 14-tile hands that are slow to analyse (see the P95 test).
+var worstHands = []string{
+	"112233m445566p77s",
+	"123456789m12344p",
+	"123456m234567p55s",
+	"223344m234p23456s",
+	"112233m456p78s99p5s",
+	"234567m234567p22s",
 }

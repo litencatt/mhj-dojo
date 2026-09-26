@@ -14,7 +14,8 @@ import (
 
 // satisfiesCombo is the oracle of a combo: the tile-set yaku hold for the
 // whole hand, and with seven pairs the hand is seven pairs; otherwise one
-// 4 melds + pair decomposition satisfies every other yaku.
+// 4 melds + pair decomposition satisfies every other yaku, with a sequence
+// for chanta and junchan (as the win evaluator scores them).
 func satisfiesCombo(keys []string, c tile.Counts) bool {
 	suits, honors, yaochu, allYaochu := map[int]bool{}, false, false, true
 	for k, n := range c {
@@ -49,7 +50,10 @@ func satisfiesCombo(keys []string, c tile.Counts) bool {
 		return false
 	}
 	for _, d := range yaku.Decompose(c) {
-		if !slices.ContainsFunc(shape, func(k string) bool { return !readingSatisfies(k, d) }) {
+		hasSeq := slices.ContainsFunc(d.Melds[:], func(m yaku.Meld) bool { return m.Type == yaku.Seq })
+		if !slices.ContainsFunc(shape, func(k string) bool {
+			return !readingSatisfies(k, d) || ((k == "chanta" || k == "junchan") && !hasSeq)
+		}) {
 			return true
 		}
 	}
@@ -146,11 +150,21 @@ func bruteComboPinfuWaits(keys []string, c tile.Counts) []tile.Kind {
 
 // TestCombosMatchBruteForce compares every combo's shanten and ukeire with
 // the brute-force definition on near-target and random hands; pinfu combos
-// are compared on the relaxed shape and, at tenpai, on the exact waits.
+// are compared on the relaxed shape and, at tenpai, on the exact waits. It
+// runs for East/East and for split winds, whose pinfu pairs and value-wind
+// rows differ.
 func TestCombosMatchBruteForce(t *testing.T) {
+	for _, w := range []Winds{EastEast, {Round: tile.South, Seat: tile.West}} {
+		oracleWinds = w
+		checkCombosBruteForce(t, w)
+	}
+	oracleWinds = EastEast
+}
+
+func checkCombosBruteForce(t *testing.T, w Winds) {
 	r := rand.New(rand.NewPCG(31, 32))
-	a := NewAnalyzer()
-	defs := combosFor(EastEast)
+	a := NewAnalyzerFor(w)
+	defs := combosFor(w)
 	if len(defs) < 100 {
 		t.Fatalf("only %d combos", len(defs))
 	}
@@ -159,22 +173,23 @@ func TestCombosMatchBruteForce(t *testing.T) {
 		d := &defs[i]
 		key := strings.Join(d.keys, "+")
 		for j := 0; j < per; j++ {
-			w, ok := randomComboHand(r, d)
+			hand, ok := randomComboHand(r, d)
 			if !ok {
 				t.Fatalf("%s: no complete hand found", key)
 			}
-			if !satisfies(key, w) {
-				t.Fatalf("%s: target hand %s does not satisfy the combo", key, w)
+			if !satisfies(key, hand) {
+				t.Fatalf("%s: target hand %s does not satisfy the combo", key, hand)
 			}
-			c := perturb(r, w)
+			c := perturb(r, hand)
 			if (i+j)%5 == 4 {
 				c = randomHand(r)
 			}
-			cd, ok := a.evalCombo(d, d.targets, c, &c)
+			dd := a.comboDist(&c)
+			cd, ok := a.evalCombo(d, d.targets, c, dd, 0)
 			if !ok {
 				t.Fatalf("%s %s: impossible", key, c)
 			}
-			got, gotU := cd.shanten, a.comboUkeire(&cd, c, &c)
+			got, gotU := cd.shanten, a.comboUkeire(&cd, c, dd)
 			if d.has("pinfu") {
 				rel := a.target(c, d.targets)
 				got, gotU = rel.Shanten, rel.Ukeire
@@ -284,6 +299,20 @@ func TestCombosOpenHand(t *testing.T) {
 	}
 }
 
+// An all-terminal-triplet hand is chinroutou, not junchan: no combo of it
+// has chanta or junchan, which need a sequence.
+func TestCombosChantaNeedsSequence(t *testing.T) {
+	a := NewAnalyzer()
+	c := tile.MustCounts("111999m111p99p19s")
+	for _, co := range a.Combos(c, nil, a.Analyze(c)) {
+		if slices.Contains(co.Keys, "chanta") || slices.Contains(co.Keys, "junchan") {
+			if co.Shanten < 1 {
+				t.Errorf("%s: %d shanten, want a sequence away", co.Name, co.Shanten)
+			}
+		}
+	}
+}
+
 // TestComboList: combos that share groups exist, and redundant or
 // impossible ones do not.
 func TestComboList(t *testing.T) {
@@ -312,6 +341,9 @@ func TestComboList(t *testing.T) {
 		"chanta+junchan",
 		"pinfu+toitoi",
 		"tanyao+honroutou+chiitoitsu",
+		"junchan+toitoi", // chanta and junchan need a sequence
+		"chanta+toitoi",
+		"sanshoku_doukou+junchan+toitoi",
 	} {
 		if have[key] {
 			t.Errorf("unexpected combo %s", key)
