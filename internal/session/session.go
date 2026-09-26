@@ -133,9 +133,11 @@ type node struct {
 	combosByDiscard map[tile.Kind][]yakushanten.Combo
 	// advice is the current node's discard advice, pruned with byDiscard;
 	// review compares the discard that led to this node with the best one
-	// at its parent and, being small, is kept forever.
-	advice *advice.Advice
-	review *advice.Review
+	// at its parent and, being small, is kept forever. Replay leaves it to
+	// be computed when the node is shown (reviewPending; see nodeReview).
+	advice        *advice.Advice
+	review        *advice.Review
+	reviewPending bool
 	// normalShanten is just the normal-form row, needed for every node in
 	// the tree view (state()'s Tree field). Unlike analysis/byDiscard
 	// above it is tiny (one int) and cheap to recompute, so it is cached
@@ -193,13 +195,22 @@ func (s *Session) State() State {
 func (s *Session) Discard(t string, expectedNode *int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.checkExpectedNode(expectedNode); err != nil {
+	if err := s.discard(t, expectedNode, true); err != nil {
 		return State{}, err
+	}
+	return s.state(), nil
+}
+
+// discard is Discard without the state; callers hold s.mu. Unless review
+// is set, the new node's review is left for nodeReview to compute.
+func (s *Session) discard(t string, expectedNode *int, review bool) error {
+	if err := s.checkExpectedNode(expectedNode); err != nil {
+		return err
 	}
 	cur := s.nodes[s.current]
 	d, ok := s.drawn(cur)
 	if !ok {
-		return State{}, fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
+		return fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
 	}
 	tiles := append(append([]tile.Tile{}, cur.hand...), d)
 	idx := -1
@@ -210,42 +221,54 @@ func (s *Session) Discard(t string, expectedNode *int) (State, error) {
 		}
 	}
 	if idx < 0 {
-		return State{}, fmt.Errorf("%w: tile %q is not in hand or drawn", ErrInvalid, t)
+		return fmt.Errorf("%w: tile %q is not in hand or drawn", ErrInvalid, t)
 	}
 	if id, ok := cur.children[t]; ok {
 		s.current = id
-		return s.state(), nil
+		return nil
 	}
 	if err := s.roomForNode(); err != nil {
-		return State{}, err
+		return err
 	}
 	disc := tiles[idx]
-	review := s.nodeAdvice(cur, s.path(cur)).Review(disc)
+	n := &node{parent: cur.id, turn: cur.turn + 1, draw: &d, discard: &disc, reviewPending: !review}
+	if review {
+		n.review = s.nodeAdvice(cur, s.path(cur)).Review(disc)
+	}
 	hand := append(tiles[:idx:idx], tiles[idx+1:]...)
 	tile.Sort(hand)
-	child := s.addNode(&node{parent: cur.id, turn: cur.turn + 1, hand: hand, draw: &d, discard: &disc, review: review})
+	n.hand = hand
+	child := s.addNode(n)
 	cur.children[t] = child.id
-	return s.state(), nil
+	return nil
 }
 
 // Tsumo declares a win with the pending draw. expectedNode is as in Discard.
 func (s *Session) Tsumo(expectedNode *int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.checkExpectedNode(expectedNode); err != nil {
+	if err := s.tsumo(expectedNode); err != nil {
 		return State{}, err
+	}
+	return s.state(), nil
+}
+
+// tsumo is Tsumo without the state; callers hold s.mu.
+func (s *Session) tsumo(expectedNode *int) error {
+	if err := s.checkExpectedNode(expectedNode); err != nil {
+		return err
 	}
 	cur := s.nodes[s.current]
 	if id, ok := cur.children[StatusTsumo]; ok {
 		s.current = id
-		return s.state(), nil
+		return nil
 	}
 	d, ok := s.drawn(cur)
 	if !ok {
-		return State{}, fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
+		return fmt.Errorf("%w: node %d is %s", ErrConflict, cur.id, cur.status)
 	}
 	if err := s.roomForNode(); err != nil {
-		return State{}, err
+		return err
 	}
 	tiles := append(append([]tile.Tile{}, cur.hand...), d)
 	tile.Sort(tiles)
@@ -253,7 +276,7 @@ func (s *Session) Tsumo(expectedNode *int) (State, error) {
 		WinTile: d.Kind, Winds: winds, DoraIndicators: s.wall.DoraIndicators(),
 	})
 	if !ok {
-		return State{}, fmt.Errorf("%w: hand is not complete", ErrConflict)
+		return fmt.Errorf("%w: hand is not complete", ErrConflict)
 	}
 	child := s.addNode(&node{
 		parent: cur.id, turn: cur.turn, hand: cur.hand, draw: &d, status: StatusTsumo,
@@ -261,7 +284,7 @@ func (s *Session) Tsumo(expectedNode *int) (State, error) {
 	})
 	child.winRows = s.winRows(tile.CountsOf(tiles), res)
 	cur.children[StatusTsumo] = child.id
-	return s.state(), nil
+	return nil
 }
 
 // checkExpectedNode returns ErrConflict if expectedNode is non-nil and does
@@ -283,11 +306,19 @@ func (s *Session) checkExpectedNode(expectedNode *int) error {
 func (s *Session) Goto(id int) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.goTo(id); err != nil {
+		return State{}, err
+	}
+	return s.state(), nil
+}
+
+// goTo is Goto without the state; callers hold s.mu.
+func (s *Session) goTo(id int) error {
 	if id < 0 || id >= len(s.nodes) {
-		return State{}, fmt.Errorf("%w: node %d", ErrNotFound, id)
+		return fmt.Errorf("%w: node %d", ErrNotFound, id)
 	}
 	s.current = id
-	return s.state(), nil
+	return nil
 }
 
 // resetAnalyzerIfFull recycles the shared analyzer once its suit-table memo

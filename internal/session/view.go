@@ -120,7 +120,7 @@ func (s *Session) state() State {
 		}
 		st.Advice = s.nodeAdvice(cur, path)
 	}
-	st.DiscardReview = cur.review
+	st.DiscardReview = s.nodeReview(cur, path)
 
 	for _, n := range path {
 		h := apiview.HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Shanten: map[string]*int{}}
@@ -182,6 +182,17 @@ func (s *Session) visibleAt(n *node, path []*node) tile.Counts {
 // nodes), filling in its per-discard analysis as needed. Both stay cached on
 // the node until pruneAnalysisCache drops them. path is the node's path from
 // the root.
+// nodeReview returns the review of the discard that led to n, the last node
+// of path, computing it from the parent's advice if Replay left it pending.
+func (s *Session) nodeReview(n *node, path []*node) *advice.Review {
+	if n.reviewPending {
+		parent := path[len(path)-2]
+		n.review = s.nodeAdvice(parent, path[:len(path)-1]).Review(*n.discard)
+		n.reviewPending = false
+	}
+	return n.review
+}
+
 func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	if n.advice != nil {
 		return n.advice
