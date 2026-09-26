@@ -47,6 +47,13 @@ test('the header shows the version and the help opens', async ({ page }) => {
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
   await expect(dialog.getByRole('heading', { name: '公開版の保存', exact: true })).toBeVisible();
+  // The third-party licenses the site ships are linked and served.
+  const licenses = dialog.getByRole('link', { name: 'THIRD_PARTY_LICENSES.txt' });
+  const res = await page.request.get(new URL((await licenses.getAttribute('href'))!, page.url()).href);
+  expect(res.status()).toBe(200);
+  const text = await res.text();
+  expect(text).toContain('Preact');
+  expect(text).toContain('The Go Authors');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });

@@ -35,6 +35,7 @@ test('practice: the header shows the version and the help opens, closes and link
     '牌の表記',
     '公開版の保存',
     'バージョン表示',
+    'ライセンス',
   ]) {
     await expect(dialog.getByRole('heading', { name: h, exact: true })).toBeVisible();
   }
@@ -107,7 +108,7 @@ test('the help fits a phone screen and scrolls', async ({ page }) => {
   // Its bottom edge is on screen, and the content scrolls inside it.
   expect(box!.y + box!.height).toBeLessThanOrEqual(844);
   expect(await dialog.evaluate((d) => d.scrollHeight > d.clientHeight)).toBe(true);
-  const last = dialog.getByRole('heading', { name: 'バージョン表示', exact: true });
+  const last = dialog.getByRole('heading', { name: 'ライセンス', exact: true });
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeInViewport();
   // The close button stays reachable at the top.
