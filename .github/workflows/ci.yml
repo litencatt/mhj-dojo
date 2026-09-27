@@ -244,6 +244,14 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - run: npm run e2e:site
+      # The Release site workflow builds with the release tag in the header:
+      # check that build's version tests too.
+      - name: Site version tests on a release build
+        env:
+          MHJDOJO_RELEASE: v2000.0101.0
+        run: |
+          npm run build:site
+          npx playwright test -c playwright.site.config.ts e2e-site/version.spec.ts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:

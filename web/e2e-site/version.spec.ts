@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 // The static site's version: the header shows it, the help opens, and a
 // banner offers a reload once version.json names another build.
 
-type Build = { version: string; id: string; built: string };
+// release: the tag the Release site workflow built it for (MHJDOJO_RELEASE), else null.
+type Build = { version: string; release?: string | null; id: string; built: string };
 
 const NEWER: Build = { version: 'fffffff', id: 'ffffffffffffffff', built: '2099-01-01T00:00:00.000Z' };
 
@@ -42,7 +43,15 @@ test('the header shows the version and the help opens', async ({ page }) => {
   expect(Number.isNaN(Date.parse(served.built))).toBe(false);
   await page.goto('./?seed=1&turns=18');
   await loaded(page);
-  await expect(page.locator('.app-header .version-tag')).toHaveText(/^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/);
+  // A release shows its tag; any other build its commit and date.
+  const tag = page.locator('.app-header .version-tag');
+  if (served.release) {
+    expect(served.release).toMatch(/^v\d{4}\.\d{4}\.\d+$/);
+    await expect(tag).toHaveText(served.release);
+    await expect(tag).toHaveAttribute('title', new RegExp(`^リリース: ${served.release.replaceAll('.', '\\.')}\\n`));
+  } else {
+    await expect(tag).toHaveText(/^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/);
+  }
 
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
