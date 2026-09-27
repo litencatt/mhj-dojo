@@ -9,6 +9,12 @@
 // and replayed when the page asks for one the worker doesn't hold. The
 // replayed one keeps the id the page knows it by (its public id), whatever id
 // the engine gave it this time, so URLs and bookmarks keep working.
+//
+// Each tab runs its own worker, but the saves are shared: when another tab
+// has saved a newer version of a session or game, this tab rebuilds its copy
+// from that save before acting on it, and refuses (409) a move the player
+// chose on the out-of-date screen, as the server does for two tabs on the
+// same session. The page then re-fetches and shows the newer state.
 
 import type { GameState, SessionState } from './api';
 
@@ -141,17 +147,23 @@ let warnedStorage = false;
 // still refuses, the saves go stale (a reload starts over from the URL's
 // seed), which is worth one warning. Without a keep (dropping a save) the
 // stale saves stay as they are rather than being wiped for a smaller write.
-function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<string, T>) => unknown, keep?: string) {
+// Returns whether keep (or, without one, everything) was stored.
+function write<T>(
+  key: string,
+  saved: Record<string, T>,
+  wrap: (saved: Record<string, T>) => unknown,
+  keep?: string,
+): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(wrap(saved)));
-    return;
+    return true;
   } catch {
     // retried below with fewer saves
   }
   if (keep !== undefined && keep in saved) {
     try {
       localStorage.setItem(key, JSON.stringify(wrap({ [keep]: saved[keep] })));
-      return;
+      return true;
     } catch {
       // storage unavailable
     }
@@ -160,10 +172,11 @@ function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<st
     warnedStorage = true;
     console.warn('mhj-dojo: cannot save to localStorage; a reload will start over from the URL');
   }
+  return false;
 }
 
-function storeAll(sessions: SavedMap, keep?: string) {
-  write(STORAGE_KEY, sessions, (s) => ({ v: 2, sessions: s }), keep);
+function storeAll(sessions: SavedMap, keep?: string): boolean {
+  return write(STORAGE_KEY, sessions, (s) => ({ v: 2, sessions: s }), keep);
 }
 
 // Drops all but the max most recently used entries.
@@ -172,7 +185,7 @@ function trim<T extends { used: number }>(saved: Record<string, T>, max: number)
   for (const id of ids.slice(max)) delete saved[id];
 }
 
-function saveSession(publicId: string, st: SessionState) {
+function saveSession(publicId: string, st: SessionState): boolean {
   const sessions = loadAll();
   sessions[publicId] = {
     seed: st.seed,
@@ -185,7 +198,7 @@ function saveSession(publicId: string, st: SessionState) {
     used: Date.now(),
   };
   trim(sessions, MAX_SAVED);
-  storeAll(sessions, publicId);
+  return storeAll(sessions, publicId);
 }
 
 function forgetSession(publicId: string) {
@@ -218,15 +231,15 @@ function loadGames(): SavedGames {
   return {};
 }
 
-function storeGames(games: SavedGames, keep?: string) {
-  write(GAMES_KEY, games, (g) => ({ v: 1, games: g }), keep);
+function storeGames(games: SavedGames, keep?: string): boolean {
+  return write(GAMES_KEY, games, (g) => ({ v: 1, games: g }), keep);
 }
 
-function saveGame(publicId: string, save: string) {
+function saveGame(publicId: string, save: string): boolean {
   const games = loadGames();
   games[publicId] = { save, used: Date.now() };
   trim(games, MAX_SAVED_GAMES);
-  storeGames(games, publicId);
+  return storeGames(games, publicId);
 }
 
 function forgetGame(publicId: string) {
@@ -244,7 +257,9 @@ interface Kind {
   noun: string; // as in the engine's "not found: session ..." errors
   restoreFn: 'restore' | 'restoreGame';
   saved: (publicId: string) => string | null; // the restore body
-  save: (publicId: string, res: WasmResponse) => void;
+  content: (saved: string) => string; // a restore body without its bookkeeping (when it was last used)
+  refuseStale: boolean; // a move on an out-of-date copy gets a 409 (the engine can't tell)
+  save: (publicId: string, res: WasmResponse) => boolean; // whether it was stored
   forget: (publicId: string) => void;
   idOf: (data: unknown) => string;
   setId: (data: unknown, id: string) => void;
@@ -252,6 +267,9 @@ interface Kind {
   publicOf: Map<string, string>; // engine id → public id
   known: Set<string>; // engine ids the current worker holds
   failures: Map<string, number>; // public id → restores in a row the engine failed (500)
+  // public id → the content of its save as this tab last wrote or rebuilt
+  // it (null: none); a different save is another tab's. Kept across workers.
+  seen: Map<string, string | null>;
 }
 
 const kinds: Kind[] = [
@@ -263,6 +281,13 @@ const kinds: Kind[] = [
       const s = loadAll()[id];
       return s ? JSON.stringify(s) : null;
     },
+    content: (saved) => {
+      const s = JSON.parse(saved) as Saved;
+      return JSON.stringify([s.seed, s.max_turns, s.moves, s.current]);
+    },
+    // A discard or tsumo names the node it was chosen on (node_id), and the
+    // engine refuses it (409) if the session has moved on from there.
+    refuseStale: false,
     save: (id, res) => saveSession(id, res.data as SessionState),
     forget: forgetSession,
     idOf: (d) => (d as SessionState).session_id,
@@ -271,6 +296,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    seen: new Map(),
   },
   {
     base: GAMES,
@@ -280,9 +306,20 @@ const kinds: Kind[] = [
       const g = loadGames()[id];
       return typeof g?.save === 'string' ? g.save : null;
     },
+    // Without the check digest, which a save from before it had none of and
+    // a rebuild adds: the moves alone say whether the game moved on.
+    content: (saved) => {
+      try {
+        return JSON.stringify(JSON.parse(saved), (k, v: unknown) => (k === 'check' ? undefined : v));
+      } catch {
+        return saved;
+      }
+    },
+    // A game's actions don't say which state they were chosen on.
+    refuseStale: true,
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
-      if (res.save) saveGame(id, res.save);
+      return !!res.save && saveGame(id, res.save);
     },
     forget: forgetGame,
     idOf: (d) => (d as GameState).game_id,
@@ -291,6 +328,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    seen: new Map(),
   },
 ];
 
@@ -315,6 +353,33 @@ function splitPath(path: string): { kind: Kind; id: string; with: (id: string) =
   return null;
 }
 
+// Notes the save of publicId, just written, as this tab's own.
+function see(kind: Kind, publicId: string) {
+  const saved = kind.saved(publicId);
+  kind.seen.set(publicId, saved === null ? null : kind.content(saved));
+}
+
+// Whether another tab has saved publicId since this tab last did.
+function savedElsewhere(kind: Kind, publicId: string): boolean {
+  if (!kind.seen.has(publicId)) return false;
+  const saved = kind.saved(publicId);
+  return saved !== null && kind.content(saved) !== kind.seen.get(publicId);
+}
+
+// The localStorage keys of the saves, whose 'storage' events tell a tab that
+// another one saved.
+export const SAVE_KEYS: readonly string[] = [STORAGE_KEY, GAMES_KEY];
+
+/**
+ * Whether another tab has moved on the session or game at path (an API
+ * path, as for wasmRequest) since this tab last saw it, so the page can show
+ * the newer state.
+ */
+export function wasmSavedElsewhere(path: string): boolean {
+  const target = splitPath(path);
+  return target !== null && savedElsewhere(target.kind, target.id);
+}
+
 const MAX_RESTORE_FAILURES = 2;
 
 // Rebuilds a saved session or game in the engine under its public id and
@@ -324,13 +389,17 @@ const MAX_RESTORE_FAILURES = 2;
 // other failure (the engine broke) keeps the save for the next try, unless
 // the engine failed on it MAX_RESTORE_FAILURES times in a row: the save may
 // be what breaks it, so it is dropped (the error is still returned).
-async function restore(kind: Kind, publicId: string): Promise<WasmResponse | null> {
+// With keep (a save another tab wrote) any failure just returns the error
+// and leaves the save alone: that tab may run a newer engine than this one.
+async function restore(kind: Kind, publicId: string, keep = false): Promise<WasmResponse | null> {
   const saved = kind.saved(publicId);
   if (saved === null) return null;
   const res = await call(kind.restoreFn, saved);
   if (res.status === 200) {
     const id = kind.idOf(res.data);
-    // The copy it replaces (evicted, or in a stopped worker) is gone.
+    // The copy it replaces is gone: evicted, in a stopped worker, or out of
+    // date and left in the engine until it evicts it (the least recently
+    // used goes first).
     const old = kind.engineOf.get(publicId);
     if (old !== undefined) {
       kind.publicOf.delete(old);
@@ -340,9 +409,13 @@ async function restore(kind: Kind, publicId: string): Promise<WasmResponse | nul
     kind.publicOf.set(id, publicId);
     kind.known.add(id);
     kind.failures.delete(publicId);
+    kind.seen.set(publicId, kind.content(saved));
+  } else if (keep) {
+    return res;
   } else if ([400, 404, 409, 422].includes(res.status)) {
     kind.failures.delete(publicId);
     kind.forget(publicId);
+    kind.seen.delete(publicId);
     return null;
   } else {
     const failures = (kind.failures.get(publicId) ?? 0) + 1;
@@ -350,6 +423,7 @@ async function restore(kind: Kind, publicId: string): Promise<WasmResponse | nul
     if (failures >= MAX_RESTORE_FAILURES) {
       kind.failures.delete(publicId);
       kind.forget(publicId);
+      kind.seen.delete(publicId);
     }
   }
   return res;
@@ -357,13 +431,33 @@ async function restore(kind: Kind, publicId: string): Promise<WasmResponse | nul
 
 let queue: Promise<unknown> = Promise.resolve();
 
+// The 409 for a move chosen on a screen another tab has since moved on from.
+const MOVED_ON = '別の画面で進んだため、この操作は行いませんでした';
+// The 409 when this tab's engine can't rebuild another tab's save (most
+// likely that tab runs a newer version of the site).
+const NEWER_SAVE = '別の画面で新しい版に保存されています。再読み込みしてください';
+
+// Rebuilds target from the save another tab wrote since this tab last saw
+// it. Returns the answer to the request: the rebuilt state for a GET, a 409
+// for a move of a kind that refuses one on an out-of-date copy, or null to
+// send the request to the rebuilt copy. A save this tab can't rebuild stays
+// for the other tab (and a reload); the request gets a 409 meanwhile rather
+// than going to the out-of-date copy.
+async function catchUp(kind: Kind, publicId: string, isGet: boolean): Promise<WasmResponse | null> {
+  const r = await restore(kind, publicId, true);
+  if (r?.status !== 200) return { status: 409, data: { error: NEWER_SAVE } };
+  if (isGet) return r;
+  return kind.refuseStale ? { status: 409, data: { error: MOVED_ON } } : null;
+}
+
 /**
  * Answers an API request (method, path and JSON body as for the server) from
  * the engine. A request for a saved session or game that the engine doesn't
- * hold (the page was reloaded, the engine restarted, or it evicted it) first
- * rebuilds it from localStorage; if its save is unusable the request gets the
- * engine's 404 and the page deals afresh from the URL's seed, as the local
- * version does after a server restart.
+ * hold (the page was reloaded, the engine restarted, or it evicted it), or
+ * that another tab has since saved a newer version of, first rebuilds it from
+ * localStorage; if its save is unusable the request gets the engine's 404 and
+ * the page deals afresh from the URL's seed, as the local version does after
+ * a server restart.
  */
 export function wasmRequest(method: string, path: string, body?: string): Promise<WasmResponse> {
   // One request at a time, in order: two requests for something the engine
@@ -383,7 +477,10 @@ async function answer(method: string, path: string, body?: string): Promise<Wasm
   };
   const isGet = target !== null && method === 'GET' && path === target.with(target.id);
   let res: WasmResponse | null = null;
-  if (target && !target.kind.known.has(target.kind.engineOf.get(target.id) ?? target.id)) {
+  if (target && savedElsewhere(target.kind, target.id)) {
+    // Another tab moved it on: this tab's copy is out of date.
+    res = await catchUp(target.kind, target.id, isGet);
+  } else if (target && !target.kind.known.has(target.kind.engineOf.get(target.id) ?? target.id)) {
     const r = await restore(target.kind, target.id);
     // A GET is answered by the rebuilt state itself.
     if (r && (r.status !== 200 || isGet)) res = r;
@@ -396,12 +493,19 @@ async function answer(method: string, path: string, body?: string): Promise<Wasm
     if (r && (r.status !== 200 || isGet)) res = r;
     else if (r) res = await send();
   }
+  if (target && res.status === 200 && savedElsewhere(target.kind, target.id)) {
+    // Another tab saved while the engine worked on this: its save wins, and
+    // what this request did to this tab's copy is not kept. Checked once:
+    // should a move sent again here race yet another save, its save wins.
+    res = (await catchUp(target.kind, target.id, isGet)) ?? (await send());
+  }
   if (kind && res.status === 200) {
     const engineId = kind.idOf(res.data);
     kind.known.add(engineId);
     const publicId = kind.publicOf.get(engineId) ?? engineId;
     kind.setId(res.data, publicId);
-    kind.save(publicId, res);
+    // A save storage refused leaves the one there was: nothing new to note.
+    if (kind.save(publicId, res)) see(kind, publicId);
   } else if (target && res.status !== 200) {
     // Error messages name the engine's id; show the page's instead.
     const engineId = target.kind.engineOf.get(target.id);

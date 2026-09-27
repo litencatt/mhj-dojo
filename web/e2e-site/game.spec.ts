@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { hideTab } from './tabs';
 
 // The static site's CPU game (?mode=game): the engine runs the game, CPU
 // turns included, as WebAssembly in the browser, and saves each game to
@@ -34,9 +35,10 @@ async function clickAndWait(page: Page, locator: Locator) {
   await waitForPlayback(page);
 }
 
-/** One step, as in e2e/game.spec.ts: tsumo or ron when offered, skip any
- * other call, otherwise tsumogiri (with no drawn tile, the last hand tile). */
-async function playOneStep(page: Page) {
+/** The control for one step, as in e2e/game.spec.ts: tsumo or ron when
+ * offered, skip any other call, otherwise tsumogiri (with no drawn tile, the
+ * last hand tile). */
+async function nextMove(page: Page): Promise<Locator> {
   await waitForPlayback(page);
   const actionBar = page.locator('.action-bar');
   await actionBar.waitFor({ state: 'visible', timeout: 15_000 });
@@ -44,16 +46,17 @@ async function playOneStep(page: Page) {
   const ron = actionBar.getByRole('button', { name: 'ロン', exact: true });
   const skip = actionBar.getByRole('button', { name: /^(見逃す|スキップ)$/ });
   for (const candidate of [tsumo, ron, skip]) {
-    if (await candidate.isVisible()) {
-      await clickAndWait(page, candidate);
-      return;
-    }
+    if (await candidate.isVisible()) return candidate;
   }
   const hand = handPanel(page);
   const drawn = hand.locator('.hand-drawn button');
   const tile = (await drawn.count()) > 0 ? drawn : hand.locator('.hand-tiles button').last();
   await expect(tile).toBeEnabled({ timeout: 15_000 });
-  await clickAndWait(page, tile);
+  return tile;
+}
+
+async function playOneStep(page: Page) {
+  await clickAndWait(page, await nextMove(page));
 }
 
 async function playToResult(page: Page, maxSteps = 150) {
@@ -149,6 +152,124 @@ test('a CPU game plays a round to its result and the next round, across a reload
   await expect(result).toBeHidden();
   await expect(page.locator('.game-status')).toContainText('東2局');
   await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// Two tabs on one game share its save: a move on a screen the other tab has
+// moved on from is not made (its actions don't say which state they were
+// chosen on); the tab shows the latest state with a notice instead. Both
+// tabs are switched away from here, so neither catches up by itself.
+async function twoTabs(page: Page, context: BrowserContext): Promise<Page> {
+  await hideTab(page);
+  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await expect(handPanel(page)).toBeVisible();
+  await playOneStep(page);
+  await expect(page).toHaveURL(/[?&]game=/);
+  const other = await context.newPage();
+  await other.emulateMedia({ reducedMotion: 'reduce' });
+  await hideTab(other);
+  await other.goto(page.url());
+  await waitForPlayback(other);
+  expect(await tableState(other)).toEqual(await tableState(page));
+  return other;
+}
+
+async function savedGame(page: Page) {
+  return (await savedGames(page))?.games[gameId(page)!]?.save;
+}
+
+test('two tabs on the same game stay in step', async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const other = await twoTabs(page, context);
+
+  await playOneStep(page);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  const a = await tableState(page);
+
+  // B still shows the state before A's move: its move is refused.
+  await playOneStep(other);
+  await expect(other.locator('.notice-banner')).toBeVisible();
+  await expect(other.locator('.error-banner')).toHaveCount(0);
+  expect(await tableState(other)).toEqual(a);
+
+  // B plays on from there; now A is behind and is told in turn.
+  await playOneStep(other);
+  const b = await tableState(other);
+  await playOneStep(page);
+  await expect(page.locator('.notice-banner')).toBeVisible();
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  expect(await tableState(page)).toEqual(b);
+
+  // Both keep the same state across a reload.
+  for (const p of [page, other]) {
+    await p.reload();
+    await waitForPlayback(p);
+    await expect(handPanel(p)).toBeVisible();
+    expect(await tableState(p)).toEqual(b);
+    await expect(p.locator('.error-banner')).toHaveCount(0);
+  }
+});
+
+test('a save from another tab this engine cannot rebuild is kept, and asks for a reload', async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const other = await twoTabs(page, context);
+  // B's engine refuses A's save, as an older engine refuses one from a newer
+  // version of the site.
+  await other.workers()[0].evaluate(() => {
+    const orig = self.onmessage!;
+    self.onmessage = (e: MessageEvent) =>
+      e.data.fn === 'restoreGame'
+        ? self.postMessage({ id: e.data.id, status: 409, body: '{"error":"save does not match this engine"}' })
+        : orig.call(self, e);
+  });
+
+  await playOneStep(page);
+  const a = await tableState(page);
+  const save = await savedGame(page);
+
+  const before = await snapshot(other);
+  await (await nextMove(other)).click();
+  await expect(other.locator('.error-banner')).toContainText('再読み込み');
+  expect(await snapshot(other)).toBe(before);
+  expect(await savedGame(other)).toBe(save);
+
+  // Reloaded (a new engine), B shows A's game.
+  await other.reload();
+  await waitForPlayback(other);
+  await expect(handPanel(other)).toBeVisible();
+  expect(await tableState(other)).toEqual(a);
+  await expect(other.locator('.error-banner')).toHaveCount(0);
+});
+
+test('a move racing a save by another tab gives way to it', async ({ page, context }) => {
+  test.setTimeout(90_000);
+  const other = await twoTabs(page, context);
+  // B's engine holds its next move until released.
+  const worker = other.workers()[0];
+  await worker.evaluate(() => {
+    const w = self as unknown as { held: boolean };
+    w.held = true;
+    const orig = self.onmessage!;
+    self.onmessage = async (e: MessageEvent) => {
+      if (e.data.fn === 'request' && e.data.args[0] === 'POST') {
+        while (w.held) await new Promise((r) => setTimeout(r, 10));
+      }
+      return orig.call(self, e);
+    };
+  });
+
+  await (await nextMove(other)).click();
+  await playOneStep(page);
+  const a = await tableState(page);
+  const save = await savedGame(page);
+  await worker.evaluate(() => {
+    (self as unknown as { held: boolean }).held = false;
+  });
+
+  await expect(other.locator('.notice-banner')).toBeVisible();
+  await waitForPlayback(other);
+  await expect(other.locator('.error-banner')).toHaveCount(0);
+  expect(await tableState(other)).toEqual(a);
+  expect(await savedGame(other)).toBe(save);
 });
 
 test('game options from the URL survive a reload', async ({ page }) => {

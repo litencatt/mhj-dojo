@@ -14,7 +14,15 @@ import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import {
+  gameMovedOn,
+  useLastAnalysis,
+  usePlayback,
+  useRefreshOnSave,
+  useRowNames,
+  useSerialRequest,
+  useUrlResume,
+} from './hooks';
 import { tileName } from './tiles';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -51,7 +59,7 @@ export function GameApp() {
   const { minimized, isMin, minimize, restore } = useMinimized();
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
-  const { busy, error, notice, request } = useSerialRequest<GameState>(
+  const { busy, error, notice, request, refresh } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
@@ -62,12 +70,12 @@ export function GameApp() {
       setRiichiMode(false);
     },
     // On the static site each tab runs its own engine, the CPU turns within
-    // the request: two tabs on the same game play separate copies (the last
-    // save wins on a reload), so a 409 is never another tab's (or a
-    // finishing CPU turn's) doing.
-    state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
+    // the request; a move on a game another tab has since moved on gets a
+    // 409 from wasm.ts, which rebuilds this tab's copy from that tab's save.
+    state ? () => api.getGame(state.game_id) : undefined,
     gameMovedOn,
   );
+  useRefreshOnSave(state?.game_id ?? null, api.gameSavedElsewhere, busy, refresh);
 
   function startGame(options: GameOptions, seed?: number) {
     return request(() => api.createGame({ seed, ...options }));
