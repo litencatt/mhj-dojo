@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.0927.2](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.1...v2026.0927.2) - 2026-09-27
+
+### 修正
+- 用語表は麻雀の用語だけにし、アプリの用語はヘルプへ移す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/95
+### その他
+- Web: iPhone でシード値とバージョンが電話番号リンクになるのを止める by @litencatt in https://github.com/litencatt/mhj-dojo/pull/92
+- リリースフローの改善: PRラベル付けとカテゴリ別リリースノート、公開後スモークテストの土台 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/93
+
 ## [v2026.0927.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.0...v2026.0927.1) - 2026-09-27
 
 - 公開サイト版 E2E: リリースのビルドではヘッダーのタグ表示を期待する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/89
