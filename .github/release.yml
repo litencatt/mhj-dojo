@@ -1,7 +1,7 @@
 # GitHub's generated release notes, used by tagpr for CHANGELOG.md and the
 # GitHub Releases: leave out tagpr's own release pull requests, and group the
 # rest by the label .github/workflows/labeler.yml adds from the head branch
-# prefix (feat/, fix/, ci/, chore/, docs/, dependabot/).
+# prefix (feat/, fix/, perf/, ci/, chore/, docs/, dependabot/).
 changelog:
   exclude:
     labels:
@@ -13,6 +13,9 @@ changelog:
     - title: 修正
       labels:
         - bug
+    - title: パフォーマンス
+      labels:
+        - performance
     - title: ドキュメント
       labels:
         - documentation
