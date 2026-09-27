@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: The release tag to build (e.g. v2026.0927.0); empty for main as it is
+        description: The release tag to build (e.g. v2026.0927.0; its GitHub Release must already exist); empty to build and test main without deploying
         type: string
         required: false
 
