@@ -139,6 +139,7 @@ cmd/mhj-dojo/        CLI のエントリポイント
 cmd/mhj-dojo-wasm/   静的サイト用のエンジン（WebAssembly）
 internal/tile/       牌の表現と表記
 internal/wall/       シード付きの山、配牌、ツモ
+internal/memo/       シャンテン計算用の上限付きメモ
 internal/shanten/    一般形・七対子・国士無双の向聴と有効牌
 internal/yakushanten/ 役別向聴
 internal/yaku/       和了形の分解、役とドラの判定

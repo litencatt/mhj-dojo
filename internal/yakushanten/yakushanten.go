@@ -343,8 +343,8 @@ type Analyzer struct {
 	// combosFor order) for the last melds Combos saw.
 	comboMelds   []yaku.Meld
 	comboTargets [][]shanten.Target
-	folds        map[[2]*shanten.Table]*shanten.Table // see comboDist
-	names        map[string]string                    // see comboNames
+	folds        *foldMemo         // see comboDist
+	names        map[string]string // see comboNames
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -352,7 +352,7 @@ func NewAnalyzer() *Analyzer { return NewAnalyzerFor(EastEast) }
 
 // NewAnalyzerFor returns an analyzer whose rows follow the given winds.
 func NewAnalyzerFor(w Winds) *Analyzer {
-	return &Analyzer{eng: shanten.NewEngine(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+	return &Analyzer{eng: shanten.NewEngine(), folds: newFoldMemo(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
 }
 
 // ForWinds returns an analyzer whose rows follow the given winds and that
@@ -367,7 +367,8 @@ func (a *Analyzer) ForWinds(w Winds) *Analyzer {
 // Rows returns the analyzer's rows in API order.
 func (a *Analyzer) Rows() []RowDef { return a.rows }
 
-// MemoSize returns the number of memoized suit tables.
+// MemoSize returns the number of memoized suit tables, both generations
+// counted (see memo.Memo.Len: a table copied forward counts twice).
 func (a *Analyzer) MemoSize() int { return a.eng.MemoSize() }
 
 // Analyze returns every row for a 13-tile hand, in the analyzer's row order. A 14-tile hand

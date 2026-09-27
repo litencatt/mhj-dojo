@@ -137,6 +137,7 @@ cmd/mhj-dojo/        CLI entry point
 cmd/mhj-dojo-wasm/   engine (practice and CPU games) as WebAssembly for the static site
 internal/tile/       tile representation and notation
 internal/wall/       seeded wall, deal, draws
+internal/memo/       bounded memo table for the shanten engines
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire
 internal/yakushanten/ per-yaku shanten
 internal/yaku/       win decomposition, yaku and dora

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/litencatt/mhj-dojo/internal/memo"
 	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
@@ -471,22 +472,28 @@ type comboDist struct {
 	full  *tile.Counts
 	v     [4][9]int8
 	n     [4]int
-	folds map[[2]*shanten.Table]*shanten.Table
+	folds *foldMemo
 }
 
-// maxFolds bounds the fold cache an analyzer keeps across hands (~100 bytes
-// per entry).
-const maxFolds = 50_000
+// foldMemo memoizes the folds of two suit tables. A table the engine's memo
+// dropped and rebuilt is a new pointer, so its folds are just recomputed
+// (and the stale entries age out of this memo in turn).
+type foldMemo = memo.Memo[[2]*shanten.Table, *shanten.Table]
 
-// comboDist returns the distances of full, sharing the analyzer's fold cache.
+// foldGen is the number of folds in each generation of an analyzer's fold
+// memo (~100 bytes per entry, see docs/api.md "Memory"). A fold is cheap to
+// recompute (~0.4 µs, against ~10 µs for a suit table), so this memo is
+// kept much smaller than the engine's.
+const foldGen = 4_000
+
+func newFoldMemo() *foldMemo { return memo.New[[2]*shanten.Table, *shanten.Table](foldGen) }
+
+// comboDist returns the distances of full, sharing the analyzer's fold memo.
 func (a *Analyzer) comboDist(full *tile.Counts) *comboDist {
-	if a.folds == nil || len(a.folds) > maxFolds {
-		a.folds = map[[2]*shanten.Table]*shanten.Table{}
-	}
 	return newComboDist(a.eng, full, a.folds)
 }
 
-func newComboDist(eng *shanten.Engine, full *tile.Counts, folds map[[2]*shanten.Table]*shanten.Table) *comboDist {
+func newComboDist(eng *shanten.Engine, full *tile.Counts, folds *foldMemo) *comboDist {
 	d := &comboDist{eng: eng, full: full, folds: folds}
 	for s := range 4 {
 		d.v[s], d.n[s] = shanten.SuitCounts(full, s)
@@ -496,11 +503,11 @@ func newComboDist(eng *shanten.Engine, full *tile.Counts, folds map[[2]*shanten.
 
 func (d *comboDist) fold(a, b *shanten.Table) *shanten.Table {
 	key := [2]*shanten.Table{a, b}
-	if t, ok := d.folds[key]; ok {
+	if t, ok := d.folds.Get(key); ok {
 		return t
 	}
 	t := shanten.Fold(a, b)
-	d.folds[key] = &t
+	d.folds.Put(key, &t)
 	return &t
 }
 
