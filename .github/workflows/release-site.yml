@@ -1,60 +1,79 @@
 name: Release site
 
-# Opens a release pull request for the static site (issue #75). The site is
-# published from the lolipop-deploy-now branch: Lolipop Deploy Now's GitHub
-# integration watches it (framework: static, no install or build command,
-# output directory web/dist-site) and publishes each merge into it.
+# Opens the site release pull request (issue #75). The site is published from
+# the lolipop-deploy-now branch: Lolipop Deploy Now's GitHub integration
+# watches it (framework: static, no install or build command, output
+# directory web/dist-site) and publishes each merge into it.
+#
+# tagpr.yml calls this with the tag of each release (v2026.0927.0), right
+# after tagpr creates it; it can also be run by hand, for a tag or for main
+# as it is (no release version then).
 #
 # Deploy Now can't build the Go WebAssembly engine, so the branch carries
 # the built site, which main doesn't (web/dist-site is gitignored there).
-# This workflow builds main, runs the site's E2E tests on the build, merges
-# main into a release branch cut from lolipop-deploy-now, commits the build
-# there and opens a pull request into lolipop-deploy-now listing what main
-# brings. Merge it with a merge commit (not squash), so the next release
-# merges main cleanly. `make deploy` still deploys by hand.
+# This workflow builds the tag (or main) with the release version in the
+# header, runs the site's E2E tests on the build, merges the tagged commit
+# into a release branch cut from lolipop-deploy-now, commits the build there
+# and opens a pull request into lolipop-deploy-now listing what it brings.
+# Merge it with a merge commit (not squash), so the next release merges
+# cleanly. `make deploy` still deploys by hand.
 #
 # Pull requests opened with the workflow's token don't trigger CI, so the
 # site's E2E tests run here; main's own CI has run the rest.
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag to build (e.g. v2026.0927.0)
+        type: string
+        required: true
   workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to build (e.g. v2026.0927.0); empty for main as it is
+        type: string
+        required: false
 
 permissions:
   contents: write # push the release branch (and create lolipop-deploy-now once)
   pull-requests: write
-
-concurrency:
-  group: release-site
-  cancel-in-progress: false
 
 env:
   RELEASE_BRANCH: lolipop-deploy-now
 
 jobs:
   release:
-    name: Build main and open a release pull request
+    name: Build the release and open a site release pull request
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: release-site
+      cancel-in-progress: false
+    env:
+      TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          fetch-depth: 0 # merge main into the release branch, list the commits
+          ref: ${{ inputs.tag || 'main' }}
+          fetch-depth: 0 # merge into the release branch, list the commits
       - name: Anything to release?
         id: check
         run: |
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "short=$(git rev-parse --short HEAD)"
+          } >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null; then
             git fetch -q origin "$RELEASE_BRANCH"
             if [ -z "$(git rev-list "origin/$RELEASE_BRANCH..HEAD")" ]; then
-              echo "::notice::$RELEASE_BRANCH already has main ($(git rev-parse --short HEAD)); nothing to release"
+              echo "::notice::$RELEASE_BRANCH already has $(git rev-parse --short HEAD); nothing to release"
               exit 0
             fi
           fi
           echo "release=true" >> "$GITHUB_OUTPUT"
 
-      # Build main itself (not the merge below), so the site and its engine
-      # report main's commit as their version, as `make deploy` does.
+      # Build the tagged commit itself (not the merge below), so the site and
+      # its engine report its commit, and the header shows the release.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: steps.check.outputs.release == 'true'
         with:
@@ -67,6 +86,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build the site
         if: steps.check.outputs.release == 'true'
+        env:
+          MHJDOJO_RELEASE: ${{ inputs.tag }}
         run: make site
       - name: Get installed Playwright version
         if: steps.check.outputs.release == 'true'
@@ -116,13 +137,13 @@ jobs:
             git push -q origin "$SHA:refs/heads/$RELEASE_BRANCH"
             git fetch -q origin "$RELEASE_BRANCH"
           fi
-          branch="release/$(date -u +%Y%m%d)-$SHORT"
+          branch="release/${TAG:-$(TZ=Asia/Tokyo date +%Y%m%d)-$SHORT}"
           git switch -q -c "$branch" "origin/$RELEASE_BRANCH"
-          git merge -q --no-ff --no-edit -m "Merge main ($SHORT) for release" "$SHA"
+          git merge -q --no-ff --no-edit -m "Merge ${TAG:-main} ($SHORT) for release" "$SHA"
           rm -rf web/dist-site
           cp -R "$RUNNER_TEMP/dist-site" web/dist-site
           git add -f web/dist-site # gitignored on main
-          git commit -q -m "Build the site from $SHORT" -m "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SHA}"
+          git commit -q -m "Build the site from ${TAG:-$SHORT}" -m "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SHA}"
           git push -q --force origin "$branch"
           echo "name=$branch" >> "$GITHUB_OUTPUT"
 
@@ -149,7 +170,11 @@ jobs:
               print(f"- {title} {sha}")
           ')
           {
-            echo "main（\`$SHORT\`）を公開用ブランチ \`$RELEASE_BRANCH\` に取り込み、ビルドした公開サイト（\`web/dist-site\`）を含めます。マージすると、デプロイナウが公開します。"
+            if [ -n "$TAG" ]; then
+              echo "リリース [$TAG](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$TAG)（\`$SHORT\`）を公開用ブランチ \`$RELEASE_BRANCH\` に取り込み、ビルドした公開サイト（\`web/dist-site\`。ヘッダーに $TAG と表示）を含めます。マージすると、デプロイナウが公開します。"
+            else
+              echo "main（\`$SHORT\`）を公開用ブランチ \`$RELEASE_BRANCH\` に取り込み、ビルドした公開サイト（\`web/dist-site\`）を含めます。リリースのタグなしのビルドなので、ヘッダーにはコミットが表示されます。マージすると、デプロイナウが公開します。"
+            fi
             echo
             echo "**「Create a merge commit」でマージしてください**（squash しない）。次回のリリースで main をきれいに取り込むためです。"
             echo
@@ -164,6 +189,6 @@ jobs:
             gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/body.md" >/dev/null
           else
             url=$(gh pr create --base "$RELEASE_BRANCH" --head "$BRANCH" \
-              --title "Release $SHORT ($(date -u +%Y-%m-%d))" --body-file "$RUNNER_TEMP/body.md")
+              --title "Release ${TAG:-$SHORT ($(TZ=Asia/Tokyo date +%Y-%m-%d))} to Deploy Now" --body-file "$RUNNER_TEMP/body.md")
           fi
           echo "Release pull request: $url" >> "$GITHUB_STEP_SUMMARY"
