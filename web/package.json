@@ -12,7 +12,8 @@
     "build:site": "tsc --noEmit && vite build --mode site",
     "dev:site": "vite --mode site",
     "preview:site": "vite preview --mode site",
-    "e2e:site": "playwright test -c playwright.site.config.ts"
+    "e2e:site": "playwright test -c playwright.site.config.ts",
+    "e2e:live": "playwright test -c playwright.live.config.ts"
   },
   "dependencies": {
     "preact": "^10.29.8"
