@@ -1,6 +1,7 @@
 // API client + types mirroring docs/api.md.
 
-import { SAVE_KEYS as wasmSaveKeys, wasmRequest, wasmSavedElsewhere } from './wasm';
+import { lease, live, STOPPED, STOPPED_MESSAGE } from './singleTab';
+import { wasmRequest } from './wasm';
 
 // The static site (`npm run build:site`, issue #67) answers requests from the
 // engine compiled to WebAssembly instead of the mhj-dojo server. Fixed
@@ -167,7 +168,29 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The singleTab key of the session or game at an API path: its own path,
+ * without any operation after the id. null for a path that names none.
+ */
+function tabKey(path: string): string | null {
+  return /^\/api\/(sessions|games)\/[^/]+/.exec(path)?.[0] ?? null;
+}
+
+export const sessionKey = (id: string) => `/api/sessions/${encodeURIComponent(id)}`;
+export const gameKey = (id: string) => `/api/games/${encodeURIComponent(id)}`;
+
+// A tab another one stopped sends nothing for that session or game, and
+// drops the answer to a request it sent before it was stopped.
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const key = tabKey(path);
+  const l = key ? lease(key) : 0;
+  if (key && l === null) throw new ApiError(STOPPED_MESSAGE, STOPPED);
+  const res = await send<T>(path, init);
+  if (key && !live(key, l)) throw new ApiError(STOPPED_MESSAGE, STOPPED);
+  return res;
+}
+
+async function send<T>(path: string, init?: RequestInit): Promise<T> {
   if (WASM) {
     const res = await wasmRequest(init?.method ?? 'GET', path, init?.body as string | undefined);
     if (res.status !== 200) {
@@ -196,15 +219,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-// The static site: whether another tab has moved on the session or game at
-// path since this one last saw it (wasm.ts). Always false for the server.
-function savedElsewhere(path: string): boolean {
-  return WASM && wasmSavedElsewhere(path);
-}
-
-// The localStorage keys another tab's save changes (the static site only).
-export const SAVE_KEYS: readonly string[] = WASM ? wasmSaveKeys : [];
-
 export function createSession(opts: { seed?: number; max_turns?: number } = {}): Promise<SessionState> {
   return request<SessionState>('/api/sessions', {
     method: 'POST',
@@ -214,10 +228,6 @@ export function createSession(opts: { seed?: number; max_turns?: number } = {}):
 
 export function getSession(id: string): Promise<SessionState> {
   return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}`);
-}
-
-export function sessionSavedElsewhere(id: string): boolean {
-  return savedElsewhere(`/api/sessions/${encodeURIComponent(id)}`);
 }
 
 // nodeId is the node the page showed when the user acted (state.node_id):
@@ -426,10 +436,6 @@ export function createGame(opts: Partial<GameOptions> & { seed?: number } = {}):
 
 export function getGame(id: string): Promise<GameState> {
   return request<GameState>(`/api/games/${encodeURIComponent(id)}`);
-}
-
-export function gameSavedElsewhere(id: string): boolean {
-  return savedElsewhere(`/api/games/${encodeURIComponent(id)}`);
 }
 
 export function gameAction(id: string, type: ActionType, tile?: Tile, tiles?: Tile[]): Promise<GameState> {

@@ -53,7 +53,7 @@ Returns the `State` at the current node.
 Body: `{"tile": "5m", "node_id": 3}` – `tile` is the exact tile string from hand or `drawn`
 (red matters: `0m` vs `5m`). `node_id` is optional: the node the client acted from (its
 current `state.node_id`); if it doesn't match the session's current node, the request is
-rejected with `409` and nothing changes (another tab has moved the session on first – see
+rejected with `409` and nothing changes (another browser has moved the session on first – see
 Errors below). Omitting it keeps the old behaviour of acting on whatever node is current.
 Creates the child node, or moves to it if the same discard already exists. Returns the `State`.
 
@@ -64,7 +64,7 @@ Creates a terminal `tsumo` child node. Returns the `State`.
 ### `POST /api/sessions/{id}/goto`
 Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id` here already
 names the destination explicitly, so there's no separate "acted from" node to guard: unlike
-discard/tsumo, another tab moving the session on first can't make this ambiguous (the target
+discard/tsumo, another browser moving the session on first can't make this ambiguous (the target
 node still exists; the tree only grows), so `goto` takes no staleness guard.
 
 ### `GET /api/version`
@@ -407,10 +407,11 @@ These clarify points the contract above leaves open; none changes the JSON shape
 - **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
   session/node/endpoint, `415` POST without a JSON content type, `409` action not
   allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand,
-  or a `node_id` that no longer matches the current node because another tab moved the session
-  on first), `422` a session's tree is already at its node cap (see below) — not a state
-  conflict, since the current node itself is fine to act on, so unlike a `409` re-fetching the
-  session changes nothing.
+  or a `node_id` that no longer matches the current node because another browser moved the
+  session on first; of two tabs in one browser the page stops the older one before that),
+  `422` a session's tree is already at its node cap (see below) — not a state conflict, since
+  the current node itself is fine to act on, so unlike a `409` re-fetching the session changes
+  nothing.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
