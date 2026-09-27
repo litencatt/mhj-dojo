@@ -60,10 +60,11 @@ func (m *Match) Save() Save {
 // check returns an FNV-1a digest, in hex, of the action logs of every round
 // so far, CPU moves and skips included. Callers hold m.mu.
 func (m *Match) check() string {
+	// Writing to a hash never fails.
 	h := fnv.New64a()
 	for _, log := range m.game.H.Logs() {
 		for _, a := range log {
-			fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
+			_, _ = fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
 		}
 		h.Write([]byte{'|'})
 	}
