@@ -123,6 +123,8 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`) built from `MHJDOJO_SITE_URL` (must be an absolute `http(s)://` URL ending with `/`; defaults to the deployed site). The embedded build (`make web`) has no public URL to share, so it omits those tags and stays byte-stable across builds (CI checks `internal/server/static` is up to date).
+
 ### Layout
 
 ```
