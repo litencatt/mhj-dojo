@@ -139,3 +139,9 @@ docs/api.md          HTTP API and definitions
 ```
 
 Tile notation: `1m`–`9m`, `1p`–`9p`, `1s`–`9s`, `1z`–`7z` (East, South, West, North, White, Green, Red). A red five is written `0m` / `0p` / `0s`.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+The static site also ships third-party software (Preact, and the Go runtime and `wasm_exec.js` in the WebAssembly engine); their licenses are in [web/site-public/THIRD_PARTY_LICENSES.txt](web/site-public/THIRD_PARTY_LICENSES.txt), which the site serves as `THIRD_PARTY_LICENSES.txt`.

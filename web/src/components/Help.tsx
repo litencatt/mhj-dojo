@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { WASM } from '../api';
 
 export interface HelpProps {
   onShowGlossary: () => void; // bring the 用語表 panel back from the dock and show it
@@ -199,6 +200,25 @@ export function Help({ onShowGlossary }: HelpProps) {
               <p>
                 ヘッダーの「abc1234 · 2026-09-26」のような表示は、動いているプログラムの元になったコミットと、コミット（またはビルド）の日付です。<code>dev</code> はバージョン情報なしでビルドしたもので、日付は付きません。
                 公開版は新しい版が公開されると「新しいバージョンがあります」と表示するので、「再読み込み」で更新できます（配信側の反映が遅れているときは、その旨を表示します）。
+              </p>
+            </section>
+
+            <section aria-labelledby="help-license">
+              <h3 id="help-license">ライセンス</h3>
+              <p>
+                mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。
+                {WASM ? (
+                  <>
+                    公開版の計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
+                    これらのライセンス文は
+                    <a href="THIRD_PARTY_LICENSES.txt" target="_blank" rel="noopener">
+                      THIRD_PARTY_LICENSES.txt
+                    </a>
+                    にあります。
+                  </>
+                ) : (
+                  'ライセンス文はリポジトリの LICENSE と web/site-public/THIRD_PARTY_LICENSES.txt にあります。'
+                )}
               </p>
             </section>
           </div>

@@ -141,3 +141,9 @@ docs/api.md          HTTP API と各種定義
 ```
 
 牌の表記は `1m`〜`9m`（萬子）、`1p`〜`9p`（筒子）、`1s`〜`9s`（索子）、`1z`〜`7z`（東南西北白發中）です。赤5は `0m` / `0p` / `0s` と書きます。
+
+## ライセンス
+
+MIT ライセンスです。[LICENSE](LICENSE) を参照してください。
+
+静的サイトには第三者のソフトウェア（Preact と、WebAssembly エンジンに含まれる Go のランタイム・`wasm_exec.js`）も含まれます。それらのライセンスは [web/site-public/THIRD_PARTY_LICENSES.txt](web/site-public/THIRD_PARTY_LICENSES.txt) にあり、サイトでは `THIRD_PARTY_LICENSES.txt` として配信しています。
