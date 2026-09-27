@@ -263,9 +263,11 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
   expect(page.url(), 'the reload resumes the same game').toBe(url);
 });
 
-test('a stale tab: acting after another tab moved the game on shows a notice, not an error', async ({
+// Two browsers on the same game (two tabs of one browser would stop each
+// other, see below).
+test('a stale browser: acting after another browser moved the game on shows a notice, not an error', async ({
   page,
-  context,
+  browser,
 }) => {
   await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
   const hand = handPanel(page);
@@ -280,7 +282,7 @@ test('a stale tab: acting after another tab moved the game on shows a notice, no
   // Page B: the same game, fetched fresh - it sees the same offer.
   const gameId = new URL(page.url()).searchParams.get('game');
   expect(gameId, 'the URL should carry the server-assigned game id').toBeTruthy();
-  const pageB = await context.newPage();
+  const pageB = await (await browser.newContext()).newPage();
   await pageB.goto(`/?mode=game&game=${gameId}`);
   const actionBarB = pageB.locator('.action-bar');
   const ponButtonB = actionBarB.getByRole('button', { name: 'ポン', exact: true });
@@ -303,6 +305,64 @@ test('a stale tab: acting after another tab moved the game on shows a notice, no
   await expect(pageB.locator('.notice-banner')).toBeVisible({ timeout: 15_000 });
   await expect(pageB.locator('.error-banner')).toBeHidden();
   await waitForPlayback(pageB);
+  await pageB.context().close();
+});
+
+// One tab of a browser at a time plays a game (src/singleTab.ts): the
+// newest tab to open it wins, and the one before stops until taken back.
+function stoppedDialog(page: Page) {
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
+}
+
+// Every river, your hand and the status line.
+async function tableState(page: Page) {
+  const labels = (sel: string) =>
+    page.locator(sel).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  return {
+    rivers: await Promise.all(
+      ['.seat-bottom', '.seat-right', '.seat-top', '.seat-left'].map((s) => labels(`${s} .seat-river .tile`)),
+    ),
+    hand: await labels('.area-hand .hand-row .tile'),
+    status: await page.locator('.game-status').innerText(),
+  };
+}
+
+test('a second tab on the same game stops the first, until taken back', async ({ page, context }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await expect(handPanel(page)).toBeVisible();
+  await playOneStep(page);
+  await waitForPlayback(page);
+  await expect(page).toHaveURL(/[?&]game=/);
+  const other = await context.newPage();
+  await other.emulateMedia({ reducedMotion: 'reduce' });
+  await other.goto(page.url());
+  await waitForPlayback(other);
+  await expect(handPanel(other)).toBeVisible();
+
+  await expectStopped(page);
+  await expect(stoppedDialog(other)).toHaveCount(0);
+
+  // B plays on.
+  await playOneStep(other);
+  await playOneStep(other);
+  await waitForPlayback(other);
+  const b = await tableState(other);
+
+  // A takes it back, from where B left it; now B stops.
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  await waitForPlayback(page);
+  await expect.poll(() => tableState(page)).toEqual(b);
+  await expectStopped(other);
+  await playOneStep(page);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
 // While the CPU moves replay, the table's numbers follow the step shown, not
@@ -413,6 +473,69 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${next.wall_remaining}`);
   await expect(log).toHaveCount(next.events_from + next.events.length);
+});
+
+// A hidden tab has nobody to show the steps to: the playback jumps to the end.
+test('the playback jumps to the end when the tab is hidden', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const table = page.locator('.game-table');
+  await expect(table).toBeVisible();
+  if ((await table.getAttribute('data-playing')) === 'true') {
+    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+  }
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+
+  // The clock stands still, so the playback stays at its first step until the tab hides.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
+    hand.locator('.hand-drawn button').click(),
+  ]);
+  const st = (await response.json()) as GameState;
+  expect(st.events.length, `CPU moves after your discard (seed ${SEED})`).toBeGreaterThan(1);
+  await page.clock.runFor(50);
+  await expect(table).toHaveAttribute('data-playing', 'true');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + 1);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(table).toHaveAttribute('data-playing', 'false');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
+  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
+});
+
+// A tab hidden before the response lands never starts the steps at all.
+test('the playback starts at its end when the tab is already hidden', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const table = page.locator('.game-table');
+  await expect(table).toBeVisible();
+  if ((await table.getAttribute('data-playing')) === 'true') {
+    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+  }
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+
+  // The clock stands still: only the hidden tab can end the playback.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
+    hand.locator('.hand-drawn button').click(),
+  ]);
+  const st = (await response.json()) as GameState;
+  expect(st.events.length, `CPU moves after your discard (seed ${SEED})`).toBeGreaterThan(1);
+  await page.clock.runFor(50);
+  await expect(table).toHaveAttribute('data-playing', 'false');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
+  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
 });
 
 // A game whose first dealer is a CPU opens with the CPU turns before yours:

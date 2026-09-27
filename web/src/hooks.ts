@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import * as api from './api';
 import type { GameEvent, GameState, SessionState, YakuRow } from './api';
 import { errorMessage } from './panels';
+import { claim, isStopped, onChange } from './singleTab';
 import {
   buildPlayback,
   PLAYBACK_STEP_MS,
@@ -23,8 +24,6 @@ import {
  * both given, a 409 re-fetches the current state and, only if `movedOn` says
  * it actually differs from what's on screen, shows it with a notice instead
  * of the error; otherwise the server's own error message is shown as usual.
- * `refresh` does the same re-fetch unasked (see useRefreshOnSave); it
- * returns false, doing nothing, while a request is in flight.
  */
 export function useSerialRequest<T>(
   onSuccess: (next: T) => void,
@@ -37,15 +36,6 @@ export function useSerialRequest<T>(
   const last = useRef<T | null>(null);
 
   const inFlight = useRef(false);
-
-  // Shows fresh with the notice if it moved on from what's on screen.
-  function showIfMoved(fresh: T): boolean {
-    if (last.current === null || !movedOn?.(last.current, fresh)) return false;
-    last.current = fresh;
-    onSuccess(fresh);
-    setNotice('別の画面で進んだため最新の状態に更新しました');
-    return true;
-  }
 
   async function request(fn: () => Promise<T>) {
     if (inFlight.current) return;
@@ -60,7 +50,14 @@ export function useSerialRequest<T>(
     } catch (err) {
       if (refetch && movedOn && last.current !== null && err instanceof api.ApiError && err.status === 409) {
         try {
-          if (!showIfMoved(await refetch())) setError(errorMessage(err));
+          const fresh = await refetch();
+          if (movedOn(last.current, fresh)) {
+            last.current = fresh;
+            onSuccess(fresh);
+            setNotice('別の画面で進んだため最新の状態に更新しました');
+          } else {
+            setError(errorMessage(err));
+          }
         } catch (refetchErr) {
           setError(errorMessage(refetchErr));
         }
@@ -73,66 +70,23 @@ export function useSerialRequest<T>(
     }
   }
 
-  function refresh(): boolean {
-    if (inFlight.current) return false;
-    if (!refetch || last.current === null) return true;
-    const fetch = refetch;
-    inFlight.current = true;
-    setBusy(true);
-    void (async () => {
-      try {
-        if (showIfMoved(await fetch())) setError(null);
-      } catch {
-        // the next action reports it
-      } finally {
-        inFlight.current = false;
-        setBusy(false);
-      }
-    })();
-    return true;
-  }
-
-  return { busy, error, notice, request, refresh };
+  return { busy, error, notice, request };
 }
 
 /**
- * On the static site, shows the session or game id afresh (with
- * useSerialRequest's notice) once another tab has moved it on
- * (savedElsewhere): as that tab saves, if this one is in view, or else when
- * it comes back into view. One that comes while a request is in flight
- * waits for it (busy) to end. The server build skips this: a move on the
- * out-of-date screen gets its 409 either way.
+ * Holds key (a singleTab key: api.sessionKey or api.gameKey) for this tab
+ * while the page shows it (a new key lets go of the one before), and
+ * returns whether another tab has taken over the one this tab holds: also
+ * the one it was loading, before there is a state to show. Claiming it
+ * again (as useUrlResume's resume does) ends that.
  */
-export function useRefreshOnSave(
-  id: string | null,
-  savedElsewhere: (id: string) => boolean,
-  busy: boolean,
-  refresh: () => boolean,
-) {
-  const latest = useRef(refresh);
-  latest.current = refresh;
-  const waiting = useRef(false);
+export function useSingleTab(key: string | null): boolean {
+  const [stopped, setStopped] = useState(isStopped);
   useEffect(() => {
-    if (!api.WASM || !id) return;
-    const check = () => {
-      if (document.visibilityState !== 'visible' || !savedElsewhere(id)) return;
-      if (!latest.current()) waiting.current = true;
-    };
-    if (waiting.current && !busy) {
-      waiting.current = false;
-      check();
-    }
-    // Only other tabs' saves fire 'storage' here: never this tab's own.
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === null || api.SAVE_KEYS.includes(e.key)) check();
-    };
-    document.addEventListener('visibilitychange', check);
-    window.addEventListener('storage', onStorage);
-    return () => {
-      document.removeEventListener('visibilitychange', check);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [id, busy]);
+    if (key) claim(key);
+  }, [key]);
+  useEffect(() => onChange(() => setStopped(isStopped())), []);
+  return stopped;
 }
 
 /**
@@ -168,10 +122,11 @@ export interface UrlResumeOptions<T> {
 /**
  * Keeps the id in the URL so a reload resumes the same session or game. They
  * live only in server memory, so after a server restart (404) the same wall is
- * dealt again from the params instead.
+ * dealt again from the params instead. Returns resume, which does it again
+ * (for a tab taking the session or game back from another tab).
  */
 export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
-  useEffect(() => {
+  function resume() {
     const params = new URLSearchParams(location.search);
     const id = params.get(idKey);
     if (!id) {
@@ -186,6 +141,10 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
         throw err;
       }
     });
+  }
+
+  useEffect(() => {
+    resume();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -199,6 +158,18 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
     }
     history.replaceState(null, '', url);
   }, [syncKey]);
+
+  return resume;
+}
+
+/**
+ * fn behind a function that keeps its identity across renders, for a
+ * memoized child's props: a call always runs the latest render's fn.
+ */
+export function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback((...args: A) => latest.current(...args), []);
 }
 
 /** Yaku key → display name, for the chart legend. */
@@ -256,15 +227,14 @@ function leadStep(build: PlaybackBuild, state: GameState): number {
  */
 export function usePlayback(state: GameState | null): Playback {
   const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
-  const [step, setStep] = useState(0);
+  // build is memoized on state, so [build] also covers the state read here.
+  const lead = useMemo(() => (build && state ? leadStep(build, state) : 0), [build]);
+  // The step, with the build it was set for. Until the first tick (or skip)
+  // sets it for a new build, the step is that build's lead step: derived
+  // here, so a new build needs no extra render to start (and never shows the
+  // previous build's step for a frame).
+  const [at, setAt] = useState<{ build: PlaybackBuild | null; step: number }>({ build: null, step: 0 });
   const timer = useRef<number | null>(null);
-  // Which build `step` was set for. Effects run after paint, so on the
-  // render right after `state` (and so `build`) changes, `step` is still
-  // whatever the *previous* build left it at - reading it as-is would flash
-  // the previous batch fully revealed for a frame, or fully un-revealed if
-  // playback had reached the end. Compared against `build` below, this lets
-  // that one render derive the correct starting step instead.
-  const stepFor = useRef<PlaybackBuild | null>(null);
 
   const clear = () => {
     if (timer.current !== null) {
@@ -275,18 +245,12 @@ export function usePlayback(state: GameState | null): Playback {
 
   useEffect(() => {
     clear();
-    if (!state || !build) {
-      stepFor.current = build;
-      setStep(0);
-      return;
-    }
+    if (!build) return;
     const total = build.opsPerEvent.length;
-    let cur = leadStep(build, state);
-    stepFor.current = build;
-    setStep(cur);
+    let cur = lead;
     const tick = () => {
       cur += 1;
-      setStep(cur);
+      setAt({ build, step: cur });
       if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
     };
     if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
@@ -296,20 +260,29 @@ export function usePlayback(state: GameState | null): Playback {
 
   const skip = useCallback(() => {
     clear();
-    if (build) {
-      stepFor.current = build;
-      setStep(build.opsPerEvent.length);
-    }
+    if (build) setAt({ build, step: build.opsPerEvent.length });
   }, [build]);
 
-  // The render right after `build` changes but before the effect above has
-  // run: derive this render's step instead of using the stale one.
-  const step0 = stepFor.current === build ? step : build && state ? leadStep(build, state) : 0;
-
+  const step = at.build === build ? at.step : lead;
   const total = build ? build.opsPerEvent.length : 0;
-  const playing = step0 < total;
-  const view = useMemo(() => (build && state ? playbackState(state, build, step0) : state), [build, step0]);
-  const highlight = build && view ? playbackHighlight(build, view.seats, step0) : null;
+  const playing = step < total;
+  const view = useMemo(() => (build && state ? playbackState(state, build, step) : state), [build, step]);
+  const highlight = build && view ? playbackHighlight(build, view.seats, step) : null;
+
+  // A hidden tab would only queue up the steps' renders for nobody: jump to
+  // the end instead, at once if it is hidden already.
+  useEffect(() => {
+    if (!playing) return;
+    if (document.visibilityState === 'hidden') {
+      skip();
+      return;
+    }
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') skip();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [playing, skip]);
 
   return { view, playing, highlight, skip };
 }

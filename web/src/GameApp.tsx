@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, GameOptions, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
@@ -12,18 +12,20 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
+import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
   gameMovedOn,
   useLastAnalysis,
   usePlayback,
-  useRefreshOnSave,
   useRoundLog,
   useRowNames,
   useSerialRequest,
+  useSingleTab,
   useUrlResume,
 } from './hooks';
+import { claim } from './singleTab';
 import { tileName } from './tiles';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -60,7 +62,7 @@ export function GameApp() {
   const { minimized, isMin, minimize, restore } = useMinimized();
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
-  const { busy, error, notice, request, refresh } = useSerialRequest<GameState>(
+  const { busy, error, notice, request } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
@@ -70,13 +72,14 @@ export function GameApp() {
       setPreviewTile(null);
       setRiichiMode(false);
     },
-    // On the static site each tab runs its own engine, the CPU turns within
-    // the request; a move on a game another tab has since moved on gets a
-    // 409 from wasm.ts, which rebuilds this tab's copy from that tab's save.
-    state ? () => api.getGame(state.game_id) : undefined,
+    // On the static site the CPU turns run within the request and no other
+    // tab plays this game meanwhile (see useSingleTab): a 409 is never
+    // another tab's (or a finishing CPU turn's) doing. On the server it may
+    // be another browser's.
+    state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
     gameMovedOn,
   );
-  useRefreshOnSave(state?.game_id ?? null, api.gameSavedElsewhere, busy, refresh);
+  const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
   function startGame(options: GameOptions, seed?: number) {
     return request(() => api.createGame({ seed, ...options }));
@@ -93,10 +96,14 @@ export function GameApp() {
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again after
   // a server restart (on the static site, if the game's save is gone).
-  useUrlResume({
+  const resume = useUrlResume({
     idKey: 'game',
     request,
-    get: api.getGame,
+    get: (id) => {
+      // Before asking for it, so that another tab stops saving it first.
+      claim(api.gameKey(id));
+      return api.getGame(id);
+    },
     create: (params) =>
       api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
     // A random seed is hidden until the end: drop any seed of a previous game.
@@ -127,6 +134,7 @@ export function GameApp() {
   // After a call the analysis is empty; the chart keeps the rows from before.
   const chartAnalysis = useLastAnalysis(state?.analysis);
   const rowNames = useRowNames(chartAnalysis);
+  const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
   // Replays state.events (issue #29) before the player can act again or the
   // round result appears.
@@ -327,7 +335,8 @@ export function GameApp() {
                 history={state.history}
                 currentAnalysis={chartAnalysis}
                 rowNames={rowNames}
-                onMinimize={() => minimize('chart')}
+                minimized={isMin('chart')}
+                onMinimize={minimizeChart}
               />
             </div>
           </>
@@ -351,6 +360,8 @@ export function GameApp() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
+      {/* 「このタブで続ける」 takes the game back, from where the other tab left it. */}
+      {stopped && <TabStopped busy={busy} onContinue={resume} />}
     </div>
   );
 }
