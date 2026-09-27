@@ -19,6 +19,7 @@ import {
   useLastAnalysis,
   usePlayback,
   useRefreshOnSave,
+  useRoundLog,
   useRowNames,
   useSerialRequest,
   useUrlResume,
@@ -130,6 +131,10 @@ export function GameApp() {
   // Replays state.events (issue #29) before the player can act again or the
   // round result appears.
   const playback = usePlayback(state);
+  // The table and the dora follow the replay: points, sticks, the wall and
+  // the dora as they stood at the current step.
+  const table = playback.view;
+  const earlierEvents = useRoundLog(state);
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
@@ -208,7 +213,7 @@ export function GameApp() {
               </label>
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
-            {state && (
+            {state && table && (
               <div class="header-status">
                 <dl class="game-status">
                   <div>
@@ -236,10 +241,10 @@ export function GameApp() {
                   </div>
                 </dl>
                 <DoraStatus
-                  doraIndicators={state.dora_indicators}
-                  dora={state.dora}
-                  uraDoraIndicators={state.ura_dora_indicators}
-                  uraDora={state.ura_dora}
+                  doraIndicators={table.dora_indicators}
+                  dora={table.dora}
+                  uraDoraIndicators={table.ura_dora_indicators}
+                  uraDora={table.ura_dora}
                 />
               </div>
             )}
@@ -260,13 +265,12 @@ export function GameApp() {
             </p>
           )}
         </div>
-        {state && me && (
+        {state && me && table && (
           <>
             <div class="area-hand">
               <GameTable
-                state={state}
-                seats={playback.seats}
-                events={playback.events}
+                state={table}
+                log={[...earlierEvents, ...table.events]}
                 highlight={playback.highlight}
                 playing={playback.playing}
               />

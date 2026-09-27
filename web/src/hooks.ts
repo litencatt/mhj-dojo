@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { GameEvent, GameState, SessionState, Seat, YakuRow } from './api';
+import type { GameEvent, GameState, SessionState, YakuRow } from './api';
 import { errorMessage } from './panels';
 import {
   buildPlayback,
   PLAYBACK_STEP_MS,
-  playbackFrame,
   playbackHighlight,
+  playbackState,
   type PlaybackBuild,
   type PlaybackHighlight,
 } from './playback';
@@ -229,8 +229,10 @@ function prefersReducedMotion(): boolean {
 }
 
 export interface Playback {
-  seats: Seat[]; // the seats to render: state.seats with events not yet played hidden
-  events: GameEvent[]; // state.events, revealed up to the current step
+  // The state to show: state as the table stood at the current step (its
+  // seats, events revealed so far, points, wall, dora ...; see
+  // playbackState), state itself once the playback ends.
+  view: GameState | null;
   playing: boolean;
   highlight: PlaybackHighlight | null; // the tile or meld that last landed
   skip: () => void; // jump straight to the final state
@@ -306,14 +308,39 @@ export function usePlayback(state: GameState | null): Playback {
 
   const total = build ? build.opsPerEvent.length : 0;
   const playing = step0 < total;
-  const seats = useMemo(() => {
-    if (!build || !state) return state?.seats ?? [];
-    return step0 >= total ? state.seats : playbackFrame(build, step0); // nothing hidden: the server's own array
-  }, [build, step0]);
-  const highlight = build ? playbackHighlight(build, seats, step0) : null;
-  const events = state ? state.events.slice(0, step0) : [];
+  const view = useMemo(() => (build && state ? playbackState(state, build, step0) : state), [build, step0]);
+  const highlight = build && view ? playbackHighlight(build, view.seats, step0) : null;
 
-  return { seats, events, playing, highlight, skip };
+  return { view, playing, highlight, skip };
+}
+
+/**
+ * The round's events before state's own (docs/api.md "events_from"): each
+ * response carries only the moves since your previous one, so the earlier
+ * ones are kept here as they arrive, for the table's log of the round. A
+ * reload, or a new round, starts again from the state's own events.
+ */
+export function useRoundLog(state: GameState | null): GameEvent[] {
+  // Worked out once per state, during the render that first sees it: the
+  // ref is only written when `state` changes, so re-renders read it back.
+  const log = useRef<{ state: GameState | null; round: string; events: GameEvent[]; before: GameEvent[] }>({
+    state: null,
+    round: '',
+    events: [],
+    before: [],
+  });
+  if (log.current.state !== state) {
+    const prev = log.current;
+    if (!state) {
+      log.current = { state, round: '', events: [], before: [] };
+    } else {
+      const round = `${state.game_id} ${state.round_wind}${state.round_number}-${state.honba}`;
+      const before =
+        prev.round === round && prev.events.length >= state.events_from ? prev.events.slice(0, state.events_from) : [];
+      log.current = { state, round, events: [...before, ...state.events], before };
+    }
+  }
+  return log.current.before;
 }
 
 /** An on/off setting kept in localStorage under key. Off by default and whenever storage fails. */
