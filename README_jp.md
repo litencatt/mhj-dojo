@@ -4,7 +4,7 @@
 
 [English README](README.md)
 
-静的サイト（練習モードのみ、CPU対戦は未対応）: https://mhj-dojo.lolipop-now.app/
+静的サイト（練習とCPU対戦、インストール不要）: https://mhj-dojo.lolipop-now.app/
 
 ## 練習モード
 
@@ -93,9 +93,9 @@ cd web && npx playwright install --with-deps chromium   # 初回のみ
 cd web && npm run build && npm run e2e
 ```
 
-### 静的サイト（WebAssembly、練習モードのみ）
+### 静的サイト（WebAssembly）
 
-練習モードは、サーバなしで動く静的サイトとしてもビルドできます。Go の練習エンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。HTTP API（docs/api.md）と同じリクエストに同じ JSON で答えるので、画面のコードは共通です。
+このアプリは、サーバなしで動く静的サイトとしてもビルドできます。Go のエンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。HTTP API（docs/api.md）と同じリクエストに同じ JSON で答えるので、画面のコードは共通です。
 
 ```sh
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
@@ -105,11 +105,11 @@ make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo
 
 ローカル版との違い:
 
-- 練習モードのみです。CPU対戦（**CPU対戦へ**、`?mode=game`）はまだ使えません。
+- CPU対戦（**CPU対戦へ**、`?mode=game`）も、CPUの手番を含めてブラウザの中で動きます。
 - タブごとに別の状態を持つので、「別の画面で進んだ」ときの処理はありません。
-- セッションごとの操作をブラウザ（localStorage、最近使った 10 セッションまで）に保存し、再読み込みのときに同じ URL のまま作り直します。作り直せないときは、URL のシードから同じ山で配り直します。
+- セッションごとの操作をブラウザ（localStorage、最近使った 10 セッションまで）に保存し、再読み込みのときに同じ URL のまま作り直します。作り直せないときは、URL のシードから同じ山で配り直します。CPU対戦も同じように保存します（最近使った 5 対局まで）。ランダムなシードは終局まで表示しません。
 
-Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードのみ、CPU対戦は未対応）に公開しています。
+Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開しています。
 
 #### デプロイ
 
@@ -136,7 +136,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 ```
 cmd/mhj-dojo/        CLI のエントリポイント
-cmd/mhj-dojo-wasm/   静的サイト用の練習エンジン（WebAssembly）
+cmd/mhj-dojo-wasm/   静的サイト用のエンジン（WebAssembly）
 internal/tile/       牌の表現と表記
 internal/wall/       シード付きの山、配牌、ツモ
 internal/shanten/    一般形・七対子・国士無双の向聴と有効牌
