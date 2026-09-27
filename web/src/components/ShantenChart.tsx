@@ -1,10 +1,12 @@
 import { Fragment } from 'preact';
+import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useState } from 'preact/hooks';
 import type { HistoryEntry, YakuRow } from '../api';
 import { PanelHeading } from './PanelHeading';
 
 export interface ShantenChartProps {
   onMinimize?: () => void;
+  minimized?: boolean; // in the dock: only its hooks run (keeping their state), nothing is drawn
   sessionId: string; // default legend selection resets when this changes (new game)
   history: HistoryEntry[];
   currentAnalysis: YakuRow[]; // used to pick the default "best 5" legend rows and the yakuman keys
@@ -60,8 +62,8 @@ function useWidth() {
 }
 
 /** 時系列チャート: x = turn, y = shanten (low = top; win=-1 tenpai=0 labeled). */
-export function ShantenChart(props: ShantenChartProps) {
-  const { sessionId, history, currentAnalysis, rowNames, onMinimize } = props;
+export const ShantenChart = memo(function ShantenChart(props: ShantenChartProps) {
+  const { sessionId, history, currentAnalysis, rowNames, onMinimize, minimized } = props;
   const yakumanKeys = useMemo(
     () => new Set(currentAnalysis.filter((r) => r.yakuman).map((r) => r.key)),
     [currentAnalysis],
@@ -90,6 +92,8 @@ export function ShantenChart(props: ShantenChartProps) {
       return next;
     });
   }
+
+  if (minimized) return null;
 
   // Phones only (style.css's phone width): a narrow desktop column keeps the scaled drawing.
   const narrow = boxWidth > 0 && boxWidth < NARROW && typeof matchMedia === 'function' && matchMedia(PHONE).matches;
@@ -248,4 +252,4 @@ export function ShantenChart(props: ShantenChartProps) {
       </div>
     </section>
   );
-}
+});

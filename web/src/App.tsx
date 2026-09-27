@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { SessionState } from './api';
 import { Hand } from './components/Hand';
@@ -12,7 +12,7 @@ import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { sessionMovedOn, useRefreshOnSave, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { sessionMovedOn, useRefreshOnSave, useRowNames, useSerialRequest, useStableCallback, useUrlResume } from './hooks';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -68,15 +68,20 @@ export function App() {
     void request(() => api.tsumo(state.session_id, state.node_id));
   }
 
-  function handleGoto(nodeId: number) {
+  const handleGoto = useStableCallback((nodeId: number) => {
     if (!state) return;
     void request(() => api.goto(state.session_id, nodeId));
-  }
+  });
 
   const rowNames = useRowNames(state?.analysis);
+  // The panels are memoized: their callbacks keep their identity.
+  const minimizeChart = useCallback(() => minimize('chart'), [minimize]);
+  const minimizeTree = useCallback(() => minimize('tree'), [minimize]);
+  const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
 
-  // Minimized panels stay mounted (hidden) so they keep their own state,
-  // such as the chart's legend selection and the glossary search.
+  // Minimized panels stay mounted (hidden, drawing nothing) so they keep
+  // their own state, such as the chart's legend selection and the glossary
+  // search.
   const docked = PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
 
@@ -92,7 +97,9 @@ export function App() {
     const ro = new ResizeObserver(() => {
       const yaku = app.querySelector('.area-yaku');
       if (!yaku) return;
-      app.style.setProperty('--yaku-top', `${yaku.getBoundingClientRect().top + window.scrollY}px`);
+      const top = `${yaku.getBoundingClientRect().top + window.scrollY}px`;
+      // A write, even of the same value, may restyle the whole app.
+      if (app.style.getPropertyValue('--yaku-top') !== top) app.style.setProperty('--yaku-top', top);
     });
     ro.observe(app);
     return () => ro.disconnect();
@@ -208,7 +215,8 @@ export function App() {
                 history={state.history}
                 currentAnalysis={state.analysis}
                 rowNames={rowNames}
-                onMinimize={() => minimize('chart')}
+                minimized={isMin('chart')}
+                onMinimize={minimizeChart}
               />
             </div>
           </>
@@ -221,7 +229,8 @@ export function App() {
             currentNodeId={state.node_id}
             disabled={busy}
             onGoto={handleGoto}
-            onMinimize={() => minimize('tree')}
+            minimized={isMin('tree')}
+            onMinimize={minimizeTree}
           />
         </div>
       )}
@@ -240,7 +249,8 @@ export function App() {
               advice={state.advice}
               review={state.discard_review}
               onHighlight={setHighlightTile}
-              onMinimize={() => minimize('advice')}
+              minimized={isMin('advice')}
+              onMinimize={minimizeAdvice}
             />
           }
         />

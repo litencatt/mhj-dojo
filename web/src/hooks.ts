@@ -201,6 +201,16 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
   }, [syncKey]);
 }
 
+/**
+ * fn behind a function that keeps its identity across renders, for a
+ * memoized child's props: a call always runs the latest render's fn.
+ */
+export function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback((...args: A) => latest.current(...args), []);
+}
+
 /** Yaku key → display name, for the chart legend. */
 /**
  * The last non-empty analysis: after a call the server stops sending one,
@@ -256,15 +266,13 @@ function leadStep(build: PlaybackBuild, state: GameState): number {
  */
 export function usePlayback(state: GameState | null): Playback {
   const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
-  const [step, setStep] = useState(0);
+  const lead = useMemo(() => (build && state ? leadStep(build, state) : 0), [build]);
+  // The step, with the build it was set for. Until the first tick (or skip)
+  // sets it for a new build, the step is that build's lead step: derived
+  // here, so a new build needs no extra render to start (and never shows the
+  // previous build's step for a frame).
+  const [at, setAt] = useState<{ build: PlaybackBuild | null; step: number }>({ build: null, step: 0 });
   const timer = useRef<number | null>(null);
-  // Which build `step` was set for. Effects run after paint, so on the
-  // render right after `state` (and so `build`) changes, `step` is still
-  // whatever the *previous* build left it at - reading it as-is would flash
-  // the previous batch fully revealed for a frame, or fully un-revealed if
-  // playback had reached the end. Compared against `build` below, this lets
-  // that one render derive the correct starting step instead.
-  const stepFor = useRef<PlaybackBuild | null>(null);
 
   const clear = () => {
     if (timer.current !== null) {
@@ -275,18 +283,12 @@ export function usePlayback(state: GameState | null): Playback {
 
   useEffect(() => {
     clear();
-    if (!state || !build) {
-      stepFor.current = build;
-      setStep(0);
-      return;
-    }
+    if (!build) return;
     const total = build.opsPerEvent.length;
-    let cur = leadStep(build, state);
-    stepFor.current = build;
-    setStep(cur);
+    let cur = lead;
     const tick = () => {
       cur += 1;
-      setStep(cur);
+      setAt({ build, step: cur });
       if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
     };
     if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
@@ -296,20 +298,25 @@ export function usePlayback(state: GameState | null): Playback {
 
   const skip = useCallback(() => {
     clear();
-    if (build) {
-      stepFor.current = build;
-      setStep(build.opsPerEvent.length);
-    }
+    if (build) setAt({ build, step: build.opsPerEvent.length });
   }, [build]);
 
-  // The render right after `build` changes but before the effect above has
-  // run: derive this render's step instead of using the stale one.
-  const step0 = stepFor.current === build ? step : build && state ? leadStep(build, state) : 0;
-
+  const step = at.build === build ? at.step : lead;
   const total = build ? build.opsPerEvent.length : 0;
-  const playing = step0 < total;
-  const view = useMemo(() => (build && state ? playbackState(state, build, step0) : state), [build, step0]);
-  const highlight = build && view ? playbackHighlight(build, view.seats, step0) : null;
+  const playing = step < total;
+  const view = useMemo(() => (build && state ? playbackState(state, build, step) : state), [build, step]);
+  const highlight = build && view ? playbackHighlight(build, view.seats, step) : null;
+
+  // A hidden tab would only queue up the steps' renders for nobody: jump to
+  // the end instead.
+  useEffect(() => {
+    if (!playing) return;
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') skip();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [playing, skip]);
 
   return { view, playing, highlight, skip };
 }

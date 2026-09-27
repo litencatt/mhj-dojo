@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { useCallback } from 'preact/hooks';
 import type { ComboRow, Tile, YakuRow } from '../api';
 import type { PanelKey } from '../panels';
 import { YakuTable } from './YakuTable';
@@ -12,7 +13,7 @@ export interface SidePanelsProps {
   previewTile: string | null;
   mode: 'practice' | 'game';
   isMin: (k: PanelKey) => boolean;
-  onMinimize: (k: PanelKey) => void;
+  onMinimize: (k: PanelKey) => void; // keeps its identity across renders (useMinimized)
   advice?: ComponentChildren; // the advice panel (practice), above the glossary
 }
 
@@ -31,6 +32,8 @@ export function SidePanels({
   // Preview only tiles the server analysed, so the title never outruns the table.
   const previewRows = previewTile ? byDiscard[previewTile] : undefined;
   const adviceShown = !!advice && !isMin('advice');
+  const minimizeYaku = useCallback(() => onMinimize('yaku'), [onMinimize]);
+  const minimizeGloss = useCallback(() => onMinimize('gloss'), [onMinimize]);
   return (
     <div class="area-side" hidden={isMin('yaku') && isMin('gloss') && !adviceShown}>
       <div class="area-yaku" hidden={isMin('yaku')}>
@@ -40,7 +43,8 @@ export function SidePanels({
           previewTile={previewRows ? previewTile : null}
           combos={(previewRows && previewTile && combosByDiscard[previewTile]) || combos}
           baseCombos={previewRows ? combos : null}
-          onMinimize={() => onMinimize('yaku')}
+          minimized={isMin('yaku')}
+          onMinimize={minimizeYaku}
         />
       </div>
       <div class="area-notes" hidden={isMin('gloss') && !adviceShown}>
@@ -50,7 +54,7 @@ export function SidePanels({
           </div>
         )}
         <div class="area-gloss" hidden={isMin('gloss')}>
-          <Glossary mode={mode} onMinimize={() => onMinimize('gloss')} />
+          <Glossary mode={mode} minimized={isMin('gloss')} onMinimize={minimizeGloss} />
         </div>
       </div>
     </div>
