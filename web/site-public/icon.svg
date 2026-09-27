@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="mhj-dojo 麻雀道場">
-  <rect width="64" height="64" fill="#f4f5f7"/>
-  <rect x="5" y="9" width="54" height="48" rx="7" fill="#3f7d5c"/>
-  <rect x="5" y="5" width="54" height="48" rx="7" fill="#fffdf5" stroke="#c9c2a8" stroke-width="1.3"/>
-  <text x="32" y="39" font-family=""Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif" font-weight="900" font-size="37" text-anchor="middle" fill="#c8201f">道</text>
+  <rect width="64" height="64" rx="14" fill="#f7f7f4"/>
+  <circle cx="32" cy="32" r="25" fill="#1f4fbf"/>
+  <circle cx="32" cy="32" r="20.5" fill="#f7f7f4"/>
+  <circle cx="32" cy="32" r="16" fill="#1f4fbf"/>
+  <circle cx="32" cy="32" r="11.5" fill="#f7f7f4"/>
+  <circle cx="32" cy="32" r="8" fill="#d1332a"/>
 </svg>
