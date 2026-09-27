@@ -9,6 +9,7 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/testmode"
 	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 // sameAsFresh fails t unless a's rows and combos for c match a fresh
@@ -68,5 +69,46 @@ func TestTinyMemos(t *testing.T) {
 	a.folds = memo.New[[2]*shanten.Table, *shanten.Table](16)
 	for i := range testmode.N(300, 100, 30) {
 		sameAsFresh(t, a, randomHand(r), i)
+	}
+}
+
+// TestResultMemo checks the memo of AnalyzeWith and Combos results against
+// an analyzer without it, on a stream of hands that keeps coming back to
+// earlier ones (as a turn's discard candidates do), with the same concealed
+// tiles both with melds and without, and with the memo turning over.
+func TestResultMemo(t *testing.T) {
+	r := rand.New(rand.NewPCG(45, 46))
+	for i, w := range []Winds{EastEast, {Round: tile.South, Seat: tile.West}} {
+		a, b := NewAnalyzerFor(w), NewAnalyzerFor(w)
+		b.DisableResultMemo()
+		type hand struct {
+			c     tile.Counts
+			melds []yaku.Meld
+		}
+		var seen []hand
+		for j := range testmode.N(600, 200, 60) {
+			var h hand
+			switch {
+			case len(seen) > 0 && j%3 == 0: // an earlier hand, maybe evicted
+				h = seen[r.IntN(len(seen))]
+			case j%5 == 1:
+				h.c, h.melds = randomOpen14(r)
+			case j%5 == 2 && seen[len(seen)-1].melds != nil: // the open hand's concealed tiles, closed
+				h.c = seen[len(seen)-1].c
+			default:
+				h.c = random14(r)
+			}
+			if k := tile.Kind(r.IntN(tile.NumKinds)); h.c[k] > 0 && j%2 == 0 {
+				h.c[k]-- // 13 tiles
+			}
+			seen = append(seen, h)
+			rows, want := a.AnalyzeWith(h.c, h.melds), b.AnalyzeWith(h.c, h.melds)
+			if !reflect.DeepEqual(rows, want) {
+				t.Fatalf("winds %d hand %d %s %v: rows differ", i, j, h.c, h.melds)
+			}
+			if got, want := a.Combos(h.c, h.melds, rows), b.Combos(h.c, h.melds, want); !reflect.DeepEqual(got, want) {
+				t.Fatalf("winds %d hand %d %s %v: combos differ", i, j, h.c, h.melds)
+			}
+		}
 	}
 }

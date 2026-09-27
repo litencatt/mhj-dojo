@@ -41,8 +41,13 @@ type HistoryEntry struct {
 // each accepting tile's remaining count is 4 minus the visible copies.
 func Rows(res []yakushanten.Result, visible *tile.Counts, han func(key string) int) []YakuRow {
 	out := make([]YakuRow, len(res))
+	shanten := make([]int, len(res)) // the rows' Shanten point into it
 	for i, r := range res {
-		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Shanten: ShantenOf(r), Approx: r.Approx, Ukeire: []Ukeire{}}
+		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Approx: r.Approx, Ukeire: make([]Ukeire, 0, len(r.Ukeire))}
+		if r.Possible {
+			shanten[i] = r.Shanten
+			row.Shanten = &shanten[i]
+		}
 		for _, k := range r.Ukeire {
 			rem := max(4-visible[k], 0)
 			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
@@ -68,7 +73,7 @@ type ComboRow struct {
 func Combos(combos []yakushanten.Combo, visible *tile.Counts) []ComboRow {
 	out := make([]ComboRow, len(combos))
 	for i, c := range combos {
-		row := ComboRow{Keys: c.Keys, Name: c.Name, Han: c.Han, Shanten: c.Shanten, Approx: c.Approx, Ukeire: []Ukeire{}}
+		row := ComboRow{Keys: c.Keys, Name: c.Name, Han: c.Han, Shanten: c.Shanten, Approx: c.Approx, Ukeire: make([]Ukeire, 0, len(c.Ukeire))}
 		for _, k := range c.Ukeire {
 			rem := max(4-visible[k], 0)
 			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})

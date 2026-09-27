@@ -244,11 +244,19 @@ func (m *Match) state() State {
 			all = append(all, *me.Drawn)
 		}
 		c := tile.CountsOf(all)
+		// A red five and a plain one leave the same hand: the first key of
+		// each kind is computed, any other shares its rows.
+		var first [tile.NumKinds]string
 		for _, t := range all {
 			key := t.String()
 			if _, done := st.ByDiscard[key]; done || !slices.Contains(st.Legal.Discards, key) {
 				continue
 			}
+			if k := first[t.Kind]; k != "" {
+				st.ByDiscard[key], st.CombosByDiscard[key] = st.ByDiscard[k], st.CombosByDiscard[k]
+				continue
+			}
+			first[t.Kind] = key
 			c[t.Kind]--
 			res := m.analyze(c, melds)
 			st.ByDiscard[key] = apiview.Rows(res, &visible, han)

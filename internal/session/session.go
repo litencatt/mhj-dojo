@@ -5,6 +5,7 @@ package session
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/advice"
@@ -153,8 +154,13 @@ type node struct {
 	// forever instead of being pruned with them.
 	normalShanten     *int
 	normalShantenDone bool
-	winRows           map[string]int // tsumo nodes: row shanten on the 14 winning tiles
-	win               *Win
+	// rowShanten is each row's shanten (noShanten: impossible), in the
+	// analyzer's row order, for the history of every path the node is on.
+	// Like normalShanten it is small and kept forever, so a path whose
+	// nodes' analysis was pruned does not recompute it.
+	rowShanten []int8
+	winRows    map[string]int // tsumo nodes: row shanten on the 14 winning tiles
+	win        *Win
 }
 
 // ID returns the session id.
@@ -234,6 +240,7 @@ func (s *Session) discard(t string, expectedNode *int, review bool) error {
 	}
 	if id, ok := cur.children[t]; ok {
 		s.current = id
+		s.seedAnalysis(s.nodes[id], cur)
 		return nil
 	}
 	if err := s.roomForNode(); err != nil {
@@ -249,7 +256,27 @@ func (s *Session) discard(t string, expectedNode *int, review bool) error {
 	n.hand = hand
 	child := s.addNode(n)
 	cur.children[t] = child.id
+	s.seedAnalysis(child, cur)
 	return nil
+}
+
+// seedAnalysis gives n, reached from its parent cur by a discard, the
+// analysis and combos of its hand that cur's per-discard preview already
+// holds, if n has none. n is then in pathCache for pruneAnalysisCache.
+func (s *Session) seedAnalysis(n, cur *node) {
+	k := n.discard.Kind
+	res, ok := cur.byDiscard[k]
+	if !ok || n.analysis != nil {
+		return
+	}
+	n.analysis = res
+	if n.rowShanten == nil {
+		n.rowShanten = compactShanten(res)
+	}
+	if combos, ok := cur.combosByDiscard[k]; ok && n.combos == nil {
+		n.combos = append([]yakushanten.Combo{}, combos...)
+	}
+	s.pathCache = append(s.pathCache, n.id)
 }
 
 // Tsumo declares a win with the pending draw. expectedNode is as in Discard.
@@ -353,15 +380,52 @@ func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
 	if n.analysis == nil {
 		n.analysis = s.analyze(tile.CountsOf(n.hand))
 	}
+	if n.rowShanten == nil {
+		n.rowShanten = compactShanten(n.analysis)
+	}
 	return n.analysis
+}
+
+// noShanten is rowShanten's value for an impossible row.
+const noShanten = math.MinInt8
+
+func compactShanten(res []yakushanten.Result) []int8 {
+	out := make([]int8, len(res))
+	for i, r := range res {
+		out[i] = noShanten
+		if r.Possible {
+			out[i] = int8(r.Shanten)
+		}
+	}
+	return out
+}
+
+// nodeRowShanten returns each row's shanten at a node that is not a win,
+// analyzing its hand only if no analysis has recorded them yet.
+func (s *Session) nodeRowShanten(n *node) []int8 {
+	if n.rowShanten == nil {
+		res := n.analysis
+		if res == nil {
+			res = s.analyze(tile.CountsOf(n.hand))
+		}
+		n.rowShanten = compactShanten(res)
+	}
+	return n.rowShanten
 }
 
 // nodeNormalShanten returns just the normal-form shanten (nil = complete
 // hand impossible), for the tree view. It is cached on the node forever
-// (unlike analysis/byDiscard) since it is tiny.
+// (unlike analysis/byDiscard) since it is tiny. A node whose rows are known
+// already (rowShanten) reads it from the normal row, the first.
 func (s *Session) nodeNormalShanten(n *node) *int {
 	if !n.normalShantenDone {
-		n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
+		if n.rowShanten != nil {
+			if v := n.rowShanten[0]; v != noShanten {
+				n.normalShanten = intPtr(int(v))
+			}
+		} else {
+			n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
+		}
 		n.normalShantenDone = true
 	}
 	return n.normalShanten
