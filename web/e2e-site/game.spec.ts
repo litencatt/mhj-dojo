@@ -367,3 +367,36 @@ test('a localStorage refusing every write warns once', async ({ page }) => {
   await expect(page.locator('.error-banner')).toHaveCount(0);
   expect(warnings.filter((w) => w.includes('localStorage'))).toHaveLength(1);
 });
+
+// A call the engine never answers (it hung, or looped) is given up after
+// wasm.ts's CALL_TIMEOUT_MS: the request fails, and the next one starts a new
+// engine that rebuilds the game from its save.
+test('a hung engine is given up and the next move restarts it', async ({ page }) => {
+  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await expect(handPanel(page)).toBeVisible();
+  await playOneStep(page);
+  const id = gameId(page)!;
+  const before = await tableState(page);
+  // From now on the engine swallows every call.
+  await page.workers()[0].evaluate(() => {
+    self.onmessage = () => {};
+  });
+  await page.clock.install();
+
+  const hand = handPanel(page);
+  const drawn = hand.locator('.hand-drawn button');
+  await expect(drawn).toBeEnabled();
+  await drawn.click();
+  await page.clock.fastForward(59_000);
+  await expect(page.locator('.error-banner')).toHaveCount(0); // still waiting
+  await page.clock.fastForward(2_000);
+  await expect(page.locator('.error-banner')).toContainText('計算エンジンが応答しません');
+  expect(await tableState(page)).toEqual(before);
+
+  // The same move again: a new engine, the game rebuilt under the same id.
+  await clickAndWait(page, drawn);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  expect(gameId(page)).toBe(id);
+  const after = await tableState(page);
+  expect(after.rivers[0]).toHaveLength(before.rivers[0].length + 1);
+});

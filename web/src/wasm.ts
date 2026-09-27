@@ -26,8 +26,15 @@ interface Reply {
 }
 
 let engine: Promise<Worker> | null = null;
+// Gives up on the current worker (see start's fail); null before the first.
+let abandon: ((message: string) => void) | null = null;
 let nextId = 1;
 const pending = new Map<number, (r: Reply) => void>();
+
+// How long one call may take before the engine counts as hung. The longest
+// legitimate calls are a rebuild from a save (a whole 半荘戦 replays in well
+// under a second on a phone) and a round of CPU turns; nothing takes seconds.
+const CALL_TIMEOUT_MS = 60_000;
 
 // Starts the worker on first use. The measure 'mhj-dojo:wasm-init' records how
 // long the download, compile and start of the engine took. If the engine
@@ -47,6 +54,7 @@ function start(): Promise<Worker> {
       w.terminate();
       if (engine !== started) return; // an old worker, already replaced
       engine = null;
+      abandon = null;
       forgetEngine();
       reject(new Error(message)); // no-op once it had started
       for (const [id, done] of pending) done({ id, status: 500, body: JSON.stringify({ error: message }) });
@@ -73,6 +81,7 @@ function start(): Promise<Worker> {
       fail(`計算エンジンを読み込めませんでした${e.message ? `: ${e.message}` : ''}`);
     };
     w.onmessageerror = () => fail('計算エンジンの応答を読めませんでした');
+    abandon = fail;
   });
   engine = started;
   return started;
@@ -82,7 +91,17 @@ async function call(fn: 'request' | 'restore' | 'restoreGame', ...args: string[]
   const w = await start();
   const id = nextId++;
   const reply = await new Promise<Reply>((resolve) => {
-    pending.set(id, resolve);
+    // A call the engine never answers (it hung, or looped) would leave the
+    // page waiting forever: past the timeout the worker is given up, this
+    // and any other pending call fail with a 500, and the next request
+    // starts a new worker and rebuilds what it needs from the saves.
+    const timer = setTimeout(() => {
+      if (pending.has(id)) abandon?.('計算エンジンが応答しません');
+    }, CALL_TIMEOUT_MS);
+    pending.set(id, (r) => {
+      clearTimeout(timer);
+      resolve(r);
+    });
     w.postMessage({ id, fn, args });
   });
   return { status: reply.status, data: JSON.parse(reply.body) as unknown, save: reply.save };
@@ -118,9 +137,10 @@ function loadAll(): SavedMap {
 let warnedStorage = false;
 
 // Writes saves to localStorage. When that fails (most likely the quota),
-// keeps only the one just saved and tries once more; if storage still
-// refuses, the saves go stale (a reload starts over from the URL's seed),
-// which is worth one warning.
+// keeps only the one just saved (keep) and tries once more; if storage
+// still refuses, the saves go stale (a reload starts over from the URL's
+// seed), which is worth one warning. Without a keep (dropping a save) the
+// stale saves stay as they are rather than being wiped for a smaller write.
 function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<string, T>) => unknown, keep?: string) {
   try {
     localStorage.setItem(key, JSON.stringify(wrap(saved)));
@@ -128,12 +148,13 @@ function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<st
   } catch {
     // retried below with fewer saves
   }
-  try {
-    const only = keep !== undefined && keep in saved ? { [keep]: saved[keep] } : {};
-    localStorage.setItem(key, JSON.stringify(wrap(only)));
-    return;
-  } catch {
-    // storage unavailable
+  if (keep !== undefined && keep in saved) {
+    try {
+      localStorage.setItem(key, JSON.stringify(wrap({ [keep]: saved[keep] })));
+      return;
+    } catch {
+      // storage unavailable
+    }
   }
   if (!warnedStorage) {
     warnedStorage = true;
