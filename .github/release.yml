@@ -1,0 +1,6 @@
+# GitHub's generated release notes, used by tagpr for CHANGELOG.md and the
+# GitHub Releases: leave out tagpr's own release pull requests.
+changelog:
+  exclude:
+    labels:
+      - tagpr
