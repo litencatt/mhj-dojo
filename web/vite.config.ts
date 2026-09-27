@@ -1,8 +1,45 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
+
+// The site's own public base URL (must end with '/'), for the absolute
+// og:url/og:image link-preview tags below. Defaults to the deployed site
+// so a plain `npm run build:site` still produces working previews; CI
+// overrides it (vars.SITE_URL) for a preview/staging deploy.
+const SITE_URL_DEFAULT = 'https://mhj-dojo.lolipop-now.app/';
+
+function resolveSiteUrl(): string {
+  const raw = process.env.MHJDOJO_SITE_URL || SITE_URL_DEFAULT;
+  if (!/^https?:\/\/.*\/$/.test(raw)) {
+    throw new Error(`MHJDOJO_SITE_URL must be an absolute http(s) URL ending with '/' (got ${JSON.stringify(raw)})`);
+  }
+  return raw;
+}
+
+// Injects the absolute og:url/og:image(+size/alt)/twitter:image tags: they
+// only make sense for the published site (a crawler fetches og:image
+// directly, without page context, so it must be absolute). index.html
+// carries the rest of the OG/Twitter tags itself, since those don't depend
+// on any URL and must stay byte-stable in the embedded build (CI checks
+// internal/server/static is up to date).
+function siteOgTagsPlugin(siteUrl: string): Plugin {
+  const image = `${siteUrl}og-image.png`;
+  return {
+    name: 'mhj-dojo-site-og-tags',
+    transformIndexHtml() {
+      return [
+        { tag: 'meta', attrs: { property: 'og:url', content: siteUrl }, injectTo: 'head' },
+        { tag: 'meta', attrs: { property: 'og:image', content: image }, injectTo: 'head' },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' }, injectTo: 'head' },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' }, injectTo: 'head' },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'mhj-dojo 麻雀道場のタイトルと麻雀牌' }, injectTo: 'head' },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: image }, injectTo: 'head' },
+      ];
+    },
+  };
+}
 
 // The checkout's commit (7 hex digits), or '' outside git.
 function gitShortSha(): string {
@@ -69,6 +106,7 @@ export default defineConfig(({ command, mode }) => {
     return {
       plugins: [
         preact(),
+        siteOgTagsPlugin(resolveSiteUrl()),
         {
           name: 'mhj-dojo-version-json',
           apply: 'build',

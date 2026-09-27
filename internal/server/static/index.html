@@ -6,9 +6,30 @@
     <!-- iOS turns long digit runs (the seed, the version) into phone-call links. -->
     <meta name="format-detection" content="telephone=no" />
     <title>mhj-dojo - 麻雀道場</title>
-    <link rel="icon" href="data:,">
-    <script type="module" crossorigin src="/assets/index-CTD_hp21.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bmy1ly95.css">
+    <meta name="description" content="役ごとの向聴と有効牌がわかる、一人打ちの麻雀練習" />
+    <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)" />
+    <!-- / is Vite's own placeholder (resolved from `base` in
+         vite.config.ts) so these public/ files resolve under the site
+         build's subpath too. -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="mhj-dojo 麻雀道場" />
+    <meta property="og:title" content="mhj-dojo 麻雀道場" />
+    <meta property="og:description" content="役ごとの向聴と有効牌がわかる、一人打ちの麻雀練習" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="mhj-dojo 麻雀道場" />
+    <meta name="twitter:description" content="役ごとの向聴と有効牌がわかる、一人打ちの麻雀練習" />
+    <!-- og:url / og:image / twitter:image are absolute and only make sense
+         for the published site; the mhj-dojo-site-og-tags plugin
+         (vite.config.ts) injects them for `--mode site` only, so the
+         embedded build's index.html stays byte-stable across builds. -->
+    <script type="module" crossorigin src="/assets/index-DoUlqHHq.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BgcFZmhr.css">
   </head>
   <body>
     <div id="app"></div>
