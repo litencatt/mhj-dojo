@@ -27,6 +27,7 @@ jobs:
           case "$HEAD_REF" in
             feat/*) label=enhancement ;;
             fix/*) label=bug ;;
+            perf/*) label=performance ;;
             ci/*) label=ci ;;
             chore/*) label=chore ;;
             docs/*) label=documentation ;;
