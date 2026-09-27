@@ -103,6 +103,8 @@ async function playToResult(page: Page, maxSteps = 150) {
 }
 
 test('a CPU game: pon offer, round result, next round, and a mobile viewport', async ({ page }) => {
+  // It plays a whole round: about 17s locally, but over 30s on a busy CI runner.
+  test.setTimeout(60_000);
   await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
 
   const hand = handPanel(page);
