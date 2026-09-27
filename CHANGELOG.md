@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.0927.8](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.7...v2026.0927.8) - 2026-09-27
+
+### 修正
+- 公開版: 同じ対局・練習を複数タブで開いたときに同期する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/118
+- CPU 対戦: 再生中の盤面を手ごとの値にし、局の動きを全件表示・スマホの CPU 手牌をコンパクトに by @litencatt in https://github.com/litencatt/mhj-dojo/pull/120
+### パフォーマンス
+- 向聴計算のメモを2世代メモにしてメモリの最悪値を抑える by @litencatt in https://github.com/litencatt/mhj-dojo/pull/121
+
 ## [v2026.0927.7](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.6...v2026.0927.7) - 2026-09-27
 
 ### 新機能

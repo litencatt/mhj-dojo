@@ -43,8 +43,6 @@ const (
 	MaxSessions = 256
 	// MaxNodes bounds a session's tree (every state carries the whole tree).
 	MaxNodes = 2000
-	// memoLimit resets an analyzer's memo when it grows past this many tables.
-	memoLimit = 200_000
 )
 
 // maxNodes is MaxNodes, lowered by tests.
@@ -332,22 +330,12 @@ func (s *Session) goTo(id int) error {
 	return nil
 }
 
-// resetAnalyzerIfFull recycles the shared analyzer once its suit-table memo
-// has grown past memoLimit.
-func (s *Session) resetAnalyzerIfFull() {
-	if s.analyzer.MemoSize() > memoLimit {
-		s.analyzer = yakushanten.NewAnalyzer()
-	}
-}
-
 func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
-	s.resetAnalyzerIfFull()
 	return s.analyzer.Analyze(c)
 }
 
 // combos returns the yaku combos of the 13 tiles c, whose rows are res.
 func (s *Session) combos(c tile.Counts, res []yakushanten.Result) []yakushanten.Combo {
-	s.resetAnalyzerIfFull()
 	return s.analyzer.Combos(c, nil, res)
 }
 
@@ -373,7 +361,6 @@ func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
 // (unlike analysis/byDiscard) since it is tiny.
 func (s *Session) nodeNormalShanten(n *node) *int {
 	if !n.normalShantenDone {
-		s.resetAnalyzerIfFull()
 		n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
 		n.normalShantenDone = true
 	}

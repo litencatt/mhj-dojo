@@ -41,9 +41,6 @@ func TestNormalMatchesClassicRandom(t *testing.T) {
 		if cl := ClassicNormal(c); dp != cl {
 			t.Fatalf("hand %s: dp=%d classic=%d", c, dp, cl)
 		}
-		if len(e.memo) > 1<<20 {
-			e = NewEngine()
-		}
 	}
 }
 

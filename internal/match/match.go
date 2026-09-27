@@ -27,8 +27,6 @@ const (
 	MaxGames = 256
 	// Human is the human player's seat.
 	Human = 0
-	// memoLimit resets the analyzer's memo when it grows past this many tables.
-	memoLimit = 200_000
 )
 
 // Store holds games in memory.
@@ -134,7 +132,7 @@ func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 }
 
 // startRound resets what is kept per round: the analyzer's rows (they
-// follow the round's winds; its memo carries over, see analyze), the events
+// follow the round's winds; its memo carries over, see ForWinds), the events
 // and the history.
 func (m *Match) startRound() {
 	if m.replaying {
@@ -145,7 +143,7 @@ func (m *Match) startRound() {
 	} else {
 		m.analyzer = m.analyzer.ForWinds(w)
 	}
-	m.since = 0
+	m.since, m.shownKanDora = 0, 0
 	m.history = nil
 	m.recordHand()
 }
@@ -168,6 +166,10 @@ type Match struct {
 	// since is the number of round events before the human's last move:
 	// the events reported are the moves after it.
 	since int
+	// shownKanDora counts the kan dora indicators turned over before the
+	// human's last move, which the human has seen: the events reported
+	// carry only those turned over since (reportEvents).
+	shownKanDora int
 	// history holds the human's per-yaku shanten at the start and after
 	// each own discard, in order (entry i = after i discards).
 	history []apiview.HistoryEntry
@@ -210,11 +212,11 @@ func (m *Match) Act(a game.Action) (State, error) {
 // act is Act without the state, which a replay (Store.Restore) needs only
 // at its end. Callers hold m.mu.
 func (m *Match) act(a game.Action) error {
-	before := len(m.game.Round.Events())
+	before, shown := len(m.game.Round.Events()), m.game.Round.KanDora()
 	if err := m.game.Act(a); err != nil {
 		return err
 	}
-	m.since = before
+	m.since, m.shownKanDora = before, shown
 	m.actions = append(m.actions, SavedAction{Type: a.Type, Tile: a.Tile, Tiles: slices.Clone(a.Tiles)})
 	return nil
 }
@@ -243,17 +245,11 @@ func (m *Match) next() error {
 }
 
 func (m *Match) analyze(c tile.Counts, melds []yaku.Meld) []yakushanten.Result {
-	if m.analyzer.MemoSize() > memoLimit {
-		m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
-	}
 	return m.analyzer.AnalyzeWith(c, melds)
 }
 
 // combos returns the yaku combos of the hand c with melds, whose rows are res.
 func (m *Match) combos(c tile.Counts, melds []yaku.Meld, res []yakushanten.Result) []yakushanten.Combo {
-	if m.analyzer.MemoSize() > memoLimit {
-		m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
-	}
 	return m.analyzer.Combos(c, melds, res)
 }
 

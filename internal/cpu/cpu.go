@@ -19,8 +19,10 @@ import (
 // foldShanten is the shanten from which the player folds against a riichi.
 const foldShanten = 2
 
-// memoLimit resets the shanten memo when it grows past this many tables.
-const memoLimit = 100_000
+// memoGen is the number of suit tables in each generation of the player's
+// shanten memo (at most twice as many, ~1 MiB): the three CPU seats build
+// only ~3,000–6,500 tables over a whole game, reusing few across rounds.
+const memoGen = 4_000
 
 // kyuushuKeep is the thirteen-orphans shanten up to which the player goes
 // for kokushi instead of declaring 九種九牌 (ten kinds and a pair, or more).
@@ -63,20 +65,17 @@ const (
 const weakStray = 50
 
 // New returns a player with an empty memo.
-func New() *Player { return &Player{eng: shanten.NewEngine()} }
+func New() *Player { return &Player{eng: shanten.NewEngineGen(memoGen)} }
 
 // NewWeak returns a weaker player: it still takes every win and declares
 // riichi when tenpai, but never calls or declares a kan, never folds, and
 // on about every other discard picks any discard that keeps the lowest
 // shanten instead of the one with the most ukeire. That pick is a hash of
 // what the seat sees, not a random draw, so a game replays exactly.
-func NewWeak() *Player { return &Player{eng: shanten.NewEngine(), weak: true} }
+func NewWeak() *Player { return &Player{eng: shanten.NewEngineGen(memoGen), weak: true} }
 
 // Decide implements game.Decider.
 func (p *Player) Decide(v game.View, l game.Legal) game.Action {
-	if p.eng.MemoSize() > memoLimit {
-		p.eng = shanten.NewEngine()
-	}
 	switch {
 	case l.Tsumo:
 		return game.Action{Type: game.Tsumo}

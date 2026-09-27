@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { GameEvent, GameState, SessionState, Seat, YakuRow } from './api';
+import type { GameEvent, GameState, SessionState, YakuRow } from './api';
 import { errorMessage } from './panels';
 import {
   buildPlayback,
   PLAYBACK_STEP_MS,
-  playbackFrame,
   playbackHighlight,
+  playbackState,
   type PlaybackBuild,
   type PlaybackHighlight,
 } from './playback';
@@ -23,6 +23,8 @@ import {
  * both given, a 409 re-fetches the current state and, only if `movedOn` says
  * it actually differs from what's on screen, shows it with a notice instead
  * of the error; otherwise the server's own error message is shown as usual.
+ * `refresh` does the same re-fetch unasked (see useRefreshOnSave); it
+ * returns false, doing nothing, while a request is in flight.
  */
 export function useSerialRequest<T>(
   onSuccess: (next: T) => void,
@@ -35,6 +37,15 @@ export function useSerialRequest<T>(
   const last = useRef<T | null>(null);
 
   const inFlight = useRef(false);
+
+  // Shows fresh with the notice if it moved on from what's on screen.
+  function showIfMoved(fresh: T): boolean {
+    if (last.current === null || !movedOn?.(last.current, fresh)) return false;
+    last.current = fresh;
+    onSuccess(fresh);
+    setNotice('別の画面で進んだため最新の状態に更新しました');
+    return true;
+  }
 
   async function request(fn: () => Promise<T>) {
     if (inFlight.current) return;
@@ -49,14 +60,7 @@ export function useSerialRequest<T>(
     } catch (err) {
       if (refetch && movedOn && last.current !== null && err instanceof api.ApiError && err.status === 409) {
         try {
-          const fresh = await refetch();
-          if (movedOn(last.current, fresh)) {
-            last.current = fresh;
-            onSuccess(fresh);
-            setNotice('別の画面で進んだため最新の状態に更新しました');
-          } else {
-            setError(errorMessage(err));
-          }
+          if (!showIfMoved(await refetch())) setError(errorMessage(err));
         } catch (refetchErr) {
           setError(errorMessage(refetchErr));
         }
@@ -69,7 +73,66 @@ export function useSerialRequest<T>(
     }
   }
 
-  return { busy, error, notice, request };
+  function refresh(): boolean {
+    if (inFlight.current) return false;
+    if (!refetch || last.current === null) return true;
+    const fetch = refetch;
+    inFlight.current = true;
+    setBusy(true);
+    void (async () => {
+      try {
+        if (showIfMoved(await fetch())) setError(null);
+      } catch {
+        // the next action reports it
+      } finally {
+        inFlight.current = false;
+        setBusy(false);
+      }
+    })();
+    return true;
+  }
+
+  return { busy, error, notice, request, refresh };
+}
+
+/**
+ * On the static site, shows the session or game id afresh (with
+ * useSerialRequest's notice) once another tab has moved it on
+ * (savedElsewhere): as that tab saves, if this one is in view, or else when
+ * it comes back into view. One that comes while a request is in flight
+ * waits for it (busy) to end. The server build skips this: a move on the
+ * out-of-date screen gets its 409 either way.
+ */
+export function useRefreshOnSave(
+  id: string | null,
+  savedElsewhere: (id: string) => boolean,
+  busy: boolean,
+  refresh: () => boolean,
+) {
+  const latest = useRef(refresh);
+  latest.current = refresh;
+  const waiting = useRef(false);
+  useEffect(() => {
+    if (!api.WASM || !id) return;
+    const check = () => {
+      if (document.visibilityState !== 'visible' || !savedElsewhere(id)) return;
+      if (!latest.current()) waiting.current = true;
+    };
+    if (waiting.current && !busy) {
+      waiting.current = false;
+      check();
+    }
+    // Only other tabs' saves fire 'storage' here: never this tab's own.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === null || api.SAVE_KEYS.includes(e.key)) check();
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [id, busy]);
 }
 
 /**
@@ -166,8 +229,10 @@ function prefersReducedMotion(): boolean {
 }
 
 export interface Playback {
-  seats: Seat[]; // the seats to render: state.seats with events not yet played hidden
-  events: GameEvent[]; // state.events, revealed up to the current step
+  // The state to show: state as the table stood at the current step (its
+  // seats, events revealed so far, points, wall, dora ...; see
+  // playbackState), state itself once the playback ends.
+  view: GameState | null;
   playing: boolean;
   highlight: PlaybackHighlight | null; // the tile or meld that last landed
   skip: () => void; // jump straight to the final state
@@ -243,14 +308,39 @@ export function usePlayback(state: GameState | null): Playback {
 
   const total = build ? build.opsPerEvent.length : 0;
   const playing = step0 < total;
-  const seats = useMemo(() => {
-    if (!build || !state) return state?.seats ?? [];
-    return step0 >= total ? state.seats : playbackFrame(build, step0); // nothing hidden: the server's own array
-  }, [build, step0]);
-  const highlight = build ? playbackHighlight(build, seats, step0) : null;
-  const events = state ? state.events.slice(0, step0) : [];
+  const view = useMemo(() => (build && state ? playbackState(state, build, step0) : state), [build, step0]);
+  const highlight = build && view ? playbackHighlight(build, view.seats, step0) : null;
 
-  return { seats, events, playing, highlight, skip };
+  return { view, playing, highlight, skip };
+}
+
+/**
+ * The round's events before state's own (docs/api.md "events_from"): each
+ * response carries only the moves since your previous one, so the earlier
+ * ones are kept here as they arrive, for the table's log of the round. A
+ * reload, or a new round, starts again from the state's own events.
+ */
+export function useRoundLog(state: GameState | null): GameEvent[] {
+  // Worked out once per state, during the render that first sees it: the
+  // ref is only written when `state` changes, so re-renders read it back.
+  const log = useRef<{ state: GameState | null; round: string; events: GameEvent[]; before: GameEvent[] }>({
+    state: null,
+    round: '',
+    events: [],
+    before: [],
+  });
+  if (log.current.state !== state) {
+    const prev = log.current;
+    if (!state) {
+      log.current = { state, round: '', events: [], before: [] };
+    } else {
+      const round = `${state.game_id} ${state.round_wind}${state.round_number}-${state.honba}`;
+      const before =
+        prev.round === round && prev.events.length >= state.events_from ? prev.events.slice(0, state.events_from) : [];
+      log.current = { state, round, events: [...before, ...state.events], before };
+    }
+  }
+  return log.current.before;
 }
 
 /** An on/off setting kept in localStorage under key. Off by default and whenever storage fails. */

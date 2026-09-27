@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'preact/hooks';
 import type { AbortReason, GameEvent, GameLength, GameState, RiverTile, Seat, Tile as TileT } from '../api';
 import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
@@ -32,26 +33,27 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
 };
 
 export interface GameTableProps {
+  // The table as shown: during a playback, state as it stood at the
+  // current step (usePlayback's view: events not yet played hidden, and the
+  // points, deposit, wall, dora and hand counts of that step).
   state: GameState;
-  // A playback in progress overrides what is shown: seats with events not
-  // yet revealed hidden, and the tile or meld that last landed. Omitted (or
-  // playing: false), the table just shows state as-is. Points, deposit,
-  // wall_remaining, dora and opponents' hand_count are always state's own
-  // final values, even mid-playback: only the river, melds and riichi badge
-  // are ever hidden, so nothing here needs to be undone if a request fails
-  // mid-round.
-  seats?: Seat[];
-  events?: GameEvent[];
+  // The round's moves so far, oldest first; state.events if omitted.
+  log?: GameEvent[];
   highlight?: PlaybackHighlight | null;
   playing?: boolean;
 }
 
 /** The table: each seat's river, points and (hidden) hand around the round
- * info. The skip control lives in the action bar (GameApp), not here. */
-export function GameTable({ state, seats, events, highlight, playing = false }: GameTableProps) {
-  const view = seats ?? state.seats;
-  const log = events ?? state.events;
-  const at = (rel: number) => view[(state.you + rel) % 4];
+ * info and the round's moves. The skip control lives in the action bar
+ * (GameApp), not here. */
+export function GameTable({ state, log = state.events, highlight, playing = false }: GameTableProps) {
+  const at = (rel: number) => state.seats[(state.you + rel) % 4];
+  const logRef = useRef<HTMLOListElement>(null);
+  // The newest move stays in sight: the log scrolls to its end as moves land.
+  useLayoutEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [log.length]);
   return (
     <section class="game-table" aria-label="卓" data-playing={playing ? 'true' : 'false'}>
       <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} />
@@ -62,8 +64,9 @@ export function GameTable({ state, seats, events, highlight, playing = false }: 
           <span class="table-remaining">残り {state.wall_remaining}</span>
         </div>
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
-        <ol class="event-log" aria-label="直前の動き">
-          {log.slice(-6).map((e, i) => (
+        {/* Focusable so a keyboard can scroll it too. */}
+        <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0}>
+          {log.map((e, i) => (
             <li key={i}>
               <span class="event-seat">{seatLabel(e.seat, state.you)}</span>
               {EVENT_VERB[e.type]}
@@ -104,12 +107,24 @@ function SeatBox({ className, seat, state, highlight, playing }: SeatBoxProps) {
         <span class="seat-points">{seat.points.toLocaleString()}</span>
         <span class="seat-rank" title="現在の順位">{state.standings[seat.seat].rank}位</span>
         {seat.riichi && <span class="seat-riichi">リーチ</span>}
+        {!you && !seat.hand && (
+          // Face down: a row of backs under the head, or on a phone one
+          // back with the count on it, in the head itself (style.css), so
+          // the seat stays short.
+          <div class="seat-hand seat-hand-hidden">
+            <span class="visually-hidden">手牌 {seat.hand_count}枚</span>
+            <span class="seat-hand-backs" aria-hidden="true">
+              {Array.from({ length: seat.hand_count }, (_, i) => <Tile key={i} tile="" size="xs" faceDown />)}
+            </span>
+            <span class="seat-hand-count" aria-hidden="true">
+              {seat.hand_count}
+            </span>
+          </div>
+        )}
       </div>
-      {!you && (
+      {!you && seat.hand && (
         <div class="seat-hand" aria-label="手牌">
-          {seat.hand
-            ? [...seat.hand, ...(seat.drawn ? [seat.drawn] : [])].map((t, i) => <Tile key={`${t}-${i}`} tile={t} size="xs" />)
-            : Array.from({ length: seat.hand_count }, (_, i) => <Tile key={i} tile="" size="xs" faceDown />)}
+          {[...seat.hand, ...(seat.drawn ? [seat.drawn] : [])].map((t, i) => <Tile key={`${t}-${i}`} tile={t} size="xs" />)}
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />
