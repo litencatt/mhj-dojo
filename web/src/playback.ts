@@ -12,7 +12,10 @@
 // inverse of each undo as a forward "op". Replaying those ops in order over
 // `base` reproduces every intermediate frame, always ending exactly on the
 // server's final seats.
-import type { GameEvent, Meld, RiverTile, Seat, Tile } from './api';
+//
+// The table's numbers (points, riichi sticks, wall, dora, the other seats'
+// hand sizes) follow the same steps: see playbackState.
+import type { GameEvent, GameState, Meld, RiverTile, Seat, Standing, Tile } from './api';
 
 /** One place for the playback timing: ~300-400ms per event, per issue #29. */
 export const PLAYBACK_STEP_MS = 350;
@@ -209,4 +212,85 @@ export function playbackHighlight(build: PlaybackBuild, seats: Seat[], step: num
     if (op.kind === 'kakan') return { seat: op.seat, kind: 'meld', index: op.index };
   }
   return null;
+}
+
+const RIICHI_STICK = 1000;
+
+// A seat between turns holds 13 concealed tiles, less 3 per meld (a kan's
+// fourth tile is made up by its replacement draw).
+function restingHandCount(seat: Seat): number {
+  return 13 - 3 * seat.melds.length;
+}
+
+// Whether the move that landed at `step` was a call by seat that left it
+// holding a tile to discard. An added kan that was robbed (or waits on a
+// chankan decision) changed no meld, and drew no replacement tile.
+function heldAfterCall(build: PlaybackBuild, events: GameEvent[], step: number, seat: number): boolean {
+  const e = events[step - 1];
+  if (!e || e.seat !== seat) return false;
+  if (e.type === 'kan') return build.opsPerEvent[step - 1].length > 0;
+  return e.type === 'pon' || e.type === 'chii';
+}
+
+/** Ranks by points, ties to the seat nearer the first dealer (as
+ * internal/game Hanchan.Standings). */
+function rankStandings(state: GameState, seats: Seat[]): Standing[] {
+  const near = (s: number) => (s - state.first_dealer + 4) % 4;
+  const order = [0, 1, 2, 3].sort((a, b) => seats[b].points - seats[a].points || near(a) - near(b));
+  return state.standings.map((sd) => ({ ...sd, points: seats[sd.seat].points, rank: order.indexOf(sd.seat) + 1 }));
+}
+
+/** `state` as the table stood after `step` of its events had played: the
+ * seats of playbackFrame, and the points, riichi sticks, wall, dora and
+ * ranks that go with them, with no ura dora yet. At the last step it is
+ * `state` itself.
+ *
+ * The wall and the kan dora come with each event (docs/api.md "events"),
+ * the wall before the first as events_wall_remaining.
+ * The rest is undone from the final state: a round result's deltas (the
+ * settlement only shows once the playback ends), then each accepted riichi
+ * still to play (its 1000 back from the table). The other seats' hands are
+ * face down until the end, holding 13 tiles less 3 per meld, one more right
+ * after their own call (the draw before a discard is not an event). */
+export function playbackState(state: GameState, build: PlaybackBuild, step: number): GameState {
+  const { events } = state;
+  const total = build.opsPerEvent.length;
+  if (step >= total) return state;
+  const seats = playbackFrame(build, step);
+  let deposit = state.deposit;
+  const res = state.result;
+  if (res) {
+    const riichi = (s: number) => (state.seats[s].riichi ? RIICHI_STICK : 0);
+    for (const s of seats) s.points -= res.deltas[s.seat] + riichi(s.seat);
+    if (res.winner >= 0) deposit = res.stick_deltas[res.winner] + riichi(res.winner);
+  }
+  let hiddenDora = 0;
+  for (let i = step; i < total; i++) {
+    const e = events[i];
+    if (e.type === 'riichi' && state.seats[e.seat].riichi) {
+      seats[e.seat].points += RIICHI_STICK;
+      deposit -= RIICHI_STICK;
+    }
+    hiddenDora += e.new_dora_indicators?.length ?? 0;
+  }
+  for (const s of seats) {
+    if (s.seat === state.you) continue;
+    s.hand_count = restingHandCount(s) + (heldAfterCall(build, events, step, s.seat) ? 1 : 0);
+    delete s.hand;
+    delete s.drawn;
+  }
+  const shown = state.dora_indicators.length - hiddenDora;
+  return {
+    ...state,
+    seats,
+    events: events.slice(0, step),
+    // An engine from before these fields (a cached wasm) sends neither.
+    wall_remaining: (step > 0 ? events[step - 1].wall_remaining : state.events_wall_remaining) ?? state.wall_remaining,
+    deposit,
+    dora_indicators: state.dora_indicators.slice(0, shown),
+    dora: state.dora.slice(0, shown),
+    ura_dora_indicators: [], // turned over with the result
+    ura_dora: [],
+    standings: rankStandings(state, seats),
+  };
 }

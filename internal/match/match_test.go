@@ -92,6 +92,22 @@ func move(st State, riichi *bool) game.Action {
 	return game.Action{Type: game.Discard, Tile: l.Discards[len(l.Discards)-1]}
 }
 
+// kanMove is move, except that it makes every kan it can and pons (to
+// make an added kan of later).
+func kanMove(st State, riichi *bool) game.Action {
+	l := st.Legal
+	switch {
+	case l.Ron || l.Tsumo:
+	case len(l.Kan) > 0 && st.Phase == game.PhaseCall:
+		return game.Action{Type: game.Kan}
+	case len(l.Kan) > 0:
+		return game.Action{Type: game.Kan, Tile: l.Kan[0]}
+	case l.Pon:
+		return game.Action{Type: game.Pon}
+	}
+	return move(st, riichi)
+}
+
 // playOut plays the human with move until the round ends.
 func playOut(t testing.TB, m *Match) State {
 	t.Helper()
@@ -238,12 +254,12 @@ func TestFailedActLeavesStateUnchanged(t *testing.T) {
 func TestEventsStartWithTheHumansMove(t *testing.T) {
 	m := newMatch(game.NewHanchan(4, game.Tonpuu), defaults, true)
 	st := m.State()
-	tile := st.Legal.Discards[0]
+	tile, wall := st.Legal.Discards[0], st.WallRemaining
 	st, err := m.Act(game.Action{Type: game.Discard, Tile: tile})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Event{Seat: Human, Type: game.Discard, Tile: tile}
+	want := Event{Seat: Human, Type: game.Discard, Tile: tile, WallRemaining: wall}
 	if len(st.Events) == 0 || !reflect.DeepEqual(st.Events[0], want) {
 		t.Fatalf("events %+v", st.Events)
 	}
@@ -251,5 +267,69 @@ func TestEventsStartWithTheHumansMove(t *testing.T) {
 		if e.Type == game.Skip && e.Seat != Human {
 			t.Fatalf("CPU skip reported: %+v", e)
 		}
+	}
+}
+
+// Each event carries the wall right after it, and the kan dora it turned
+// over: replayed in order they lead from one state to the next, and a
+// round's new_dora_indicators add up to its kan dora indicators. events_from
+// counts the round's events before them, events_wall_remaining is the wall
+// just before them.
+func TestEventsReplayTheWallAndDora(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole rounds on one goroutine; run without -short")
+	}
+	kanSeen, yourKans := false, 0
+	for seed := int64(0); seed < 200 && (seed < 10 || !kanSeen || yourKans < 2); seed++ {
+		// Odd seeds call and kan whenever they can.
+		play := move
+		if seed%2 == 1 {
+			play = kanMove
+		}
+		m := newMatch(game.NewHanchan(seed, game.Tonpuu), defaults, true)
+		st := m.State()
+		wall, dora := 1<<30, []string{} // the CPU turns before your first may come first
+		riichi, seen := false, 0
+		for steps := 0; ; steps++ {
+			if steps > 100 {
+				t.Fatalf("seed %d: round does not end", seed)
+			}
+			if st.EventsFrom != seen {
+				t.Fatalf("seed %d: events_from %d after %d events", seed, st.EventsFrom, seen)
+			}
+			seen += len(st.Events)
+			if st.EventsWall > wall || (len(st.Events) > 0 && st.EventsWall < st.Events[0].WallRemaining) {
+				t.Fatalf("seed %d: events_wall_remaining %d between %d and %+v", seed, st.EventsWall, wall, st.Events)
+			}
+			for _, e := range st.Events {
+				if e.WallRemaining > wall {
+					t.Fatalf("seed %d: %+v after a wall of %d", seed, e, wall)
+				}
+				wall = e.WallRemaining
+				dora = append(dora, e.NewDoraIndicators...)
+				kanSeen = kanSeen || e.Type == game.Kan
+				if e.Type == game.Kan && e.Seat == Human {
+					yourKans++
+				}
+			}
+			// Only the human's own draw may follow the last event.
+			if len(st.Events) > 0 && st.WallRemaining != wall && (st.WallRemaining != wall-1 || st.Phase != game.PhaseDiscard || st.Actor != Human) {
+				t.Fatalf("seed %d: wall %d after events ending at %d", seed, st.WallRemaining, wall)
+			}
+			wall = st.WallRemaining
+			if !reflect.DeepEqual(dora, st.DoraIndicators[1:]) {
+				t.Fatalf("seed %d: new dora %v, indicators %v", seed, dora, st.DoraIndicators)
+			}
+			if st.Result != nil {
+				break
+			}
+			var err error
+			if st, err = m.Act(play(st, &riichi)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if !kanSeen || yourKans < 2 {
+		t.Fatalf("kans seen %v, yours %d; pick other seeds", kanSeen, yourKans)
 	}
 }

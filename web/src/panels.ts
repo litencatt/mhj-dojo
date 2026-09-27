@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { tileName } from './tiles';
 
 // Panels that can be minimized into the dock (the right edge; a bottom bar on a phone).
@@ -41,22 +41,31 @@ function saveMinimized(keys: PanelKey[]) {
   }
 }
 
-/** Minimized panels, shared by practice and game mode and kept in localStorage. */
+/**
+ * Minimized panels, shared by practice and game mode and kept in localStorage.
+ * minimize and restore keep their identity across renders (the memoized
+ * panels take them as props) and work from the latest list, never the one
+ * of the render that made them.
+ */
 export function useMinimized() {
   const [minimized, setMinimized] = useState<PanelKey[]>(loadMinimized);
-  const update = (next: PanelKey[]) => {
-    setMinimized(next);
-    saveMinimized(next);
-  };
-  return {
-    minimized,
-    isMin: (k: PanelKey) => minimized.includes(k),
-    minimize: (k: PanelKey) => update([...minimized.filter((x) => x !== k), k]),
-    restore: (k: PanelKey) => {
-      update(minimized.filter((x) => x !== k));
+  const update = useCallback((next: (prev: PanelKey[]) => PanelKey[]) => {
+    setMinimized((prev) => {
+      const keys = next(prev);
+      saveMinimized(keys);
+      return keys;
+    });
+  }, []);
+  const minimize = useCallback((k: PanelKey) => update((prev) => [...prev.filter((x) => x !== k), k]), [update]);
+  const restore = useCallback(
+    (k: PanelKey) => {
+      update((prev) => prev.filter((x) => x !== k));
       revealPanel(k);
     },
-  };
+    [update],
+  );
+  const isMin = useCallback((k: PanelKey) => minimized.includes(k), [minimized]);
+  return { minimized, isMin, minimize, restore };
 }
 
 /**

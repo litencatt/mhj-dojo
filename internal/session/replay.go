@@ -11,12 +11,12 @@ type Move struct {
 
 // Replay applies moves in order, each as a Goto to its Parent followed by a
 // Discard or Tsumo that must make the next node (ErrInvalid otherwise), then
-// moves to node current and returns the state, the
+// moves to node current and returns its state as v picks it, the
 // same as making those calls one by one. It is much cheaper, for rebuilding
 // a session from its moves (the WebAssembly build does after a page
 // reload): it builds the state only once, at the end, and leaves each
 // discard's review to be computed when its node is shown.
-func (s *Session) Replay(moves []Move, current int) (State, error) {
+func (s *Session) Replay(moves []Move, current int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, m := range moves {
@@ -42,5 +42,5 @@ func (s *Session) Replay(moves []Move, current int) (State, error) {
 	if err := s.goTo(current); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }

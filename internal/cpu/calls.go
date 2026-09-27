@@ -19,11 +19,14 @@ import (
 // skip.
 func (p *Player) decideCall(v game.View, l game.Legal) (game.Action, bool) {
 	me := v.Seats[v.Viewer]
-	if v.LastDiscard == nil || (len(riichiRivers(v)) > 0 && p.handShanten(me.Hand, len(me.Melds)) >= foldShanten) {
+	if v.LastDiscard == nil {
+		return game.Action{}, false
+	}
+	cur := p.handShanten(me.Hand, len(me.Melds))
+	if len(riichiRivers(v)) > 0 && cur >= foldShanten {
 		return game.Action{}, false
 	}
 	t := *v.LastDiscard
-	cur := p.handShanten(me.Hand, len(me.Melds))
 	value := isValue(v, t.Kind)
 	best, bestSh := game.Action{}, cur+1
 	try := func(a game.Action, used []tile.Tile, meld yaku.Meld, needDiscard bool) {

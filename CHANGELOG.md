@@ -1,5 +1,22 @@
 # Changelog
 
+## [v2026.0927.9](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.8...v2026.0927.9) - 2026-09-27
+
+### 修正
+- 同じ対局・練習は1つのタブだけで進める（新しいタブが優先し、古いタブは停止） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/124
+### パフォーマンス
+- 画面の無駄な描き直しを減らす（役別向聴の表・グラフの memo 化、最小化パネルは中身を作らない） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/123
+- エンジン: 同じ手牌の重複分析をなくす（1手 約15〜20% 短縮、分岐移動 35 ms → 0.1 ms） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/126
+- 応答を小さく（残り枚数を1回だけ・分岐ツリーは差分）、アドバイスは開いたときだけ計算 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/127
+
+## [v2026.0927.8](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.7...v2026.0927.8) - 2026-09-27
+
+### 修正
+- 公開版: 同じ対局・練習を複数タブで開いたときに同期する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/118
+- CPU 対戦: 再生中の盤面を手ごとの値にし、局の動きを全件表示・スマホの CPU 手牌をコンパクトに by @litencatt in https://github.com/litencatt/mhj-dojo/pull/120
+### パフォーマンス
+- 向聴計算のメモを2世代メモにしてメモリの最悪値を抑える by @litencatt in https://github.com/litencatt/mhj-dojo/pull/121
+
 ## [v2026.0927.7](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.6...v2026.0927.7) - 2026-09-27
 
 ### 新機能

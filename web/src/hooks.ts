@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { GameEvent, GameState, SessionState, Seat, YakuRow } from './api';
+import type { GameEvent, GameState, SessionState, YakuRow } from './api';
 import { errorMessage } from './panels';
+import { claim, isStopped, onChange } from './singleTab';
 import {
   buildPlayback,
   PLAYBACK_STEP_MS,
-  playbackFrame,
   playbackHighlight,
+  playbackState,
   type PlaybackBuild,
   type PlaybackHighlight,
 } from './playback';
@@ -73,6 +74,22 @@ export function useSerialRequest<T>(
 }
 
 /**
+ * Holds key (a singleTab key: api.sessionKey or api.gameKey) for this tab
+ * while the page shows it (a new key lets go of the one before), and
+ * returns whether another tab has taken over the one this tab holds: also
+ * the one it was loading, before there is a state to show. Claiming it
+ * again (as useUrlResume's resume does) ends that.
+ */
+export function useSingleTab(key: string | null): boolean {
+  const [stopped, setStopped] = useState(isStopped);
+  useEffect(() => {
+    if (key) claim(key);
+  }, [key]);
+  useEffect(() => onChange(() => setStopped(isStopped())), []);
+  return stopped;
+}
+
+/**
  * `useSerialRequest`'s `movedOn` for practice sessions: true only if the
  * re-fetched state is actually a different node than what was on screen, so
  * a plain "not allowed right now" 409 (e.g. tsumo with an incomplete hand)
@@ -105,10 +122,11 @@ export interface UrlResumeOptions<T> {
 /**
  * Keeps the id in the URL so a reload resumes the same session or game. They
  * live only in server memory, so after a server restart (404) the same wall is
- * dealt again from the params instead.
+ * dealt again from the params instead. Returns resume, which does it again
+ * (for a tab taking the session or game back from another tab).
  */
 export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
-  useEffect(() => {
+  function resume() {
     const params = new URLSearchParams(location.search);
     const id = params.get(idKey);
     if (!id) {
@@ -123,6 +141,10 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
         throw err;
       }
     });
+  }
+
+  useEffect(() => {
+    resume();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,6 +158,18 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
     }
     history.replaceState(null, '', url);
   }, [syncKey]);
+
+  return resume;
+}
+
+/**
+ * fn behind a function that keeps its identity across renders, for a
+ * memoized child's props: a call always runs the latest render's fn.
+ */
+export function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback((...args: A) => latest.current(...args), []);
 }
 
 /** Yaku key → display name, for the chart legend. */
@@ -166,8 +200,10 @@ function prefersReducedMotion(): boolean {
 }
 
 export interface Playback {
-  seats: Seat[]; // the seats to render: state.seats with events not yet played hidden
-  events: GameEvent[]; // state.events, revealed up to the current step
+  // The state to show: state as the table stood at the current step (its
+  // seats, events revealed so far, points, wall, dora ...; see
+  // playbackState), state itself once the playback ends.
+  view: GameState | null;
   playing: boolean;
   highlight: PlaybackHighlight | null; // the tile or meld that last landed
   skip: () => void; // jump straight to the final state
@@ -191,15 +227,14 @@ function leadStep(build: PlaybackBuild, state: GameState): number {
  */
 export function usePlayback(state: GameState | null): Playback {
   const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
-  const [step, setStep] = useState(0);
+  // build is memoized on state, so [build] also covers the state read here.
+  const lead = useMemo(() => (build && state ? leadStep(build, state) : 0), [build]);
+  // The step, with the build it was set for. Until the first tick (or skip)
+  // sets it for a new build, the step is that build's lead step: derived
+  // here, so a new build needs no extra render to start (and never shows the
+  // previous build's step for a frame).
+  const [at, setAt] = useState<{ build: PlaybackBuild | null; step: number }>({ build: null, step: 0 });
   const timer = useRef<number | null>(null);
-  // Which build `step` was set for. Effects run after paint, so on the
-  // render right after `state` (and so `build`) changes, `step` is still
-  // whatever the *previous* build left it at - reading it as-is would flash
-  // the previous batch fully revealed for a frame, or fully un-revealed if
-  // playback had reached the end. Compared against `build` below, this lets
-  // that one render derive the correct starting step instead.
-  const stepFor = useRef<PlaybackBuild | null>(null);
 
   const clear = () => {
     if (timer.current !== null) {
@@ -210,18 +245,12 @@ export function usePlayback(state: GameState | null): Playback {
 
   useEffect(() => {
     clear();
-    if (!state || !build) {
-      stepFor.current = build;
-      setStep(0);
-      return;
-    }
+    if (!build) return;
     const total = build.opsPerEvent.length;
-    let cur = leadStep(build, state);
-    stepFor.current = build;
-    setStep(cur);
+    let cur = lead;
     const tick = () => {
       cur += 1;
-      setStep(cur);
+      setAt({ build, step: cur });
       if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
     };
     if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
@@ -231,26 +260,60 @@ export function usePlayback(state: GameState | null): Playback {
 
   const skip = useCallback(() => {
     clear();
-    if (build) {
-      stepFor.current = build;
-      setStep(build.opsPerEvent.length);
-    }
+    if (build) setAt({ build, step: build.opsPerEvent.length });
   }, [build]);
 
-  // The render right after `build` changes but before the effect above has
-  // run: derive this render's step instead of using the stale one.
-  const step0 = stepFor.current === build ? step : build && state ? leadStep(build, state) : 0;
-
+  const step = at.build === build ? at.step : lead;
   const total = build ? build.opsPerEvent.length : 0;
-  const playing = step0 < total;
-  const seats = useMemo(() => {
-    if (!build || !state) return state?.seats ?? [];
-    return step0 >= total ? state.seats : playbackFrame(build, step0); // nothing hidden: the server's own array
-  }, [build, step0]);
-  const highlight = build ? playbackHighlight(build, seats, step0) : null;
-  const events = state ? state.events.slice(0, step0) : [];
+  const playing = step < total;
+  const view = useMemo(() => (build && state ? playbackState(state, build, step) : state), [build, step]);
+  const highlight = build && view ? playbackHighlight(build, view.seats, step) : null;
 
-  return { seats, events, playing, highlight, skip };
+  // A hidden tab would only queue up the steps' renders for nobody: jump to
+  // the end instead, at once if it is hidden already.
+  useEffect(() => {
+    if (!playing) return;
+    if (document.visibilityState === 'hidden') {
+      skip();
+      return;
+    }
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') skip();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [playing, skip]);
+
+  return { view, playing, highlight, skip };
+}
+
+/**
+ * The round's events before state's own (docs/api.md "events_from"): each
+ * response carries only the moves since your previous one, so the earlier
+ * ones are kept here as they arrive, for the table's log of the round. A
+ * reload, or a new round, starts again from the state's own events.
+ */
+export function useRoundLog(state: GameState | null): GameEvent[] {
+  // Worked out once per state, during the render that first sees it: the
+  // ref is only written when `state` changes, so re-renders read it back.
+  const log = useRef<{ state: GameState | null; round: string; events: GameEvent[]; before: GameEvent[] }>({
+    state: null,
+    round: '',
+    events: [],
+    before: [],
+  });
+  if (log.current.state !== state) {
+    const prev = log.current;
+    if (!state) {
+      log.current = { state, round: '', events: [], before: [] };
+    } else {
+      const round = `${state.game_id} ${state.round_wind}${state.round_number}-${state.honba}`;
+      const before =
+        prev.round === round && prev.events.length >= state.events_from ? prev.events.slice(0, state.events_from) : [];
+      log.current = { state, round, events: [...before, ...state.events], before };
+    }
+  }
+  return log.current.before;
 }
 
 /** An on/off setting kept in localStorage under key. Off by default and whenever storage fails. */

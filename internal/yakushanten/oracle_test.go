@@ -669,9 +669,6 @@ func TestPropertiesRandom(t *testing.T) {
 				t.Fatalf("%s: %s %d < %v %d", c, rel[0], get(rel[0]).Shanten, rel[1:], lower)
 			}
 		}
-		if a.eng.MemoSize() > 1<<20 {
-			a = NewAnalyzer()
-		}
 	}
 }
 
@@ -688,9 +685,6 @@ func TestNormalShantenMatchesAnalyze(t *testing.T) {
 		got := a.NormalShanten(c)
 		if got.Possible != want.Possible || got.Shanten != want.Shanten || got.Approx != want.Approx || !slices.Equal(got.Ukeire, want.Ukeire) {
 			t.Fatalf("%s: NormalShanten %+v != Analyze row %+v", c, got, want)
-		}
-		if a.eng.MemoSize() > 1<<20 {
-			a = NewAnalyzer()
 		}
 	}
 }

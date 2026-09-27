@@ -5,6 +5,7 @@ package session
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/advice"
@@ -41,10 +42,8 @@ const (
 	// MaxSessions bounds memory; the least recently used session is evicted
 	// beyond it.
 	MaxSessions = 256
-	// MaxNodes bounds a session's tree (every state carries the whole tree).
+	// MaxNodes bounds a session's tree.
 	MaxNodes = 2000
-	// memoLimit resets an analyzer's memo when it grows past this many tables.
-	memoLimit = 200_000
 )
 
 // maxNodes is MaxNodes, lowered by tests.
@@ -144,8 +143,10 @@ type node struct {
 	combosByDiscard map[tile.Kind][]yakushanten.Combo
 	// advice is the current node's discard advice, pruned with byDiscard;
 	// review compares the discard that led to this node with the best one
-	// at its parent and, being small, is kept forever. Replay leaves it to
-	// be computed when the node is shown (reviewPending; see nodeReview).
+	// at its parent and, being small, is kept forever. Replay, and a
+	// discard made without the advice (View.NoAdvice), leave it to be
+	// computed when the node is shown with the advice (reviewPending; see
+	// nodeReview).
 	advice        *advice.Advice
 	review        *advice.Review
 	reviewPending bool
@@ -155,8 +156,13 @@ type node struct {
 	// forever instead of being pruned with them.
 	normalShanten     *int
 	normalShantenDone bool
-	winRows           map[string]int // tsumo nodes: row shanten on the 14 winning tiles
-	win               *Win
+	// rowShanten is each row's shanten (noShanten: impossible), in the
+	// analyzer's row order, for the history of every path the node is on.
+	// Like normalShanten it is small and kept forever, so a path whose
+	// nodes' analysis was pruned does not recompute it.
+	rowShanten []int8
+	winRows    map[string]int // tsumo nodes: row shanten on the 14 winning tiles
+	win        *Win
 }
 
 // ID returns the session id.
@@ -193,23 +199,24 @@ func (s *Session) drawn(n *node) (tile.Tile, bool) {
 }
 
 // State returns the view of the current node.
-func (s *Session) State() State {
+func (s *Session) State(v View) State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state()
+	return s.state(v)
 }
 
 // Discard discards an exact tile (red distinguished) from hand+drawn.
 // expectedNode, when non-nil, must match the current node: it lets a client
 // detect that another tab moved the session on first (ErrConflict) instead
-// of silently acting on whatever node happens to be current.
-func (s *Session) Discard(t string, expectedNode *int) (State, error) {
+// of silently acting on whatever node happens to be current. A new node's
+// review of the discard is computed now unless v leaves the advice out.
+func (s *Session) Discard(t string, expectedNode *int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.discard(t, expectedNode, true); err != nil {
+	if err := s.discard(t, expectedNode, !v.NoAdvice); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // discard is Discard without the state; callers hold s.mu. Unless review
@@ -236,6 +243,7 @@ func (s *Session) discard(t string, expectedNode *int, review bool) error {
 	}
 	if id, ok := cur.children[t]; ok {
 		s.current = id
+		s.seedAnalysis(s.nodes[id], cur)
 		return nil
 	}
 	if err := s.roomForNode(); err != nil {
@@ -251,17 +259,37 @@ func (s *Session) discard(t string, expectedNode *int, review bool) error {
 	n.hand = hand
 	child := s.addNode(n)
 	cur.children[t] = child.id
+	s.seedAnalysis(child, cur)
 	return nil
 }
 
+// seedAnalysis gives n, reached from its parent cur by a discard, the
+// analysis and combos of its hand that cur's per-discard preview already
+// holds, if n has none. n is then in pathCache for pruneAnalysisCache.
+func (s *Session) seedAnalysis(n, cur *node) {
+	k := n.discard.Kind
+	res, ok := cur.byDiscard[k]
+	if !ok || n.analysis != nil {
+		return
+	}
+	n.analysis = res
+	if n.rowShanten == nil {
+		n.rowShanten = compactShanten(res)
+	}
+	if combos, ok := cur.combosByDiscard[k]; ok && n.combos == nil {
+		n.combos = append([]yakushanten.Combo{}, combos...)
+	}
+	s.pathCache = append(s.pathCache, n.id)
+}
+
 // Tsumo declares a win with the pending draw. expectedNode is as in Discard.
-func (s *Session) Tsumo(expectedNode *int) (State, error) {
+func (s *Session) Tsumo(expectedNode *int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.tsumo(expectedNode); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // tsumo is Tsumo without the state; callers hold s.mu.
@@ -314,13 +342,13 @@ func (s *Session) checkExpectedNode(expectedNode *int) error {
 // moving the session on first doesn't make it ambiguous: it either still
 // exists (it does; the tree only grows) or doesn't (ErrNotFound already).
 // It has no expectedNode guard.
-func (s *Session) Goto(id int) (State, error) {
+func (s *Session) Goto(id int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.goTo(id); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // goTo is Goto without the state; callers hold s.mu.
@@ -332,22 +360,12 @@ func (s *Session) goTo(id int) error {
 	return nil
 }
 
-// resetAnalyzerIfFull recycles the shared analyzer once its suit-table memo
-// has grown past memoLimit.
-func (s *Session) resetAnalyzerIfFull() {
-	if s.analyzer.MemoSize() > memoLimit {
-		s.analyzer = yakushanten.NewAnalyzer()
-	}
-}
-
 func (s *Session) analyze(c tile.Counts) []yakushanten.Result {
-	s.resetAnalyzerIfFull()
 	return s.analyzer.Analyze(c)
 }
 
 // combos returns the yaku combos of the 13 tiles c, whose rows are res.
 func (s *Session) combos(c tile.Counts, res []yakushanten.Result) []yakushanten.Combo {
-	s.resetAnalyzerIfFull()
 	return s.analyzer.Combos(c, nil, res)
 }
 
@@ -365,16 +383,52 @@ func (s *Session) nodeAnalysis(n *node) []yakushanten.Result {
 	if n.analysis == nil {
 		n.analysis = s.analyze(tile.CountsOf(n.hand))
 	}
+	if n.rowShanten == nil {
+		n.rowShanten = compactShanten(n.analysis)
+	}
 	return n.analysis
+}
+
+// noShanten is rowShanten's value for an impossible row.
+const noShanten = math.MinInt8
+
+func compactShanten(res []yakushanten.Result) []int8 {
+	out := make([]int8, len(res))
+	for i, r := range res {
+		out[i] = noShanten
+		if r.Possible {
+			out[i] = int8(r.Shanten)
+		}
+	}
+	return out
+}
+
+// nodeRowShanten returns each row's shanten at a node that is not a win,
+// analyzing its hand only if no analysis has recorded them yet.
+func (s *Session) nodeRowShanten(n *node) []int8 {
+	if n.rowShanten == nil {
+		res := n.analysis
+		if res == nil {
+			res = s.analyze(tile.CountsOf(n.hand))
+		}
+		n.rowShanten = compactShanten(res)
+	}
+	return n.rowShanten
 }
 
 // nodeNormalShanten returns just the normal-form shanten (nil = complete
 // hand impossible), for the tree view. It is cached on the node forever
-// (unlike analysis/byDiscard) since it is tiny.
+// (unlike analysis/byDiscard) since it is tiny. A node whose rows are known
+// already (rowShanten) reads it from the normal row, the first.
 func (s *Session) nodeNormalShanten(n *node) *int {
 	if !n.normalShantenDone {
-		s.resetAnalyzerIfFull()
-		n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
+		if n.rowShanten != nil {
+			if v := n.rowShanten[0]; v != noShanten {
+				n.normalShanten = intPtr(int(v))
+			}
+		} else {
+			n.normalShanten = apiview.ShantenOf(s.analyzer.NormalShanten(tile.CountsOf(n.hand)))
+		}
 		n.normalShantenDone = true
 	}
 	return n.normalShanten

@@ -39,15 +39,18 @@ func TestRouteMatchesServer(t *testing.T) {
 	}
 
 	create := `{"seed":1,"max_turns":6}`
-	srv := c.state("POST", "/api/sessions", create)
-	_, v := apicall.Route(store, games, "POST", "/api/sessions", strings.NewReader(create))
-	st := v.(session.State)
-	srvID, wasmID = srv.SessionID, st.SessionID
-	srv.SessionID, st.SessionID = "", ""
-	a, _ := json.Marshal(srv)
-	b, _ := json.Marshal(st)
-	if string(a) != string(b) {
-		t.Fatalf("create:\nserver %.300s\nroute  %.300s", a, b)
+	var st session.State
+	for _, path := range []string{"/api/sessions?advice=0&tree_from=1", "/api/sessions"} {
+		srv := c.state("POST", path, create)
+		_, v := apicall.Route(store, games, "POST", path, strings.NewReader(create))
+		st = v.(session.State)
+		srvID, wasmID = srv.SessionID, st.SessionID
+		srv.SessionID, st.SessionID = "", ""
+		a, _ := json.Marshal(srv)
+		b, _ := json.Marshal(st)
+		if string(a) != string(b) {
+			t.Fatalf("create:\nserver %.300s\nroute  %.300s", a, b)
+		}
 	}
 	if len(st.Combos) == 0 || len(st.CombosByDiscard) == 0 {
 		t.Fatal("the compared states should carry combos")
@@ -74,6 +77,19 @@ func TestRouteMatchesServer(t *testing.T) {
 		{"POST", "/api/sessions", `{"seed":"x"}`},
 		{"GET", "/api/sessions/nope", ""},
 		{"POST", "/api/sessions/nope/discard", `{"tile":"1m"}`},
+		// View options: a discard without the advice leaves its review to
+		// the next state shown with it.
+		{"POST", "/api/sessions/{id}/goto?advice=0&tree_from=3", `{"node_id":0}`},
+		{"POST", "/api/sessions/{id}/discard?advice=0&tree_from=3", `{"tile":"` + st.Hand[1] + `"}`},
+		{"GET", "/api/sessions/{id}?tree_from=2", ""},
+		{"GET", "/api/sessions/{id}?advice=1&tree_from=99&other=x", ""},
+		{"POST", "/api/sessions/{id}/tsumo?advice=0", ""},
+		{"GET", "/api/sessions/{id}?advice=2", ""},
+		{"GET", "/api/sessions/{id}?tree_from=-1", ""},
+		{"GET", "/api/sessions/{id}?tree_from=x", ""},
+		{"POST", "/api/sessions?tree_from=", create},
+		{"GET", "/api/sessions/nope?advice=2", ""},
+		{"GET", "/api/version?advice=0", ""},
 		// Unknown paths, wrong methods and trailing slashes.
 		{"GET", "/api/sessions", ""},
 		{"PUT", "/api/sessions", "{}"},

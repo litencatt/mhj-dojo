@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import type { Advice, AdviceCandidate, AdvicePhase, DiscardReview } from '../api';
 import { PanelHeading } from './PanelHeading';
 import { Tile, mouseOnly } from './Tile';
@@ -8,6 +9,7 @@ export interface AdvicePanelProps {
   review: DiscardReview | null; // the discard that led to this node
   onHighlight: (tile: string | null) => void; // a hovered candidate, to mark in the hand
   onMinimize: () => void; // send the panel to the dock
+  minimized?: boolean; // in the dock: nothing is drawn
 }
 
 const PHASE_LABELS: Record<AdvicePhase, string> = { early: '序盤', middle: '中盤', late: '終盤' };
@@ -33,7 +35,8 @@ function percent(p: number): string {
  * It starts minimized in the right-edge dock like the other panels, so the
  * answer is not shown before the player has thought about the hand.
  */
-export function AdvicePanel({ advice, review, onHighlight, onMinimize }: AdvicePanelProps) {
+export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlight, onMinimize, minimized }: AdvicePanelProps) {
+  if (minimized) return null;
   return (
     <section class="advice-panel" aria-label="アドバイス">
       <PanelHeading
@@ -124,4 +127,4 @@ export function AdvicePanel({ advice, review, onHighlight, onMinimize }: AdviceP
       </div>
     </section>
   );
-}
+});

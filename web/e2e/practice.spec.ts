@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // Solo practice mode (the root page): load a fixed seed and discard once,
 // checking that both the table (discard river) and the analysis (yaku
@@ -47,15 +47,16 @@ test('practice mode loads and a discard updates the table and analysis', async (
   await expect(analysisBody).not.toHaveText(analysisBefore);
 });
 
-// Two tabs on the same practice session (issue #53): page A discards first,
-// moving the session on; page B, still showing the pre-discard node, then
-// discards too. Its request carries the node it acted from (node_id), the
+// Two browsers on the same practice session (issue #53; two tabs of one
+// browser would stop each other, see below): page A discards first, moving
+// the session on; page B, still showing the pre-discard node, then discards
+// too. Its request carries the node it acted from (node_id), the
 // server rejects it as stale (409, mirroring the game stale-tab test in
 // game.spec.ts), and the client's re-fetch-on-real-change logic shows the
 // notice instead of an error and lands page B on the current node.
-test('a stale tab: discarding after another tab moved the session on shows a notice, not an error', async ({
+test('a stale browser: discarding after another browser moved the session on shows a notice, not an error', async ({
   page,
-  context,
+  browser,
 }) => {
   await page.goto('/?seed=1&turns=18');
   const handA = page.getByRole('region', { name: '手牌' });
@@ -67,7 +68,7 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(page).toHaveURL(/[?&]session=/);
   const sessionId = new URL(page.url()).searchParams.get('session');
   expect(sessionId, 'the URL should carry the server-assigned session id').toBeTruthy();
-  const pageB = await context.newPage();
+  const pageB = await (await browser.newContext()).newPage();
   await pageB.goto(`/?session=${sessionId}`);
   const handB = pageB.getByRole('region', { name: '手牌' });
   const drawnB = handB.locator('.hand-drawn button');
@@ -93,6 +94,93 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(pageB.locator('.notice-banner')).toBeVisible({ timeout: 15_000 });
   await expect(pageB.locator('.error-banner')).toBeHidden();
   await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
+  for (const p of [page, pageB]) await expect(stoppedDialog(p)).toHaveCount(0);
+  await pageB.context().close();
+});
+
+// One tab of a browser at a time plays a session (src/singleTab.ts): the
+// newest tab to open it wins, and the one before stops until taken back.
+function stoppedDialog(page: Page) {
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
+}
+
+async function discardDrawn(page: Page) {
+  const hand = page.getByRole('region', { name: '手牌' });
+  const river = hand.locator('.discard-river .tile');
+  const before = await river.count();
+  const drawn = hand.locator('.hand-drawn button');
+  await expect(drawn).toBeEnabled();
+  await drawn.click();
+  await expect(river).toHaveCount(before + 1);
+}
+
+function riverOf(page: Page) {
+  return page
+    .getByRole('region', { name: '手牌' })
+    .locator('.discard-river .tile')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+}
+
+test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
+  await page.goto('/?seed=21&turns=18');
+  await discardDrawn(page);
+  await expect(page).toHaveURL(/[?&]session=/);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+
+  // A stops: the dialog covers it, and it sends nothing more.
+  await expectStopped(page);
+  await expect(stoppedDialog(other)).toHaveCount(0);
+  const sent: string[] = [];
+  page.on('request', (req) => {
+    if (req.url().includes('/api/')) sent.push(`${req.method()} ${req.url()}`);
+  });
+  const handA = page.getByRole('region', { name: '手牌' });
+
+  // B plays on.
+  await discardDrawn(other);
+  await discardDrawn(other);
+  expect(sent).toEqual([]);
+
+  // A takes it back with a GET, from where B left it; now B stops.
+  const get = page.waitForRequest((req) => req.method() === 'GET' && /\/api\/sessions\/[^/]+$/.test(req.url()));
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await get;
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
+  expect(await riverOf(page)).toEqual(await riverOf(other));
+  await expectStopped(other);
+  await discardDrawn(page);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('tabs on different sessions both play, and a new session lets go of the one before', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/?seed=31&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const first = page.url();
+  await page.locator('.new-game-form input[type="number"]').first().fill('32');
+  await page.getByRole('button', { name: '新規対局' }).click();
+  await expect(page).toHaveURL(/[?&]seed=32(&|$)/);
+
+  const other = await context.newPage();
+  await other.goto(first);
+  await discardDrawn(other);
+  await discardDrawn(page);
+  await discardDrawn(other);
+  for (const p of [page, other]) {
+    await expect(stoppedDialog(p)).toHaveCount(0);
+    await expect(p.locator('.error-banner')).toHaveCount(0);
+  }
 });
 
 // The 面子表示 toggle regroups the hand under labelled brackets without a
@@ -201,7 +289,7 @@ test('a server error with a tile code shows the tile name, not the code', async 
   const drawn = handPanel.locator('.hand-drawn button');
   await expect(drawn).toBeVisible();
 
-  await page.route('**/api/sessions/*/discard', (route) =>
+  await page.route('**/api/sessions/*/discard*', (route) =>
     route.fulfill({
       status: 400,
       contentType: 'application/json',
@@ -212,4 +300,231 @@ test('a server error with a tile code shows the tile name, not the code', async 
   await drawn.click();
   const banner = page.getByRole('alert');
   await expect(banner).toHaveText('tile 5筒 is not in hand or drawn (also 5筒, seat 2, 18p)');
+});
+
+/** Opens practice mode with every panel open (the layout is kept in localStorage; a reload keeps its own). */
+async function openAllPanels(page: Page) {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e-minimized')) return;
+    localStorage.setItem('mhj-dojo.minimized.v2', '[]');
+    sessionStorage.setItem('e2e-minimized', '1');
+  });
+  await page.goto('/?seed=1&turns=18');
+  await expect(page.getByRole('region', { name: '時系列チャート' })).toBeVisible();
+}
+
+// The panels are memoized, so their – buttons keep the callback of an
+// earlier render: each must still act on the latest set of minimized panels
+// (a stale one would bring back a panel minimized since).
+test('minimize and restore: each panel goes to the dock and back, the others stay put', async ({ page }) => {
+  await openAllPanels(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const panels = [
+    { region: '時系列チャート', button: '時系列チャートを最小化', tab: '時系列チャート' },
+    { region: '履歴ツリー', button: '履歴ツリーを最小化', tab: '履歴ツリー' },
+    { region: '役別向聴テーブル', button: '役別向聴を最小化', tab: '役別向聴' },
+    { region: 'アドバイス', button: 'アドバイスを最小化', tab: 'アドバイス' },
+    { region: '用語表', button: '用語表を最小化', tab: '用語表' },
+  ];
+  await expect(dock).toHaveCount(0);
+
+  // One at a time, with a new node (new data for the panels) in between.
+  for (const [i, p] of panels.entries()) {
+    await page.getByRole('region', { name: p.region }).getByRole('button', { name: p.button }).click();
+    await expect(page.getByRole('region', { name: p.region })).toBeHidden();
+    await expect(dock.getByRole('button')).toHaveText(panels.slice(0, i + 1).map((q) => new RegExp(q.tab)));
+    if (i < 2) await discardDrawn(page);
+  }
+  // A minimized panel draws nothing, but its place is kept.
+  await expect(page.locator('.area-chart')).toBeAttached();
+  await expect(page.locator('.area-chart > *')).toHaveCount(0);
+
+  // Back from the dock in another order, each leaving the rest docked.
+  for (const [i, p] of [...panels].reverse().entries()) {
+    await dock.getByRole('button', { name: p.tab }).click();
+    await expect(page.getByRole('region', { name: p.region })).toBeVisible();
+    await expect(dock.getByRole('button')).toHaveCount(panels.length - i - 1);
+  }
+  await expect(page.locator('.yaku-table tbody tr')).not.toHaveCount(0);
+
+  // Two in one go (before the page renders again), and then the layout survives a reload.
+  await page.evaluate(() => {
+    for (const name of ['時系列チャートを最小化', '用語表を最小化']) {
+      document.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!.click();
+    }
+  });
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+  await page.reload();
+  await expect(page.getByRole('region', { name: '履歴ツリー' })).toBeVisible();
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+});
+
+// A minimized panel stays mounted: its own state (the chart's legend, the
+// glossary's search) is there again when it comes back, even after new data
+// arrived while it was in the dock, which it then shows.
+test('minimize and restore keep the chart legend and the glossary search', async ({ page }) => {
+  await openAllPanels(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const chart = page.getByRole('region', { name: '時系列チャート' });
+  const glossary = page.getByRole('region', { name: '用語表' });
+
+  const legend = chart.locator('.legend-item');
+  const off = chart.locator('.legend-item[aria-pressed="false"]').first();
+  const name = (await off.textContent())!;
+  await off.click();
+  const item = legend.filter({ hasText: name });
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  const onBefore = await chart.locator('.legend-item[aria-pressed="true"]').count();
+  const search = glossary.getByRole('searchbox', { name: '用語を検索' });
+  await search.fill('リャンメン');
+  await expect(glossary.locator('.glossary-item')).toHaveCount(1);
+
+  await chart.getByRole('button', { name: '時系列チャートを最小化' }).click();
+  await glossary.getByRole('button', { name: '用語表を最小化' }).click();
+  await expect(chart).toBeHidden();
+  await expect(glossary).toBeHidden();
+  await discardDrawn(page);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+
+  await dock.getByRole('button', { name: '時系列チャート' }).click();
+  await dock.getByRole('button', { name: '用語表' }).click();
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart.locator('.legend-item[aria-pressed="true"]')).toHaveCount(onBefore);
+  // The chart shows the node discarded to while it was docked: two turns.
+  await expect(chart.locator('.chart-axis-label[text-anchor="middle"]')).toHaveCount(2);
+  await expect(search).toHaveValue('リャンメン');
+  await expect(glossary.locator('.glossary-item')).toHaveCount(1);
+});
+
+/** The whole state of the page's session, as the server has it (the view the page doesn't ask for). */
+async function fullState(page: Page) {
+  await expect(page).toHaveURL(/[?&]session=/);
+  const id = new URL(page.url()).searchParams.get('session');
+  const res = await page.request.get(`/api/sessions/${encodeURIComponent(id!)}`);
+  expect(res.ok()).toBe(true);
+  return (await res.json()) as {
+    node_count: number;
+    hand: string[];
+    tree: { node_id: number; discard: string | null }[];
+    remaining: Record<string, number>;
+    analysis: { key: string; name: string; han: number; yakuman: boolean }[];
+    by_discard: Record<string, { key: string; shanten: number | null; ukeire: string[]; ukeire_total: number }[]>;
+    advice: { candidates: { tile: string }[] } | null;
+    discard_review: { text: string } | null;
+  };
+}
+
+// While the advice panel is minimized the page asks for no advice
+// (?advice=0), so neither the advice nor the review of a discard is computed;
+// opening the panel asks for the state again with them, and they are the
+// same as if they had been there all along.
+test('advice: left out while minimized, filled in (the review too) when the panel opens', async ({ page }) => {
+  await page.goto('/?seed=3&turns=18');
+  const sent: string[] = [];
+  page.on('request', (req) => {
+    if (req.url().includes('/api/sessions')) sent.push(`${req.method()} ${new URL(req.url()).pathname}${new URL(req.url()).search}`);
+  });
+  await discardDrawn(page);
+  await discardDrawn(page);
+  expect(sent.length).toBe(2);
+  for (const s of sent) expect(s).toMatch(/^POST \/api\/sessions\/[^/]+\/discard\?advice=0&tree_from=\d+$/);
+
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  const dockTab = page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' });
+  const get = page.waitForResponse((res) => res.request().method() === 'GET' && res.url().includes('/api/sessions/'));
+  await dockTab.click();
+  const res = await get;
+  expect(new URL(res.url()).searchParams.get('advice')).toBeNull();
+  const want = await fullState(page);
+  expect(want.advice!.candidates).toHaveLength(3);
+  await expect(panel.locator('.advice-candidate')).toHaveCount(3);
+  await expect(panel.locator('.advice-review')).toHaveText(want.discard_review!.text);
+
+  // With the panel open, the next discard brings its advice and review along.
+  sent.length = 0;
+  await discardDrawn(page);
+  expect(sent).toEqual([expect.stringMatching(/\/discard\?tree_from=3$/)]);
+  await expect(panel.locator('.advice-review')).toHaveText((await fullState(page)).discard_review!.text);
+});
+
+// The page asks only for the tree nodes it lacks (?tree_from=) and appends
+// them: the tree stays whole across moves, branches, gotos and a reload.
+test('history tree: only new nodes are sent, the tree stays whole across goto, branches and reload', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e-minimized')) return;
+    localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'advice', 'gloss']));
+    sessionStorage.setItem('e2e-minimized', '1');
+  });
+  await page.goto('/?seed=5&turns=18');
+  const tree = page.getByRole('region', { name: '履歴ツリー' });
+  const nodes = tree.locator('.tree-node-btn');
+  const hand = page.getByRole('region', { name: '手牌' });
+  const shown = () => nodes.evaluateAll((els) => els.map((e) => e.textContent));
+  const trees: number[] = [];
+  page.on('response', async (res) => {
+    if (res.url().includes('/api/sessions/')) trees.push(((await res.json()) as { tree: unknown[] }).tree.length);
+  });
+
+  await discardDrawn(page);
+  await discardDrawn(page);
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(4);
+  await nodes.nth(1).click();
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  // A branch: a tile other than the one discarded from here before.
+  const at1 = await fullState(page);
+  const other = at1.hand.findIndex((t) => t !== at1.tree[2].discard);
+  await hand.locator('.hand-tiles button').nth(other).click();
+  await expect(nodes).toHaveCount(5);
+  await nodes.nth(3).click();
+  await expect(nodes.nth(3)).toHaveAttribute('aria-current', 'true');
+  // Each discard sent back its one new node, each goto none.
+  expect(trees).toEqual([1, 1, 1, 0, 1, 0]);
+
+  const whole = await fullState(page);
+  expect(whole.node_count).toBe(5);
+  expect(whole.tree).toHaveLength(5);
+  const before = await shown();
+  await page.reload();
+  await expect(nodes).toHaveCount(5);
+  expect(await shown()).toEqual(before);
+  await expect(nodes.nth(3)).toHaveAttribute('aria-current', 'true');
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(6);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// A discard preview (hovering a tile) joins by_discard's rows with the
+// analysis's names and han, and counts their ukeire from remaining: the
+// table shows what the server's preview says, as before.
+test('preview: the rows after a discard, with names, han and remaining counts', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  const hand = page.getByRole('region', { name: '手牌' });
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  await expect(yaku.locator('.yaku-table tbody tr')).not.toHaveCount(0);
+  const st = await fullState(page);
+  // The hand's buttons are in the hand's order.
+  await hand.locator('.hand-tiles button').nth(4).hover();
+  await expect(yaku.locator('.preview-note')).toBeVisible();
+  const preview = st.by_discard[st.hand[4]];
+  expect(preview).toBeTruthy();
+
+  const rows = await yaku.locator('.yaku-table tbody tr').evaluateAll((trs) =>
+    trs.map((tr) => ({
+      name: tr.querySelector('.yaku-name')!.textContent,
+      han: tr.querySelector('.han-cell')!.textContent,
+      shanten: tr.querySelector('.shanten-cell > span')!.textContent,
+      counts: [...tr.querySelectorAll('.ukeire-count')].map((c) => Number(c.textContent)),
+      total: Number(tr.querySelector('.ukeire-total-cell')!.textContent),
+    })),
+  );
+  expect(rows.length).toBeGreaterThan(20);
+  for (const r of rows) {
+    const a = st.analysis.find((x) => x.name === r.name)!;
+    const p = preview.find((x) => x.key === a.key)!;
+    expect(r.han).toBe(a.yakuman ? '役満' : a.han > 0 ? `${a.han}翻` : '—');
+    expect(r.shanten).toBe(p.shanten === null ? '不可' : p.shanten === 0 ? '聴牌' : `${p.shanten}向聴`);
+    expect(r.counts).toEqual(p.ukeire.map((t) => st.remaining[t]));
+    expect(r.total).toBe(p.ukeire_total);
+  }
 });

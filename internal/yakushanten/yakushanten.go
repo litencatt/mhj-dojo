@@ -343,8 +343,79 @@ type Analyzer struct {
 	// combosFor order) for the last melds Combos saw.
 	comboMelds   []yaku.Meld
 	comboTargets [][]shanten.Target
-	folds        map[[2]*shanten.Table]*shanten.Table // see comboDist
-	names        map[string]string                    // see comboNames
+	folds        *foldMemo         // see comboDist
+	names        map[string]string // see comboNames
+	// rowsMemo and combosMemo hold the last results of AnalyzeWith and
+	// Combos by hand: a request asks for the same hand more than once (a
+	// game's analysis is also its drawn tile's discard preview, and the
+	// hand recorded after a discard is the preview of that discard).
+	rowsMemo   resultMemo[[]Result]
+	combosMemo resultMemo[[]Combo]
+	// scratch buffers of combos, reused across calls.
+	todo  []pending
+	evald []comboCand
+	sel   []comboCand
+}
+
+// resultMemoSize is how many hands each result memo holds: a turn's discard
+// candidates (at most 14 kinds) and the hand itself, twice over, so a turn's
+// results are still there on the next one.
+const resultMemoSize = 32
+
+// handKey identifies a hand for the result memos: its concealed tiles and
+// fixed melds (at most four).
+type handKey struct {
+	c     tile.Counts
+	melds [4]yaku.Meld
+	n     int
+}
+
+func keyOf(c *tile.Counts, melds []yaku.Meld) (handKey, bool) {
+	k := handKey{c: *c, n: len(melds)}
+	if len(melds) > len(k.melds) {
+		return k, false
+	}
+	copy(k.melds[:], melds)
+	return k, true
+}
+
+// resultMemo is a small FIFO of results by hand. The results are shared
+// between callers, which must not modify them. One that is off memoizes
+// nothing.
+type resultMemo[T any] struct {
+	keys []handKey
+	vals []T
+	next int
+	off  bool
+}
+
+func (m *resultMemo[T]) get(k *handKey) (T, bool) {
+	for i := range m.keys {
+		if m.keys[i] == *k {
+			return m.vals[i], true
+		}
+	}
+	var zero T
+	return zero, false
+}
+
+func (m *resultMemo[T]) put(k *handKey, v T) {
+	if m.off {
+		return
+	}
+	if len(m.keys) < resultMemoSize {
+		m.keys, m.vals = append(m.keys, *k), append(m.vals, v)
+		return
+	}
+	m.keys[m.next], m.vals[m.next] = *k, v
+	m.next = (m.next + 1) % resultMemoSize
+}
+
+// DisableResultMemo turns off the memo of AnalyzeWith and Combos results,
+// for tests comparing results with and without it.
+func (a *Analyzer) DisableResultMemo() {
+	a.rowsMemo = resultMemo[[]Result]{off: true}
+	a.combosMemo = resultMemo[[]Combo]{off: true}
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -352,27 +423,38 @@ func NewAnalyzer() *Analyzer { return NewAnalyzerFor(EastEast) }
 
 // NewAnalyzerFor returns an analyzer whose rows follow the given winds.
 func NewAnalyzerFor(w Winds) *Analyzer {
-	return &Analyzer{eng: shanten.NewEngine(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+	return &Analyzer{eng: shanten.NewEngine(), folds: newFoldMemo(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
 }
 
 // ForWinds returns an analyzer whose rows follow the given winds and that
 // shares this one's memo: the suit tables (and the folds of two of them) do
 // not depend on the winds, so a game's next round starts warm instead of
 // recomputing the tables its hands share with the last round's. The two
-// must not be used concurrently, as one analyzer may not be either.
+// must not be used concurrently, as one analyzer may not be either. The
+// results memo is not shared (the rows differ), only turned off if a's is.
 func (a *Analyzer) ForWinds(w Winds) *Analyzer {
-	return &Analyzer{eng: a.eng, folds: a.folds, winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+	b := &Analyzer{eng: a.eng, folds: a.folds, winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+	if a.rowsMemo.off {
+		b.DisableResultMemo()
+	}
+	return b
 }
 
 // Rows returns the analyzer's rows in API order.
 func (a *Analyzer) Rows() []RowDef { return a.rows }
 
-// MemoSize returns the number of memoized suit tables.
+// MemoSize returns the number of memoized suit tables, both generations
+// counted (see memo.Memo.Len: a table copied forward counts twice).
 func (a *Analyzer) MemoSize() int { return a.eng.MemoSize() }
 
 // Analyze returns every row for a 13-tile hand, in the analyzer's row order. A 14-tile hand
 // is accepted too (shanten -1 = satisfied); its pinfu row is the relaxed value.
+// The result may be shared with other calls (see AnalyzeWith): do not modify it.
 func (a *Analyzer) Analyze(c tile.Counts) []Result {
+	return a.AnalyzeWith(c, nil)
+}
+
+func (a *Analyzer) analyze(c tile.Counts) []Result {
 	out := make([]Result, 0, len(a.rows))
 	var toitoi Result
 	for _, row := range a.rows {
@@ -411,9 +493,26 @@ var needClosed = map[string]bool{"iipeikou": true, "suuankou": true}
 // and concealed kans. Each meld is a group of every target hand, standing for
 // one of the target's forced groups or for one of its free melds. A called
 // meld opens the hand, which rules out the closed-only rows.
+//
+// The last results are memoized by hand, so the result may be shared with
+// other calls: callers must not modify it.
 func (a *Analyzer) AnalyzeWith(c tile.Counts, melds []yaku.Meld) []Result {
+	k, ok := keyOf(&c, melds)
+	if ok {
+		if res, hit := a.rowsMemo.get(&k); hit {
+			return res
+		}
+	}
+	res := a.analyzeWith(c, melds)
+	if ok {
+		a.rowsMemo.put(&k, res)
+	}
+	return res
+}
+
+func (a *Analyzer) analyzeWith(c tile.Counts, melds []yaku.Meld) []Result {
 	if len(melds) == 0 {
-		return a.Analyze(c)
+		return a.analyze(c)
 	}
 	open := slices.ContainsFunc(melds, func(m yaku.Meld) bool { return m.Open })
 	// The meld tiles join the hand and the target alike (as forced tiles), so
