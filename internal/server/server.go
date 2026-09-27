@@ -21,6 +21,13 @@ import (
 //go:embed all:static
 var staticFS embed.FS
 
+func init() {
+	// Go's mime package doesn't know this extension (it has no OS mime.types
+	// entry), so http.FileServerFS would otherwise serve the manifest as
+	// text/plain.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
+
 // New returns the HTTP handler for the API and the embedded frontend.
 func New(store *session.Store, games *match.Store) http.Handler {
 	static, err := fs.Sub(staticFS, "static")
