@@ -5,7 +5,7 @@
 //
 //   worker → page  {type: 'ready', initMs} | {type: 'failed', error} (at start, or later if the engine exits)
 //   page → worker  {id, fn: 'request', args: [method, path, body]}   an HTTP API request (docs/api.md)
-//                  {id, fn: 'restore', args: [body]}                 rebuild a session from its moves
+//                  {id, fn: 'restore', args: [body, query]}          rebuild a session from its moves
 //                  {id, fn: 'restoreGame', args: [save]}             rebuild a CPU game from its save
 //   worker → page  {id, status, body, save?}   the status and JSON body the server would send, and
 //                                              for a CPU game's success its save (JSON) to keep
