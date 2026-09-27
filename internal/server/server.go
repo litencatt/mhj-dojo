@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/litencatt/mhj-dojo/internal/apicall"
-	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/match"
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
@@ -62,30 +61,7 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 		return m.State(), nil
 	}))
 	mux.HandleFunc("POST /api/games/{id}/action", a.withGame(func(m *match.Match, r *http.Request) (match.State, error) {
-		var body struct {
-			Type  game.ActionType `json:"type"`
-			Tile  string          `json:"tile"`
-			Tiles []string        `json:"tiles"`
-		}
-		if err := apicall.Decode(r.Body, &body, true); err != nil {
-			return match.State{}, err
-		}
-		switch body.Type {
-		case game.Discard, game.Riichi:
-			if body.Tile == "" {
-				return match.State{}, apicall.Invalid("tile is required for " + string(body.Type))
-			}
-		case game.Chii:
-			if len(body.Tiles) != 2 {
-				return match.State{}, apicall.Invalid("tiles (two) are required for chii")
-			}
-		case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
-		case actionNext:
-			return m.Next()
-		default:
-			return match.State{}, apicall.Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
-		}
-		return m.Act(game.Action{Type: body.Type, Tile: body.Tile, Tiles: body.Tiles})
+		return apicall.GameAction(m, r.Body)
 	}))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)
@@ -138,26 +114,13 @@ type api struct {
 	games *match.Store
 }
 
-// actionNext deals the next round of a game; it is not a round move.
-const actionNext game.ActionType = "next"
-
 func (a *api) createGame(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Seed        *int64 `json:"seed"`
-		Length      string `json:"length"`
-		FirstDealer string `json:"first_dealer"`
-		CPU         string `json:"cpu"`
-	}
-	if err := apicall.Decode(r.Body, &body, false); err != nil {
-		writeErr(w, err)
-		return
-	}
-	m, err := a.games.Create(body.Seed, match.Options{Length: body.Length, FirstDealer: body.FirstDealer, CPU: body.CPU})
+	st, err := apicall.CreateGame(a.games, r.Body)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, m.State())
+	writeJSON(w, http.StatusOK, st)
 }
 
 func (a *api) withGame(f func(*match.Match, *http.Request) (match.State, error)) http.HandlerFunc {

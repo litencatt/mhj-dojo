@@ -106,9 +106,7 @@ export function App() {
           <header class="app-header">
             <h1>
               mhj-dojo <span class="app-subtitle">麻雀道場</span>
-              {!api.WASM && (
-                <a class="mode-link" href="?mode=game">CPU対戦へ</a>
-              )}
+              <a class="mode-link" href="?mode=game">CPU対戦へ</a>
             </h1>
             <div class="header-meta">
               <VersionTag />
