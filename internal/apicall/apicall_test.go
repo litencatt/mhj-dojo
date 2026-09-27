@@ -205,6 +205,9 @@ func TestSessionView(t *testing.T) {
 		"advice=0":                   {NoAdvice: true},
 		"tree_from=12":               {TreeFrom: 12},
 		"advice=0&tree_from=3&x=y&z": {NoAdvice: true, TreeFrom: 3},
+		"tree_from=+3":               {TreeFrom: 3},
+		"advice=0&advice=1":          {}, // the last one counts
+		"tree_from=2&tree_from=5":    {TreeFrom: 5},
 	} {
 		if got, err := SessionView(query); err != nil || got != want {
 			t.Errorf("SessionView(%q) = %+v, %v; want %+v", query, got, err, want)

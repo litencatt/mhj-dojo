@@ -84,7 +84,8 @@ parameters that leave parts of the returned `State` out, for a client that doesn
   the whole tree has, a check that the two add up. `0` (the default) sends the whole tree; past
   the end, `tree` is `[]`.
 
-Any other value is a `400`; unknown parameters are ignored. The UI sends `advice=0` while the
+Any other value is a `400` (`tree_from` is read as a decimal integer, a leading `+` allowed);
+unknown parameters are ignored, and of a parameter given twice the last value counts. The UI sends `advice=0` while the
 advice panel is minimized (opening it asks for the state shown again, with the advice), and
 `tree_from` on every request but those that load a session afresh (a new one, the first of a page,
 the re-fetch after a `409`), which take the whole tree.

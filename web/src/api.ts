@@ -31,7 +31,10 @@ export type DiscardRow = Pick<YakuRow, 'key' | 'shanten' | 'approx' | 'ukeire' |
 /** A discard's preview rows as whole rows, joined with the analysis by key. */
 export function withNames(rows: DiscardRow[], analysis: YakuRow[]): YakuRow[] {
   const byKey = new Map(analysis.map((r) => [r.key, r]));
-  return rows.map((r) => ({ ...byKey.get(r.key)!, ...r }));
+  return rows.flatMap((r) => {
+    const a = byKey.get(r.key);
+    return a ? [{ ...a, ...r }] : [];
+  });
 }
 
 // A combination of yaku one complete hand scores together (docs/api.md "Yaku combos").

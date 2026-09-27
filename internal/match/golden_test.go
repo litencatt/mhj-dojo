@@ -57,7 +57,9 @@ func goldenGame(t *testing.T, seed int64, o Options, pick func(State, *bool) gam
 // hashes were taken again when the JSON took its slimmer shape (ukeire as
 // tile kinds counted by one remaining map, by_discard rows without the
 // analysis's names and han): converted to that shape, the old states were
-// the same as the new ones, state for state (the saves, match.Save, are untouched).
+// the same as the new ones, state for state (the saves, match.Save, are
+// untouched; a one-off check described in the message of commit 776859a,
+// which re-pinned them).
 func TestGoldenStates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")

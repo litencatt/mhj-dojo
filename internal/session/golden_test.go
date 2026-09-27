@@ -56,7 +56,8 @@ func goldenSession(t *testing.T, seed int64) string {
 // hashes were taken again when the JSON took its slimmer shape (ukeire as
 // tile kinds counted by one remaining map, by_discard rows without the
 // analysis's names and han, node_count): converted to that shape, the old
-// states were the same as the new ones, state for state.
+// states were the same as the new ones, state for state (a one-off check
+// described in the message of commit 776859a, which re-pinned them).
 func TestGoldenStates(t *testing.T) {
 	want := map[int64]string{
 		1: "bdf2bd60871aa04a10460196971bd97dc06e4da57e269bdbe92e90d0e254782a",

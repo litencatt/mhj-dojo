@@ -85,8 +85,9 @@ func Message(err error) string {
 func ErrorBody(msg string) map[string]string { return map[string]string{"error": msg} }
 
 // SessionView reads the view options of a practice request from its URL
-// query (docs/api.md "View options"): advice=0 leaves the advice out and
-// tree_from=<n> the tree's first n nodes. Other keys are ignored.
+// query (docs/api.md "View options"): advice=0 leaves the advice out, and
+// tree_from=<n> leaves out the tree's first n nodes (those with an id below
+// n). Other keys are ignored; of a key given twice, the last one counts.
 func SessionView(query string) (session.View, error) {
 	var v session.View
 	for _, kv := range strings.Split(query, "&") {

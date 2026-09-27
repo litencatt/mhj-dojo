@@ -68,13 +68,28 @@ export function App() {
   const stopped = useSingleTab(state ? api.sessionKey(state.session_id) : null);
 
   // A state shown while the advice panel was minimized came without the
-  // advice: opening the panel asks for it (once per state).
+  // advice: opening the panel asks for it (once per state), apart from the
+  // serial requests (nothing else waits on it, and the preview stays). The
+  // answer fills in the advice and the review only if the state shown is
+  // still the one asked about, at the same node: had the session moved on
+  // (another browser), the next request shows that.
   const adviceAsked = useRef<SessionState | null>(null);
   useEffect(() => {
     if (!state || !adviceOpen || busy || stopped || withAdvice.current.has(state) || adviceAsked.current === state) return;
-    adviceAsked.current = state;
-    void request(() => load((v) => api.getSession(state.session_id, v), state));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const asked = state;
+    adviceAsked.current = asked;
+    api.getSession(asked.session_id, { advice: true, treeFrom: asked.tree.length }).then(
+      (got) =>
+        setState((cur) => {
+          if (cur !== asked || got.session_id !== asked.session_id || got.node_id !== asked.node_id) return cur;
+          const next = { ...cur, advice: got.advice, discard_review: got.discard_review };
+          withAdvice.current.add(next);
+          return next;
+        }),
+      () => {
+        // Stopped by another tab, or failed: the panel stays as it is.
+      },
+    );
   }, [state, adviceOpen, busy, stopped]);
 
   function startGame(seed?: number, maxTurns?: number) {

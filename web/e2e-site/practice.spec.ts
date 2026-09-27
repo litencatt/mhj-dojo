@@ -771,9 +771,54 @@ test('storage refusing writes: moves are kept in the tab, no whole-tree requests
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
+/** The review of the last of tiles discarded on a new session of seed, made with the advice all along. */
+async function reviewAllAlong(page: Page, seed: number, tiles: string[]) {
+  return (await page.workers()[0].evaluate(
+    ({ seed, tiles }) => {
+      const call = (method: string, path: string, body: unknown) =>
+        JSON.parse(mhjDojoRequest(method, path, JSON.stringify(body)).body) as {
+          session_id: string;
+          discard_review: { text: string };
+        };
+      let st = call('POST', '/api/sessions', { seed, max_turns: 18 });
+      for (const tile of tiles) st = call('POST', `/api/sessions/${st.session_id}/discard`, { tile });
+      return st.discard_review.text;
+    },
+    { seed, tiles },
+  )) as string;
+}
+
+/** The tiles of the page's saved moves (all discards). */
+function savedTiles(page: Page) {
+  return page.evaluate(() => {
+    const id = new URL(location.href).searchParams.get('session')!;
+    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!) as {
+      sessions: Record<string, { moves: { tile?: string }[] }>;
+    };
+    return all.sessions[id].moves.map((m) => m.tile!);
+  });
+}
+
+async function openAdvice(page: Page) {
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
+  await expect(panel.locator('.advice-candidate')).toHaveCount(3);
+  return panel;
+}
+
 // The advice panel starts minimized, so the discards leave their reviews
-// pending; after a reload (a rebuild from the moves) opening the panel fills
-// in the advice and the review, the same as a session that had them all along.
+// pending; opening the panel fills in the advice and the review, the same as
+// a session that had them all along: on the session as played, and after a
+// reload (a rebuild from the moves).
+test('advice opened after discards: the review is the one computed all along', async ({ page }) => {
+  await page.goto('./?seed=9&turns=18');
+  await discardDrawn(page);
+  await discardDrawn(page);
+  const panel = await openAdvice(page);
+  await expect(panel.locator('.advice-review')).toHaveText(await reviewAllAlong(page, 9, await savedTiles(page)));
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
 test('advice opened after discards and a reload: the review is the one computed all along', async ({ page }) => {
   await page.goto('./?seed=9&turns=18');
   const hand = page.getByRole('region', { name: '手牌' });
@@ -781,26 +826,8 @@ test('advice opened after discards and a reload: the review is the one computed 
   await discardDrawn(page);
   await page.reload();
   await expect(hand.locator('.discard-river .tile')).toHaveCount(2);
-
-  // The same moves on a session with the advice all along, in the engine.
-  const river = await page.evaluate(() => {
-    const id = new URL(location.href).searchParams.get('session')!;
-    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!) as {
-      sessions: Record<string, { moves: { tile?: string }[] }>;
-    };
-    return all.sessions[id].moves.map((m) => m.tile!);
-  });
-  const want = (await page.workers()[0].evaluate((tiles) => {
-    const call = (method: string, path: string, body: unknown) =>
-      JSON.parse(mhjDojoRequest(method, path, JSON.stringify(body)).body) as { session_id: string; discard_review: { text: string } };
-    let st = call('POST', '/api/sessions', { seed: 9, max_turns: 18 });
-    for (const tile of tiles) st = call('POST', `/api/sessions/${st.session_id}/discard`, { tile });
-    return st.discard_review.text;
-  }, river)) as string;
-
-  const panel = page.getByRole('region', { name: 'アドバイス' });
-  await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
-  await expect(panel.locator('.advice-candidate')).toHaveCount(3);
+  const want = await reviewAllAlong(page, 9, await savedTiles(page));
+  const panel = await openAdvice(page);
   await expect(panel.locator('.advice-review')).toHaveText(want);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

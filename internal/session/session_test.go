@@ -205,7 +205,7 @@ func TestExpectedNodeGuardTsumo(t *testing.T) {
 	}
 
 	// mismatch: expectedNode names a node other than the current one.
-	if _, err := s.Tsumo(intPtr(root.NodeID + 1), View{}); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(intPtr(root.NodeID+1), View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("mismatch tsumo: %v", err)
 	}
 	after := s.State(View{})
@@ -387,7 +387,7 @@ func TestConcurrentUse(t *testing.T) {
 				if v.Drawn != nil {
 					_, _ = s.Discard(*v.Drawn, nil, View{}) // conflicts between goroutines are expected
 				}
-				_, _ = s.Goto(g % 2, View{})
+				_, _ = s.Goto(g%2, View{})
 			}
 		}(g)
 	}
