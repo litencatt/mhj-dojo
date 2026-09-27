@@ -355,6 +355,25 @@ func TestStoreEviction(t *testing.T) {
 	}
 }
 
+// TestNewStoreWithMaxEvictsOldest exercises the smaller cap the wasm build
+// (cmd/mhj-dojo-wasm) passes to NewStoreWithMax instead of MaxSessions: the
+// oldest session is evicted once the store holds more than its own custom
+// max, and sessions within that max stay reachable.
+func TestNewStoreWithMaxEvictsOldest(t *testing.T) {
+	st := NewStoreWithMax(2)
+	a := mustCreate(t, st, 1, 1)
+	b := mustCreate(t, st, 2, 1)
+	c := mustCreate(t, st, 3, 1)
+	if _, err := st.Get(a.ID()); !errors.Is(err, ErrNotFound) {
+		t.Fatal("oldest session should be evicted")
+	}
+	for _, s := range []*Session{b, c} {
+		if _, err := st.Get(s.ID()); err != nil {
+			t.Errorf("Get(%s) = %v; want no error", s.ID(), err)
+		}
+	}
+}
+
 func TestConcurrentUse(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 9, 0)
