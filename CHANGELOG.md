@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.0927.3](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.2...v2026.0927.3) - 2026-09-27
+
+### 新機能
+- サイトのリリースビルドと Lolipop デプロイを分離 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/100
+- favicon・アプリアイコン・OGP設定を追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/99
+### 修正
+- スマホ横向きでは最小化したパネルを PC と同じ右端の縦タブにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/97
+
 ## [v2026.0927.2](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.1...v2026.0927.2) - 2026-09-27
 
 ### 修正
