@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ComboRow, UkeireEntry, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
@@ -24,6 +25,7 @@ export interface YakuTableProps {
   combos: ComboRow[]; // yaku combinations of the shown hand (the preview while previewing)
   baseCombos: ComboRow[] | null; // the current node's combos while previewing
   onMinimize?: () => void;
+  minimized?: boolean; // in the dock: the filter is kept, nothing is drawn
 }
 
 function shantenLabel(s: number | null): string {
@@ -111,8 +113,8 @@ function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | n
  * discard) that candidate's resulting analysis with deltas vs the current node.
  * A filter bar narrows and sorts the rows by the current values, so rows do not
  * jump while previewing. The normal row always comes first. */
-export function YakuTable(props: YakuTableProps) {
-  const { rows, baseline, previewTile, combos, baseCombos, onMinimize } = props;
+export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
+  const { rows, baseline, previewTile, combos, baseCombos, onMinimize, minimized } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
   const setFilter = (f: YakuFilter) => {
     setFilterState(f);
@@ -151,6 +153,8 @@ export function YakuTable(props: YakuTableProps) {
     window.addEventListener('scroll', close, true);
     return () => window.removeEventListener('scroll', close, true);
   }, [tip]);
+
+  if (minimized) return null;
 
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
@@ -318,4 +322,4 @@ export function YakuTable(props: YakuTableProps) {
       </div>
     </section>
   );
-}
+});

@@ -1,9 +1,11 @@
+import { memo } from 'preact/compat';
 import type { TreeNode } from '../api';
 import { Tile } from './Tile';
 import { PanelHeading } from './PanelHeading';
 
 export interface HistoryTreeProps {
   onMinimize?: () => void;
+  minimized?: boolean; // in the dock: nothing is drawn
   tree: TreeNode[];
   currentNodeId: number;
   disabled: boolean;
@@ -32,8 +34,9 @@ interface Row {
 /** 履歴ツリー: every branch ever created from this seed's wall. Click to goto.
  * Only fork points add indentation — a long single-child chain stays flat, so
  * an 18-turn straight line renders as a compact vertical list, not a staircase. */
-export function HistoryTree(props: HistoryTreeProps) {
-  const { tree, currentNodeId, disabled, onGoto, onMinimize } = props;
+export const HistoryTree = memo(function HistoryTree(props: HistoryTreeProps) {
+  const { tree, currentNodeId, disabled, onGoto, onMinimize, minimized } = props;
+  if (minimized) return null;
   const byParent = new Map<number | null, TreeNode[]>();
   const byId = new Map<number, TreeNode>();
   for (const n of tree) {
@@ -108,4 +111,4 @@ export function HistoryTree(props: HistoryTreeProps) {
       </ul>
     </section>
   );
-}
+});

@@ -475,6 +475,69 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   await expect(log).toHaveCount(next.events_from + next.events.length);
 });
 
+// A hidden tab has nobody to show the steps to: the playback jumps to the end.
+test('the playback jumps to the end when the tab is hidden', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const table = page.locator('.game-table');
+  await expect(table).toBeVisible();
+  if ((await table.getAttribute('data-playing')) === 'true') {
+    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+  }
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+
+  // The clock stands still, so the playback stays at its first step until the tab hides.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
+    hand.locator('.hand-drawn button').click(),
+  ]);
+  const st = (await response.json()) as GameState;
+  expect(st.events.length, `CPU moves after your discard (seed ${SEED})`).toBeGreaterThan(1);
+  await page.clock.runFor(50);
+  await expect(table).toHaveAttribute('data-playing', 'true');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + 1);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(table).toHaveAttribute('data-playing', 'false');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
+  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
+});
+
+// A tab hidden before the response lands never starts the steps at all.
+test('the playback starts at its end when the tab is already hidden', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const table = page.locator('.game-table');
+  await expect(table).toBeVisible();
+  if ((await table.getAttribute('data-playing')) === 'true') {
+    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+  }
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+
+  // The clock stands still: only the hidden tab can end the playback.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const [response] = await Promise.all([
+    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
+    hand.locator('.hand-drawn button').click(),
+  ]);
+  const st = (await response.json()) as GameState;
+  expect(st.events.length, `CPU moves after your discard (seed ${SEED})`).toBeGreaterThan(1);
+  await page.clock.runFor(50);
+  await expect(table).toHaveAttribute('data-playing', 'false');
+  await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
+  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
+});
+
 // A game whose first dealer is a CPU opens with the CPU turns before yours:
 // before the first of them lands, the wall is the one they started from.
 const CPU_DEALS = 13; // a seed whose first dealer is not you

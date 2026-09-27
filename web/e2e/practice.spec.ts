@@ -301,3 +301,97 @@ test('a server error with a tile code shows the tile name, not the code', async 
   const banner = page.getByRole('alert');
   await expect(banner).toHaveText('tile 5筒 is not in hand or drawn (also 5筒, seat 2, 18p)');
 });
+
+/** Opens practice mode with every panel open (the layout is kept in localStorage; a reload keeps its own). */
+async function openAllPanels(page: Page) {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e-minimized')) return;
+    localStorage.setItem('mhj-dojo.minimized.v2', '[]');
+    sessionStorage.setItem('e2e-minimized', '1');
+  });
+  await page.goto('/?seed=1&turns=18');
+  await expect(page.getByRole('region', { name: '時系列チャート' })).toBeVisible();
+}
+
+// The panels are memoized, so their – buttons keep the callback of an
+// earlier render: each must still act on the latest set of minimized panels
+// (a stale one would bring back a panel minimized since).
+test('minimize and restore: each panel goes to the dock and back, the others stay put', async ({ page }) => {
+  await openAllPanels(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const panels = [
+    { region: '時系列チャート', button: '時系列チャートを最小化', tab: '時系列チャート' },
+    { region: '履歴ツリー', button: '履歴ツリーを最小化', tab: '履歴ツリー' },
+    { region: '役別向聴テーブル', button: '役別向聴を最小化', tab: '役別向聴' },
+    { region: 'アドバイス', button: 'アドバイスを最小化', tab: 'アドバイス' },
+    { region: '用語表', button: '用語表を最小化', tab: '用語表' },
+  ];
+  await expect(dock).toHaveCount(0);
+
+  // One at a time, with a new node (new data for the panels) in between.
+  for (const [i, p] of panels.entries()) {
+    await page.getByRole('region', { name: p.region }).getByRole('button', { name: p.button }).click();
+    await expect(page.getByRole('region', { name: p.region })).toBeHidden();
+    await expect(dock.getByRole('button')).toHaveText(panels.slice(0, i + 1).map((q) => new RegExp(q.tab)));
+    if (i < 2) await discardDrawn(page);
+  }
+  // A minimized panel draws nothing, but its place is kept.
+  await expect(page.locator('.area-chart')).toBeAttached();
+  await expect(page.locator('.area-chart > *')).toHaveCount(0);
+
+  // Back from the dock in another order, each leaving the rest docked.
+  for (const [i, p] of [...panels].reverse().entries()) {
+    await dock.getByRole('button', { name: p.tab }).click();
+    await expect(page.getByRole('region', { name: p.region })).toBeVisible();
+    await expect(dock.getByRole('button')).toHaveCount(panels.length - i - 1);
+  }
+  await expect(page.locator('.yaku-table tbody tr')).not.toHaveCount(0);
+
+  // Two in one go (before the page renders again), and then the layout survives a reload.
+  await page.evaluate(() => {
+    for (const name of ['時系列チャートを最小化', '用語表を最小化']) {
+      document.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!.click();
+    }
+  });
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+  await page.reload();
+  await expect(page.getByRole('region', { name: '履歴ツリー' })).toBeVisible();
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+});
+
+// A minimized panel stays mounted: its own state (the chart's legend, the
+// glossary's search) is there again when it comes back, even after new data
+// arrived while it was in the dock, which it then shows.
+test('minimize and restore keep the chart legend and the glossary search', async ({ page }) => {
+  await openAllPanels(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const chart = page.getByRole('region', { name: '時系列チャート' });
+  const glossary = page.getByRole('region', { name: '用語表' });
+
+  const legend = chart.locator('.legend-item');
+  const off = chart.locator('.legend-item[aria-pressed="false"]').first();
+  const name = (await off.textContent())!;
+  await off.click();
+  const item = legend.filter({ hasText: name });
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  const onBefore = await chart.locator('.legend-item[aria-pressed="true"]').count();
+  const search = glossary.getByRole('searchbox', { name: '用語を検索' });
+  await search.fill('リャンメン');
+  await expect(glossary.locator('.glossary-item')).toHaveCount(1);
+
+  await chart.getByRole('button', { name: '時系列チャートを最小化' }).click();
+  await glossary.getByRole('button', { name: '用語表を最小化' }).click();
+  await expect(chart).toBeHidden();
+  await expect(glossary).toBeHidden();
+  await discardDrawn(page);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+
+  await dock.getByRole('button', { name: '時系列チャート' }).click();
+  await dock.getByRole('button', { name: '用語表' }).click();
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  await expect(chart.locator('.legend-item[aria-pressed="true"]')).toHaveCount(onBefore);
+  // The chart shows the node discarded to while it was docked: two turns.
+  await expect(chart.locator('.chart-axis-label[text-anchor="middle"]')).toHaveCount(2);
+  await expect(search).toHaveValue('リャンメン');
+  await expect(glossary.locator('.glossary-item')).toHaveCount(1);
+});

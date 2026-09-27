@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, GameOptions, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
@@ -134,6 +134,7 @@ export function GameApp() {
   // After a call the analysis is empty; the chart keeps the rows from before.
   const chartAnalysis = useLastAnalysis(state?.analysis);
   const rowNames = useRowNames(chartAnalysis);
+  const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
   // Replays state.events (issue #29) before the player can act again or the
   // round result appears.
@@ -334,7 +335,8 @@ export function GameApp() {
                 history={state.history}
                 currentAnalysis={chartAnalysis}
                 rowNames={rowNames}
-                onMinimize={() => minimize('chart')}
+                minimized={isMin('chart')}
+                onMinimize={minimizeChart}
               />
             </div>
           </>
