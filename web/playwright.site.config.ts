@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 8798;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
-// End-to-end tests for the static site (issue #67): the practice engine runs
+// End-to-end tests for the static site (issue #67): the engine runs
 // as WebAssembly in the browser, with no mhj-dojo server. `make site` must run
 // first so web/dist-site is up to date; `vite preview` serves it (with
 // .wasm as application/wasm).

@@ -30,7 +30,7 @@ async function discardDrawn(page: Page) {
   return tile;
 }
 
-test('practice runs in the browser: load, discard, no server requests, no CPU mode', async ({ page }) => {
+test('practice runs in the browser: load, discard, no server requests', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (req) => {
     if (req.url().includes('/api/')) apiRequests.push(req.url());
@@ -66,15 +66,9 @@ test('practice runs in the browser: load, discard, no server requests, no CPU mo
   await expect(rows).not.toHaveText(before);
 
   await expect(page).toHaveURL(/[?&]session=/);
-  await expect(page.getByRole('link', { name: 'CPU対戦へ' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'CPU対戦へ' })).toBeVisible();
   await expect(page.locator('.error-banner')).toHaveCount(0);
   expect(apiRequests).toEqual([]);
-});
-
-test('?mode=game shows practice on the static site', async ({ page }) => {
-  await page.goto('./?mode=game');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
 test('a reload replays the saved moves, branches included', async ({ page }) => {

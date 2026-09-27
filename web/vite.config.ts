@@ -65,7 +65,7 @@ function digest(files: URL[], length: number): string {
 
 export default defineConfig(({ command, mode }) => {
   // `--mode site` (npm run build:site): the static site that runs the
-  // practice engine as WebAssembly (issue #67). Relative asset paths let it
+  // engine as WebAssembly (issue #67). Relative asset paths let it
   // be served from any subpath; site-public/ holds the worker, and `make
   // wasm` puts mhj-dojo.wasm and Go's wasm_exec.js next to it.
   if (mode === 'site') {
