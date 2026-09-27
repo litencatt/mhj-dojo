@@ -26,6 +26,7 @@ test('practice: the header shows the version and the help opens, closes and link
   let dialog = await openHelp(page);
   for (const h of [
     'このアプリについて',
+    '画面の用語',
     '練習モード',
     '役別向聴の表の見方',
     '複合役',
@@ -40,6 +41,8 @@ test('practice: the header shows the version and the help opens, closes and link
     await expect(dialog.getByRole('heading', { name: h, exact: true })).toBeVisible();
   }
   await expect(dialog.getByRole('row', { name: /1筒〜9筒/ })).toContainText('筒子（ピンズ）');
+  // The app's own terms are here, not in the glossary.
+  await expect(dialog.getByRole('term').filter({ hasText: /^シード$/ })).toBeVisible();
   await expect(dialog.getByRole('row', { name: /東・南・西・北・白・發・中/ })).toContainText('字牌');
 
   // Esc closes it and focus goes back to the button.
@@ -60,6 +63,11 @@ test('practice: the header shows the version and the help opens, closes and link
   await expect(dialog).toBeHidden();
   await expect(glossary).toBeVisible();
   await expect(glossary.getByRole('searchbox', { name: '用語を検索' })).toBeFocused();
+  // The glossary holds mahjong terms only: the app's (シード etc.) are in the help.
+  await glossary.getByRole('searchbox', { name: '用語を検索' }).fill('シード');
+  await expect(glossary).toContainText('該当する用語がありません');
+  await glossary.getByRole('searchbox', { name: '用語を検索' }).fill('向聴');
+  await expect(glossary).not.toContainText('該当する用語がありません');
 });
 
 test('a click on the backdrop closes the help, a drag that ends there does not', async ({ page }) => {

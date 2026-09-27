@@ -22,11 +22,8 @@ const GROUPS: Group[] = [
       { term: '和了', reading: 'ホーラ', body: '手牌が完成した状態。表やチャートでは −1 として扱う。' },
       { term: '有効牌', reading: 'ゆうこうはい', body: '引くと向聴数が1つ減る牌。受け入れとも言う。種類と残り枚数が多いほど手が進みやすい。' },
       { term: '残り枚数', reading: 'のこりまいすう', body: '各牌4枚から、手牌・ツモ牌・捨て牌・ドラ表示牌で見えている枚数を引いた数。有効牌の下の数字。' },
-      { term: '合計枚数', reading: 'ごうけいまいすう', body: 'その役の有効牌の残り枚数の合計。' },
       { term: '空聴', reading: 'からテン', body: '聴牌しているが、待ち牌がすべて見えていて残り0枚の状態。' },
-      { term: '役別向聴', reading: 'やくべつシャンテン', body: 'その役を満たす和了形まで、手牌を最小何枚入れ替えればよいか − 1。役ごとに近道が分かる。' },
       { term: '一般形', reading: 'いっぱんけい', body: '役の条件を付けない4面子1雀頭の形。通常の向聴数。七対子・国士無双は別の行。' },
-      { term: '近似', reading: 'きんじ', body: '平和の1向聴以上の値。両面待ちの条件を除いて数えた目安で、実際はそれ以上かかることがある。' },
     ],
   },
   {
@@ -106,18 +103,9 @@ const GROUPS: Group[] = [
       { term: 'トビ', reading: 'トビ', body: '持ち点が0点を下回ること。誰かがトビになるとその時点で終局する。' },
     ],
   },
-  {
-    title: 'アプリ',
-    terms: [
-      { term: 'シード', reading: 'シード', body: '山の並びを決める数。同じシードなら毎回同じ配牌・ツモ順。' },
-      { term: '巡目', reading: 'じゅんめ', body: '打牌した回数。最大巡目で流局。', game: null },
-      { term: '履歴ツリー', reading: 'りれきツリー', body: '打牌の履歴。任意の巡目に戻って別の牌を切ると枝が増え、元の枝も残る。', game: null },
-      { term: '打牌プレビュー', reading: 'だはいプレビュー', body: '手牌にカーソルを合わせると、その牌を切った後の役別向聴と差分を表示。' },
-    ],
-  },
 ];
 
-/** 用語表: short explanations of the terms used on the page, filterable. */
+/** 用語表: short explanations of the mahjong terms used on the page, filterable. The app's own terms (seed, turns, the yaku table's columns) are in the help. */
 export function Glossary({ mode, onMinimize }: { mode: 'practice' | 'game'; onMinimize?: () => void }) {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();

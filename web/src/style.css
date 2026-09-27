@@ -1236,6 +1236,16 @@ section {
   font: inherit;
   cursor: pointer;
 }
+.help-terms {
+  margin: 0;
+}
+.help-terms dt {
+  margin-top: 6px;
+  font-weight: bold;
+}
+.help-terms dd {
+  margin: 0 0 0 1em;
+}
 .help-tiles {
   border-collapse: collapse;
 }
