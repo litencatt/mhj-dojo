@@ -311,6 +311,8 @@ export interface GameEvent {
   type: Exclude<ActionType, 'next'>;
   tile?: Tile; // for a call, the claimed tile; for a kan on your own turn, the kind
   tiles?: Tile[]; // for a call, the seat's own tiles in the meld
+  wall_remaining: number; // live draws left right after the move
+  new_dora_indicators?: Tile[]; // kan dora indicators the move turned over
 }
 
 export type Limit = '' | 'mangan' | 'haneman' | 'baiman' | 'sanbaiman' | 'yakuman';
@@ -399,6 +401,8 @@ export interface GameState {
   last_discard: Tile | null;
   legal: Legal;
   events: GameEvent[];
+  events_from: number; // the round's index of events[0]
+  events_wall_remaining: number; // the wall just before events[0]
   analysis: YakuRow[];
   by_discard: Record<Tile, YakuRow[]>;
   combos: ComboRow[]; // best yaku combinations, at most 5

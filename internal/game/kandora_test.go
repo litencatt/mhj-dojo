@@ -176,3 +176,66 @@ func TestReplayWithDaiminkan(t *testing.T) {
 	}
 	t.Fatal("no round with an open kan")
 }
+
+// Each event's mark is the table around it: an open or concealed kan
+// counts its replacement draw, and a concealed kan its indicator; an open
+// or added kan's indicator comes with the discard after it, and an added
+// kan's replacement draw too. The next seat's draw counts with that seat's
+// own move.
+func TestEventMarks(t *testing.T) {
+	r := daiminkan5z(t, "5z5z5z1111m258p369s")
+	d := r.DrawsLeft() + 1 // before the open kan's replacement draw
+	mustApply(t, r, Action{Seat: 2, Type: Kan, Tile: "1m"})
+	passSafe(t, r, 2)
+	want := []EventMark{{d, d, 0}, {d, d - 1, 0}, {d - 1, d - 2, 2}, {d - 2, d - 2, 2}}
+	if got := r.EventMarks(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("open kan + ankan: marks %v, want %v", got, want)
+	}
+	if r.DrawsLeft() != d-3 {
+		t.Fatalf("draws left %d after the next seat's draw", r.DrawsLeft())
+	}
+
+	r = newRound(t)
+	setPon(r, 0, 2, "7z", "147m258p369s1z", "7z")
+	d = r.DrawsLeft()
+	mustApply(t, r, Action{Seat: 0, Type: Kan, Tile: "7z"})
+	passSafe(t, r, 0)
+	want = []EventMark{{d, d, 0}, {d - 1, d - 1, 1}}
+	if got := r.EventMarks(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("added kan: marks %v, want %v", got, want)
+	}
+	if got := r.Events(); len(got) != len(want) {
+		t.Fatalf("events %v", got)
+	}
+}
+
+// An added kan made right after an open kan, which a seat declines to rob
+// in a later Apply: the marks already logged stay as they were (a client
+// has them), and the open kan's indicator, turned over as the added kan
+// completes, comes with the declarer's discard along with the added kan's.
+func TestEventMarksAfterADeclinedChankan(t *testing.T) {
+	r := daiminkan5z(t, "5z5z5z4p147m258s")
+	p := &r.players[2]
+	p.melds = append([]Called{called("4p", 1, false)}, p.melds...)
+	setHand(r, 3, "123m456m789s23p55s", "") // waits 1p/4p
+	mustApply(t, r, Action{Seat: 2, Type: Kan, Tile: "4p"})
+	if r.Phase() != PhaseCall || !r.LegalFor(3).Ron {
+		t.Fatalf("phase %s legal %+v", r.Phase(), r.LegalFor(3))
+	}
+	sent := r.EventMarks()
+	mustApply(t, r, Action{Seat: 3, Type: Skip})
+	if got := r.EventMarks(); !reflect.DeepEqual(got, sent) {
+		t.Fatalf("marks %v after the declined chankan, were %v", got, sent)
+	}
+	if r.KanDora() != 1 {
+		t.Fatalf("kan dora %d after the added kan completed", r.KanDora())
+	}
+	passSafe(t, r, 2)
+	marks := r.EventMarks()
+	if len(marks) != len(sent)+1 || sent[len(sent)-1].KanDora != 0 || marks[len(sent)].KanDora != 2 {
+		t.Fatalf("marks %v", marks)
+	}
+	if d, _ := indicators(r); d != 3 {
+		t.Fatalf("indicators %d", d)
+	}
+}

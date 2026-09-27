@@ -40,6 +40,8 @@ type State struct {
 	LastDiscard       *string                       `json:"last_discard"` // the tile you may ron
 	Legal             game.Legal                    `json:"legal"`
 	Events            []Event                       `json:"events"`
+	EventsFrom        int                           `json:"events_from"`           // the round's index of events[0]
+	EventsWall        int                           `json:"events_wall_remaining"` // the wall just before events[0]; wall_remaining with none
 	Analysis          []apiview.YakuRow             `json:"analysis"`
 	ByDiscard         map[string][]apiview.YakuRow  `json:"by_discard"`
 	Combos            []apiview.ComboRow            `json:"combos"`
@@ -83,12 +85,17 @@ type RiverTile struct {
 // Event is one move since your previous move: discards, riichi, calls
 // (tile = the claimed tile, tiles = the seat's own tiles in the meld), kans,
 // wins and declarations. Skips and claims that lost to a higher one are not
-// reported.
+// reported. WallRemaining and NewDoraIndicators are the table right after
+// the move (game.EventMark), so a client can replay the moves one by one.
+// The marks never change once sent, so a round's NewDoraIndicators add up
+// to its kan dora indicators.
 type Event struct {
-	Seat  int             `json:"seat"`
-	Type  game.ActionType `json:"type"`
-	Tile  string          `json:"tile,omitempty"`
-	Tiles []string        `json:"tiles,omitempty"`
+	Seat              int             `json:"seat"`
+	Type              game.ActionType `json:"type"`
+	Tile              string          `json:"tile,omitempty"`
+	Tiles             []string        `json:"tiles,omitempty"`
+	WallRemaining     int             `json:"wall_remaining"`
+	NewDoraIndicators []string        `json:"new_dora_indicators,omitempty"` // kan dora turned over by the move
 }
 
 // Standing is a seat's place in the game.
@@ -212,9 +219,13 @@ func (m *Match) state() State {
 		}
 		st.Seats[s] = seat
 	}
-	for _, a := range m.game.Events(m.since) {
-		st.Events = append(st.Events, Event(a))
+	events, marks := m.game.Events(m.since), m.game.Round.EventMarks()
+	from := len(marks) - len(events)
+	st.EventsFrom, st.EventsWall = from, st.WallRemaining
+	if len(events) > 0 {
+		st.EventsWall = marks[from].DrawsBefore
 	}
+	st.Events = reportEvents(events, marks[from:], m.shownKanDora, st.DoraIndicators)
 
 	me := v.Seats[Human]
 	visible := v.Visible()
@@ -252,6 +263,30 @@ func (m *Match) state() State {
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
 	return st
+}
+
+// reportEvents turns events and their marks into the response's events.
+// Each carries the kan dora indicators turned over with it beyond the
+// first `shown`, which the human has already seen. Any turned over after
+// the last mark (an added kan completing once the other seats decline to
+// rob it) go on the last event: the response's new_dora_indicators add up
+// to indicators[1+shown:], and none is reported twice.
+func reportEvents(events []game.Action, marks []game.EventMark, shown int, indicators []string) []Event {
+	out := []Event{}
+	for i, a := range events {
+		mark := marks[i]
+		e := Event{Seat: a.Seat, Type: a.Type, Tile: a.Tile, Tiles: a.Tiles, WallRemaining: mark.DrawsLeft}
+		if mark.KanDora > shown {
+			e.NewDoraIndicators = slices.Clone(indicators[1+shown : 1+mark.KanDora])
+			shown = mark.KanDora
+		}
+		out = append(out, e)
+	}
+	if n := len(out); n > 0 && len(indicators)-1 > shown {
+		last := &out[n-1]
+		last.NewDoraIndicators = append(last.NewDoraIndicators, indicators[1+shown:]...)
+	}
+	return out
 }
 
 // bestRows is the analysis of a hand that must discard before it can win

@@ -101,8 +101,18 @@ test('a CPU game runs in the browser and a reload resumes it', async ({ page }) 
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await expect(handPanel(page)).toBeVisible();
   await expect(page.getByRole('link', { name: '練習へ' })).toBeVisible();
-  for (let i = 0; i < 4; i++) await playOneStep(page);
+  // The table's log keeps the round's moves across your moves (events_from):
+  // it never shrinks within the round (skipping a call adds nothing when
+  // the draw is yours next) and holds at least every discard on the table.
+  const log = page.locator('.event-log li');
+  let logged = await log.count();
+  for (let i = 0; i < 4; i++) {
+    await playOneStep(page);
+    expect(await log.count()).toBeGreaterThanOrEqual(logged);
+    logged = await log.count();
+  }
   await expect(page.locator('.seat-bottom .seat-river .tile')).not.toHaveCount(0);
+  expect(logged).toBeGreaterThanOrEqual(await page.locator('.seat-river .tile').count());
 
   const id = gameId(page);
   expect(id).toBeTruthy();

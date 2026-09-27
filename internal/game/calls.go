@@ -171,11 +171,12 @@ func (r *Round) call(a Action) {
 		r.notePao(a.Seat, from)
 	}
 	r.interrupt()
-	r.events = append(r.events, Action{Seat: a.Seat, Type: a.Type, Tile: t.String(), Tiles: tile.Strings(used)})
+	r.logEvent(Action{Seat: a.Seat, Type: a.Type, Tile: t.String(), Tiles: tile.Strings(used)})
 	r.startTurn(a.Seat)
 	if a.Type == Kan {
 		r.kanSeats = append(r.kanSeats, a.Seat)
 		r.drawRinshan(a.Seat, true)
+		r.markEvent()
 	}
 }
 
@@ -299,7 +300,7 @@ func (r *Round) selfKan(seat int, s string) error {
 		added := pickKind(p.hand, k, 1)
 		p.hand = removeTiles(p.hand, added)
 		tile.Sort(p.hand)
-		r.events = append(r.events, Action{Seat: seat, Type: Kan, Tile: added[0].String()})
+		r.logEvent(Action{Seat: seat, Type: Kan, Tile: added[0].String()})
 		r.lastDiscard = added[0]
 		r.robbing = &pendingKakan{seat: seat, meld: m, tile: added[0]}
 		r.openClaims(seat, true)
@@ -309,10 +310,11 @@ func (r *Round) selfKan(seat int, s string) error {
 	p.hand = removeTiles(p.hand, used)
 	tile.Sort(p.hand)
 	p.melds = append(p.melds, Called{Meld: yaku.Meld{Type: yaku.Trip, Kind: k, Kan: true}, Tiles: used, From: -1})
-	r.events = append(r.events, Action{Seat: seat, Type: Kan, Tile: s})
+	r.logEvent(Action{Seat: seat, Type: Kan, Tile: s})
 	r.interrupt()
 	r.kanSeats = append(r.kanSeats, seat)
 	r.drawRinshan(seat, false)
+	r.markEvent()
 	return nil
 }
 
