@@ -115,7 +115,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 公開サイトは `lolipop-deploy-now` ブランチから公開します。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。リリースには [tagpr](https://github.com/Songmu/tagpr) を使います（`.tagpr`、`.github/workflows/tagpr.yml`）。
 
-1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` を更新します。
+1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` をカテゴリ別（新機能・修正・ドキュメント・CI・リポジトリ・依存関係・その他）に更新します。カテゴリは、各 PR の head ブランチ名の接頭辞から **Label pull requests**（`.github/workflows/labeler.yml`）が付けるラベル（`feat/` → enhancement、`fix/` → bug、`docs/` → documentation、`ci/`/`chore/` → ci/chore、`dependabot/` → dependencies）で決まります。
 2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.0927.0`、次は `v2026.0927.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Release site**（`.github/workflows/release-site.yml`）を実行します。Release site は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行します。そして `lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、ビルドした公開サイト（`web/dist-site`。Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）をコミットして、`lolipop-deploy-now` 向けの PR を作ります。
 3. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
 

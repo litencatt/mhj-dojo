@@ -1,0 +1,36 @@
+name: Label pull requests
+
+# Labels each pull request by its head branch prefix, so the release notes
+# (.github/release.yml) group changes into categories. pull_request_target
+# runs with the base branch's workflow and a token that can write labels,
+# but must never check out the pull request's own code; this workflow
+# doesn't, it only reads github.head_ref and calls the API.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    name: Label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add a label from the head branch prefix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          case "$HEAD_REF" in
+            feat/*) label=enhancement ;;
+            fix/*) label=bug ;;
+            ci/*) label=ci ;;
+            chore/*) label=chore ;;
+            docs/*) label=documentation ;;
+            dependabot/*) label=dependencies ;;
+            *) echo "::notice::No label for head branch $HEAD_REF"; exit 0 ;;
+          esac
+          gh pr edit "$PR" --repo "$REPO" --add-label "$label"
