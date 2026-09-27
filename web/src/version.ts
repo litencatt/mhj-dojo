@@ -5,12 +5,12 @@ import { useEffect, useState } from 'preact/hooks';
 import * as api from './api';
 
 // The static site's build (vite.config.ts, which also writes it to
-// version.json): the commit, an id that changes with anything the build
-// reads, and the build time. The default build is committed and has none of
+// version.json): the commit, the release (if the Release site workflow built
+// it), an id that changes with anything the build reads, and the build time. The default build is committed and has none of
 // them, so it shows the server's version.
 export const SITE_BUILD =
   __MHJDOJO_SITE_VERSION__ !== null && __MHJDOJO_SITE_ID__ !== null && __MHJDOJO_SITE_BUILT__ !== null
-    ? { version: __MHJDOJO_SITE_VERSION__, id: __MHJDOJO_SITE_ID__, built: __MHJDOJO_SITE_BUILT__ }
+    ? { version: __MHJDOJO_SITE_VERSION__, release: __MHJDOJO_SITE_RELEASE__, id: __MHJDOJO_SITE_ID__, built: __MHJDOJO_SITE_BUILT__ }
     : null;
 
 // The bundle's file name (its content hash), e.g. "index-DkR2xq3v": which
