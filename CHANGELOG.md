@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2026.0927.4](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.3...v2026.0927.4) - 2026-09-27
+
+### その他
+- wasmビルドに GOEXPERIMENT=nojsonv2 を適用してサイズ削減 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/102
+- wasm: 静的サイトのpracticeセッション保持数を4に制限 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/103
+- 牌の描画を共有SVGスプライト方式に変更してDOMを削減 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/104
+
 ## [v2026.0927.3](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.2...v2026.0927.3) - 2026-09-27
 
 ### 新機能
