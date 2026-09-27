@@ -145,7 +145,7 @@ func (m *Match) startRound() {
 	} else {
 		m.analyzer = m.analyzer.ForWinds(w)
 	}
-	m.since = 0
+	m.since, m.shownKanDora = 0, 0
 	m.history = nil
 	m.recordHand()
 }
@@ -168,6 +168,10 @@ type Match struct {
 	// since is the number of round events before the human's last move:
 	// the events reported are the moves after it.
 	since int
+	// shownKanDora counts the kan dora indicators turned over before the
+	// human's last move, which the human has seen: the events reported
+	// carry only those turned over since (reportEvents).
+	shownKanDora int
 	// history holds the human's per-yaku shanten at the start and after
 	// each own discard, in order (entry i = after i discards).
 	history []apiview.HistoryEntry
@@ -210,11 +214,11 @@ func (m *Match) Act(a game.Action) (State, error) {
 // act is Act without the state, which a replay (Store.Restore) needs only
 // at its end. Callers hold m.mu.
 func (m *Match) act(a game.Action) error {
-	before := len(m.game.Round.Events())
+	before, shown := len(m.game.Round.Events()), m.game.Round.KanDora()
 	if err := m.game.Act(a); err != nil {
 		return err
 	}
-	m.since = before
+	m.since, m.shownKanDora = before, shown
 	m.actions = append(m.actions, SavedAction{Type: a.Type, Tile: a.Tile, Tiles: slices.Clone(a.Tiles)})
 	return nil
 }

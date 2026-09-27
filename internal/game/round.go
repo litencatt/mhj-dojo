@@ -200,8 +200,9 @@ type Round struct {
 	pendingRiichi bool          // the last discard declared riichi, not yet accepted
 	kanSeats      []int         // who made each kan (四開槓)
 
-	log    []Action // every applied action, for replay
-	events []Action // the moves that happened, without skips and unused claims
+	log    []Action    // every applied action, for replay
+	events []Action    // the moves that happened, without skips and unused claims
+	marks  []EventMark // the table right after each event
 	result *Result
 }
 
@@ -254,6 +255,37 @@ func (r *Round) Log() []Action { return slices.Clone(r.log) }
 // higher one are left out, so they reveal nothing about hidden hands.
 func (r *Round) Events() []Action { return slices.Clone(r.events) }
 
+// EventMark is the table around an event: the live draws left just before
+// it (the mover's own draw taken) and right after it, and the kan dora
+// indicators turned over right after it. A kan's replacement draw, and the
+// indicator a concealed kan turns over at once, count with the kan; the
+// next seat's draw counts with that seat's own move. An added kan counts
+// its replacement draw with the declarer's next move: it completes only
+// once every other seat has passed on robbing it, possibly in a later
+// Apply, and a mark never changes after the Apply that logged its event.
+type EventMark struct {
+	DrawsBefore int
+	DrawsLeft   int
+	KanDora     int
+}
+
+// EventMarks returns the table around each of Events.
+func (r *Round) EventMarks() []EventMark { return slices.Clone(r.marks) }
+
+// logEvent records a move that happened and the table around it.
+func (r *Round) logEvent(a Action) {
+	r.events = append(r.events, a)
+	r.marks = append(r.marks, EventMark{DrawsBefore: r.DrawsLeft()})
+	r.markEvent()
+}
+
+// markEvent brings the last event's mark up to date: an open or concealed
+// kan's replacement draw comes after the kan is logged, in the same Apply.
+func (r *Round) markEvent() {
+	m := &r.marks[len(r.marks)-1]
+	m.DrawsLeft, m.KanDora = r.DrawsLeft(), r.kanDora
+}
+
 // SeatWind returns seat's wind: the dealer is East.
 func (r *Round) SeatWind(seat int) tile.Kind {
 	return tile.East + tile.Kind((seat-r.dealer+4)%4)
@@ -271,6 +303,9 @@ func (r *Round) DrawsLeft() int { return wall.LiveDraws4 - r.kans - r.draws }
 // doraIndicators returns the revealed dora indicators: one plus one per
 // revealed kan dora.
 func (r *Round) doraIndicators() []tile.Tile { return r.wall.DoraIndicatorsN(1 + r.kanDora) }
+
+// KanDora returns how many kan dora indicators are turned over.
+func (r *Round) KanDora() int { return r.kanDora }
 
 // uraIndicators returns the ura-dora indicators under the revealed ones.
 func (r *Round) uraIndicators() []tile.Tile { return r.wall.UraDoraIndicatorsN(1 + r.kanDora) }
@@ -335,9 +370,10 @@ func (r *Round) Apply(a Action) error {
 		}
 		return err
 	case r.phase == PhaseDiscard && a.Type == Tsumo:
-		r.events = append(r.events, a)
+		r.logEvent(a)
 		if err = r.tsumo(a.Seat); err != nil {
 			r.events = r.events[:len(r.events)-1]
+			r.marks = r.marks[:len(r.marks)-1]
 		}
 	case r.phase == PhaseDiscard && a.Type == Kan:
 		r.log = append(r.log, a)
@@ -350,7 +386,7 @@ func (r *Round) Apply(a Action) error {
 			err = fmt.Errorf("%w: kyuushu needs the first uninterrupted turn and nine different terminals and honors", ErrConflict)
 			break
 		}
-		r.events = append(r.events, a)
+		r.logEvent(a)
 		r.finish(&Result{Kind: "abort", Reason: AbortKyuushu, Winner: -1, From: -1})
 	case r.phase == PhaseCall:
 		r.log = append(r.log, a)
@@ -410,7 +446,7 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	if declare {
 		kind = Riichi
 	}
-	r.events = append(r.events, Action{Seat: seat, Type: kind, Tile: s})
+	r.logEvent(Action{Seat: seat, Type: kind, Tile: s})
 	if declare {
 		// Accepted once the discard passes without a ron.
 		p.doubleRiichi = first
@@ -665,7 +701,7 @@ func (r *Round) ron(seat int) error {
 		p.river[len(p.river)-1].Riichi = false
 		r.pendingRiichi = false
 	}
-	r.events = append(r.events, Action{Seat: seat, Type: Ron})
+	r.logEvent(Action{Seat: seat, Type: Ron})
 	pts := score.FromWin(w, seat == r.dealer, false)
 	res := &Result{Kind: "ron", Winner: seat, From: r.turn, Win: &w, Points: pts, WinTile: r.lastDiscard, Pao: r.paoOf(seat, w)}
 	payRon(res, r.dealer)

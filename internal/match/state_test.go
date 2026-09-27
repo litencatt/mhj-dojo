@@ -1,9 +1,11 @@
 package match
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
@@ -83,5 +85,31 @@ func TestCombosAfterCallAreBestDiscard(t *testing.T) {
 	}
 	if got := bestCombos(nil, nil); got == nil || len(got) != 0 {
 		t.Errorf("no discards: %+v, want empty non-nil", got)
+	}
+}
+
+// You make an open kan, then an added kan on its replacement tile, and the
+// CPUs decline to rob it within the same request: completing the added kan
+// turns the open kan's indicator over with no event marked for it
+// (game.EventMark). That response's last event carries it, and your next
+// discard reports only the added kan's own.
+func TestReportEventsAfterADeclinedChankan(t *testing.T) {
+	kan := []game.Action{{Seat: Human, Type: game.Kan, Tile: "5z", Tiles: []string{"5z", "5z", "5z"}}}
+	got := reportEvents(kan, []game.EventMark{{DrawsBefore: 60, DrawsLeft: 59}}, 0, []string{"1m"})
+	if len(got) != 1 || got[0].NewDoraIndicators != nil {
+		t.Fatalf("open kan: %+v", got)
+	}
+	// The added kan's mark stays at no kan dora; the open kan's shows.
+	kakan := []game.Action{{Seat: Human, Type: game.Kan, Tile: "7z"}}
+	got = reportEvents(kakan, []game.EventMark{{DrawsBefore: 59, DrawsLeft: 59}}, 0, []string{"1m", "9m"})
+	if len(got) != 1 || !reflect.DeepEqual(got[0].NewDoraIndicators, []string{"9m"}) {
+		t.Fatalf("added kan: %+v", got)
+	}
+	// Your discard then turns the added kan's over; the open kan's was shown.
+	discard := []game.Action{{Seat: Human, Type: game.Discard, Tile: "2z"}, {Seat: 1, Type: game.Discard, Tile: "3z"}}
+	marks := []game.EventMark{{DrawsBefore: 58, DrawsLeft: 58, KanDora: 2}, {DrawsBefore: 57, DrawsLeft: 57, KanDora: 2}}
+	got = reportEvents(discard, marks, 1, []string{"1m", "9m", "7s"})
+	if !reflect.DeepEqual(got[0].NewDoraIndicators, []string{"7s"}) || got[1].NewDoraIndicators != nil {
+		t.Fatalf("discard: %+v", got)
 	}
 }
