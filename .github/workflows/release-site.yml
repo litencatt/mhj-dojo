@@ -192,16 +192,3 @@ jobs:
               --title "Release ${TAG:-$SHORT ($(TZ=Asia/Tokyo date +%Y-%m-%d))} to Deploy Now" --body-file "$RUNNER_TEMP/body.md")
           fi
           echo "Release pull request: $url" >> "$GITHUB_STEP_SUMMARY"
-
-      # TODO(one human merge per release, tracked for follow-up): for a
-      # tagged release only, merge $BRANCH with a merge commit here (the
-      # site E2E above already covers this exact commit) so a release needs
-      # one human merge, not two; a manual run without a tag should still
-      # just leave the pull request open for a human. A merge by GITHUB_TOKEN
-      # doesn't trigger other workflows, but that's fine here: Deploy Now is
-      # external and reacts to the branch push via its GitHub App, not a
-      # workflow. A follow-up post-deploy verification job (polling
-      # https://mhj-dojo.lolipop-now.app/version.json until it reports the
-      # tag, then running web/e2e-live/smoke.spec.ts via `npm run e2e:live`,
-      # already added in this change) should then run only when this step
-      # actually merged.
