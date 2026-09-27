@@ -217,7 +217,6 @@ func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	for _, ind := range s.wall.DoraIndicators() {
 		dora = append(dora, tile.DoraFromIndicator(ind.Kind))
 	}
-	s.resetAnalyzerIfFull()
 	n.advice = advice.Compute(advice.Input{
 		Tiles: tiles, Visible: s.visibleAt(n, path), Dora: dora, Turn: n.turn, MaxTurns: s.maxTurns,
 		ByDiscard: n.byDiscard, Han: func(key string) int { return yaku.HanFor(key, winds) }, Analyzer: s.analyzer,

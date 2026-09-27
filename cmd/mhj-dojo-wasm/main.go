@@ -39,7 +39,7 @@ import (
 // maxSessions bounds the engine's in-memory sessions much tighter than the
 // native server's session.MaxSessions (256): this runs in a browser tab's
 // memory, and each practice session (its branch tree plus its own
-// yakushanten.Analyzer memo) can hold several MB, never released by Go's
+// yakushanten.Analyzer memo) can hold up to ~8 MiB, never released by Go's
 // wasm runtime back to the OS (docs/api.md "Memory"). 4 is enough for the
 // one game actually being played plus room to return to a couple of others
 // by URL without forcing a rebuild; web/e2e-site/practice.spec.ts asserts
@@ -48,8 +48,8 @@ const maxSessions = 4
 
 // maxGames bounds the engine's in-memory games the same way, much tighter
 // than the native server's match.MaxGames (256): a game holds its analyzer
-// memo and the CPU players' shanten memo, a couple of MB after a 半荘戦
-// (docs/api.md "Memory"). 2 keeps the game being played plus one more; an
+// memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and ~9 MiB
+// at most (docs/api.md "Memory"). 2 keeps the game being played plus one more; an
 // evicted game is rebuilt from its save (mhjDojoRestoreGame).
 const maxGames = 2
 
