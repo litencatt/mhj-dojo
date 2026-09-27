@@ -10,7 +10,7 @@ function localTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** The build in the header: a released site's version (e.g. "v2026.09.27.0"), otherwise the commit and its date in the viewer's time zone (e.g. "abc1234 · 2026-09-26"); details in its title. */
+/** The build in the header: a released site's version (e.g. "v2026.0927.0"), otherwise the commit and its date in the viewer's time zone (e.g. "abc1234 · 2026-09-26"); details in its title. */
 export function VersionTag() {
   const v = useVersion();
   if (!v) return null;

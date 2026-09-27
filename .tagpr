@@ -1,12 +1,13 @@
 # tagpr (https://github.com/Songmu/tagpr, .github/workflows/tagpr.yml): keeps a
 # release pull request open on main that updates CHANGELOG.md. Merging it tags
-# the release (v2026.09.27.0: the date in Japan and the number of the release
-# that day, from 0), creates the GitHub Release, and opens the site release
+# the release (v2026.0927.0: the date in Japan and the number of the release
+# that day, from 0; three parts, as tagpr's CHANGELOG headings read only
+# three), creates the GitHub Release, and opens the site release
 # pull request into lolipop-deploy-now (.github/workflows/release-site.yml).
 [tagpr]
 	vPrefix = true
 	releaseBranch = main
 	versionFile = -
-	calendarVersioning = YYYY.0M.0D.MICRO
+	calendarVersioning = YYYY.0M0D.MICRO
 	changelog = true
 	release = true

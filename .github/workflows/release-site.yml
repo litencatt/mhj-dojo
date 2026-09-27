@@ -5,7 +5,7 @@ name: Release site
 # watches it (framework: static, no install or build command, output
 # directory web/dist-site) and publishes each merge into it.
 #
-# tagpr.yml calls this with the tag of each release (v2026.09.27.0), right
+# tagpr.yml calls this with the tag of each release (v2026.0927.0), right
 # after tagpr creates it; it can also be run by hand, for a tag or for main
 # as it is (no release version then).
 #
@@ -24,13 +24,13 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: The release tag to build (e.g. v2026.09.27.0)
+        description: The release tag to build (e.g. v2026.0927.0)
         type: string
         required: true
   workflow_dispatch:
     inputs:
       tag:
-        description: The release tag to build (e.g. v2026.09.27.0); empty for main as it is
+        description: The release tag to build (e.g. v2026.0927.0); empty for main as it is
         type: string
         required: false
 

@@ -8,5 +8,5 @@ declare const __MHJDOJO_SITE_VERSION__: string | null;
 declare const __MHJDOJO_SITE_ID__: string | null;
 /** When the site was built (ISO 8601). */
 declare const __MHJDOJO_SITE_BUILT__: string | null;
-/** The release the site was built as (e.g. v2026.09.27.0), or null outside the Release site workflow. */
+/** The release the site was built as (e.g. v2026.0927.0), or null outside the Release site workflow. */
 declare const __MHJDOJO_SITE_RELEASE__: string | null;
