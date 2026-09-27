@@ -9,8 +9,17 @@
 // and replayed when the page asks for one the worker doesn't hold. The
 // replayed one keeps the id the page knows it by (its public id), whatever id
 // the engine gave it this time, so URLs and bookmarks keep working.
+//
+// Each tab runs its own worker, but the saves are shared: only one tab at a
+// time plays a session or game (singleTab.ts). A tab another one stopped
+// neither asks its engine about that one nor saves it, even for a request
+// the engine was already working on, and drops its copy, so that taking the
+// session or game back rebuilds it from the other tab's save. That save may
+// come from a newer version of the site than this tab runs: one this tab's
+// engine can't rebuild is kept, and the page asked to reload.
 
 import type { GameState, SessionState } from './api';
+import { lease, live, onChange, settled, STOPPED, STOPPED_MESSAGE } from './singleTab';
 
 export interface WasmResponse {
   status: number;
@@ -172,23 +181,42 @@ function trim<T extends { used: number }>(saved: Record<string, T>, max: number)
   for (const id of ids.slice(max)) delete saved[id];
 }
 
-function saveSession(publicId: string, st: SessionState) {
+// Each session's save as this tab last built it (by public id), kept even
+// when storage refuses to write it: a state's new moves are added to it,
+// not to the save read back from localStorage, which may have fallen
+// behind. A session this tab hasn't built one for since it was rebuilt from
+// a save (or another tab took it over) has none.
+const built = new Map<string, Saved>();
+
+// Saves a session from its state, whose tree holds the nodes from treeFrom
+// on (docs/api.md "View options"): the moves that made the nodes before
+// come from its last built save. Returns false, saving nothing, when the
+// moves then don't add up to the session's whole tree (none built yet).
+function saveSession(publicId: string, st: SessionState, treeFrom: number): boolean {
+  const old = built.get(publicId);
+  const made = [...st.tree]
+    .sort((a, b) => a.node_id - b.node_id)
+    .filter((n) => n.parent_id !== null)
+    .map((n) => (n.status === 'tsumo' ? { parent: n.parent_id ?? 0 } : { parent: n.parent_id ?? 0, tile: n.discard ?? '' }));
+  // Node i+1 was made by moves[i].
+  const before = Math.max(treeFrom - 1, 0);
+  let moves = made;
+  if (before > 0) {
+    if (!old || old.seed !== st.seed || old.max_turns !== st.max_turns || old.moves.length < before) return false;
+    moves = [...old.moves.slice(0, before), ...made];
+  }
+  if (moves.length !== st.node_count - 1) return false;
+  const saved = { seed: st.seed, max_turns: st.max_turns, moves, current: st.node_id, used: Date.now() };
+  built.set(publicId, saved);
   const sessions = loadAll();
-  sessions[publicId] = {
-    seed: st.seed,
-    max_turns: st.max_turns,
-    moves: [...st.tree]
-      .sort((a, b) => a.node_id - b.node_id)
-      .slice(1)
-      .map((n) => (n.status === 'tsumo' ? { parent: n.parent_id ?? 0 } : { parent: n.parent_id ?? 0, tile: n.discard ?? '' })),
-    current: st.node_id,
-    used: Date.now(),
-  };
+  sessions[publicId] = saved;
   trim(sessions, MAX_SAVED);
   storeAll(sessions, publicId);
+  return true;
 }
 
 function forgetSession(publicId: string) {
+  built.delete(publicId);
   const sessions = loadAll();
   delete sessions[publicId];
   storeAll(sessions);
@@ -244,7 +272,12 @@ interface Kind {
   noun: string; // as in the engine's "not found: session ..." errors
   restoreFn: 'restore' | 'restoreGame';
   saved: (publicId: string) => string | null; // the restore body
-  save: (publicId: string, res: WasmResponse) => void;
+  // Notes the save the engine was just rebuilt from, or (null) that this
+  // tab's copy is out of date: another tab took it over.
+  rebuilt: (publicId: string, saved: string | null) => void;
+  // Saves a successful response, made with the request's query; false if
+  // it can't (see saveSession).
+  save: (publicId: string, res: WasmResponse, query: string) => boolean;
   forget: (publicId: string) => void;
   idOf: (data: unknown) => string;
   setId: (data: unknown, id: string) => void;
@@ -252,6 +285,9 @@ interface Kind {
   publicOf: Map<string, string>; // engine id → public id
   known: Set<string>; // engine ids the current worker holds
   failures: Map<string, number>; // public id → restores in a row the engine failed (500)
+  // Public ids whose save another tab has written since this tab last
+  // rebuilt it (it took them over). Kept across workers.
+  foreign: Set<string>;
 }
 
 const kinds: Kind[] = [
@@ -259,11 +295,17 @@ const kinds: Kind[] = [
     base: SESSIONS,
     noun: 'session',
     restoreFn: 'restore',
+    // This tab's own last save first: storage may have refused it.
     saved: (id) => {
-      const s = loadAll()[id];
+      const s = built.get(id) ?? loadAll()[id];
       return s ? JSON.stringify(s) : null;
     },
-    save: (id, res) => saveSession(id, res.data as SessionState),
+    rebuilt: (id, saved) => {
+      if (saved === null) built.delete(id);
+      else built.set(id, JSON.parse(saved) as Saved);
+    },
+    save: (id, res, query) =>
+      saveSession(id, res.data as SessionState, Number(new URLSearchParams(query).get('tree_from') ?? 0)),
     forget: forgetSession,
     idOf: (d) => (d as SessionState).session_id,
     setId: (d, id) => ((d as SessionState).session_id = id),
@@ -271,6 +313,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    foreign: new Set(),
   },
   {
     base: GAMES,
@@ -280,9 +323,11 @@ const kinds: Kind[] = [
       const g = loadGames()[id];
       return typeof g?.save === 'string' ? g.save : null;
     },
+    rebuilt: () => {},
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
       if (res.save) saveGame(id, res.save);
+      return true;
     },
     forget: forgetGame,
     idOf: (d) => (d as GameState).game_id,
@@ -291,6 +336,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    foreign: new Set(),
   },
 ];
 
@@ -302,18 +348,40 @@ function forgetEngine() {
   }
 }
 
-// The kind and id in a {base}/{id}[/op] path, and the path with the id
-// swapped for another.
-function splitPath(path: string): { kind: Kind; id: string; with: (id: string) => string } | null {
+// The kind and id in a {base}/{id}[/op] path (no query), the path with the
+// id swapped for another, and its singleTab key ({base}/{id}).
+function splitPath(path: string): { kind: Kind; id: string; with: (id: string) => string; key: string } | null {
   for (const kind of kinds) {
     if (!path.startsWith(`${kind.base}/`)) continue;
     const m = /^([^/]+)(\/.*)?$/.exec(path.slice(kind.base.length + 1));
     if (!m) return null;
     const id = decodeURIComponent(m[1]);
-    return { kind, id, with: (other) => `${kind.base}/${encodeURIComponent(other)}${m[2] ?? ''}` };
+    return {
+      kind,
+      id,
+      with: (other) => `${kind.base}/${encodeURIComponent(other)}${m[2] ?? ''}`,
+      key: `${kind.base}/${m[1]}`,
+    };
   }
   return null;
 }
+
+// Another tab took over a session or game: the copy in this tab's engine is
+// out of date from now on, and taking it back rebuilds it from the save.
+onChange((key, stopped) => {
+  const target = stopped && splitPath(key);
+  if (!target) return;
+  target.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
+  target.kind.foreign.add(target.id);
+  target.kind.rebuilt(target.id, null);
+});
+
+// The answer to a request on a session or game another tab has taken over.
+const stoppedResponse = (): WasmResponse => ({ status: STOPPED, data: { error: STOPPED_MESSAGE } });
+
+// The answer when this tab's engine can't rebuild another tab's save (most
+// likely that tab runs a newer version of the site).
+const NEWER_SAVE = '別の画面で新しい版に保存されています。再読み込みしてください';
 
 const MAX_RESTORE_FAILURES = 2;
 
@@ -324,13 +392,23 @@ const MAX_RESTORE_FAILURES = 2;
 // other failure (the engine broke) keeps the save for the next try, unless
 // the engine failed on it MAX_RESTORE_FAILURES times in a row: the save may
 // be what breaks it, so it is dropped (the error is still returned).
-async function restore(kind: Kind, publicId: string): Promise<WasmResponse | null> {
+// A save another tab wrote (foreign) is never dropped: any failure is a
+// 409 asking for a reload, as that tab may run a newer engine. Should
+// another tab take it over meanwhile (stopped), none of this is done: that
+// tab's save is its own, and this tab's copy is out of date.
+async function restore(kind: Kind, publicId: string, query: string, stopped: () => boolean): Promise<WasmResponse | null> {
+  // Once the tab this one just took it from has stopped saving it; the
+  // engine starts meanwhile.
+  await Promise.all([settled(`${kind.base}/${encodeURIComponent(publicId)}`), start()]);
   const saved = kind.saved(publicId);
   if (saved === null) return null;
-  const res = await call(kind.restoreFn, saved);
+  // A session's rebuilt state answers with the request's view options.
+  const res = await (kind.restoreFn === 'restore' ? call('restore', saved, query) : call('restoreGame', saved));
+  if (stopped()) return stoppedResponse();
   if (res.status === 200) {
     const id = kind.idOf(res.data);
-    // The copy it replaces (evicted, or in a stopped worker) is gone.
+    // The copy it replaces (evicted, out of date, or in a stopped worker) is
+    // gone; one left in the engine goes when the engine evicts it.
     const old = kind.engineOf.get(publicId);
     if (old !== undefined) {
       kind.publicOf.delete(old);
@@ -340,6 +418,10 @@ async function restore(kind: Kind, publicId: string): Promise<WasmResponse | nul
     kind.publicOf.set(id, publicId);
     kind.known.add(id);
     kind.failures.delete(publicId);
+    kind.foreign.delete(publicId);
+    kind.rebuilt(publicId, saved);
+  } else if (kind.foreign.has(publicId)) {
+    return { status: 409, data: { error: NEWER_SAVE } };
   } else if ([400, 404, 409, 422].includes(res.status)) {
     kind.failures.delete(publicId);
     kind.forget(publicId);
@@ -360,31 +442,45 @@ let queue: Promise<unknown> = Promise.resolve();
 /**
  * Answers an API request (method, path and JSON body as for the server) from
  * the engine. A request for a saved session or game that the engine doesn't
- * hold (the page was reloaded, the engine restarted, or it evicted it) first
- * rebuilds it from localStorage; if its save is unusable the request gets the
- * engine's 404 and the page deals afresh from the URL's seed, as the local
- * version does after a server restart.
+ * hold (the page was reloaded, the engine restarted, it evicted it, or
+ * another tab took it over and gave it back) first rebuilds it from
+ * localStorage; if its save is unusable the request gets the engine's 404 and
+ * the page deals afresh from the URL's seed, as the local version does after
+ * a server restart. One another tab has taken over (singleTab.ts) gets a 423,
+ * and neither the engine nor the save sees it.
  */
 export function wasmRequest(method: string, path: string, body?: string): Promise<WasmResponse> {
+  // Whether another tab has taken the session or game over since the
+  // request was made: checked as it starts, and before anything is saved.
+  const key = splitPath(path.split('?', 1)[0])?.key;
+  const l = key === undefined ? 0 : lease(key);
+  const stopped = () => key !== undefined && !live(key, l);
   // One request at a time, in order: two requests for something the engine
   // doesn't hold would otherwise each rebuild it, and the second copy would
   // lose the first one's move. The worker runs one call at a time anyway.
-  const res = queue.then(() => answer(method, path, body));
+  const res = queue.then(() => answer(method, path, body, stopped));
   queue = res.catch(() => undefined);
   return res;
 }
 
-async function answer(method: string, path: string, body?: string): Promise<WasmResponse> {
+async function answer(
+  method: string,
+  fullPath: string,
+  body: string | undefined,
+  stopped: () => boolean,
+): Promise<WasmResponse> {
+  if (stopped()) return stoppedResponse();
+  const [path, query = ''] = fullPath.split('?', 2);
   const target = splitPath(path);
   const kind = target?.kind ?? kinds.find((k) => path === k.base);
   const send = () => {
     const engineId = target && target.kind.engineOf.get(target.id);
-    return call('request', method, target && engineId ? target.with(engineId) : path, body ?? '');
+    return call('request', method, target && engineId ? `${target.with(engineId)}${query ? `?${query}` : ''}` : fullPath, body ?? '');
   };
   const isGet = target !== null && method === 'GET' && path === target.with(target.id);
   let res: WasmResponse | null = null;
   if (target && !target.kind.known.has(target.kind.engineOf.get(target.id) ?? target.id)) {
-    const r = await restore(target.kind, target.id);
+    const r = await restore(target.kind, target.id, query, stopped);
     // A GET is answered by the rebuilt state itself.
     if (r && (r.status !== 200 || isGet)) res = r;
   }
@@ -392,16 +488,23 @@ async function answer(method: string, path: string, body?: string): Promise<Wasm
   if (target && res.status === 404 && (res.data as { error?: string })?.error?.startsWith(`not found: ${target.kind.noun} `)) {
     // The engine no longer holds what it had (evicted): rebuild it.
     target.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
-    const r = await restore(target.kind, target.id);
+    const r = await restore(target.kind, target.id, query, stopped);
     if (r && (r.status !== 200 || isGet)) res = r;
     else if (r) res = await send();
   }
+  // Taken over while the engine worked on it: the other tab's save stands.
+  if (stopped()) return stoppedResponse();
   if (kind && res.status === 200) {
     const engineId = kind.idOf(res.data);
     kind.known.add(engineId);
     const publicId = kind.publicOf.get(engineId) ?? engineId;
     kind.setId(res.data, publicId);
-    kind.save(publicId, res);
+    if (!kind.save(publicId, res, query)) {
+      // The save fell behind the tree: save it from the whole tree.
+      const whole = await call('request', 'GET', `${kind.base}/${encodeURIComponent(engineId)}?advice=0`, '');
+      if (stopped()) return stoppedResponse();
+      if (whole.status === 200) kind.save(publicId, whole, '');
+    }
   } else if (target && res.status !== 200) {
     // Error messages name the engine's id; show the page's instead.
     const engineId = target.kind.engineOf.get(target.id);

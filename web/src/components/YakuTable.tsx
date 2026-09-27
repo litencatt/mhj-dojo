@@ -1,5 +1,6 @@
+import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { ComboRow, UkeireEntry, YakuRow } from '../api';
+import type { ComboRow, Remaining, Tile as TileCode, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
 import { useMediaQuery } from '../hooks';
@@ -23,7 +24,9 @@ export interface YakuTableProps {
   previewTile: string | null;
   combos: ComboRow[]; // yaku combinations of the shown hand (the preview while previewing)
   baseCombos: ComboRow[] | null; // the current node's combos while previewing
+  remaining: Remaining; // unseen copies of each ukeire tile
   onMinimize?: () => void;
+  minimized?: boolean; // in the dock: the filter is kept, nothing is drawn
 }
 
 function shantenLabel(s: number | null): string {
@@ -41,16 +44,19 @@ function deltaLabel(cur: number | null, base: number | null): { text: string; cl
   return { text: d < 0 ? `${d}` : `+${d}`, cls: d < 0 ? 'delta-improve' : d > 0 ? 'delta-worse' : 'delta-flat' };
 }
 
-function UkeireCell({ ukeire }: { ukeire: UkeireEntry[] }) {
+function UkeireCell({ ukeire, remaining }: { ukeire: TileCode[]; remaining: Remaining }) {
   if (ukeire.length === 0) return <span class="muted">—</span>;
   return (
     <div class="ukeire-tiles">
-      {ukeire.map((u) => (
-        <div key={u.tile} class={`ukeire-item ${u.remaining === 0 ? 'ukeire-item-zero' : ''}`}>
-          <Tile tile={u.tile} size="xs" dimmed={u.remaining === 0} />
-          <span class="ukeire-count">{u.remaining}</span>
-        </div>
-      ))}
+      {ukeire.map((tile) => {
+        const left = remaining[tile] ?? 0;
+        return (
+          <div key={tile} class={`ukeire-item ${left === 0 ? 'ukeire-item-zero' : ''}`}>
+            <Tile tile={tile} size="xs" dimmed={left === 0} />
+            <span class="ukeire-count">{left}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -63,7 +69,7 @@ function isTenpai(shanten: number | null): boolean {
 /** 複合役: the best combinations of yaku one hand can score together, ranked
  * by the server (docs/api.md "Yaku combos"). While previewing, a combination
  * the current node also lists shows its shanten delta. */
-function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | null }) {
+function ComboTable({ combos, base, remaining }: { combos: ComboRow[]; base: ComboRow[] | null; remaining: Remaining }) {
   if (combos.length === 0) return null;
   const baseByName = new Map((base ?? []).map((c) => [c.name, c]));
   return (
@@ -95,7 +101,7 @@ function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | n
                   {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
                 </td>
                 <td class="ukeire-cell">
-                  <UkeireCell ukeire={c.ukeire} />
+                  <UkeireCell ukeire={c.ukeire} remaining={remaining} />
                 </td>
                 <td class="ukeire-total-cell">{c.ukeire_total}</td>
               </tr>
@@ -111,8 +117,8 @@ function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | n
  * discard) that candidate's resulting analysis with deltas vs the current node.
  * A filter bar narrows and sorts the rows by the current values, so rows do not
  * jump while previewing. The normal row always comes first. */
-export function YakuTable(props: YakuTableProps) {
-  const { rows, baseline, previewTile, combos, baseCombos, onMinimize } = props;
+export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
+  const { rows, baseline, previewTile, combos, baseCombos, remaining, onMinimize, minimized } = props;
   const [filter, setFilterState] = useState<YakuFilter>(loadFilter);
   const setFilter = (f: YakuFilter) => {
     setFilterState(f);
@@ -151,6 +157,8 @@ export function YakuTable(props: YakuTableProps) {
     window.addEventListener('scroll', close, true);
     return () => window.removeEventListener('scroll', close, true);
   }, [tip]);
+
+  if (minimized) return null;
 
   const current = baseline ?? rows; // filter/sort by the current node, not the preview
   const shown = new Map(rows.map((r) => [r.key, r]));
@@ -194,7 +202,7 @@ export function YakuTable(props: YakuTableProps) {
           {delta && <span class={`delta ${delta.cls}`}>{delta.text}</span>}
         </td>
         <td class="ukeire-cell">
-          <UkeireCell ukeire={row.ukeire} />
+          <UkeireCell ukeire={row.ukeire} remaining={remaining} />
         </td>
         <td class="ukeire-total-cell">{row.ukeire_total}</td>
       </tr>
@@ -212,7 +220,7 @@ export function YakuTable(props: YakuTableProps) {
       <PanelHeading title="役別向聴" onMinimize={onMinimize}>
         {previewTile && <span class="preview-note"> — {tileName(previewTile)} を打牌した場合のプレビュー</span>}
       </PanelHeading>
-      {!phone && <ComboTable combos={combos} base={baseCombos} />}
+      {!phone && <ComboTable combos={combos} base={baseCombos} remaining={remaining} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
           {!phone && (
@@ -318,4 +326,4 @@ export function YakuTable(props: YakuTableProps) {
       </div>
     </section>
   );
-}
+});

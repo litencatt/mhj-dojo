@@ -1,6 +1,9 @@
 package tile
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestParseFormatRoundTrip(t *testing.T) {
 	ts, err := ParseHand("123m0p55p789s1234567z")
@@ -87,5 +90,24 @@ func TestCountsString(t *testing.T) {
 	}
 	if c.Total() != 7 {
 		t.Fatalf("total %d", c.Total())
+	}
+}
+
+// TestStringTables checks the string tables against the formatting they
+// replace.
+func TestStringTables(t *testing.T) {
+	for k := Kind(0); k < NumKinds; k++ {
+		if got, want := k.String(), fmt.Sprintf("%d%c", k.Num(), suitChars[k.Suit()]); got != want {
+			t.Errorf("kind %d: %q, want %q", k, got, want)
+		}
+		for _, red := range []bool{false, true} {
+			want := k.String()
+			if red {
+				want = fmt.Sprintf("0%c", suitChars[k.Suit()])
+			}
+			if got := (Tile{Kind: k, Red: red}).String(); got != want {
+				t.Errorf("tile %d red %v: %q, want %q", k, red, got, want)
+			}
+		}
 	}
 }

@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import { useState } from 'preact/hooks';
 import { PanelHeading } from './PanelHeading';
 
@@ -105,9 +106,16 @@ const GROUPS: Group[] = [
   },
 ];
 
+export interface GlossaryProps {
+  mode: 'practice' | 'game';
+  onMinimize?: () => void;
+  minimized?: boolean; // in the dock: the search text is kept, nothing is drawn
+}
+
 /** 用語表: short explanations of the mahjong terms used on the page, filterable. The app's own terms (seed, turns, the yaku table's columns) are in the help. */
-export function Glossary({ mode, onMinimize }: { mode: 'practice' | 'game'; onMinimize?: () => void }) {
+export const Glossary = memo(function Glossary({ mode, onMinimize, minimized }: GlossaryProps) {
   const [query, setQuery] = useState('');
+  if (minimized) return null;
   const q = query.trim().toLowerCase();
   const groups = GROUPS.map((g) => {
     const terms = g.terms.flatMap((t) => {
@@ -150,4 +158,4 @@ export function Glossary({ mode, onMinimize }: { mode: 'practice' | 'game'; onMi
       ))}
     </section>
   );
-}
+});

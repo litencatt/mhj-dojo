@@ -129,6 +129,282 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
     await expect(p.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(n);
     await expect(p.locator('.error-banner')).toHaveCount(0);
   }
+  // Different sessions: neither tab stops the other.
+  await discardDrawn(page);
+  await discardDrawn(other);
+  for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
+});
+
+// One tab at a time plays a session (src/singleTab.ts): the newest tab to
+// open it wins, and the one before stops until taken back.
+function stoppedDialog(page: Page) {
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
+}
+
+function savedMoves(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
+      sessions: Record<string, { moves: unknown[] }>;
+    } | null;
+    return s?.sessions[id!]?.moves.length;
+  }, new URL(page.url()).searchParams.get('session'));
+}
+
+test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
+  await page.goto('./?seed=21&turns=18');
+  await discardDrawn(page);
+  await expect(page).toHaveURL(/[?&]session=/);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  const handA = page.getByRole('region', { name: '手牌' });
+  const handB = other.getByRole('region', { name: '手牌' });
+  await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
+
+  // A stops: the dialog covers it.
+  await expectStopped(page);
+  await expect(stoppedDialog(other)).toHaveCount(0);
+
+  // B plays on and saves.
+  await discardDrawn(other);
+  await discardDrawn(other);
+  expect(await savedMoves(other)).toBe(3);
+
+  // A takes it back, from where B left it; now B stops.
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
+  expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
+  expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
+  await expectStopped(other);
+  await discardDrawn(page);
+  expect(await savedMoves(page)).toBe(4);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+
+  // 閉じる: a tab the page did not open stays open, with a hint.
+  await stoppedDialog(other).getByRole('button', { name: '閉じる' }).click();
+  await expect(stoppedDialog(other)).toContainText('このタブはそのまま閉じてかまいません');
+  expect(other.isClosed()).toBe(false);
+});
+
+test('an answer that comes after the tab stopped is neither shown nor saved', async ({ page, context }) => {
+  await page.goto('./?seed=24&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const handA = page.getByRole('region', { name: '手牌' });
+  await expect(handA.locator('.hand-drawn button')).toBeEnabled();
+  // A's engine holds its next move until released.
+  const worker = page.workers()[0];
+  await worker.evaluate(() => {
+    const w = self as unknown as { held: boolean };
+    w.held = true;
+    const orig = self.onmessage!;
+    self.onmessage = async (e: MessageEvent) => {
+      if (e.data.fn === 'request' && e.data.args[0] === 'POST') {
+        while (w.held) await new Promise((r) => setTimeout(r, 10));
+      }
+      return orig.call(self, e);
+    };
+  });
+  await handA.locator('.hand-drawn button').click();
+
+  // B opens the session meanwhile, from the save without A's move, and
+  // plays two moves of its own.
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expectStopped(page);
+  await expect(stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' })).toBeDisabled();
+  await discardDrawn(other);
+  await discardDrawn(other);
+  expect(await savedMoves(other)).toBe(2);
+
+  // A's move is answered now: B's save stands, and A shows nothing new.
+  await worker.evaluate(() => {
+    (self as unknown as { held: boolean }).held = false;
+  });
+  const resume = stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' });
+  await expect(resume).toBeEnabled();
+  expect(await savedMoves(page)).toBe(2);
+  await expect(handA.locator('.discard-river')).toHaveCount(0);
+
+  await resume.click();
+  await expect(handA.locator('.discard-river .tile')).toHaveCount(2);
+  expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('a new session lets go of the one before', async ({ page, context }) => {
+  await page.goto('./?seed=25&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const first = page.url();
+  await page.locator('.new-game-form input[type="number"]').first().fill('26');
+  await page.getByRole('button', { name: '新規対局' }).click();
+  await expect(page).not.toHaveURL(first);
+  await expect(page).toHaveURL(/[?&]seed=26(&|$)/);
+
+  const other = await context.newPage();
+  await other.goto(first);
+  await discardDrawn(other);
+  await discardDrawn(page);
+  for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
+});
+
+// Makes page drop the singleTab messages that arrive while deaf (setDeaf),
+// as a frozen tab, or one in the back/forward cache, would miss them.
+async function deafen(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { deaf: boolean };
+    w.deaf = false;
+    const Channel = BroadcastChannel;
+    window.BroadcastChannel = class extends Channel {
+      set onmessage(fn: ((e: MessageEvent) => void) | null) {
+        super.onmessage = fn && ((e: MessageEvent) => void (w.deaf || fn.call(this, e)));
+      }
+      get onmessage() {
+        return super.onmessage;
+      }
+    };
+  });
+}
+
+async function setDeaf(page: Page, deaf: boolean) {
+  await page.evaluate((d) => ((window as unknown as { deaf: boolean }).deaf = d), deaf);
+}
+
+// A tab that missed the claim (frozen, say) checks again as it comes back
+// into view, and stops then.
+test('a tab that missed another tab opening its session stops when shown again', async ({ page, context }) => {
+  await deafen(page);
+  await page.goto('./?seed=27&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await setDeaf(page, true);
+
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await page.waitForTimeout(300);
+  await expect(stoppedDialog(page)).toHaveCount(0);
+
+  await setDeaf(page, false);
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expectStopped(page);
+  await expect(stoppedDialog(other)).toHaveCount(0);
+});
+
+// Even with the newer tab gone, the tab that missed it must not play on its
+// out-of-date copy: the claim recorded in localStorage stops it.
+test('a tab back from the back/forward cache after the newer tab closed stops', async ({ page, context }) => {
+  await deafen(page);
+  await page.goto('./?seed=28&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await setDeaf(page, true);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await discardDrawn(other);
+  await discardDrawn(other);
+  await other.close();
+  await setDeaf(page, false);
+
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expectStopped(page);
+  expect(await savedMoves(page)).toBe(2);
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(2);
+  await discardDrawn(page);
+  expect(await savedMoves(page)).toBe(3);
+});
+
+test('a move on a tab that missed being stopped is not made', async ({ page, context }) => {
+  await deafen(page);
+  await page.goto('./?seed=29&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const handA = page.getByRole('region', { name: '手牌' });
+  await expect(handA.locator('.hand-drawn button')).toBeEnabled();
+  await setDeaf(page, true);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await discardDrawn(other);
+  await discardDrawn(other);
+  await other.close();
+
+  await handA.locator('.hand-drawn button').click();
+  await expectStopped(page);
+  await expect(handA.locator('.discard-river')).toHaveCount(0);
+  expect(await savedMoves(page)).toBe(2);
+});
+
+test('a tab stopped while it loads shows the dialog, and can take the session back', async ({ page, context }) => {
+  await page.goto('./?seed=30&turns=18');
+  await discardDrawn(page);
+  const url = page.url();
+  // B's engine is slow to load.
+  const other = await context.newPage();
+  let release = () => {};
+  const loaded = new Promise<void>((r) => (release = r));
+  await other.route('**/mhj-dojo.wasm*', async (route) => {
+    await loaded;
+    await route.continue();
+  });
+  await other.goto(url);
+  await expectStopped(page);
+
+  // A takes it back before B has shown anything: B stops, with no state.
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+  await expectStopped(other);
+  release();
+  await expect(stoppedDialog(other).getByRole('button', { name: 'このタブで続ける' })).toBeEnabled();
+  await expect(other.getByRole('region', { name: '手牌' })).toHaveCount(0);
+  await discardDrawn(page);
+
+  await stoppedDialog(other).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(2);
+  await expectStopped(page);
+  expect(await savedMoves(other)).toBe(2);
+});
+
+// The claims themselves, sent from another page of the site: of two claims
+// with the same time the tab id decides, and a tab holding the newer claim
+// answers an older one with its own.
+test('crossing claims: the newer wins, the tab id breaking a tie', async ({ page, context }) => {
+  await page.goto('./?seed=31&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  const key = `/api/sessions/${encodeURIComponent(new URL(page.url()).searchParams.get('session')!)}`;
+  type Claim = { key: string; tab: string; at: number; stopped?: true };
+  const mine = await page.evaluate((k) => (JSON.parse(localStorage.getItem('mhj-dojo.tabs')!) as Record<string, Claim>)[k], key);
+  expect(mine.tab).toBeTruthy();
+
+  const helper = await context.newPage();
+  await helper.goto('./icon.svg');
+  const post = (m: Claim) =>
+    helper.evaluate(
+      (m) =>
+        new Promise<Claim[]>((resolve) => {
+          const ch = new BroadcastChannel('mhj-dojo.tabs');
+          const got: Claim[] = [];
+          ch.onmessage = (e) => got.push(e.data as Claim);
+          ch.postMessage(m);
+          setTimeout(() => {
+            ch.close();
+            resolve(got);
+          }, 300);
+        }),
+      m,
+    );
+
+  // Older (the same time, a lower tab id): A answers with its own claim.
+  expect(await post({ key, tab: '', at: mine.at })).toEqual([mine]);
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  // Newer (the same time, a higher tab id): A stops, and says so.
+  expect(await post({ key, tab: '~', at: mine.at })).toEqual([{ ...mine, stopped: true }]);
+  await expectStopped(page);
 });
 
 // Seed 2's best-advice line: eleven discards, then tsumo on the twelfth draw.
@@ -381,4 +657,177 @@ test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the scre
   const panel = await yaku.boundingBox();
   const table = await yaku.locator('.yaku-table').boundingBox();
   expect(table!.x + table!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
+});
+
+/** The page's saved moves (localStorage), for the session in its URL. */
+function savedMoveList(page: Page) {
+  return page.evaluate(() => {
+    const id = new URL(location.href).searchParams.get('session')!;
+    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? '{}') as {
+      sessions?: Record<string, { moves: { parent: number; tile?: string }[] }>;
+    };
+    return all.sessions?.[id]?.moves ?? null;
+  });
+}
+
+/**
+ * Counts the GETs the page sends its engine. With the advice panel
+ * minimized the page itself sends one only to load a session, so any other
+ * is wasm.ts asking for the whole tree because the moves it saves from did
+ * not add up (see saveSession).
+ */
+async function spyEngineGets(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { engineGets: string[] };
+    w.engineGets = [];
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, m: { fn?: string; args?: string[] }) {
+      if (m?.fn === 'request' && m.args?.[0] === 'GET') w.engineGets.push(m.args[1]);
+      return post.call(this, m as never);
+    } as typeof Worker.prototype.postMessage;
+  });
+  return async () => {
+    const gets = await page.evaluate(() => (window as unknown as { engineGets: string[] }).engineGets.splice(0));
+    return gets;
+  };
+}
+
+// Responses carry only the tree nodes the page lacks (?tree_from=), so the
+// save adds each new move to the ones it already holds, without asking the
+// engine for the whole tree: it stays whole across moves, gotos, a branch,
+// an eviction rebuild and a reload.
+test('the save keeps every move while responses carry only the new nodes', async ({ page }) => {
+  await openTree(page);
+  const engineGets = await spyEngineGets(page);
+  await page.goto('./?seed=8&turns=18');
+  const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await discardDrawn(page);
+  await engineGets(); // the page's own load, if any
+  const second = await discardDrawn(page);
+  await expect(nodes).toHaveCount(3);
+  await nodes.nth(1).click();
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  const labelsAt1 = await labels(page, '.hand-tiles');
+  const other = labelsAt1.findIndex((l) => l !== second);
+  await hand.locator('.hand-tiles button').nth(other).click();
+  await expect(nodes).toHaveCount(4);
+  let moves = await savedMoveList(page);
+  expect(moves).toHaveLength(3);
+  expect(moves!.map((m) => m.parent)).toEqual([0, 1, 1]);
+  expect(await engineGets()).toEqual([]);
+
+  await evictEverything(page, 4000);
+  await discardDrawn(page); // rebuilt from the save, then one more node
+  await expect(nodes).toHaveCount(5);
+  moves = await savedMoveList(page);
+  expect(moves!.map((m) => m.parent)).toEqual([0, 1, 1, 3]);
+  expect(await engineGets()).toEqual([]);
+
+  const before = await nodes.evaluateAll((els) => els.map((e) => e.textContent));
+  await page.reload();
+  await expect(nodes).toHaveCount(5);
+  expect(await nodes.evaluateAll((els) => els.map((e) => e.textContent))).toEqual(before);
+  await engineGets(); // the page loading the session (answered by the rebuild)
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(6);
+  expect((await savedMoveList(page))!.map((m) => m.parent)).toEqual([0, 1, 1, 3, 4]);
+  expect(await engineGets()).toEqual([]);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// With storage refusing every write (private mode, a full quota) nothing is
+// saved, but the moves this tab built are kept: the new ones are added to
+// them without asking the engine for the whole tree, and an evicted session
+// is rebuilt from them.
+test('storage refusing writes: moves are kept in the tab, no whole-tree requests', async ({ page }) => {
+  await openTree(page);
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
+      if (key === 'mhj-dojo.site.practice') throw new DOMException('quota', 'QuotaExceededError');
+      return set.call(this, key, value);
+    };
+  });
+  const engineGets = await spyEngineGets(page);
+  await page.goto('./?seed=10&turns=18');
+  const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
+  await discardDrawn(page);
+  await engineGets();
+  const second = await discardDrawn(page);
+  await discardDrawn(page);
+  await nodes.nth(1).click();
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  const other = (await labels(page, '.hand-tiles')).findIndex((l) => l !== second);
+  await page.getByRole('region', { name: '手牌' }).locator('.hand-tiles button').nth(other).click();
+  await expect(nodes).toHaveCount(5);
+  expect(await savedMoveList(page)).toBeNull();
+  expect(await engineGets()).toEqual([]);
+
+  await evictEverything(page, 5000);
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(6);
+  expect(await engineGets()).toEqual([]);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+/** The review of the last of tiles discarded on a new session of seed, made with the advice all along. */
+async function reviewAllAlong(page: Page, seed: number, tiles: string[]) {
+  return (await page.workers()[0].evaluate(
+    ({ seed, tiles }) => {
+      const call = (method: string, path: string, body: unknown) =>
+        JSON.parse(mhjDojoRequest(method, path, JSON.stringify(body)).body) as {
+          session_id: string;
+          discard_review: { text: string };
+        };
+      let st = call('POST', '/api/sessions', { seed, max_turns: 18 });
+      for (const tile of tiles) st = call('POST', `/api/sessions/${st.session_id}/discard`, { tile });
+      return st.discard_review.text;
+    },
+    { seed, tiles },
+  )) as string;
+}
+
+/** The tiles of the page's saved moves (all discards). */
+function savedTiles(page: Page) {
+  return page.evaluate(() => {
+    const id = new URL(location.href).searchParams.get('session')!;
+    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!) as {
+      sessions: Record<string, { moves: { tile?: string }[] }>;
+    };
+    return all.sessions[id].moves.map((m) => m.tile!);
+  });
+}
+
+async function openAdvice(page: Page) {
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
+  await expect(panel.locator('.advice-candidate')).toHaveCount(3);
+  return panel;
+}
+
+// The advice panel starts minimized, so the discards leave their reviews
+// pending; opening the panel fills in the advice and the review, the same as
+// a session that had them all along: on the session as played, and after a
+// reload (a rebuild from the moves).
+test('advice opened after discards: the review is the one computed all along', async ({ page }) => {
+  await page.goto('./?seed=9&turns=18');
+  await discardDrawn(page);
+  await discardDrawn(page);
+  const panel = await openAdvice(page);
+  await expect(panel.locator('.advice-review')).toHaveText(await reviewAllAlong(page, 9, await savedTiles(page)));
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('advice opened after discards and a reload: the review is the one computed all along', async ({ page }) => {
+  await page.goto('./?seed=9&turns=18');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await discardDrawn(page);
+  await discardDrawn(page);
+  await page.reload();
+  await expect(hand.locator('.discard-river .tile')).toHaveCount(2);
+  const want = await reviewAllAlong(page, 9, await savedTiles(page));
+  const panel = await openAdvice(page);
+  await expect(panel.locator('.advice-review')).toHaveText(want);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
 });

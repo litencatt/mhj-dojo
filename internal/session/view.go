@@ -37,7 +37,7 @@ func strPtr(t *tile.Tile) *string {
 
 func intPtr(v int) *int { return &v }
 
-func (s *Session) state() State {
+func (s *Session) state(v View) State {
 	cur := s.nodes[s.current]
 	path := s.path(cur)
 	dora := s.wall.DoraIndicators()
@@ -66,8 +66,11 @@ func (s *Session) state() State {
 		// Ura dora are revealed only once the game has ended.
 		UraDoraIndicators: []string{},
 		UraDora:           []string{},
-		ByDiscard:         map[string][]apiview.YakuRow{},
+		ByDiscard:         map[string][]apiview.DiscardRow{},
 		CombosByDiscard:   map[string][]apiview.ComboRow{},
+		Remaining:         apiview.Remaining(&visible),
+		NodeCount:         len(s.nodes),
+		Tree:              []TreeNode{},
 		Win:               cur.win,
 	}
 	if cur.status != StatusPlaying {
@@ -90,25 +93,32 @@ func (s *Session) state() State {
 		all := append(append([]tile.Tile{}, cur.hand...), d)
 		c := tile.CountsOf(all)
 		st.CanTsumo = yaku.IsComplete(c)
-		if cur.byDiscard == nil {
-			cur.byDiscard = map[tile.Kind][]yakushanten.Result{}
-		}
+		byDiscard := s.previews(cur, d)
 		if cur.combosByDiscard == nil {
-			cur.combosByDiscard = map[tile.Kind][]yakushanten.Combo{}
+			// Discarding the drawn tile leaves the hand, whose combos are known.
+			cur.combosByDiscard = map[tile.Kind][]yakushanten.Combo{d.Kind: s.nodeCombos(cur)}
 		}
+		// A red five and a plain one leave the same hand: the first key of
+		// each kind is computed, any other shares its rows.
+		var first [tile.NumKinds]string
 		for _, t := range all {
 			key := t.String()
 			if _, done := st.ByDiscard[key]; done {
 				continue
 			}
-			res, ok := cur.byDiscard[t.Kind]
+			if k := first[t.Kind]; k != "" {
+				st.ByDiscard[key], st.CombosByDiscard[key] = st.ByDiscard[k], st.CombosByDiscard[k]
+				continue
+			}
+			first[t.Kind] = key
+			res, ok := byDiscard[t.Kind]
 			if !ok {
 				c[t.Kind]--
 				res = s.analyze(c)
 				c[t.Kind]++
-				cur.byDiscard[t.Kind] = res
+				byDiscard[t.Kind] = res
 			}
-			st.ByDiscard[key] = rows(res, &visible)
+			st.ByDiscard[key] = apiview.DiscardRows(rows(res, &visible))
 			combos, ok := cur.combosByDiscard[t.Kind]
 			if !ok {
 				c[t.Kind]--
@@ -118,25 +128,39 @@ func (s *Session) state() State {
 			}
 			st.CombosByDiscard[key] = apiview.Combos(combos, &visible)
 		}
-		st.Advice = s.nodeAdvice(cur, path)
+		if !v.NoAdvice {
+			st.Advice = s.nodeAdvice(cur, path)
+		}
 	}
-	st.DiscardReview = s.nodeReview(cur, path)
+	if !v.NoAdvice {
+		st.DiscardReview = s.nodeReview(cur, path)
+	}
 
+	keys := s.analyzer.Rows()
 	for _, n := range path {
-		h := apiview.HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Shanten: map[string]*int{}}
+		h := apiview.HistoryEntry{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard)}
 		if n.status == StatusTsumo {
+			h.Shanten = make(map[string]*int, len(n.winRows))
 			for k, v := range n.winRows {
 				h.Shanten[k] = intPtr(v)
 			}
 		} else {
-			for _, r := range s.nodeAnalysis(n) {
-				h.Shanten[r.Key] = shantenPtr(r)
+			rs := s.nodeRowShanten(n)
+			h.Shanten = make(map[string]*int, len(rs))
+			vals := make([]int, len(rs))
+			for i, v := range rs {
+				var p *int
+				if v != noShanten {
+					vals[i] = int(v)
+					p = &vals[i]
+				}
+				h.Shanten[keys[i].Key] = p
 			}
 		}
 		st.History = append(st.History, h)
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range s.nodes[min(v.TreeFrom, len(s.nodes)):] {
 		tn := TreeNode{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Status: n.status}
 		if n.parent >= 0 {
 			tn.ParentID = intPtr(n.parent)
@@ -179,7 +203,8 @@ func (s *Session) visibleAt(n *node, path []*node) tile.Counts {
 }
 
 // nodeReview returns the review of the discard that led to n, the last node
-// of path, computing it from the parent's advice if Replay left it pending.
+// of path, computing it from the parent's advice if Replay, or a discard
+// made without the advice, left it pending.
 func (s *Session) nodeReview(n *node, path []*node) *advice.Review {
 	if n.reviewPending {
 		parent := path[len(path)-2]
@@ -203,13 +228,11 @@ func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	}
 	tiles := append(append([]tile.Tile{}, n.hand...), d)
 	c := tile.CountsOf(tiles)
-	if n.byDiscard == nil {
-		n.byDiscard = map[tile.Kind][]yakushanten.Result{}
-	}
+	byDiscard := s.previews(n, d)
 	for _, t := range tiles {
-		if _, ok := n.byDiscard[t.Kind]; !ok {
+		if _, ok := byDiscard[t.Kind]; !ok {
 			c[t.Kind]--
-			n.byDiscard[t.Kind] = s.analyze(c)
+			byDiscard[t.Kind] = s.analyze(c)
 			c[t.Kind]++
 		}
 	}
@@ -217,7 +240,6 @@ func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	for _, ind := range s.wall.DoraIndicators() {
 		dora = append(dora, tile.DoraFromIndicator(ind.Kind))
 	}
-	s.resetAnalyzerIfFull()
 	n.advice = advice.Compute(advice.Input{
 		Tiles: tiles, Visible: s.visibleAt(n, path), Dora: dora, Turn: n.turn, MaxTurns: s.maxTurns,
 		ByDiscard: n.byDiscard, Han: func(key string) int { return yaku.HanFor(key, winds) }, Analyzer: s.analyzer,
@@ -225,7 +247,15 @@ func (s *Session) nodeAdvice(n *node, path []*node) *advice.Advice {
 	return n.advice
 }
 
-func shantenPtr(r yakushanten.Result) *int { return apiview.ShantenOf(r) }
+// previews returns a playing node's per-discard analysis (byDiscard), made
+// with the entry of its drawn tile d: discarding d leaves the node's hand,
+// whose analysis is known.
+func (s *Session) previews(n *node, d tile.Tile) map[tile.Kind][]yakushanten.Result {
+	if n.byDiscard == nil {
+		n.byDiscard = map[tile.Kind][]yakushanten.Result{d.Kind: s.nodeAnalysis(n)}
+	}
+	return n.byDiscard
+}
 
 func rows(res []yakushanten.Result, visible *tile.Counts) []apiview.YakuRow {
 	return apiview.Rows(res, visible, func(key string) int { return yaku.HanFor(key, winds) })

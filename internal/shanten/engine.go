@@ -7,7 +7,10 @@
 // package yakushanten expresses yaku constraints on the same engine.
 package shanten
 
-import "github.com/litencatt/mhj-dojo/internal/tile"
+import (
+	"github.com/litencatt/mhj-dojo/internal/memo"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+)
 
 // Inf marks an unreachable cost.
 const Inf = 255
@@ -45,16 +48,29 @@ type memoKey struct {
 	rule SuitRule
 }
 
+// MemoGen is the number of suit tables in each generation of NewEngine's
+// memo (see memo.Memo), which holds at most twice as many: ~7 MiB at ~127
+// bytes per table, map included. A practice session's per-yaku analysis
+// (every row of every discard candidate, and the advice's waits) reuses
+// tables across several turns and rewinds; below ~28,000 its misses grow
+// (see docs/api.md "Memory").
+const MemoGen = 28_000
+
 // Engine memoizes suit tables. It is not safe for concurrent use.
 type Engine struct {
-	memo map[memoKey]*Table
+	memo *memo.Memo[memoKey, *Table]
 }
 
-// NewEngine returns an engine with an empty memo.
-func NewEngine() *Engine { return &Engine{memo: make(map[memoKey]*Table)} }
+// NewEngine returns an engine with an empty memo of MemoGen tables per
+// generation.
+func NewEngine() *Engine { return NewEngineGen(MemoGen) }
+
+// NewEngineGen returns an engine with an empty memo of gen tables per
+// generation.
+func NewEngineGen(gen int) *Engine { return &Engine{memo: memo.New[memoKey, *Table](gen)} }
 
 // MemoSize returns the number of memoized suit tables.
-func (e *Engine) MemoSize() int { return len(e.memo) }
+func (e *Engine) MemoSize() int { return e.memo.Len() }
 
 // SuitCounts extracts the counts of suit s (9 kinds, or 7 for honors).
 func SuitCounts(c *tile.Counts, s int) (v [9]int8, n int) {
@@ -91,11 +107,11 @@ func (e *Engine) Suit(v [9]int8, n int, rule SuitRule) *Table {
 		return noneTable
 	}
 	key := memoKey{c: v, n: int8(n), rule: rule}
-	if t, ok := e.memo[key]; ok {
+	if t, ok := e.memo.Get(key); ok {
 		return t
 	}
 	t := suitDP(&v, n, &rule)
-	e.memo[key] = t
+	e.memo.Put(key, t)
 	return t
 }
 

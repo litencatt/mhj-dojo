@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, GameOptions, GameState, Tile as TileT } from './api';
 import { Hand } from './components/Hand';
@@ -12,9 +12,20 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
+import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { gameMovedOn, useLastAnalysis, usePlayback, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import {
+  gameMovedOn,
+  useLastAnalysis,
+  usePlayback,
+  useRoundLog,
+  useRowNames,
+  useSerialRequest,
+  useSingleTab,
+  useUrlResume,
+} from './hooks';
+import { claim } from './singleTab';
 import { tileName } from './tiles';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -61,13 +72,14 @@ export function GameApp() {
       setPreviewTile(null);
       setRiichiMode(false);
     },
-    // On the static site each tab runs its own engine, the CPU turns within
-    // the request: two tabs on the same game play separate copies (the last
-    // save wins on a reload), so a 409 is never another tab's (or a
-    // finishing CPU turn's) doing.
+    // On the static site the CPU turns run within the request and no other
+    // tab plays this game meanwhile (see useSingleTab): a 409 is never
+    // another tab's (or a finishing CPU turn's) doing. On the server it may
+    // be another browser's.
     state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
     gameMovedOn,
   );
+  const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
   function startGame(options: GameOptions, seed?: number) {
     return request(() => api.createGame({ seed, ...options }));
@@ -84,10 +96,14 @@ export function GameApp() {
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again after
   // a server restart (on the static site, if the game's save is gone).
-  useUrlResume({
+  const resume = useUrlResume({
     idKey: 'game',
     request,
-    get: api.getGame,
+    get: (id) => {
+      // Before asking for it, so that another tab stops saving it first.
+      claim(api.gameKey(id));
+      return api.getGame(id);
+    },
     create: (params) =>
       api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
     // A random seed is hidden until the end: drop any seed of a previous game.
@@ -118,10 +134,15 @@ export function GameApp() {
   // After a call the analysis is empty; the chart keeps the rows from before.
   const chartAnalysis = useLastAnalysis(state?.analysis);
   const rowNames = useRowNames(chartAnalysis);
+  const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
   // Replays state.events (issue #29) before the player can act again or the
   // round result appears.
   const playback = usePlayback(state);
+  // The table and the dora follow the replay: points, sticks, the wall and
+  // the dora as they stood at the current step.
+  const table = playback.view;
+  const earlierEvents = useRoundLog(state);
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
@@ -200,7 +221,7 @@ export function GameApp() {
               </label>
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
-            {state && (
+            {state && table && (
               <div class="header-status">
                 <dl class="game-status">
                   <div>
@@ -228,10 +249,10 @@ export function GameApp() {
                   </div>
                 </dl>
                 <DoraStatus
-                  doraIndicators={state.dora_indicators}
-                  dora={state.dora}
-                  uraDoraIndicators={state.ura_dora_indicators}
-                  uraDora={state.ura_dora}
+                  doraIndicators={table.dora_indicators}
+                  dora={table.dora}
+                  uraDoraIndicators={table.ura_dora_indicators}
+                  uraDora={table.ura_dora}
                 />
               </div>
             )}
@@ -252,13 +273,12 @@ export function GameApp() {
             </p>
           )}
         </div>
-        {state && me && (
+        {state && me && table && (
           <>
             <div class="area-hand">
               <GameTable
-                state={state}
-                seats={playback.seats}
-                events={playback.events}
+                state={table}
+                log={[...earlierEvents, ...table.events]}
                 highlight={playback.highlight}
                 playing={playback.playing}
               />
@@ -315,7 +335,8 @@ export function GameApp() {
                 history={state.history}
                 currentAnalysis={chartAnalysis}
                 rowNames={rowNames}
-                onMinimize={() => minimize('chart')}
+                minimized={isMin('chart')}
+                onMinimize={minimizeChart}
               />
             </div>
           </>
@@ -327,6 +348,7 @@ export function GameApp() {
           byDiscard={state.by_discard}
           combos={state.combos}
           combosByDiscard={state.combos_by_discard}
+          remaining={state.remaining}
           previewTile={previewTile}
           mode="game"
           isMin={isMin}
@@ -339,6 +361,8 @@ export function GameApp() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
+      {/* 「このタブで続ける」 takes the game back, from where the other tab left it. */}
+      {stopped && <TabStopped busy={busy} onContinue={resume} />}
     </div>
   );
 }

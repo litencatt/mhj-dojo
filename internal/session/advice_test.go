@@ -15,7 +15,7 @@ func TestAdviceAndReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := s.State()
+	root := s.State(View{})
 	if root.Advice == nil || len(root.Advice.Candidates) != 3 || root.Advice.Candidates[0].Tile != "9m" {
 		t.Fatalf("root advice %+v", root.Advice)
 	}
@@ -23,7 +23,7 @@ func TestAdviceAndReview(t *testing.T) {
 		t.Fatalf("root review %+v", root.DiscardReview)
 	}
 
-	bad, err := s.Discard("1z", nil)
+	bad, err := s.Discard("1z", nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,10 +35,10 @@ func TestAdviceAndReview(t *testing.T) {
 		t.Fatalf("advice at turn 1: %+v", bad.Advice)
 	}
 
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	good, err := s.Discard("9m", nil)
+	good, err := s.Discard("9m", nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,14 +48,14 @@ func TestAdviceAndReview(t *testing.T) {
 
 	// Going back to the first branch shows its own review again, and the
 	// full advice of nodes off the current path is dropped.
-	back, err := s.Goto(bad.NodeID)
+	back, err := s.Goto(bad.NodeID, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if back.DiscardReview == nil || back.DiscardReview.Tile != "1z" || back.DiscardReview.IsBest {
 		t.Fatalf("review after goto: %+v", back.DiscardReview)
 	}
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, n := range s.nodes {
@@ -71,7 +71,7 @@ func TestAdviceAtTerminalNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err := s.Discard("9m", nil)
+	v, err := s.Discard("9m", nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestAdviceAtTerminalNodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := s.Tsumo(nil)
+	w, err := s.Tsumo(nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,10 +103,10 @@ func TestPracticeActionP95(t *testing.T) {
 	var took []time.Duration
 	for seed := int64(1); seed <= testmode.N(int64(8), 3, 1); seed++ {
 		s := mustCreate(t, st, seed, DefaultMaxTurns)
-		v := s.State()
+		v := s.State(View{})
 		for v.Status == StatusPlaying {
 			start := time.Now()
-			v, _ = s.Discard(v.Advice.Candidates[0].Tile, nil)
+			v, _ = s.Discard(v.Advice.Candidates[0].Tile, nil, View{})
 			took = append(took, time.Since(start))
 		}
 	}

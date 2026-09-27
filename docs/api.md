@@ -7,8 +7,9 @@ The static site (README, "Static site") has no server: the engine built as WebAs
 request below — practice (`/api/sessions…`), game (`/api/games…`) or `GET /api/version` — as its
 method, path and JSON body and returns `{status, body, save}` with the status and JSON body the
 server would send (both use `internal/apicall`). It also defines two functions that are not HTTP
-endpoints: `mhjDojoRestore(body)`, which rebuilds a session from its moves in one call after a page
-reload, and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
+endpoints: `mhjDojoRestore(body, query)`, which rebuilds a session from its moves in one call after a page
+reload (`body` is `{"seed", "max_turns", "moves", "current"}`; `query`, which may be left out, holds
+view options as a request's URL query does, see "View options"), and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
 (WebAssembly)").
 
 ## Tile notation
@@ -53,7 +54,7 @@ Returns the `State` at the current node.
 Body: `{"tile": "5m", "node_id": 3}` – `tile` is the exact tile string from hand or `drawn`
 (red matters: `0m` vs `5m`). `node_id` is optional: the node the client acted from (its
 current `state.node_id`); if it doesn't match the session's current node, the request is
-rejected with `409` and nothing changes (another tab has moved the session on first – see
+rejected with `409` and nothing changes (another browser has moved the session on first – see
 Errors below). Omitting it keeps the old behaviour of acting on whatever node is current.
 Creates the child node, or moves to it if the same discard already exists. Returns the `State`.
 
@@ -64,8 +65,30 @@ Creates a terminal `tsumo` child node. Returns the `State`.
 ### `POST /api/sessions/{id}/goto`
 Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id` here already
 names the destination explicitly, so there's no separate "acted from" node to guard: unlike
-discard/tsumo, another tab moving the session on first can't make this ambiguous (the target
+discard/tsumo, another browser moving the session on first can't make this ambiguous (the target
 node still exists; the tree only grows), so `goto` takes no staleness guard.
+
+### View options
+
+Every practice endpoint above (`POST /api/sessions` included) takes two optional URL query
+parameters that leave parts of the returned `State` out, for a client that doesn't need them:
+
+- `advice=0` – `advice` and `discard_review` are `null`, and the advice is not computed (about
+  2 ms, a sixth of a discard's time along the advice's best line). A discard made with it leaves
+  the new node's review to be computed the next time the node is shown with the advice, so asking
+  for the same state again without `advice=0` (say, once the client's advice panel opens) fills
+  in both. `advice=1` is the default.
+- `tree_from=<n>` – `tree` holds only the nodes with `node_id >= n`. Nodes are numbered in the
+  order they are made and never change once made, so a client that holds the first `n` nodes
+  (its tree's length) asks for the rest only and appends them; `node_count` tells it how many
+  the whole tree has, a check that the two add up. `0` (the default) sends the whole tree; past
+  the end, `tree` is `[]`.
+
+Any other value is a `400` (`tree_from` is read as a decimal integer, a leading `+` allowed);
+unknown parameters are ignored, and of a parameter given twice the last value counts. The UI sends `advice=0` while the
+advice panel is minimized (opening it asks for the state shown again, with the advice), and
+`tree_from` on every request but those that load a session afresh (a new one, the first of a page,
+the re-fetch after a `409`), which take the whole tree.
 
 ### `GET /api/version`
 The commit the answering binary was built from, as the go command stamps it into a build
@@ -111,12 +134,16 @@ it in the header.
 
   // Only when status == playing: for each distinct discard candidate of hand+drawn
   // (key = exact tile string, red kept distinct), analysis of the resulting 13 tiles.
-  "by_discard": { "5m": [YakuRow], "...": [YakuRow] },
+  "by_discard": { "5m": [DiscardRow], "...": [DiscardRow] },
 
   // Up to five yaku combinations for `hand`, best first (see Yaku combos),
   // and, only when status == playing, for each discard candidate as in by_discard.
   "combos": [ComboRow],
   "combos_by_discard": { "5m": [ComboRow] },
+
+  // Unseen copies of every tile kind (34 keys, no red notation), which the ukeire
+  // lists of analysis, by_discard and the combos count from (see YakuRow).
+  "remaining": { "1m": 3, "2m": 4, "...": 4 },
 
   // Path from the root to the current node (inclusive), for the time-series chart.
   "history": [
@@ -124,7 +151,9 @@ it in the header.
       "shanten": { "normal": 3, "tanyao": 4, "honitsu": null /* impossible */ } }
   ],
 
-  // Whole tree for the branch view.
+  // Nodes in the whole tree, and the tree for the branch view: all of it, or the
+  // nodes from tree_from on (see View options).
+  "node_count": 1,
   "tree": [
     { "node_id": 0, "parent_id": null, "turn": 0, "draw": null, "discard": null, "status": "playing", "normal_shanten": 3 }
   ],
@@ -138,9 +167,11 @@ it in the header.
   },
 
   // Only when status == playing: ranked discards and notes (see Advice).
+  // null with advice=0.
   "advice": Advice,
   // Only at a node reached by a discard (null at the root and at tsumo
   // nodes): that discard compared with the best one at the parent.
+  // null with advice=0.
   "discard_review": Review
 }
 ```
@@ -155,14 +186,24 @@ it in the header.
   "han": 1,                // han for your hand (practice: closed, East round/seat); 13 for yakuman, 0 for "normal"
   "shanten": 2,            // 0 = tenpai, null = impossible (∞)
   "approx": false,         // true when the value is an approximation (pinfu at shanten >= 1)
-  "ukeire": [ { "tile": "3m", "remaining": 3 } ],  // tile types (no red notation) that lower shanten
-  "ukeire_total": 12       // sum of remaining
+  "ukeire": ["3m", "6m"],  // tile types (no red notation) that lower shanten
+  "ukeire_total": 12       // their unseen copies: the sum of remaining[t] over ukeire
 }
 ```
 
-`remaining` = 4 − copies visible to the player at this node: `hand` + `drawn` (if any) +
-`discards` + `dora_indicators`. The same visible set is used for `analysis` and every `by_discard` entry.
-A tile type can appear with `remaining: 0` (空聴).
+The state's `remaining[t]` = 4 − copies of `t` visible to the player at this node: `hand` + `drawn`
+(if any) + `discards` + `dora_indicators`. The same visible set is used for `analysis` and every
+`by_discard` entry, so one map serves every ukeire list of the state. A tile type can be ukeire with
+`remaining` 0 (空聴).
+
+### `DiscardRow`
+
+A row of a `by_discard` preview: a `YakuRow` without `name`, `yakuman` and `han`, which depend only
+on the key within one state; the state's `analysis` has a row of every key with them.
+
+```jsonc
+{ "key": "tanyao", "shanten": 1, "approx": false, "ukeire": ["2p"], "ukeire_total": 3 }
+```
 
 ### `HandGroup`
 
@@ -309,7 +350,7 @@ without that showing in its han. East/East practice has 295 combinations.
   "han": 4,                // sum of the rows' han (open-hand han after a call); dora not counted
   "shanten": 0,            // never null: impossible combinations are not listed
   "approx": false,         // true for a pinfu combination at shanten >= 1 (as the pinfu row)
-  "ukeire": [ { "tile": "4s", "remaining": 3 } ],
+  "ukeire": ["4s"],        // counted by the state's remaining, as for a row
   "ukeire_total": 3
 }
 ```
@@ -407,18 +448,19 @@ These clarify points the contract above leaves open; none changes the JSON shape
 - **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
   session/node/endpoint, `415` POST without a JSON content type, `409` action not
   allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand,
-  or a `node_id` that no longer matches the current node because another tab moved the session
-  on first), `422` a session's tree is already at its node cap (see below) — not a state
-  conflict, since the current node itself is fine to act on, so unlike a `409` re-fetching the
-  session changes nothing.
+  or a `node_id` that no longer matches the current node because another browser moved the
+  session on first; of two tabs in one browser the page stops the older one before that),
+  `422` a session's tree is already at its node cap (see below) — not a state conflict, since
+  the current node itself is fine to act on, so unlike a `409` re-fetching the session changes
+  nothing.
 - **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
   **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
-  (an exhausted node has one). Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
-  each node keeps just its small review. Computing the advice takes ~1.4 ms on average, ~4 ms at p95, per
-  request (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
-  discard p95 ~23 ms including the rest of the state).
+  (an exhausted node has one); both are `null` with `advice=0`. Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
+  each node keeps just its small review. Computing the advice takes ~2 ms per discard along the advice's
+  best line (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
+  discard p95 ~20 ms including the rest of the state), which `advice=0` saves.
 - **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
@@ -710,13 +752,22 @@ under the 64 KiB body limit.
   "last_discard": null,         // the tile you may claim, in the call phase
   "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false,
              "pon": false, "chii": [["3m", "4m"]], "kan": [] },
-  "events": [ {"seat": 1, "type": "discard", "tile": "2z"},
-              {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"]} ],  // moves since your previous move; no skips
+  "events": [ {"seat": 1, "type": "discard", "tile": "2z", "wall_remaining": 70},
+              {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"], "wall_remaining": 70} ],  // moves since your previous move; no skips
+                                // wall_remaining: live draws left right after the move (an open or concealed kan's replacement
+                                // draw included, an added kan's with the declarer's next move, the next seat's draw not);
+                                // new_dora_indicators: kan dora indicators the move turned over (a concealed kan's at once, an
+                                // open or added kan's on the declarer's next discard or kan; one turned over with no move of its own,
+                                // as an added kan completes, on the response's last move), omitted if none. None is reported
+                                // twice: a round's new_dora_indicators add up to dora_indicators[1:]
+  "events_from": 12,            // the round's index of events[0]: the round's earlier events came in earlier responses
+  "events_wall_remaining": 70,  // live draws left just before events[0] (its mover's draw taken); wall_remaining with no events
   "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
                                 // wind rows follow your seat and the round
-  "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
+  "by_discard": { "1m": [DiscardRow] },  // on your turn: rows after each legal discard
   "combos": [ComboRow],         // yaku combos of your hand (right after a pon or chii: the best discard's, see Yaku combos)
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
+  "remaining": { "1m": 3, "...": 4 },  // unseen copies of every tile kind, for the ukeire lists (see YakuRow)
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended
 }
@@ -760,15 +811,15 @@ entry once full (`internal/store`; a `Get` marks an entry most recently used,
 so one a client keeps polling or acting on stays in): up to
 `session.MaxSessions` = 256 practice sessions and up to `match.MaxGames` = 256
 CPU games. Each session or game owns a
-`yakushanten.Analyzer`, whose shanten memo resets once it exceeds 200,000 suit
-tables; a game's three CPU seats additionally share one `cpu.Player`, whose own
-memo resets past 100,000 tables.
+`yakushanten.Analyzer`, and a game's three CPU seats additionally share one
+`cpu.Player`; each keeps a shanten memo bounded as described under "Memo
+bounds" below (at most ~9 MiB per analyzer and ~1 MiB per CPU player).
 
 The wasm build (`cmd/mhj-dojo-wasm`) passes a much smaller max — 4, via
 `session.NewStoreWithMax` — instead of `session.MaxSessions`: it runs in a
 browser tab's memory rather than a server's, and Go's wasm runtime never
 returns freed heap pages to the OS, so a session's cost (its branch tree plus
-its own analyzer memo, a few MB each in ordinary play) only ever grows the
+its own analyzer memo, up to ~8 MiB) only ever grows the
 tab's memory until the store evicts it. A session evicted this way, or lost
 to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
@@ -786,9 +837,11 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
 `runtime.MemStats` `HeapAlloc` delta, after a `runtime.GC()`, by N — run with
 `go test ./internal/<pkg> -run '^$' -bench BenchmarkXMemory -benchtime=1x`):
 
-- **A finished 半荘戦 game**, played out with the real CPU: ~1.7 MiB. 256 games
-  ≈ 441 MiB — under the ~500 MB rule of thumb, so the memo caps above were
-  left as they are.
+- **A finished 半荘戦 game**, played out with the real CPU: ~1.7 MiB when first
+  measured, while the analyzer still started each round with an empty memo.
+  Since the memo carries over to the next round (`Analyzer.ForWinds`) it was
+  ~15.5 MiB under the old reset-at-200,000-tables cap, and is ~7.7 MiB with
+  the bounds below (the analyzer's memo is full by the end of a 半荘戦).
 - **A session's branch tree at its `MaxNodes` = 2000 cap** (reached by
   branching into every distinct discard at every node): originally ~84 MiB,
   256 such sessions ≈ 21 GiB — alarming, and not explained by the analyzer's
@@ -810,6 +863,10 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
     path (`pruneAnalysisCache`), instead of being kept forever. A node whose
     cache was pruned just recomputes it, from the still-memoized suit
     tables, if it's revisited.
+  - The `history` field only needs each row's shanten, which every node
+    keeps permanently once known (`rowShanten`, one byte per row), so
+    switching to another branch reads its history path from them instead of
+    re-analyzing the path's nodes.
 
   Result: ~2.51 MiB per maximally branched session (a 34x cut), 256 sessions
   ≈ 644 MiB. Most of what's left (~72% in this benchmark, measured by
@@ -817,10 +874,11 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
   is the *analyzer's own* suit-table memo, not node data: a session tied to
   one wall still explores enough distinct hands, while branching into
   thousands of alternate lines, to grow it well past what one played-out
-  line ever needs. It's already bounded by `memoLimit` (200,000 tables,
-  ~140 bytes each once map/allocator overhead is counted) exactly like the
-  memos described above, so ~28 MiB is the worst case for it alone,
-  independent of `MaxNodes`; the rest — 2000 nodes' own data (hand,
+  line ever needs. It was bounded only by a reset at 200,000 tables
+  (~28 MiB), and is now bounded like every other memo (see "Memo bounds"
+  below: at most ~8.8 MiB), independent of `MaxNodes`; measured again with
+  those bounds, the benchmark is ~4.9 MiB per session (it was ~7.2 MiB
+  just before). The rest — 2000 nodes' own data (hand,
   per-node child map) plus the current node and its history path's pruned
   cache — is a few hundred KiB, not worth tightening further.
   `TestStateUnchangedAfterCachePruning` checks that revisiting a pruned node
@@ -841,3 +899,106 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
   tree (~2s total, fast enough for `go test ./...`), failing if a request
   ever exceeds 300 ms — enough margin to absorb CI noise while still
   catching a regression back toward O(tree size) work per request.
+
+### Memo bounds
+
+A memo that throws itself away whole once it reaches a cap is cheap to bound
+but costly at a low cap: a practice request's analysis (every row of every
+discard candidate, plus the advice's waits) touches several thousand suit
+tables, so a reset forces the request to rebuild them all, and it recurs
+every few requests. Measured on real sessions, capping the old memo at
+16,000 tables made requests ~24% slower. So the memos are now
+generational (`internal/memo`): new entries go to the current generation;
+once it holds `gen` entries it becomes the old one (the previous old one is
+dropped), and a hit in the old generation copies the entry forward, so
+whatever is still in use survives. A memo holds at most `2 × gen` entries,
+and a working set of up to `gen` entries is never lost. Returned tables are
+immutable and stay valid after they are dropped (the caller's pointer keeps
+them alive), so a turnover in the middle of a turn only costs recomputation,
+never correctness; the fold memo is keyed by table pointers, so a table
+dropped and rebuilt only misses its old folds. `TestMemoTurnover`
+(`internal/yakushanten/memo_test.go`) checks an analyzer for ~200 hands
+past its memo's turnovers against a fresh one, and the bounds below;
+`TestTinyMemos` does the same, on every hand, with generations of 64
+tables and 16 folds, so tables are dropped and rebuilt under their folds'
+keys all the time.
+
+| memo | per generation | bytes per entry | at most |
+|---|---|---|---|
+| suit tables, `shanten.MemoGen` (analyzer) | 28,000 | ~127 | ~7 MiB |
+| folds, `foldGen` (`internal/yakushanten/combo.go`) | 4,000 | ~100 | ~0.8 MiB |
+| tables kept alive only by fold keys (2 per fold) | | 64 | ~1 MiB |
+| results, `resultMemoSize` (analyzer; FIFO, not generational) | 32 hands | ~4 KiB | ~0.15 MiB |
+| **one analyzer** | | | **~9 MiB** |
+| suit tables, `cpu` `memoGen` | 4,000 | ~127 | ~1 MiB |
+
+A fold's key names two tables, which it keeps alive even after the engine's
+memo dropped them: at most `2 × foldGen × 2` = 16,000 tables, hence the
+third row.
+
+An analyzer also keeps its last results: the rows and the combos of the
+last `resultMemoSize` = 32 hands each (`internal/yakushanten/yakushanten.go`),
+because a request asks for the same hand more than once (a game's
+`analysis` is also its drawn tile's `by_discard` preview, and the hand
+recorded in the history after a discard is that discard's preview). That is
+~4 KiB per hand, ~0.15 MiB in all (the fourth row). In a practice session
+many of them are also the current node's preview, so the memo adds less
+than that there: `BenchmarkSessionMemory` went from ~5.2 to ~5.5 MiB per
+session with it and the nodes' per-row shanten (above), `BenchmarkGameMemory` from
+~8.1 to ~8.3 MiB per game.
+
+The bytes per entry are `HeapAlloc` deltas (after `runtime.GC()`) of an
+analyzer filled from random hands, divided by its entries: a table is 50
+bytes allocated in a 64-byte size class plus its map slot and the map's
+slack. The measured peak of one analyzer, filled the same way, was ~7.7
+MiB (both memos full; the fold keys' tables were mostly still in the
+engine's memo), under the tables' ~8.8 MiB bound. At a turnover the dropped
+generation stays on the heap until the next GC, so for that moment a memo
+briefly holds three generations (~3.5 MiB more for the analyzer's tables):
+ordinary GC slack, not a lasting cost.
+
+The sizes come from counting cache misses (computed tables and folds) on
+real play, which unlike timings is deterministic: 8 practice sessions of
+18 turns each played along the advice's best discard and then rewound and
+replayed 4 times (472 requests), 8 more of 109 turns, and 12 whole CPU games
+(6 東風戦 and 6 半荘戦, 1,486 human moves). Unbounded, an 18-turn session's
+table memo reached 13,000–45,000 tables and a 半荘戦's 78,000–107,000 (the
+memo carries over between rounds); the old caps were never reached, and
+the fold cache (then 50,000 entries, reset when full) was reset in nearly
+every session and game. Suit-table misses against an unbounded memo, per
+generation size (every engine counted, so the CPU games also include the
+CPU seats' misses):
+
+| per generation | 18-turn sessions | 109-turn sessions | CPU games |
+|---|---|---|---|
+| 12,000 | +47% | | +15% |
+| 16,000 | +23% | +155% | +12% |
+| 20,000 | +12% | | +9% |
+| 24,000 | +7% | +113% | +7% |
+| 28,000 | +3% | | +5% |
+| 32,000 | 0% | +76% | +4% |
+
+A table costs ~10–18 µs to build and a fold ~0.4 µs, so the fold memo is
+kept small (4,000 per generation: +77% fold misses, ~0.3 ms per request).
+The CPU seats build only ~3,000–6,500 tables over a whole game, so 4,000
+per generation leaves their misses unchanged.
+
+Latency cost, against the old caps: **+4%** per request in 18-turn practice
+sessions and per move in CPU games, **+11%** per request in long (109-turn)
+sessions, which revisit hands from many turns back. Measured on a native
+build over 3 alternating runs of the same play as above (noisy, ±1 ms):
+18-turn session requests ~11.4 → ~11.9 ms, 109-turn ~11.0 → ~12.1 ms, CPU
+game moves ~11.7 → ~12.2 ms.
+`BenchmarkAnalyzeAllDiscards` (one fresh analyzer per call) is unchanged
+at ~22.5 ms, so the generational lookup itself costs nothing measurable.
+
+Worst case, native server: a session ≈ 9 MiB (analyzer) + ~0.8 MiB (a
+2000-node tree, its per-row shanten included) ≈ 9.8 MiB, a game ≈ 9 + 1
+(CPU) + ~0.5 (game state) ≈ 10.5 MiB, so 256 sessions + 256 games ≈ 2.5 +
+2.6 ≈ 5.1 GiB, down from ~18 GiB under the old caps (~30 MiB per session,
+~42 MiB per game). The
+WebAssembly build (4 sessions, 2 games) is bounded at ~60 MiB, down from
+~200 MiB (plus a turnover's brief extra generation, see above). A lower
+`shanten.MemoGen` trades latency for memory along the table above (12,000
+per generation would be ~5 MiB per analyzer and ~3 GiB in total, at +47%
+table misses in ordinary practice).

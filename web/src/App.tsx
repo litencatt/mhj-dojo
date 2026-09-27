@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { SessionState } from './api';
 import { Hand } from './components/Hand';
@@ -10,9 +10,18 @@ import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
+import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { sessionMovedOn, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import {
+  sessionMovedOn,
+  useRowNames,
+  useSerialRequest,
+  useSingleTab,
+  useStableCallback,
+  useUrlResume,
+} from './hooks';
+import { claim } from './singleTab';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -21,30 +30,88 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
+  const adviceOpen = !isMin('advice');
+  // The states that came with the advice (see load).
+  const withAdvice = useRef(new WeakSet<SessionState>());
+
+  // Runs a session call with the view the page needs (docs/api.md "View
+  // options"): the advice only while its panel is open, and with prev (the
+  // state shown, of the same session) only the tree nodes it lacks. The
+  // state returned carries the whole tree: prev's nodes and the new ones,
+  // or, should they not add up to node_count, the tree asked for afresh.
+  async function load(call: (view: api.SessionView) => Promise<SessionState>, prev: SessionState | null) {
+    const view = { advice: adviceOpen, treeFrom: prev ? prev.tree.length : 0 };
+    let next = await call(view);
+    if (prev && view.treeFrom > 0) {
+      const tree = next.session_id === prev.session_id ? [...prev.tree.slice(0, view.treeFrom), ...next.tree] : [];
+      next =
+        tree.length === next.node_count
+          ? { ...next, tree }
+          : await api.getSession(next.session_id, { advice: view.advice, treeFrom: 0 });
+    }
+    if (view.advice) withAdvice.current.add(next);
+    return next;
+  }
+
   const { busy, error, notice, request } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
       setHighlightTile(null);
     },
-    // The static site runs the session in this tab alone: nothing else can
-    // move it on, so a 409 is never another tab's doing.
-    state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
+    // On the static site no other tab plays this session meanwhile (see
+    // useSingleTab): a 409 is never another tab's doing. On the server it
+    // may be another browser's.
+    state && !api.WASM ? () => load((v) => api.getSession(state.session_id, v), null) : undefined,
     sessionMovedOn,
   );
+  const stopped = useSingleTab(state ? api.sessionKey(state.session_id) : null);
+
+  // A state shown while the advice panel was minimized came without the
+  // advice: opening the panel asks for it (once per state), apart from the
+  // serial requests (nothing else waits on it, and the preview stays). The
+  // answer fills in the advice and the review only if the state shown is
+  // still the one asked about, at the same node: had the session moved on
+  // (another browser), the next request shows that.
+  const adviceAsked = useRef<SessionState | null>(null);
+  useEffect(() => {
+    if (!state || !adviceOpen || busy || stopped || withAdvice.current.has(state) || adviceAsked.current === state) return;
+    const asked = state;
+    adviceAsked.current = asked;
+    api.getSession(asked.session_id, { advice: true, treeFrom: asked.tree.length }).then(
+      (got) =>
+        setState((cur) => {
+          if (cur !== asked || got.session_id !== asked.session_id || got.node_id !== asked.node_id) return cur;
+          const next = { ...cur, advice: got.advice, discard_review: got.discard_review };
+          withAdvice.current.add(next);
+          return next;
+        }),
+      () => {
+        // Stopped by another tab, or failed: the panel stays as it is.
+      },
+    );
+  }, [state, adviceOpen, busy, stopped]);
 
   function startGame(seed?: number, maxTurns?: number) {
-    return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
+    return request(() => load((v) => api.createSession({ seed, max_turns: maxTurns ?? 18 }, v), null));
   }
 
   // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
   // replays the same wall from the seed after a server restart.
-  useUrlResume({
+  const resume = useUrlResume({
     idKey: 'session',
     request,
-    get: api.getSession,
+    get: (id) => {
+      // Before asking for it, so that another tab stops saving it first.
+      claim(api.sessionKey(id));
+      return load((v) => api.getSession(id, v), null);
+    },
     create: (params) =>
-      api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }),
+      load(
+        (v) =>
+          api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }, v),
+        null,
+      ),
     sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns) },
   });
 
@@ -61,23 +128,28 @@ export function App() {
 
   function handleDiscard(tile: string) {
     if (!state) return;
-    void request(() => api.discard(state.session_id, tile, state.node_id));
+    void request(() => load((v) => api.discard(state.session_id, tile, state.node_id, v), state));
   }
 
   function handleTsumo() {
     if (!state) return;
-    void request(() => api.tsumo(state.session_id, state.node_id));
+    void request(() => load((v) => api.tsumo(state.session_id, state.node_id, v), state));
   }
 
-  function handleGoto(nodeId: number) {
+  const handleGoto = useStableCallback((nodeId: number) => {
     if (!state) return;
-    void request(() => api.goto(state.session_id, nodeId));
-  }
+    void request(() => load((v) => api.goto(state.session_id, nodeId, v), state));
+  });
 
   const rowNames = useRowNames(state?.analysis);
+  // The panels are memoized: their callbacks keep their identity.
+  const minimizeChart = useCallback(() => minimize('chart'), [minimize]);
+  const minimizeTree = useCallback(() => minimize('tree'), [minimize]);
+  const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
 
-  // Minimized panels stay mounted (hidden) so they keep their own state,
-  // such as the chart's legend selection and the glossary search.
+  // Minimized panels stay mounted (hidden, drawing nothing) so they keep
+  // their own state, such as the chart's legend selection and the glossary
+  // search.
   const docked = PANELS.filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
 
@@ -93,7 +165,9 @@ export function App() {
     const ro = new ResizeObserver(() => {
       const yaku = app.querySelector('.area-yaku');
       if (!yaku) return;
-      app.style.setProperty('--yaku-top', `${yaku.getBoundingClientRect().top + window.scrollY}px`);
+      const top = `${yaku.getBoundingClientRect().top + window.scrollY}px`;
+      // A write, even of the same value, may restyle the whole app.
+      if (app.style.getPropertyValue('--yaku-top') !== top) app.style.setProperty('--yaku-top', top);
     });
     ro.observe(app);
     return () => ro.disconnect();
@@ -209,7 +283,8 @@ export function App() {
                 history={state.history}
                 currentAnalysis={state.analysis}
                 rowNames={rowNames}
-                onMinimize={() => minimize('chart')}
+                minimized={isMin('chart')}
+                onMinimize={minimizeChart}
               />
             </div>
           </>
@@ -222,7 +297,8 @@ export function App() {
             currentNodeId={state.node_id}
             disabled={busy}
             onGoto={handleGoto}
-            onMinimize={() => minimize('tree')}
+            minimized={isMin('tree')}
+            onMinimize={minimizeTree}
           />
         </div>
       )}
@@ -232,6 +308,7 @@ export function App() {
           byDiscard={state.by_discard}
           combos={state.combos}
           combosByDiscard={state.combos_by_discard}
+          remaining={state.remaining}
           previewTile={previewTile}
           mode="practice"
           isMin={isMin}
@@ -241,7 +318,8 @@ export function App() {
               advice={state.advice}
               review={state.discard_review}
               onHighlight={setHighlightTile}
-              onMinimize={() => minimize('advice')}
+              minimized={isMin('advice')}
+              onMinimize={minimizeAdvice}
             />
           }
         />
@@ -252,6 +330,8 @@ export function App() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
+      {/* 「このタブで続ける」 takes the session back, from where the other tab left it. */}
+      {stopped && <TabStopped busy={busy} onContinue={resume} />}
     </div>
   );
 }

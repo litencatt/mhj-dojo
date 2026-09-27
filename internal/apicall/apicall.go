@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -83,8 +84,33 @@ func Message(err error) string {
 // ErrorBody is the JSON body of an error response.
 func ErrorBody(msg string) map[string]string { return map[string]string{"error": msg} }
 
+// SessionView reads the view options of a practice request from its URL
+// query (docs/api.md "View options"): advice=0 leaves the advice out, and
+// tree_from=<n> leaves out the tree's first n nodes (those with an id below
+// n). Other keys are ignored; of a key given twice, the last one counts.
+func SessionView(query string) (session.View, error) {
+	var v session.View
+	for _, kv := range strings.Split(query, "&") {
+		k, val, _ := strings.Cut(kv, "=")
+		switch k {
+		case "advice":
+			if val != "0" && val != "1" {
+				return v, Invalid("advice must be 0 or 1")
+			}
+			v.NoAdvice = val == "0"
+		case "tree_from":
+			n, err := strconv.Atoi(val)
+			if err != nil || n < 0 {
+				return v, Invalid("tree_from must be a non-negative integer")
+			}
+			v.TreeFrom = n
+		}
+	}
+	return v, nil
+}
+
 // CreateSession is POST /api/sessions.
-func CreateSession(store *session.Store, body io.Reader) (session.State, error) {
+func CreateSession(store *session.Store, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		Seed     *int64 `json:"seed"`
 		MaxTurns int    `json:"max_turns"`
@@ -96,11 +122,11 @@ func CreateSession(store *session.Store, body io.Reader) (session.State, error) 
 	if err != nil {
 		return session.State{}, err
 	}
-	return s.State(), nil
+	return s.State(v), nil
 }
 
 // Discard is POST /api/sessions/{id}/discard.
-func Discard(s *session.Session, body io.Reader) (session.State, error) {
+func Discard(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		Tile   *string `json:"tile"`
 		NodeID *int    `json:"node_id"`
@@ -111,22 +137,22 @@ func Discard(s *session.Session, body io.Reader) (session.State, error) {
 	if req.Tile == nil {
 		return session.State{}, Invalid("tile is required")
 	}
-	return s.Discard(*req.Tile, req.NodeID)
+	return s.Discard(*req.Tile, req.NodeID, v)
 }
 
 // Tsumo is POST /api/sessions/{id}/tsumo.
-func Tsumo(s *session.Session, body io.Reader) (session.State, error) {
+func Tsumo(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		NodeID *int `json:"node_id"`
 	}
 	if err := Decode(body, &req, false); err != nil {
 		return session.State{}, err
 	}
-	return s.Tsumo(req.NodeID)
+	return s.Tsumo(req.NodeID, v)
 }
 
 // Goto is POST /api/sessions/{id}/goto.
-func Goto(s *session.Session, body io.Reader) (session.State, error) {
+func Goto(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		NodeID *int `json:"node_id"`
 	}
@@ -136,7 +162,7 @@ func Goto(s *session.Session, body io.Reader) (session.State, error) {
 	if req.NodeID == nil {
 		return session.State{}, Invalid("node_id is required")
 	}
-	return s.Goto(*req.NodeID)
+	return s.Goto(*req.NodeID, v)
 }
 
 // CreateGame is POST /api/games.
@@ -221,17 +247,19 @@ func versionOf(bi *debug.BuildInfo, ok bool) VersionInfo {
 	return v
 }
 
-// Route runs one request given as its HTTP method and API path (such as
-// "POST", "/api/sessions/{id}/discard"), for a transport without an HTTP
+// Route runs one request given as its HTTP method and API path, with any
+// query (such as "POST", "/api/sessions/{id}/discard?advice=0"), for a
+// transport without an HTTP
 // router (the WebAssembly build). It returns the status and the response
 // value the HTTP server would send: a session.State, a match.State, a
 // VersionInfo or an ErrorBody. Any other path is a 404 as for an unknown
 // endpoint.
 func Route(store *session.Store, games *match.Store, method, path string, body io.Reader) (int, any) {
+	path, query, _ := strings.Cut(path, "?")
 	if method == methodGet && path == "/api/version" {
 		return statusOK, Version()
 	}
-	return result(route(store, games, method, path, body))
+	return result(route(store, games, method, path, query, body))
 }
 
 // Restore rebuilds a session from its moves in one call (session.Replay)
@@ -239,8 +267,8 @@ func Route(store *session.Store, games *match.Store, method, path string, body i
 // an HTTP endpoint: the WebAssembly build uses it to bring a session back
 // after a page reload. The body is {"seed", "max_turns", "moves",
 // "current"}, moves as [{"parent": 0, "tile": "5m"}, {"parent": 3}] (no
-// tile: tsumo).
-func Restore(store *session.Store, body io.Reader) (int, any) {
+// tile: tsumo); query holds view options as for a request (SessionView).
+func Restore(store *session.Store, query string, body io.Reader) (int, any) {
 	var req struct {
 		Seed     *int64         `json:"seed"`
 		MaxTurns int            `json:"max_turns"`
@@ -253,11 +281,15 @@ func Restore(store *session.Store, body io.Reader) (int, any) {
 	if req.Seed == nil {
 		return result(session.State{}, Invalid("seed is required"))
 	}
+	v, err := SessionView(query)
+	if err != nil {
+		return result(session.State{}, err)
+	}
 	s, err := store.Create(req.Seed, req.MaxTurns)
 	if err != nil {
 		return result(session.State{}, err)
 	}
-	st, err := s.Replay(req.Moves, req.Current)
+	st, err := s.Replay(req.Moves, req.Current, v)
 	if err != nil {
 		store.Delete(s.ID()) // half built: nobody will ever ask for it
 	}
@@ -287,24 +319,18 @@ func result(v any, err error) (int, any) {
 	return statusOK, v
 }
 
-func route(store *session.Store, games *match.Store, method, path string, body io.Reader) (any, error) {
+func route(store *session.Store, games *match.Store, method, path, query string, body io.Reader) (any, error) {
 	// The server's message for a path no endpoint matches.
 	noEndpoint := errors.Join(session.ErrNotFound, errors.New("no such endpoint: "+method+" "+path))
 	if rest, ok := strings.CutPrefix(path, "/api/sessions"); ok {
-		if rest == "" {
-			if method != methodPost {
-				return nil, noEndpoint
-			}
-			return CreateSession(store, body)
-		}
+		var f func(*session.Session, session.View, io.Reader) (session.State, error)
 		id, op, ok := resource(rest)
-		if !ok {
-			return nil, noEndpoint
-		}
-		var f func(*session.Session, io.Reader) (session.State, error)
 		switch {
+		case rest == "" && method == methodPost:
+		case !ok:
+			return nil, noEndpoint
 		case method == methodGet && op == "":
-			f = func(s *session.Session, _ io.Reader) (session.State, error) { return s.State(), nil }
+			f = func(s *session.Session, v session.View, _ io.Reader) (session.State, error) { return s.State(v), nil }
 		case method == methodPost && op == "discard":
 			f = Discard
 		case method == methodPost && op == "tsumo":
@@ -314,11 +340,21 @@ func route(store *session.Store, games *match.Store, method, path string, body i
 		default:
 			return nil, noEndpoint
 		}
-		s, err := store.Get(id)
+		var s *session.Session
+		if f != nil {
+			var err error
+			if s, err = store.Get(id); err != nil {
+				return nil, err
+			}
+		}
+		v, err := SessionView(query)
 		if err != nil {
 			return nil, err
 		}
-		return f(s, body)
+		if f == nil {
+			return CreateSession(store, v, body)
+		}
+		return f(s, v, body)
 	}
 	if rest, ok := strings.CutPrefix(path, "/api/games"); ok {
 		if rest == "" {
