@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2026.0927.5](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.4...v2026.0927.5) - 2026-09-27
+
+### 修正
+- スマホ縦向きの下部タブバーをコンパクトにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/108
+### CI・リポジトリ
+- perf/ ブランチの PR をリリースノートの「パフォーマンス」に分類する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/107
+
 ## [v2026.0927.4](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.3...v2026.0927.4) - 2026-09-27
 
 ### その他
