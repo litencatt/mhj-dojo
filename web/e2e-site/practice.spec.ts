@@ -261,6 +261,42 @@ test('unusable saved moves start over from the seed in the URL', async ({ page }
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
+// The engine (cmd/mhj-dojo-wasm) keeps only a handful of sessions in memory
+// (maxSessions there) to bound the wasm heap in a browser tab; anything
+// beyond that is evicted and rebuilt from localStorage on its next request
+// (web/src/wasm.ts's "not found: session" path), same as after a reload.
+// Talking to the worker's own mhjDojoRequest directly (like worker.js does)
+// creates sessions the page's wasm.ts never learns about, so it still
+// treats session A as live and sends its next move straight to the engine
+// -- which is exactly what exercises the eviction, without reloading the
+// tab (a reload would start a fresh, empty engine and always rebuild,
+// masking whether the cap itself did anything).
+test('a session evicted by the engine cap is rebuilt from its save, no reload', async ({ page }) => {
+  await openTree(page);
+  await page.goto('./?seed=50&turns=18');
+  await discardDrawn(page);
+  const url = page.url();
+  const tree = page.getByRole('region', { name: '履歴ツリー' });
+  await expect(tree.locator('.tree-node-btn')).toHaveCount(2);
+
+  const worker = page.workers()[0];
+  const CAP = 4; // cmd/mhj-dojo-wasm/main.go's maxSessions; keep in sync
+  for (let i = 0; i < CAP + 1; i++) {
+    const res = (await worker.evaluate(
+      (seed) => mhjDojoRequest('POST', '/api/sessions', JSON.stringify({ seed })),
+      1000 + i,
+    )) as { status: number };
+    expect(res.status).toBe(200);
+  }
+
+  // Session A's own move now finds it gone from the engine and rebuilds it,
+  // keeping the same public URL and its move so far.
+  await discardDrawn(page);
+  expect(page.url()).toBe(url);
+  await expect(tree.locator('.tree-node-btn')).toHaveCount(3);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
 // On a phone (390px wide): no sideways page scroll, the hand on one row, the
 // minimized panels in a bar along the bottom, and the yaku table in the width.
 test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the screen', async ({ page }) => {

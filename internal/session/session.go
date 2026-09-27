@@ -59,8 +59,15 @@ type Store struct {
 	DefaultSeed *int64
 }
 
-// NewStore returns an empty store.
-func NewStore() *Store { return &Store{sessions: store.New[*Session](MaxSessions)} }
+// NewStore returns an empty store that keeps at most MaxSessions sessions.
+func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
+
+// NewStoreWithMax returns an empty store that keeps at most max sessions,
+// evicting the oldest beyond that. The wasm build (cmd/mhj-dojo-wasm) uses a
+// much smaller max than MaxSessions: it runs in a browser tab's memory
+// rather than a server's, so it can't afford to hold hundreds of sessions'
+// trees and analyzer memos (see docs/api.md "Memory").
+func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
 // Create starts a session. A nil seed picks the default or a random seed;
 // maxTurns 0 means DefaultMaxTurns.

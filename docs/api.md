@@ -704,6 +704,17 @@ to `match.MaxGames` = 256 CPU games. Each session or game owns a
 tables; a game's three CPU seats additionally share one `cpu.Player`, whose own
 memo resets past 100,000 tables.
 
+The wasm build (`cmd/mhj-dojo-wasm`) passes a much smaller max — 4, via
+`session.NewStoreWithMax` — instead of `session.MaxSessions`: it runs in a
+browser tab's memory rather than a server's, and Go's wasm runtime never
+returns freed heap pages to the OS, so a session's cost (its branch tree plus
+its own analyzer memo, a few MB each in ordinary play) only ever grows the
+tab's memory until the store evicts it. A session evicted this way, or lost
+to a reload, is rebuilt from its moves on its next request
+(`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
+works; `web/e2e-site/practice.spec.ts` checks the eviction and rebuild
+together.
+
 Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
 `internal/session/memory_test.go`'s `BenchmarkSessionMemory` (not run by
 `go test ./...`; each plays or grows N real games/sessions, then divides the

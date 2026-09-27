@@ -28,8 +28,18 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
+// maxSessions bounds the engine's in-memory sessions much tighter than the
+// native server's session.MaxSessions (256): this runs in a browser tab's
+// memory, and each practice session (its branch tree plus its own
+// yakushanten.Analyzer memo) can hold several MB, never released by Go's
+// wasm runtime back to the OS (docs/api.md "Memory"). 4 is enough for the
+// one game actually being played plus room to return to a couple of others
+// by URL without forcing a rebuild; web/e2e-site/practice.spec.ts asserts
+// eviction past this cap and its rebuild-from-save, so keep the two in sync.
+const maxSessions = 4
+
 func main() {
-	store := session.NewStore()
+	store := session.NewStoreWithMax(maxSessions)
 	js.Global().Set("mhjDojoRequest", js.FuncOf(func(_ js.Value, args []js.Value) any {
 		if len(args) != 3 {
 			return response(400, apicall.ErrorBody("mhjDojoRequest takes method, path and body"))
