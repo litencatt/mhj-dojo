@@ -181,14 +181,19 @@ function trim<T extends { used: number }>(saved: Record<string, T>, max: number)
   for (const id of ids.slice(max)) delete saved[id];
 }
 
+// Each session's save as this tab last built it (by public id), kept even
+// when storage refuses to write it: a state's new moves are added to it,
+// not to the save read back from localStorage, which may have fallen
+// behind. A session this tab hasn't built one for since it was rebuilt from
+// a save (or another tab took it over) has none.
+const built = new Map<string, Saved>();
+
 // Saves a session from its state, whose tree holds the nodes from treeFrom
 // on (docs/api.md "View options"): the moves that made the nodes before
-// come from its save. Returns false, saving nothing, when the moves then
-// don't add up to the session's whole tree (no save, or one that fell
-// behind, such as when storage refused it).
+// come from its last built save. Returns false, saving nothing, when the
+// moves then don't add up to the session's whole tree (none built yet).
 function saveSession(publicId: string, st: SessionState, treeFrom: number): boolean {
-  const sessions = loadAll();
-  const old = sessions[publicId];
+  const old = built.get(publicId);
   const made = [...st.tree]
     .sort((a, b) => a.node_id - b.node_id)
     .filter((n) => n.parent_id !== null)
@@ -201,13 +206,17 @@ function saveSession(publicId: string, st: SessionState, treeFrom: number): bool
     moves = [...old.moves.slice(0, before), ...made];
   }
   if (moves.length !== st.node_count - 1) return false;
-  sessions[publicId] = { seed: st.seed, max_turns: st.max_turns, moves, current: st.node_id, used: Date.now() };
+  const saved = { seed: st.seed, max_turns: st.max_turns, moves, current: st.node_id, used: Date.now() };
+  built.set(publicId, saved);
+  const sessions = loadAll();
+  sessions[publicId] = saved;
   trim(sessions, MAX_SAVED);
   storeAll(sessions, publicId);
   return true;
 }
 
 function forgetSession(publicId: string) {
+  built.delete(publicId);
   const sessions = loadAll();
   delete sessions[publicId];
   storeAll(sessions);
@@ -263,6 +272,9 @@ interface Kind {
   noun: string; // as in the engine's "not found: session ..." errors
   restoreFn: 'restore' | 'restoreGame';
   saved: (publicId: string) => string | null; // the restore body
+  // Notes the save the engine was just rebuilt from, or (null) that this
+  // tab's copy is out of date: another tab took it over.
+  rebuilt: (publicId: string, saved: string | null) => void;
   // Saves a successful response, made with the request's query; false if
   // it can't (see saveSession).
   save: (publicId: string, res: WasmResponse, query: string) => boolean;
@@ -283,9 +295,14 @@ const kinds: Kind[] = [
     base: SESSIONS,
     noun: 'session',
     restoreFn: 'restore',
+    // This tab's own last save first: storage may have refused it.
     saved: (id) => {
-      const s = loadAll()[id];
+      const s = built.get(id) ?? loadAll()[id];
       return s ? JSON.stringify(s) : null;
+    },
+    rebuilt: (id, saved) => {
+      if (saved === null) built.delete(id);
+      else built.set(id, JSON.parse(saved) as Saved);
     },
     save: (id, res, query) =>
       saveSession(id, res.data as SessionState, Number(new URLSearchParams(query).get('tree_from') ?? 0)),
@@ -306,6 +323,7 @@ const kinds: Kind[] = [
       const g = loadGames()[id];
       return typeof g?.save === 'string' ? g.save : null;
     },
+    rebuilt: () => {},
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
       if (res.save) saveGame(id, res.save);
@@ -355,6 +373,7 @@ onChange((key, stopped) => {
   if (!target) return;
   target.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
   target.kind.foreign.add(target.id);
+  target.kind.rebuilt(target.id, null);
 });
 
 // The answer to a request on a session or game another tab has taken over.
@@ -400,6 +419,7 @@ async function restore(kind: Kind, publicId: string, query: string, stopped: () 
     kind.known.add(id);
     kind.failures.delete(publicId);
     kind.foreign.delete(publicId);
+    kind.rebuilt(publicId, saved);
   } else if (kind.foreign.has(publicId)) {
     return { status: 409, data: { error: NEWER_SAVE } };
   } else if ([400, 404, 409, 422].includes(res.status)) {
