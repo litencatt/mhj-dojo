@@ -53,7 +53,11 @@ func goldenGame(t *testing.T, seed int64, o Options, pick func(State, *bool) gam
 // TestGoldenStates pins the state JSON and saves of two whole games (one
 // taking every call and kan, one declaring riichi) to what the engine
 // answered at commit 383fe58, before the analyses were shared across a
-// request's rows and between requests (see TestCachesMatchFresh).
+// request's rows and between requests (see TestCachesMatchFresh). The
+// hashes were taken again when the JSON took its slimmer shape (ukeire as
+// tile kinds counted by one remaining map, by_discard rows without the
+// analysis's names and han): converted to that shape, the old states were
+// the same as the new ones, state for state (the saves, match.Save, are untouched).
 func TestGoldenStates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
@@ -64,8 +68,8 @@ func TestGoldenStates(t *testing.T) {
 		pick func(State, *bool) game.Action
 		want string
 	}{
-		{0, Options{Length: Tonpuu, FirstDealer: DealerYou, CPU: cpu.Normal}, caller, "4d38d534d26980ab713cb81e256332325fcaaf54f15a02120bacfa213875f344"},
-		{5, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, move, "5ee22db46b71b657685fcd9b94c641c518c3d6f61008d5bc772b1c488d07e378"},
+		{0, Options{Length: Tonpuu, FirstDealer: DealerYou, CPU: cpu.Normal}, caller, "8c4fd89861e80d5f3288a4797636ef50fd434b61290627796ec03c994ce6dbde"},
+		{5, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, move, "29a82b6df508a22389cee80b70cde342b069f455142acec7f92889f94219d4ce"},
 	} {
 		if got := goldenGame(t, c.seed, c.o, c.pick); got != c.want {
 			t.Errorf("seed %d: states hash to %s, want %s", c.seed, got, c.want)

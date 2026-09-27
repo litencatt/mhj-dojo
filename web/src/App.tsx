@@ -30,6 +30,29 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
+  const adviceOpen = !isMin('advice');
+  // The states that came with the advice (see load).
+  const withAdvice = useRef(new WeakSet<SessionState>());
+
+  // Runs a session call with the view the page needs (docs/api.md "View
+  // options"): the advice only while its panel is open, and with prev (the
+  // state shown, of the same session) only the tree nodes it lacks. The
+  // state returned carries the whole tree: prev's nodes and the new ones,
+  // or, should they not add up to node_count, the tree asked for afresh.
+  async function load(call: (view: api.SessionView) => Promise<SessionState>, prev: SessionState | null) {
+    const view = { advice: adviceOpen, treeFrom: prev ? prev.tree.length : 0 };
+    let next = await call(view);
+    if (prev && view.treeFrom > 0) {
+      const tree = next.session_id === prev.session_id ? [...prev.tree.slice(0, view.treeFrom), ...next.tree] : [];
+      next =
+        tree.length === next.node_count
+          ? { ...next, tree }
+          : await api.getSession(next.session_id, { advice: view.advice, treeFrom: 0 });
+    }
+    if (view.advice) withAdvice.current.add(next);
+    return next;
+  }
+
   const { busy, error, notice, request } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
@@ -39,13 +62,23 @@ export function App() {
     // On the static site no other tab plays this session meanwhile (see
     // useSingleTab): a 409 is never another tab's doing. On the server it
     // may be another browser's.
-    state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
+    state && !api.WASM ? () => load((v) => api.getSession(state.session_id, v), null) : undefined,
     sessionMovedOn,
   );
   const stopped = useSingleTab(state ? api.sessionKey(state.session_id) : null);
 
+  // A state shown while the advice panel was minimized came without the
+  // advice: opening the panel asks for it (once per state).
+  const adviceAsked = useRef<SessionState | null>(null);
+  useEffect(() => {
+    if (!state || !adviceOpen || busy || stopped || withAdvice.current.has(state) || adviceAsked.current === state) return;
+    adviceAsked.current = state;
+    void request(() => load((v) => api.getSession(state.session_id, v), state));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, adviceOpen, busy, stopped]);
+
   function startGame(seed?: number, maxTurns?: number) {
-    return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
+    return request(() => load((v) => api.createSession({ seed, max_turns: maxTurns ?? 18 }, v), null));
   }
 
   // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
@@ -56,10 +89,14 @@ export function App() {
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
       claim(api.sessionKey(id));
-      return api.getSession(id);
+      return load((v) => api.getSession(id, v), null);
     },
     create: (params) =>
-      api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }),
+      load(
+        (v) =>
+          api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }, v),
+        null,
+      ),
     sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns) },
   });
 
@@ -76,17 +113,17 @@ export function App() {
 
   function handleDiscard(tile: string) {
     if (!state) return;
-    void request(() => api.discard(state.session_id, tile, state.node_id));
+    void request(() => load((v) => api.discard(state.session_id, tile, state.node_id, v), state));
   }
 
   function handleTsumo() {
     if (!state) return;
-    void request(() => api.tsumo(state.session_id, state.node_id));
+    void request(() => load((v) => api.tsumo(state.session_id, state.node_id, v), state));
   }
 
   const handleGoto = useStableCallback((nodeId: number) => {
     if (!state) return;
-    void request(() => api.goto(state.session_id, nodeId));
+    void request(() => load((v) => api.goto(state.session_id, nodeId, v), state));
   });
 
   const rowNames = useRowNames(state?.analysis);
@@ -256,6 +293,7 @@ export function App() {
           byDiscard={state.by_discard}
           combos={state.combos}
           combosByDiscard={state.combos_by_discard}
+          remaining={state.remaining}
           previewTile={previewTile}
           mode="practice"
           isMin={isMin}

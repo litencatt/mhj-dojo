@@ -42,7 +42,7 @@ func TestTreeRequestLatency(t *testing.T) {
 	start := time.Now()
 	calls := 0
 	for id := range s.nodes {
-		if _, err := s.Goto(id); err != nil {
+		if _, err := s.Goto(id, View{}); err != nil {
 			t.Fatal(err)
 		}
 		calls++
@@ -101,23 +101,23 @@ func typicalTreeFixture(tb testing.TB) *Session {
 		// grown to the node cap.
 		play := func() {
 			for {
-				v := s.State()
+				v := s.State(View{})
 				if v.Drawn == nil {
 					return
 				}
-				if _, err := s.Discard(*v.Drawn, nil); err != nil {
+				if _, err := s.Discard(*v.Drawn, nil, View{}); err != nil {
 					tb.Fatal(err)
 				}
 			}
 		}
 		play()
 		for rewind := 10; rewind <= 50; rewind += 10 {
-			if _, err := s.Goto(rewind); err != nil {
+			if _, err := s.Goto(rewind, View{}); err != nil {
 				tb.Fatal(err)
 			}
-			v := s.State()
+			v := s.State(View{})
 			tiles := append(append([]string{}, v.Hand...), *v.Drawn)
-			if _, err := s.Discard(tiles[0], nil); err != nil { // an alternate discard, branching here
+			if _, err := s.Discard(tiles[0], nil, View{}); err != nil { // an alternate discard, branching here
 				tb.Fatal(err)
 			}
 			play()
@@ -143,7 +143,7 @@ func BenchmarkLargeTreeRequestLatency(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := s.Goto(i % n); err != nil {
+		if _, err := s.Goto(i % n, View{}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -160,7 +160,7 @@ func BenchmarkTypicalTreeRequestLatency(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := s.Goto(i % n); err != nil {
+		if _, err := s.Goto(i % n, View{}); err != nil {
 			b.Fatal(err)
 		}
 	}

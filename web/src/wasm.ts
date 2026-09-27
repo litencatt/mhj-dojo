@@ -181,20 +181,30 @@ function trim<T extends { used: number }>(saved: Record<string, T>, max: number)
   for (const id of ids.slice(max)) delete saved[id];
 }
 
-function saveSession(publicId: string, st: SessionState) {
+// Saves a session from its state, whose tree holds the nodes from treeFrom
+// on (docs/api.md "View options"): the moves that made the nodes before
+// come from its save. Returns false, saving nothing, when the moves then
+// don't add up to the session's whole tree (no save, or one that fell
+// behind, such as when storage refused it).
+function saveSession(publicId: string, st: SessionState, treeFrom: number): boolean {
   const sessions = loadAll();
-  sessions[publicId] = {
-    seed: st.seed,
-    max_turns: st.max_turns,
-    moves: [...st.tree]
-      .sort((a, b) => a.node_id - b.node_id)
-      .slice(1)
-      .map((n) => (n.status === 'tsumo' ? { parent: n.parent_id ?? 0 } : { parent: n.parent_id ?? 0, tile: n.discard ?? '' })),
-    current: st.node_id,
-    used: Date.now(),
-  };
+  const old = sessions[publicId];
+  const made = [...st.tree]
+    .sort((a, b) => a.node_id - b.node_id)
+    .filter((n) => n.parent_id !== null)
+    .map((n) => (n.status === 'tsumo' ? { parent: n.parent_id ?? 0 } : { parent: n.parent_id ?? 0, tile: n.discard ?? '' }));
+  // Node i+1 was made by moves[i].
+  const before = Math.max(treeFrom - 1, 0);
+  let moves = made;
+  if (before > 0) {
+    if (!old || old.seed !== st.seed || old.max_turns !== st.max_turns || old.moves.length < before) return false;
+    moves = [...old.moves.slice(0, before), ...made];
+  }
+  if (moves.length !== st.node_count - 1) return false;
+  sessions[publicId] = { seed: st.seed, max_turns: st.max_turns, moves, current: st.node_id, used: Date.now() };
   trim(sessions, MAX_SAVED);
   storeAll(sessions, publicId);
+  return true;
 }
 
 function forgetSession(publicId: string) {
@@ -253,7 +263,9 @@ interface Kind {
   noun: string; // as in the engine's "not found: session ..." errors
   restoreFn: 'restore' | 'restoreGame';
   saved: (publicId: string) => string | null; // the restore body
-  save: (publicId: string, res: WasmResponse) => void;
+  // Saves a successful response, made with the request's query; false if
+  // it can't (see saveSession).
+  save: (publicId: string, res: WasmResponse, query: string) => boolean;
   forget: (publicId: string) => void;
   idOf: (data: unknown) => string;
   setId: (data: unknown, id: string) => void;
@@ -275,7 +287,8 @@ const kinds: Kind[] = [
       const s = loadAll()[id];
       return s ? JSON.stringify(s) : null;
     },
-    save: (id, res) => saveSession(id, res.data as SessionState),
+    save: (id, res, query) =>
+      saveSession(id, res.data as SessionState, Number(new URLSearchParams(query).get('tree_from') ?? 0)),
     forget: forgetSession,
     idOf: (d) => (d as SessionState).session_id,
     setId: (d, id) => ((d as SessionState).session_id = id),
@@ -296,6 +309,7 @@ const kinds: Kind[] = [
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
       if (res.save) saveGame(id, res.save);
+      return true;
     },
     forget: forgetGame,
     idOf: (d) => (d as GameState).game_id,
@@ -316,8 +330,8 @@ function forgetEngine() {
   }
 }
 
-// The kind and id in a {base}/{id}[/op] path, the path with the id swapped
-// for another, and its singleTab key ({base}/{id}).
+// The kind and id in a {base}/{id}[/op] path (no query), the path with the
+// id swapped for another, and its singleTab key ({base}/{id}).
 function splitPath(path: string): { kind: Kind; id: string; with: (id: string) => string; key: string } | null {
   for (const kind of kinds) {
     if (!path.startsWith(`${kind.base}/`)) continue;
@@ -363,13 +377,14 @@ const MAX_RESTORE_FAILURES = 2;
 // 409 asking for a reload, as that tab may run a newer engine. Should
 // another tab take it over meanwhile (stopped), none of this is done: that
 // tab's save is its own, and this tab's copy is out of date.
-async function restore(kind: Kind, publicId: string, stopped: () => boolean): Promise<WasmResponse | null> {
+async function restore(kind: Kind, publicId: string, query: string, stopped: () => boolean): Promise<WasmResponse | null> {
   // Once the tab this one just took it from has stopped saving it; the
   // engine starts meanwhile.
   await Promise.all([settled(`${kind.base}/${encodeURIComponent(publicId)}`), start()]);
   const saved = kind.saved(publicId);
   if (saved === null) return null;
-  const res = await call(kind.restoreFn, saved);
+  // A session's rebuilt state answers with the request's view options.
+  const res = await (kind.restoreFn === 'restore' ? call('restore', saved, query) : call('restoreGame', saved));
   if (stopped()) return stoppedResponse();
   if (res.status === 200) {
     const id = kind.idOf(res.data);
@@ -417,7 +432,7 @@ let queue: Promise<unknown> = Promise.resolve();
 export function wasmRequest(method: string, path: string, body?: string): Promise<WasmResponse> {
   // Whether another tab has taken the session or game over since the
   // request was made: checked as it starts, and before anything is saved.
-  const key = splitPath(path)?.key;
+  const key = splitPath(path.split('?', 1)[0])?.key;
   const l = key === undefined ? 0 : lease(key);
   const stopped = () => key !== undefined && !live(key, l);
   // One request at a time, in order: two requests for something the engine
@@ -430,21 +445,22 @@ export function wasmRequest(method: string, path: string, body?: string): Promis
 
 async function answer(
   method: string,
-  path: string,
+  fullPath: string,
   body: string | undefined,
   stopped: () => boolean,
 ): Promise<WasmResponse> {
   if (stopped()) return stoppedResponse();
+  const [path, query = ''] = fullPath.split('?', 2);
   const target = splitPath(path);
   const kind = target?.kind ?? kinds.find((k) => path === k.base);
   const send = () => {
     const engineId = target && target.kind.engineOf.get(target.id);
-    return call('request', method, target && engineId ? target.with(engineId) : path, body ?? '');
+    return call('request', method, target && engineId ? `${target.with(engineId)}${query ? `?${query}` : ''}` : fullPath, body ?? '');
   };
   const isGet = target !== null && method === 'GET' && path === target.with(target.id);
   let res: WasmResponse | null = null;
   if (target && !target.kind.known.has(target.kind.engineOf.get(target.id) ?? target.id)) {
-    const r = await restore(target.kind, target.id, stopped);
+    const r = await restore(target.kind, target.id, query, stopped);
     // A GET is answered by the rebuilt state itself.
     if (r && (r.status !== 200 || isGet)) res = r;
   }
@@ -452,7 +468,7 @@ async function answer(
   if (target && res.status === 404 && (res.data as { error?: string })?.error?.startsWith(`not found: ${target.kind.noun} `)) {
     // The engine no longer holds what it had (evicted): rebuild it.
     target.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
-    const r = await restore(target.kind, target.id, stopped);
+    const r = await restore(target.kind, target.id, query, stopped);
     if (r && (r.status !== 200 || isGet)) res = r;
     else if (r) res = await send();
   }
@@ -463,7 +479,12 @@ async function answer(
     kind.known.add(engineId);
     const publicId = kind.publicOf.get(engineId) ?? engineId;
     kind.setId(res.data, publicId);
-    kind.save(publicId, res);
+    if (!kind.save(publicId, res, query)) {
+      // The save fell behind the tree: save it from the whole tree.
+      const whole = await call('request', 'GET', `${kind.base}/${encodeURIComponent(engineId)}?advice=0`, '');
+      if (stopped()) return stoppedResponse();
+      if (whole.status === 200) kind.save(publicId, whole, '');
+    }
   } else if (target && res.status !== 200) {
     // Error messages name the engine's id; show the page's instead.
     const engineId = target.kind.engineOf.get(target.id);

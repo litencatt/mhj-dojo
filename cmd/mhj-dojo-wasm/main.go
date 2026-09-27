@@ -14,10 +14,12 @@
 // server would send (apicall.Route). A game response with a state also
 // carries save, the game's match.Save as a JSON string ("" otherwise);
 //
-//	mhjDojoRestore(body) -> {status, body, save}
+//	mhjDojoRestore(body, query) -> {status, body, save}
 //
 // rebuilds a session from its moves in one call after a page reload
-// (apicall.Restore; not an HTTP endpoint); and
+// (apicall.Restore; not an HTTP endpoint), answering with its state as the
+// view options in query (a request's URL query, such as "advice=0"; may be
+// left out) pick it; and
 //
 //	mhjDojoRestoreGame(save) -> {status, body, save}
 //
@@ -67,11 +69,15 @@ func main() {
 		})
 	}))
 	js.Global().Set("mhjDojoRestore", js.FuncOf(func(_ js.Value, args []js.Value) any {
-		if len(args) != 1 {
-			return response(games, 400, apicall.ErrorBody("mhjDojoRestore takes a body"))
+		if len(args) != 1 && len(args) != 2 {
+			return response(games, 400, apicall.ErrorBody("mhjDojoRestore takes a body and a query"))
+		}
+		query := ""
+		if len(args) == 2 {
+			query = args[1].String()
 		}
 		return safely(games, func() (int, any) {
-			return apicall.Restore(store, strings.NewReader(args[0].String()))
+			return apicall.Restore(store, query, strings.NewReader(args[0].String()))
 		})
 	}))
 	js.Global().Set("mhjDojoRestoreGame", js.FuncOf(func(_ js.Value, args []js.Value) any {

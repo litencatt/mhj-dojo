@@ -348,6 +348,7 @@ export function GameApp() {
           byDiscard={state.by_discard}
           combos={state.combos}
           combosByDiscard={state.combos_by_discard}
+          remaining={state.remaining}
           previewTile={previewTile}
           mode="game"
           isMin={isMin}
