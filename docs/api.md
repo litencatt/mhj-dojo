@@ -697,9 +697,11 @@ East, otherwise the round wind row then your seat wind row (1 han each).
 
 ## Memory
 
-The server keeps two in-memory stores, each evicting its oldest entry once full
-(`internal/store`): up to `session.MaxSessions` = 256 practice sessions and up
-to `match.MaxGames` = 256 CPU games. Each session or game owns a
+The server keeps two in-memory stores, each evicting its least recently used
+entry once full (`internal/store`; a `Get` marks an entry most recently used,
+so one a client keeps polling or acting on stays in): up to
+`session.MaxSessions` = 256 practice sessions and up to `match.MaxGames` = 256
+CPU games. Each session or game owns a
 `yakushanten.Analyzer`, whose shanten memo resets once it exceeds 200,000 suit
 tables; a game's three CPU seats additionally share one `cpu.Player`, whose own
 memo resets past 100,000 tables.

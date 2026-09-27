@@ -23,7 +23,7 @@ import (
 var ErrNotFound = errors.New("not found")
 
 const (
-	// MaxGames bounds memory; the oldest game is evicted beyond it.
+	// MaxGames bounds memory; the least recently used game is evicted beyond it.
 	MaxGames = 256
 	// Human is the human player's seat.
 	Human = 0

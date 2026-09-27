@@ -141,8 +141,10 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
 const TSUMO_LINE = ['6z', '7z', '1m', '2s', '9p', '2z', '9m', '2z', '7z', '8s', '5s'];
 const tsumoMoves = [...TSUMO_LINE.map((tile, i) => ({ parent: i, tile })), { parent: TSUMO_LINE.length }];
 
-async function seedStorage(page: Page, id: string, current: number) {
-  const saved = { v: 2, sessions: { [id]: { seed: 2, max_turns: 18, moves: tsumoMoves, current, used: 1 } } };
+type SavedMove = { parent: number; tile?: string };
+
+async function seedStorage(page: Page, id: string, current: number, moves: SavedMove[] = tsumoMoves) {
+  const saved = { v: 2, sessions: { [id]: { seed: 2, max_turns: 18, moves, current, used: 1 } } };
   await page.addInitScript((s) => {
     if (!sessionStorage.getItem('seeded')) {
       localStorage.setItem('mhj-dojo.site.practice', s);
@@ -271,29 +273,77 @@ test('unusable saved moves start over from the seed in the URL', async ({ page }
 // -- which is exactly what exercises the eviction, without reloading the
 // tab (a reload would start a fresh, empty engine and always rebuild,
 // masking whether the cap itself did anything).
+const ENGINE_CAP = 4; // cmd/mhj-dojo-wasm/main.go's maxSessions; keep in sync
+
+/** Fills the live engine past its cap, evicting every session it already knows. */
+async function evictEverything(page: Page, seedFrom: number) {
+  const worker = page.workers()[0];
+  for (let i = 0; i <= ENGINE_CAP; i++) {
+    const res = (await worker.evaluate(
+      (seed) => mhjDojoRequest('POST', '/api/sessions', JSON.stringify({ seed })),
+      seedFrom + i,
+    )) as { status: number };
+    expect(res.status).toBe(200);
+  }
+}
+
 test('a session evicted by the engine cap is rebuilt from its save, no reload', async ({ page }) => {
   await openTree(page);
   await page.goto('./?seed=50&turns=18');
   await discardDrawn(page);
+  await discardDrawn(page);
   const url = page.url();
   const tree = page.getByRole('region', { name: '履歴ツリー' });
-  await expect(tree.locator('.tree-node-btn')).toHaveCount(2);
+  const nodes = tree.locator('.tree-node-btn');
+  await expect(nodes).toHaveCount(3);
 
-  const worker = page.workers()[0];
-  const CAP = 4; // cmd/mhj-dojo-wasm/main.go's maxSessions; keep in sync
-  for (let i = 0; i < CAP + 1; i++) {
-    const res = (await worker.evaluate(
-      (seed) => mhjDojoRequest('POST', '/api/sessions', JSON.stringify({ seed })),
-      1000 + i,
-    )) as { status: number };
-    expect(res.status).toBe(200);
-  }
+  await evictEverything(page, 1000);
 
-  // Session A's own move now finds it gone from the engine and rebuilds it,
-  // keeping the same public URL and its move so far.
+  // A goto on the evicted session (not a new move) rebuilds it too, landing
+  // exactly on the requested node rather than wherever the save left it.
+  await nodes.nth(1).click();
+  expect(page.url()).toBe(url);
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+
+  // Branching from the rebuilt node still works.
+  await page.getByRole('region', { name: '手牌' }).locator('.hand-tiles button').first().click();
+  await expect(nodes).toHaveCount(4);
+  expect(page.url()).toBe(url);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+
+  // Evict again, then a plain move (not a goto) rebuilds it the same way.
+  await evictEverything(page, 2000);
   await discardDrawn(page);
   expect(page.url()).toBe(url);
-  await expect(tree.locator('.tree-node-btn')).toHaveCount(3);
+  await expect(nodes).toHaveCount(5);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// Seed 2's TSUMO_LINE (below) reaches tsumo on the 12th draw. Rather than
+// clicking through 11 real discards, the session is seeded with just those
+// 11 moves (a real Restore replay on load, exactly like "a saved session
+// resumes at an inner node") so it starts already positioned at the winning
+// draw, still playing -- then the test evicts it and declares tsumo for
+// real, exercising the engine's own win-detection on a session that only
+// exists because wasm.ts rebuilt it.
+test('an evicted session declares tsumo after rebuilding, no reload', async ({ page }) => {
+  await openTree(page);
+  const discardsOnly = TSUMO_LINE.map((tile, i) => ({ parent: i, tile }));
+  await seedStorage(page, 'e2etsumolive', TSUMO_LINE.length, discardsOnly);
+  await page.goto('./?session=e2etsumolive&seed=2&turns=18');
+  const url = page.url();
+  const tree = page.getByRole('region', { name: '履歴ツリー' });
+  await expect(tree.locator('.tree-node-btn')).toHaveCount(TSUMO_LINE.length + 1);
+  await expect(page.getByRole('region', { name: '和了' })).toHaveCount(0);
+
+  await evictEverything(page, 3000);
+
+  await page.getByRole('button', { name: 'ツモ' }).click();
+  await expect(page.getByRole('region', { name: '和了' })).toBeVisible();
+  expect(page.url()).toBe(url);
+  await expect(tree.locator('.tree-node-btn')).toHaveCount(TSUMO_LINE.length + 2);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
