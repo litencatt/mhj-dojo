@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2026.0927.7](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.6...v2026.0927.7) - 2026-09-27
+
+### 新機能
+- 公開版（WASM）で CPU 対戦を遊べるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/114
+### パフォーマンス
+- WASM 版: 向聴メモの局またぎ再利用と、応答しないエンジンからの復帰 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/116
+
 ## [v2026.0927.6](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.5...v2026.0927.6) - 2026-09-27
 
 ### 新機能
