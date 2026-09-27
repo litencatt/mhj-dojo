@@ -41,17 +41,17 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 	a := &api{store: store, games: games}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/sessions", a.create)
-	mux.HandleFunc("GET /api/sessions/{id}", a.withSession(func(s *session.Session, _ *http.Request) (session.State, error) {
-		return s.State(), nil
+	mux.HandleFunc("GET /api/sessions/{id}", a.withSession(func(s *session.Session, v session.View, _ *http.Request) (session.State, error) {
+		return s.State(v), nil
 	}))
-	mux.HandleFunc("POST /api/sessions/{id}/discard", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		return apicall.Discard(s, r.Body)
+	mux.HandleFunc("POST /api/sessions/{id}/discard", a.withSession(func(s *session.Session, v session.View, r *http.Request) (session.State, error) {
+		return apicall.Discard(s, v, r.Body)
 	}))
-	mux.HandleFunc("POST /api/sessions/{id}/tsumo", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		return apicall.Tsumo(s, r.Body)
+	mux.HandleFunc("POST /api/sessions/{id}/tsumo", a.withSession(func(s *session.Session, v session.View, r *http.Request) (session.State, error) {
+		return apicall.Tsumo(s, v, r.Body)
 	}))
-	mux.HandleFunc("POST /api/sessions/{id}/goto", a.withSession(func(s *session.Session, r *http.Request) (session.State, error) {
-		return apicall.Goto(s, r.Body)
+	mux.HandleFunc("POST /api/sessions/{id}/goto", a.withSession(func(s *session.Session, v session.View, r *http.Request) (session.State, error) {
+		return apicall.Goto(s, v, r.Body)
 	}))
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, apicall.Version())
@@ -140,7 +140,12 @@ func (a *api) withGame(f func(*match.Match, *http.Request) (match.State, error))
 }
 
 func (a *api) create(w http.ResponseWriter, r *http.Request) {
-	st, err := apicall.CreateSession(a.store, r.Body)
+	v, err := apicall.SessionView(r.URL.RawQuery)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	st, err := apicall.CreateSession(a.store, v, r.Body)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -148,14 +153,21 @@ func (a *api) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, st)
 }
 
-func (a *api) withSession(f func(*session.Session, *http.Request) (session.State, error)) http.HandlerFunc {
+// withSession runs f on the request's session with the request's view
+// options (apicall.SessionView).
+func (a *api) withSession(f func(*session.Session, session.View, *http.Request) (session.State, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := a.store.Get(r.PathValue("id"))
 		if err != nil {
 			writeErr(w, err)
 			return
 		}
-		st, err := f(s, r)
+		v, err := apicall.SessionView(r.URL.RawQuery)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		st, err := f(s, v, r)
 		if err != nil {
 			writeErr(w, err)
 			return

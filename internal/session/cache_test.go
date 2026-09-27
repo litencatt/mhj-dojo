@@ -28,17 +28,17 @@ func TestCachesMatchFresh(t *testing.T) {
 		plain.analyzer.DisableResultMemo()
 		fresh := yakushanten.NewAnalyzer()
 		for range testmode.N(80, 40, 15) {
-			v := s.State()
+			v := s.State(View{})
 			var got, want State
 			var err, perr error
 			switch {
 			case v.Status != StatusPlaying || rng.IntN(5) == 0:
 				id := rng.IntN(len(v.Tree))
-				got, err = s.Goto(id)
-				want, perr = plain.Goto(id)
+				got, err = s.Goto(id, View{})
+				want, perr = plain.Goto(id, View{})
 			case v.CanTsumo && rng.IntN(2) == 0:
-				got, err = s.Tsumo(nil)
-				want, perr = plain.Tsumo(nil)
+				got, err = s.Tsumo(nil, View{})
+				want, perr = plain.Tsumo(nil, View{})
 			default:
 				tiles := append(append([]string{}, v.Hand...), *v.Drawn)
 				x := tiles[rng.IntN(len(tiles))]
@@ -47,8 +47,8 @@ func TestCachesMatchFresh(t *testing.T) {
 				}
 				k, _ := tile.Parse(x)
 				preview := plain.nodes[plain.current].byDiscard[k.Kind]
-				got, err = s.Discard(x, nil)
-				want, perr = plain.Discard(x, nil)
+				got, err = s.Discard(x, nil, View{})
+				want, perr = plain.Discard(x, nil, View{})
 				// Without the result memo, only the seeding shares the rows.
 				if a := plain.nodes[plain.current].analysis; perr == nil && len(preview) > 0 && &a[0] == &preview[0] {
 					seeded++

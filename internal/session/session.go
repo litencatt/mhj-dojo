@@ -42,7 +42,7 @@ const (
 	// MaxSessions bounds memory; the least recently used session is evicted
 	// beyond it.
 	MaxSessions = 256
-	// MaxNodes bounds a session's tree (every state carries the whole tree).
+	// MaxNodes bounds a session's tree.
 	MaxNodes = 2000
 )
 
@@ -143,8 +143,10 @@ type node struct {
 	combosByDiscard map[tile.Kind][]yakushanten.Combo
 	// advice is the current node's discard advice, pruned with byDiscard;
 	// review compares the discard that led to this node with the best one
-	// at its parent and, being small, is kept forever. Replay leaves it to
-	// be computed when the node is shown (reviewPending; see nodeReview).
+	// at its parent and, being small, is kept forever. Replay, and a
+	// discard made without the advice (View.NoAdvice), leave it to be
+	// computed when the node is shown with the advice (reviewPending; see
+	// nodeReview).
 	advice        *advice.Advice
 	review        *advice.Review
 	reviewPending bool
@@ -197,23 +199,24 @@ func (s *Session) drawn(n *node) (tile.Tile, bool) {
 }
 
 // State returns the view of the current node.
-func (s *Session) State() State {
+func (s *Session) State(v View) State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state()
+	return s.state(v)
 }
 
 // Discard discards an exact tile (red distinguished) from hand+drawn.
 // expectedNode, when non-nil, must match the current node: it lets a client
 // detect that another tab moved the session on first (ErrConflict) instead
-// of silently acting on whatever node happens to be current.
-func (s *Session) Discard(t string, expectedNode *int) (State, error) {
+// of silently acting on whatever node happens to be current. A new node's
+// review of the discard is computed now unless v leaves the advice out.
+func (s *Session) Discard(t string, expectedNode *int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.discard(t, expectedNode, true); err != nil {
+	if err := s.discard(t, expectedNode, !v.NoAdvice); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // discard is Discard without the state; callers hold s.mu. Unless review
@@ -280,13 +283,13 @@ func (s *Session) seedAnalysis(n, cur *node) {
 }
 
 // Tsumo declares a win with the pending draw. expectedNode is as in Discard.
-func (s *Session) Tsumo(expectedNode *int) (State, error) {
+func (s *Session) Tsumo(expectedNode *int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.tsumo(expectedNode); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // tsumo is Tsumo without the state; callers hold s.mu.
@@ -339,13 +342,13 @@ func (s *Session) checkExpectedNode(expectedNode *int) error {
 // moving the session on first doesn't make it ambiguous: it either still
 // exists (it does; the tree only grows) or doesn't (ErrNotFound already).
 // It has no expectedNode guard.
-func (s *Session) Goto(id int) (State, error) {
+func (s *Session) Goto(id int, v View) (State, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.goTo(id); err != nil {
 		return State{}, err
 	}
-	return s.state(), nil
+	return s.state(v), nil
 }
 
 // goTo is Goto without the state; callers hold s.mu.

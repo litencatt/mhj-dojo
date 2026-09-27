@@ -7,8 +7,9 @@ The static site (README, "Static site") has no server: the engine built as WebAs
 request below — practice (`/api/sessions…`), game (`/api/games…`) or `GET /api/version` — as its
 method, path and JSON body and returns `{status, body, save}` with the status and JSON body the
 server would send (both use `internal/apicall`). It also defines two functions that are not HTTP
-endpoints: `mhjDojoRestore(body)`, which rebuilds a session from its moves in one call after a page
-reload, and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
+endpoints: `mhjDojoRestore(body, query)`, which rebuilds a session from its moves in one call after a page
+reload (`body` is `{"seed", "max_turns", "moves", "current"}`; `query`, which may be left out, holds
+view options as a request's URL query does, see "View options"), and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
 (WebAssembly)").
 
 ## Tile notation
@@ -67,6 +68,28 @@ names the destination explicitly, so there's no separate "acted from" node to gu
 discard/tsumo, another browser moving the session on first can't make this ambiguous (the target
 node still exists; the tree only grows), so `goto` takes no staleness guard.
 
+### View options
+
+Every practice endpoint above (`POST /api/sessions` included) takes two optional URL query
+parameters that leave parts of the returned `State` out, for a client that doesn't need them:
+
+- `advice=0` – `advice` and `discard_review` are `null`, and the advice is not computed (about
+  2 ms, a sixth of a discard's time along the advice's best line). A discard made with it leaves
+  the new node's review to be computed the next time the node is shown with the advice, so asking
+  for the same state again without `advice=0` (say, once the client's advice panel opens) fills
+  in both. `advice=1` is the default.
+- `tree_from=<n>` – `tree` holds only the nodes with `node_id >= n`. Nodes are numbered in the
+  order they are made and never change once made, so a client that holds the first `n` nodes
+  (its tree's length) asks for the rest only and appends them; `node_count` tells it how many
+  the whole tree has, a check that the two add up. `0` (the default) sends the whole tree; past
+  the end, `tree` is `[]`.
+
+Any other value is a `400` (`tree_from` is read as a decimal integer, a leading `+` allowed);
+unknown parameters are ignored, and of a parameter given twice the last value counts. The UI sends `advice=0` while the
+advice panel is minimized (opening it asks for the state shown again, with the advice), and
+`tree_from` on every request but those that load a session afresh (a new one, the first of a page,
+the re-fetch after a `409`), which take the whole tree.
+
 ### `GET /api/version`
 The commit the answering binary was built from, as the go command stamps it into a build
 made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
@@ -111,12 +134,16 @@ it in the header.
 
   // Only when status == playing: for each distinct discard candidate of hand+drawn
   // (key = exact tile string, red kept distinct), analysis of the resulting 13 tiles.
-  "by_discard": { "5m": [YakuRow], "...": [YakuRow] },
+  "by_discard": { "5m": [DiscardRow], "...": [DiscardRow] },
 
   // Up to five yaku combinations for `hand`, best first (see Yaku combos),
   // and, only when status == playing, for each discard candidate as in by_discard.
   "combos": [ComboRow],
   "combos_by_discard": { "5m": [ComboRow] },
+
+  // Unseen copies of every tile kind (34 keys, no red notation), which the ukeire
+  // lists of analysis, by_discard and the combos count from (see YakuRow).
+  "remaining": { "1m": 3, "2m": 4, "...": 4 },
 
   // Path from the root to the current node (inclusive), for the time-series chart.
   "history": [
@@ -124,7 +151,9 @@ it in the header.
       "shanten": { "normal": 3, "tanyao": 4, "honitsu": null /* impossible */ } }
   ],
 
-  // Whole tree for the branch view.
+  // Nodes in the whole tree, and the tree for the branch view: all of it, or the
+  // nodes from tree_from on (see View options).
+  "node_count": 1,
   "tree": [
     { "node_id": 0, "parent_id": null, "turn": 0, "draw": null, "discard": null, "status": "playing", "normal_shanten": 3 }
   ],
@@ -138,9 +167,11 @@ it in the header.
   },
 
   // Only when status == playing: ranked discards and notes (see Advice).
+  // null with advice=0.
   "advice": Advice,
   // Only at a node reached by a discard (null at the root and at tsumo
   // nodes): that discard compared with the best one at the parent.
+  // null with advice=0.
   "discard_review": Review
 }
 ```
@@ -155,14 +186,24 @@ it in the header.
   "han": 1,                // han for your hand (practice: closed, East round/seat); 13 for yakuman, 0 for "normal"
   "shanten": 2,            // 0 = tenpai, null = impossible (∞)
   "approx": false,         // true when the value is an approximation (pinfu at shanten >= 1)
-  "ukeire": [ { "tile": "3m", "remaining": 3 } ],  // tile types (no red notation) that lower shanten
-  "ukeire_total": 12       // sum of remaining
+  "ukeire": ["3m", "6m"],  // tile types (no red notation) that lower shanten
+  "ukeire_total": 12       // their unseen copies: the sum of remaining[t] over ukeire
 }
 ```
 
-`remaining` = 4 − copies visible to the player at this node: `hand` + `drawn` (if any) +
-`discards` + `dora_indicators`. The same visible set is used for `analysis` and every `by_discard` entry.
-A tile type can appear with `remaining: 0` (空聴).
+The state's `remaining[t]` = 4 − copies of `t` visible to the player at this node: `hand` + `drawn`
+(if any) + `discards` + `dora_indicators`. The same visible set is used for `analysis` and every
+`by_discard` entry, so one map serves every ukeire list of the state. A tile type can be ukeire with
+`remaining` 0 (空聴).
+
+### `DiscardRow`
+
+A row of a `by_discard` preview: a `YakuRow` without `name`, `yakuman` and `han`, which depend only
+on the key within one state; the state's `analysis` has a row of every key with them.
+
+```jsonc
+{ "key": "tanyao", "shanten": 1, "approx": false, "ukeire": ["2p"], "ukeire_total": 3 }
+```
 
 ### `HandGroup`
 
@@ -309,7 +350,7 @@ without that showing in its han. East/East practice has 295 combinations.
   "han": 4,                // sum of the rows' han (open-hand han after a call); dora not counted
   "shanten": 0,            // never null: impossible combinations are not listed
   "approx": false,         // true for a pinfu combination at shanten >= 1 (as the pinfu row)
-  "ukeire": [ { "tile": "4s", "remaining": 3 } ],
+  "ukeire": ["4s"],        // counted by the state's remaining, as for a row
   "ukeire_total": 3
 }
 ```
@@ -416,10 +457,10 @@ These clarify points the contract above leaves open; none changes the JSON shape
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
   **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
-  (an exhausted node has one). Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
-  each node keeps just its small review. Computing the advice takes ~1.4 ms on average, ~4 ms at p95, per
-  request (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
-  discard p95 ~23 ms including the rest of the state).
+  (an exhausted node has one); both are `null` with `advice=0`. Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
+  each node keeps just its small review. Computing the advice takes ~2 ms per discard along the advice's
+  best line (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
+  discard p95 ~20 ms including the rest of the state), which `advice=0` saves.
 - **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
@@ -723,9 +764,10 @@ under the 64 KiB body limit.
   "events_wall_remaining": 70,  // live draws left just before events[0] (its mover's draw taken); wall_remaining with no events
   "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
                                 // wind rows follow your seat and the round
-  "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
+  "by_discard": { "1m": [DiscardRow] },  // on your turn: rows after each legal discard
   "combos": [ComboRow],         // yaku combos of your hand (right after a pon or chii: the best discard's, see Yaku combos)
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
+  "remaining": { "1m": 3, "...": 4 },  // unseen copies of every tile kind, for the ukeire lists (see YakuRow)
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
   "result": null                // Result once ended
 }

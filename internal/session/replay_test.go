@@ -44,23 +44,23 @@ func TestReplayMatchesPlay(t *testing.T) {
 		s := mustCreate(t, st, seed, 8)
 		var last State
 		for range testmode.N(60, 30, 12) {
-			v := s.State()
+			v := s.State(View{})
 			if v.Status != StatusPlaying {
-				last, _ = s.Goto(rng.IntN(len(v.Tree)))
+				last, _ = s.Goto(rng.IntN(len(v.Tree)), View{})
 				continue
 			}
 			tiles := append(append([]string{}, v.Hand...), *v.Drawn)
 			var err error
-			last, err = s.Discard(tiles[rng.IntN(len(tiles))], nil)
+			last, err = s.Discard(tiles[rng.IntN(len(tiles))], nil, View{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if rng.IntN(4) == 0 {
-				last, _ = s.Goto(rng.IntN(len(last.Tree)))
+				last, _ = s.Goto(rng.IntN(len(last.Tree)), View{})
 			}
 		}
 		rs := mustCreate(t, st, seed, 8)
-		r, err := rs.Replay(movesOf(last), last.NodeID)
+		r, err := rs.Replay(movesOf(last), last.NodeID, View{})
 		if err != nil {
 			t.Fatalf("seed %d: %v", seed, err)
 		}
@@ -70,8 +70,8 @@ func TestReplayMatchesPlay(t *testing.T) {
 		// Other nodes too: their reviews were left for when they're shown.
 		for range 3 {
 			id := rng.IntN(len(last.Tree))
-			got, _ := rs.Goto(id)
-			want, _ := s.Goto(id)
+			got, _ := rs.Goto(id, View{})
+			want, _ := s.Goto(id, View{})
 			if stateJSON(t, got) != stateJSON(t, want) {
 				t.Fatalf("seed %d: replayed node %d differs", seed, id)
 			}
@@ -87,12 +87,12 @@ func TestReplayMatchesPlay(t *testing.T) {
 func TestReplayTsumo(t *testing.T) {
 	st := NewStore()
 	s, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
-	want, err := s.Tsumo(nil)
+	want, err := s.Tsumo(nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
-	got, err := r.Replay(movesOf(want), want.NodeID)
+	got, err := r.Replay(movesOf(want), want.NodeID, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestReplayErrors(t *testing.T) {
 		// Seed 1's hand holds 1m; the second move repeats the first.
 		{[]Move{{Parent: 0, Tile: tile("1m")}, {Parent: 0, Tile: tile("1m")}}, 1, ErrInvalid},
 	} {
-		if _, err := mustCreate(t, st, 1, 0).Replay(c.moves, c.current); !errors.Is(err, c.want) {
+		if _, err := mustCreate(t, st, 1, 0).Replay(c.moves, c.current, View{}); !errors.Is(err, c.want) {
 			t.Errorf("Replay(%+v, %d) = %v, want %v", c.moves, c.current, err, c.want)
 		}
 	}

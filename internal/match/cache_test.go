@@ -158,7 +158,7 @@ func checkRedPreviews(t *testing.T, m *Match, st State) int {
 		c := tile.CountsOf(all)
 		c[t0.Kind]--
 		fresh := yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
-		want := apiview.Rows(fresh.AnalyzeWith(c, melds), &visible, m.hanFor(melds))
+		want := apiview.DiscardRows(apiview.Rows(fresh.AnalyzeWith(c, melds), &visible, m.hanFor(melds)))
 		if !reflect.DeepEqual(rr, pr) || !reflect.DeepEqual(rr, want) {
 			t.Fatalf("%s and %s previews differ from each other or a fresh analysis", red, plain)
 		}

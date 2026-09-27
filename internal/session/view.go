@@ -37,7 +37,7 @@ func strPtr(t *tile.Tile) *string {
 
 func intPtr(v int) *int { return &v }
 
-func (s *Session) state() State {
+func (s *Session) state(v View) State {
 	cur := s.nodes[s.current]
 	path := s.path(cur)
 	dora := s.wall.DoraIndicators()
@@ -66,8 +66,11 @@ func (s *Session) state() State {
 		// Ura dora are revealed only once the game has ended.
 		UraDoraIndicators: []string{},
 		UraDora:           []string{},
-		ByDiscard:         map[string][]apiview.YakuRow{},
+		ByDiscard:         map[string][]apiview.DiscardRow{},
 		CombosByDiscard:   map[string][]apiview.ComboRow{},
+		Remaining:         apiview.Remaining(&visible),
+		NodeCount:         len(s.nodes),
+		Tree:              []TreeNode{},
 		Win:               cur.win,
 	}
 	if cur.status != StatusPlaying {
@@ -115,7 +118,7 @@ func (s *Session) state() State {
 				c[t.Kind]++
 				byDiscard[t.Kind] = res
 			}
-			st.ByDiscard[key] = rows(res, &visible)
+			st.ByDiscard[key] = apiview.DiscardRows(rows(res, &visible))
 			combos, ok := cur.combosByDiscard[t.Kind]
 			if !ok {
 				c[t.Kind]--
@@ -125,9 +128,13 @@ func (s *Session) state() State {
 			}
 			st.CombosByDiscard[key] = apiview.Combos(combos, &visible)
 		}
-		st.Advice = s.nodeAdvice(cur, path)
+		if !v.NoAdvice {
+			st.Advice = s.nodeAdvice(cur, path)
+		}
 	}
-	st.DiscardReview = s.nodeReview(cur, path)
+	if !v.NoAdvice {
+		st.DiscardReview = s.nodeReview(cur, path)
+	}
 
 	keys := s.analyzer.Rows()
 	for _, n := range path {
@@ -153,7 +160,7 @@ func (s *Session) state() State {
 		st.History = append(st.History, h)
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range s.nodes[min(v.TreeFrom, len(s.nodes)):] {
 		tn := TreeNode{NodeID: n.id, Turn: n.turn, Draw: strPtr(n.draw), Discard: strPtr(n.discard), Status: n.status}
 		if n.parent >= 0 {
 			tn.ParentID = intPtr(n.parent)
@@ -196,7 +203,8 @@ func (s *Session) visibleAt(n *node, path []*node) tile.Counts {
 }
 
 // nodeReview returns the review of the discard that led to n, the last node
-// of path, computing it from the parent's advice if Replay left it pending.
+// of path, computing it from the parent's advice if Replay, or a discard
+// made without the advice, left it pending.
 func (s *Session) nodeReview(n *node, path []*node) *advice.Review {
 	if n.reviewPending {
 		parent := path[len(path)-2]

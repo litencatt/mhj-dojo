@@ -13,41 +13,42 @@ import (
 
 // State is the JSON view of a game for the human (docs/api.md).
 type State struct {
-	GameID            string                        `json:"game_id"`
-	Seed              *int64                        `json:"seed"` // null until the game ends unless you chose it
-	Length            string                        `json:"length"`
-	FirstDealerMode   string                        `json:"first_dealer_mode"` // the first_dealer asked for: random or you
-	CPU               string                        `json:"cpu"`               // weak or normal
-	You               int                           `json:"you"`
-	FirstDealer       int                           `json:"first_dealer"` // the seat
-	Dealer            int                           `json:"dealer"`
-	RoundWind         string                        `json:"round_wind"`
-	RoundNumber       int                           `json:"round_number"` // 1-4: 東1局 = round_wind 1z, round_number 1
-	Honba             int                           `json:"honba"`
-	CanNext           bool                          `json:"can_next"`  // the round has ended and another follows
-	GameOver          bool                          `json:"game_over"` // the last round has ended
-	Standings         [4]Standing                   `json:"standings"`
-	Rounds            []RoundSummary                `json:"rounds"` // finished rounds, the current one last once it ends
-	Phase             game.Phase                    `json:"phase"`
-	Actor             int                           `json:"actor"` // -1 once ended
-	WallRemaining     int                           `json:"wall_remaining"`
-	Deposit           int                           `json:"deposit"`
-	DoraIndicators    []string                      `json:"dora_indicators"`
-	Dora              []string                      `json:"dora"`
-	UraDoraIndicators []string                      `json:"ura_dora_indicators"` // empty until the end
-	UraDora           []string                      `json:"ura_dora"`
-	Seats             [4]Seat                       `json:"seats"`
-	LastDiscard       *string                       `json:"last_discard"` // the tile you may ron
-	Legal             game.Legal                    `json:"legal"`
-	Events            []Event                       `json:"events"`
-	EventsFrom        int                           `json:"events_from"`           // the round's index of events[0]
-	EventsWall        int                           `json:"events_wall_remaining"` // the wall just before events[0]; wall_remaining with none
-	Analysis          []apiview.YakuRow             `json:"analysis"`
-	ByDiscard         map[string][]apiview.YakuRow  `json:"by_discard"`
-	Combos            []apiview.ComboRow            `json:"combos"`
-	CombosByDiscard   map[string][]apiview.ComboRow `json:"combos_by_discard"`
-	History           []apiview.HistoryEntry        `json:"history"`
-	Result            *Result                       `json:"result"`
+	GameID            string                          `json:"game_id"`
+	Seed              *int64                          `json:"seed"` // null until the game ends unless you chose it
+	Length            string                          `json:"length"`
+	FirstDealerMode   string                          `json:"first_dealer_mode"` // the first_dealer asked for: random or you
+	CPU               string                          `json:"cpu"`               // weak or normal
+	You               int                             `json:"you"`
+	FirstDealer       int                             `json:"first_dealer"` // the seat
+	Dealer            int                             `json:"dealer"`
+	RoundWind         string                          `json:"round_wind"`
+	RoundNumber       int                             `json:"round_number"` // 1-4: 東1局 = round_wind 1z, round_number 1
+	Honba             int                             `json:"honba"`
+	CanNext           bool                            `json:"can_next"`  // the round has ended and another follows
+	GameOver          bool                            `json:"game_over"` // the last round has ended
+	Standings         [4]Standing                     `json:"standings"`
+	Rounds            []RoundSummary                  `json:"rounds"` // finished rounds, the current one last once it ends
+	Phase             game.Phase                      `json:"phase"`
+	Actor             int                             `json:"actor"` // -1 once ended
+	WallRemaining     int                             `json:"wall_remaining"`
+	Deposit           int                             `json:"deposit"`
+	DoraIndicators    []string                        `json:"dora_indicators"`
+	Dora              []string                        `json:"dora"`
+	UraDoraIndicators []string                        `json:"ura_dora_indicators"` // empty until the end
+	UraDora           []string                        `json:"ura_dora"`
+	Seats             [4]Seat                         `json:"seats"`
+	LastDiscard       *string                         `json:"last_discard"` // the tile you may ron
+	Legal             game.Legal                      `json:"legal"`
+	Events            []Event                         `json:"events"`
+	EventsFrom        int                             `json:"events_from"`           // the round's index of events[0]
+	EventsWall        int                             `json:"events_wall_remaining"` // the wall just before events[0]; wall_remaining with none
+	Analysis          []apiview.YakuRow               `json:"analysis"`
+	ByDiscard         map[string][]apiview.DiscardRow `json:"by_discard"` // name, yakuman and han as in analysis
+	Combos            []apiview.ComboRow              `json:"combos"`
+	CombosByDiscard   map[string][]apiview.ComboRow   `json:"combos_by_discard"`
+	Remaining         map[string]int                  `json:"remaining"` // unseen copies of each tile kind, for the ukeire lists
+	History           []apiview.HistoryEntry          `json:"history"`
+	Result            *Result                         `json:"result"`
 }
 
 // Seat is one player. Hand and drawn are present only for you, and for
@@ -169,7 +170,7 @@ func (m *Match) state() State {
 		UraDora:           []string{},
 		Legal:             r.LegalFor(Human),
 		Events:            []Event{},
-		ByDiscard:         map[string][]apiview.YakuRow{},
+		ByDiscard:         map[string][]apiview.DiscardRow{},
 		Combos:            []apiview.ComboRow{},
 		CombosByDiscard:   map[string][]apiview.ComboRow{},
 	}
@@ -229,6 +230,7 @@ func (m *Match) state() State {
 
 	me := v.Seats[Human]
 	visible := v.Visible()
+	st.Remaining = apiview.Remaining(&visible)
 	melds := fixedMelds(me.Melds)
 	han := m.hanFor(melds)
 	yourTurn := v.Phase == game.PhaseDiscard && v.Actor == Human
@@ -244,27 +246,29 @@ func (m *Match) state() State {
 			all = append(all, *me.Drawn)
 		}
 		c := tile.CountsOf(all)
+		byDiscard := map[string][]apiview.YakuRow{}
 		// A red five and a plain one leave the same hand: the first key of
 		// each kind is computed, any other shares its rows.
 		var first [tile.NumKinds]string
 		for _, t := range all {
 			key := t.String()
-			if _, done := st.ByDiscard[key]; done || !slices.Contains(st.Legal.Discards, key) {
+			if _, done := byDiscard[key]; done || !slices.Contains(st.Legal.Discards, key) {
 				continue
 			}
 			if k := first[t.Kind]; k != "" {
-				st.ByDiscard[key], st.CombosByDiscard[key] = st.ByDiscard[k], st.CombosByDiscard[k]
+				byDiscard[key], st.ByDiscard[key], st.CombosByDiscard[key] = byDiscard[k], st.ByDiscard[k], st.CombosByDiscard[k]
 				continue
 			}
 			first[t.Kind] = key
 			c[t.Kind]--
 			res := m.analyze(c, melds)
-			st.ByDiscard[key] = apiview.Rows(res, &visible, han)
+			byDiscard[key] = apiview.Rows(res, &visible, han)
+			st.ByDiscard[key] = apiview.DiscardRows(byDiscard[key])
 			st.CombosByDiscard[key] = apiview.Combos(m.combos(c, melds, res), &visible)
 			c[t.Kind]++
 		}
 		if me.Drawn == nil { // right after a call: the hand must still discard
-			st.Analysis = bestRows(st.ByDiscard, st.Legal.Discards)
+			st.Analysis = bestRows(byDiscard, st.Legal.Discards)
 			st.Combos = bestCombos(st.CombosByDiscard, st.Legal.Discards)
 		}
 	}

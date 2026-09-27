@@ -109,7 +109,7 @@ func TestRestoreBodyFitsFullTree(t *testing.T) {
 	if len(b) > maxBody {
 		t.Fatalf("a %d-node restore body is %d bytes, over the %d limit", session.MaxNodes, len(b), maxBody)
 	}
-	status, v := Restore(session.NewStore(), strings.NewReader(string(b)))
+	status, v := Restore(session.NewStore(), "", strings.NewReader(string(b)))
 	if msg := v.(map[string]string)["error"]; status != statusNotFound || strings.Contains(msg, "JSON") {
 		t.Fatalf("Restore = %d %v; want the 404 of its first move's parent", status, v)
 	}
@@ -126,7 +126,7 @@ func TestRestore(t *testing.T) {
 	want := state(t, store, "POST", base+"/goto", `{"node_id":1}`)
 
 	body := `{"seed":2,"max_turns":6,"moves":[{"parent":0,"tile":"` + *st.Drawn + `"},{"parent":0,"tile":"` + st.Hand[0] + `"}],"current":1}`
-	status, v := Restore(store, strings.NewReader(body))
+	status, v := Restore(store, "", strings.NewReader(body))
 	if status != statusOK {
 		t.Fatalf("restore: %d %v", status, v)
 	}
@@ -141,6 +141,15 @@ func TestRestore(t *testing.T) {
 		t.Fatalf("restored state differs:\n got %.300s\nwant %.300s", a, b)
 	}
 
+	// The query's view options apply to the restored state.
+	status, v = Restore(store, "advice=0&tree_from=2", strings.NewReader(body))
+	if slim, ok := v.(session.State); status != statusOK || !ok || slim.Advice != nil || len(slim.Tree) != 1 || slim.NodeCount != 3 {
+		t.Fatalf("restore with a view: %d %+v", status, v)
+	}
+	if status, _ := Restore(store, "advice=no", strings.NewReader(body)); status != statusBadRequest {
+		t.Fatalf("restore with a bad view: %d", status)
+	}
+
 	for body, want := range map[string]int{
 		``:                                  statusBadRequest,
 		`{"moves":[]}`:                      statusBadRequest,
@@ -149,7 +158,7 @@ func TestRestore(t *testing.T) {
 		`{"seed":2,"moves":[{"parent":5}]}`: statusNotFound,
 		`{"seed":2,"moves":[{"parent":0,"tile":"9z"}]}`: statusBadRequest,
 	} {
-		if status, v := Restore(store, strings.NewReader(body)); status != want {
+		if status, v := Restore(store, "", strings.NewReader(body)); status != want {
 			t.Errorf("Restore(%s) = %d %v, want %d", body, status, v, want)
 		}
 	}
@@ -185,5 +194,28 @@ func TestVersion(t *testing.T) {
 	}
 	if status, _ := call(t, session.NewStore(), "POST", "/api/version", ""); status != statusNotFound {
 		t.Errorf("POST /api/version = %d, want %d", status, statusNotFound)
+	}
+}
+
+// TestSessionView reads the view options from a request's query.
+func TestSessionView(t *testing.T) {
+	for query, want := range map[string]session.View{
+		"":                           {},
+		"advice=1":                   {},
+		"advice=0":                   {NoAdvice: true},
+		"tree_from=12":               {TreeFrom: 12},
+		"advice=0&tree_from=3&x=y&z": {NoAdvice: true, TreeFrom: 3},
+		"tree_from=+3":               {TreeFrom: 3},
+		"advice=0&advice=1":          {}, // the last one counts
+		"tree_from=2&tree_from=5":    {TreeFrom: 5},
+	} {
+		if got, err := SessionView(query); err != nil || got != want {
+			t.Errorf("SessionView(%q) = %+v, %v; want %+v", query, got, err, want)
+		}
+	}
+	for _, query := range []string{"advice=", "advice=true", "tree_from=-1", "tree_from=", "tree_from=1.5"} {
+		if _, err := SessionView(query); Status(err) != statusBadRequest {
+			t.Errorf("SessionView(%q): %v, want a 400", query, err)
+		}
 	}
 }

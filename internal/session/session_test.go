@@ -33,7 +33,7 @@ func mustCreate(t *testing.T, st *Store, seed int64, maxTurns int) *Session {
 func TestCreateState(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 42, 0)
-	v := s.State()
+	v := s.State(View{})
 	if v.Seed != 42 || v.MaxTurns != DefaultMaxTurns || v.NodeID != 0 || v.Turn != 0 || v.Status != StatusPlaying {
 		t.Fatalf("unexpected header %+v", v)
 	}
@@ -67,7 +67,7 @@ func TestCreateState(t *testing.T) {
 	}
 
 	// Same seed, same game.
-	w := mustCreate(t, st, 42, 0).State()
+	w := mustCreate(t, st, 42, 0).State(View{})
 	if !slices.Equal(w.Hand, v.Hand) || *w.Drawn != *v.Drawn || w.SessionID == v.SessionID {
 		t.Fatal("same seed should deal the same hand in a new session")
 	}
@@ -76,7 +76,7 @@ func TestCreateState(t *testing.T) {
 func TestRemainingCountsVisibleTiles(t *testing.T) {
 	st := NewStore()
 	s, _ := st.CreateWithWall(fixedWall(t, "123456789m1234p", "5z"), 0)
-	v := s.State()
+	v := s.State(View{})
 	// visible: hand + drawn 5z + dora indicator
 	for _, row := range v.Analysis {
 		if row.Key != "normal" {
@@ -85,15 +85,15 @@ func TestRemainingCountsVisibleTiles(t *testing.T) {
 		// tenpai on 1p/4p: 1p and 4p are each held once.
 		want := map[string]int{"1p": 3, "4p": 3}
 		for _, u := range row.Ukeire {
-			w := want[u.Tile]
-			if v.DoraIndicators[0] == u.Tile {
+			w := want[u]
+			if v.DoraIndicators[0] == u {
 				w--
 			}
-			if u.Remaining != w {
-				t.Fatalf("remaining %s = %d, want %d", u.Tile, u.Remaining, w)
+			if v.Remaining[u] != w {
+				t.Fatalf("remaining %s = %d, want %d", u, v.Remaining[u], w)
 			}
 		}
-		if len(row.Ukeire) != 2 || row.UkeireTotal != row.Ukeire[0].Remaining+row.Ukeire[1].Remaining {
+		if len(row.Ukeire) != 2 || row.UkeireTotal != v.Remaining[row.Ukeire[0]]+v.Remaining[row.Ukeire[1]] {
 			t.Fatalf("ukeire %+v total %d", row.Ukeire, row.UkeireTotal)
 		}
 	}
@@ -102,10 +102,10 @@ func TestRemainingCountsVisibleTiles(t *testing.T) {
 func TestDiscardGotoBranch(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 1, 0)
-	root := s.State()
+	root := s.State(View{})
 	drawn := *root.Drawn
 
-	v, err := s.Discard(drawn, nil)
+	v, err := s.Discard(drawn, nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,14 +119,14 @@ func TestDiscardGotoBranch(t *testing.T) {
 		t.Fatalf("wall_remaining %d", v.WallRemaining)
 	}
 
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
 	other := root.Hand[0]
 	if other == drawn {
 		other = root.Hand[12]
 	}
-	b, err := s.Discard(other, nil)
+	b, err := s.Discard(other, nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,15 +138,15 @@ func TestDiscardGotoBranch(t *testing.T) {
 	}
 
 	// Re-discarding the same tile from the root moves to the existing child.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := s.Discard(drawn, nil)
+	again, _ := s.Discard(drawn, nil, View{})
 	if again.NodeID != 1 || len(again.Tree) != 3 {
 		t.Fatalf("expected to revisit node 1, got %d (tree %d)", again.NodeID, len(again.Tree))
 	}
 	// Both branches remain selectable.
-	if v2, err := s.Goto(2); err != nil || v2.NodeID != 2 {
+	if v2, err := s.Goto(2, View{}); err != nil || v2.NodeID != 2 {
 		t.Fatal("branch 2 lost")
 	}
 }
@@ -157,11 +157,11 @@ func TestDiscardGotoBranch(t *testing.T) {
 func TestExpectedNodeGuard(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 1, 0)
-	root := s.State()
+	root := s.State(View{})
 	drawn := *root.Drawn
 
 	// match: expectedNode equals the current node, so the discard applies.
-	v, err := s.Discard(drawn, intPtr(root.NodeID))
+	v, err := s.Discard(drawn, intPtr(root.NodeID), View{})
 	if err != nil {
 		t.Fatalf("match: %v", err)
 	}
@@ -172,17 +172,17 @@ func TestExpectedNodeGuard(t *testing.T) {
 	// mismatch: expectedNode still names the now-stale root node, as if
 	// another tab had already moved the session on to node 1. The request
 	// is rejected and makes no change.
-	before := s.State()
-	if _, err := s.Discard(*v.Drawn, intPtr(root.NodeID)); !errors.Is(err, ErrConflict) {
+	before := s.State(View{})
+	if _, err := s.Discard(*v.Drawn, intPtr(root.NodeID), View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("mismatch discard: %v", err)
 	}
-	after := s.State()
+	after := s.State(View{})
 	if after.NodeID != before.NodeID || len(after.Tree) != len(before.Tree) {
 		t.Fatalf("mismatch discard changed state: before %+v after %+v", before, after)
 	}
 
 	// absent: no expectedNode keeps today's behaviour (applies regardless).
-	again, err := s.Discard(*v.Drawn, nil)
+	again, err := s.Discard(*v.Drawn, nil, View{})
 	if err != nil {
 		t.Fatalf("absent: %v", err)
 	}
@@ -199,22 +199,22 @@ func TestExpectedNodeGuardTsumo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := s.State()
+	root := s.State(View{})
 	if !root.CanTsumo {
 		t.Fatalf("expected can_tsumo: %+v", root)
 	}
 
 	// mismatch: expectedNode names a node other than the current one.
-	if _, err := s.Tsumo(intPtr(root.NodeID + 1)); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(intPtr(root.NodeID+1), View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("mismatch tsumo: %v", err)
 	}
-	after := s.State()
+	after := s.State(View{})
 	if after.NodeID != root.NodeID || len(after.Tree) != len(root.Tree) || !after.CanTsumo {
 		t.Fatalf("mismatch tsumo changed state: before %+v after %+v", root, after)
 	}
 
 	// match: expectedNode equals the current node, so the tsumo applies.
-	w, err := s.Tsumo(intPtr(root.NodeID))
+	w, err := s.Tsumo(intPtr(root.NodeID), View{})
 	if err != nil {
 		t.Fatalf("match: %v", err)
 	}
@@ -227,22 +227,22 @@ func TestExhausted(t *testing.T) {
 	st := NewStore()
 	s := mustCreate(t, st, 3, 2)
 	for i := 0; i < 2; i++ {
-		v := s.State()
-		if _, err := s.Discard(*v.Drawn, nil); err != nil {
+		v := s.State(View{})
+		if _, err := s.Discard(*v.Drawn, nil, View{}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	v := s.State()
+	v := s.State(View{})
 	if v.Status != StatusExhausted || v.Drawn != nil || len(v.ByDiscard) != 0 || v.CanTsumo || v.Turn != 2 {
 		t.Fatalf("expected exhausted: %+v", v)
 	}
 	if v.WallRemaining != wall.LiveDraws-2 {
 		t.Fatalf("wall_remaining %d", v.WallRemaining)
 	}
-	if _, err := s.Discard(v.Hand[0], nil); !errors.Is(err, ErrConflict) {
+	if _, err := s.Discard(v.Hand[0], nil, View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("discard at exhausted node: %v", err)
 	}
-	if _, err := s.Tsumo(nil); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(nil, View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tsumo at exhausted node: %v", err)
 	}
 }
@@ -253,11 +253,11 @@ func TestTsumo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := s.State()
+	v := s.State(View{})
 	if !v.CanTsumo || *v.Drawn != "5s" {
 		t.Fatalf("can_tsumo=%v drawn=%v", v.CanTsumo, *v.Drawn)
 	}
-	w, err := s.Tsumo(nil)
+	w, err := s.Tsumo(nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,25 +278,25 @@ func TestTsumo(t *testing.T) {
 	if *w.Tree[1].NormalShanten != -1 || w.Tree[1].Discard != nil || *w.Tree[1].Draw != "5s" {
 		t.Fatalf("tree tsumo node: %+v", w.Tree[1])
 	}
-	if _, err := s.Discard("5s", nil); !errors.Is(err, ErrConflict) {
+	if _, err := s.Discard("5s", nil, View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("discard after tsumo: %v", err)
 	}
 	// Declaring again from the parent revisits the same node.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	again, _ := s.Tsumo(nil)
+	again, _ := s.Tsumo(nil, View{})
 	if again.NodeID != w.NodeID || len(again.Tree) != 2 {
 		t.Fatal("tsumo should reuse the existing node")
 	}
 	// After tsumogiri the hand is no longer complete.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard("5s", nil); err != nil {
+	if _, err := s.Discard("5s", nil, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Tsumo(nil); !errors.Is(err, ErrConflict) {
+	if _, err := s.Tsumo(nil, View{}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tsumo with incomplete hand: %v", err)
 	}
 }
@@ -310,10 +310,10 @@ func TestErrors(t *testing.T) {
 		t.Fatal("max_turns out of range should fail")
 	}
 	s := mustCreate(t, st, 5, 0)
-	if _, err := s.Discard("8z", nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Discard("8z", nil, View{}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("invalid tile: %v", err)
 	}
-	if _, err := s.Goto(99); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Goto(99, View{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("goto: %v", err)
 	}
 }
@@ -321,24 +321,24 @@ func TestErrors(t *testing.T) {
 func TestRedFiveDiscardIsExact(t *testing.T) {
 	st := NewStore()
 	s, _ := st.CreateWithWall(fixedWall(t, "0m5m123p456p789s11z", "9m"), 0)
-	v := s.State()
+	v := s.State(View{})
 	if _, ok := v.ByDiscard["0m"]; !ok {
 		t.Fatalf("by_discard keys %v", v.ByDiscard)
 	}
 	if _, ok := v.ByDiscard["5m"]; !ok {
 		t.Fatal("plain 5m candidate missing")
 	}
-	a, err := s.Discard("0m", nil)
+	a, err := s.Discard("0m", nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if slices.Contains(a.Hand, "0m") || !slices.Contains(a.Hand, "5m") || a.Discards[0] != "0m" {
 		t.Fatalf("hand after discarding red five: %v", a.Hand)
 	}
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := s.Discard("5m", nil)
+	b, _ := s.Discard("5m", nil, View{})
 	if b.NodeID == a.NodeID || !slices.Contains(b.Hand, "0m") {
 		t.Fatal("0m and 5m discards must be distinct children")
 	}
@@ -383,16 +383,16 @@ func TestConcurrentUse(t *testing.T) {
 		go func(g int) {
 			defer wg.Done()
 			for i := 0; i < 5; i++ {
-				v := s.State()
+				v := s.State(View{})
 				if v.Drawn != nil {
-					_, _ = s.Discard(*v.Drawn, nil) // conflicts between goroutines are expected
+					_, _ = s.Discard(*v.Drawn, nil, View{}) // conflicts between goroutines are expected
 				}
-				_, _ = s.Goto(g % 2)
+				_, _ = s.Goto(g%2, View{})
 			}
 		}(g)
 	}
 	wg.Wait()
-	if n := len(s.State().Tree); n < 2 {
+	if n := len(s.State(View{}).Tree); n < 2 {
 		t.Fatalf("tree has %d nodes", n)
 	}
 }
@@ -404,7 +404,7 @@ func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := s.Tsumo(nil)
+	w, err := s.Tsumo(nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,16 +421,16 @@ func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
 func TestDiscardCannotReachTsumoChild(t *testing.T) {
 	st := NewStore()
 	s, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s"), 0)
-	if _, err := s.Tsumo(nil); err != nil {
+	if _, err := s.Tsumo(nil, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard("tsumo", nil); !errors.Is(err, ErrInvalid) {
+	if _, err := s.Discard("tsumo", nil, View{}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("discard \"tsumo\": %v", err)
 	}
-	if v := s.State(); v.NodeID != 0 {
+	if v := s.State(View{}); v.NodeID != 0 {
 		t.Fatalf("moved to node %d", v.NodeID)
 	}
 }
@@ -442,17 +442,17 @@ func TestDoraAndUraDora(t *testing.T) {
 	w := wall.New(3)
 	ind, ura := w.DoraIndicators()[0], w.UraDoraIndicators()[0]
 
-	v := s.State()
+	v := s.State(View{})
 	if len(v.Dora) != 1 || v.Dora[0] != tile.DoraFromIndicator(ind.Kind).String() {
 		t.Fatalf("dora %v for indicator %v", v.Dora, ind)
 	}
 	if len(v.UraDoraIndicators) != 0 || len(v.UraDora) != 0 {
 		t.Fatalf("ura dora revealed while playing: %v %v", v.UraDoraIndicators, v.UraDora)
 	}
-	if _, err := s.Discard(*v.Drawn, nil); err != nil {
+	if _, err := s.Discard(*v.Drawn, nil, View{}); err != nil {
 		t.Fatal(err)
 	}
-	v = s.State()
+	v = s.State(View{})
 	if v.Status != StatusExhausted {
 		t.Fatalf("status %s", v.Status)
 	}
@@ -461,10 +461,10 @@ func TestDoraAndUraDora(t *testing.T) {
 		t.Fatalf("ura dora at the end: %v %v (want %v)", v.UraDoraIndicators, v.UraDora, ura)
 	}
 	// Going back to a playing node hides them again.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if v = s.State(); len(v.UraDoraIndicators) != 0 {
+	if v = s.State(View{}); len(v.UraDoraIndicators) != 0 {
 		t.Fatalf("ura dora after goto: %v", v.UraDoraIndicators)
 	}
 }
@@ -478,11 +478,11 @@ func TestTreeIsBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	for len(s.nodes) < maxNodes {
-		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
+		if _, err := s.Discard(*s.State(View{}).Drawn, nil, View{}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.Discard(*s.State().Drawn, nil); !errors.Is(err, ErrTreeFull) {
+	if _, err := s.Discard(*s.State(View{}).Drawn, nil, View{}); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("discard past the node limit: %v", err)
 	}
 	// Tsumo creates a node too, so it is capped as well.
@@ -491,15 +491,15 @@ func TestTreeIsBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	maxNodes = 1
-	if _, err := full.Tsumo(nil); !errors.Is(err, ErrTreeFull) {
+	if _, err := full.Tsumo(nil, View{}); !errors.Is(err, ErrTreeFull) {
 		t.Fatalf("tsumo past the node limit: %v", err)
 	}
 	maxNodes = 10
 	// Revisiting an existing node is still allowed.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
+	if _, err := s.Discard(*s.State(View{}).Drawn, nil, View{}); err != nil {
 		t.Fatalf("moving to an existing child: %v", err)
 	}
 }
@@ -513,7 +513,7 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 
 	// Two distinct first moves from the root, so branch A and branch B
 	// below are sibling subtrees that don't share any node past the root.
-	v0 := s.State()
+	v0 := s.State(View{})
 	tiles := append(append([]string{}, v0.Hand...), *v0.Drawn)
 	a, b := tiles[0], tiles[len(tiles)-1]
 	if a == b {
@@ -522,13 +522,13 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 
 	// Branch A: discard a, then a few more turns, remembering the node
 	// right after the first discard as "mid".
-	va, err := s.Discard(a, nil)
+	va, err := s.Discard(a, nil, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	midID := va.NodeID
 	for i := 0; i < 3; i++ {
-		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
+		if _, err := s.Discard(*s.State(View{}).Drawn, nil, View{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -537,20 +537,20 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 	// turns, so the whole tree (both branches) exists before either
 	// snapshot below — otherwise the two state()s would legitimately
 	// differ in the tree field just because branch B didn't exist yet.
-	if _, err := s.Goto(0); err != nil {
+	if _, err := s.Goto(0, View{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Discard(b, nil); err != nil {
+	if _, err := s.Discard(b, nil, View{}); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 3; i++ {
-		if _, err := s.Discard(*s.State().Drawn, nil); err != nil {
+		if _, err := s.Discard(*s.State(View{}).Drawn, nil, View{}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	tipB := s.current
 
-	before, err := s.Goto(midID)
+	before, err := s.Goto(midID, View{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,10 +563,10 @@ func TestStateUnchangedAfterCachePruning(t *testing.T) {
 	// in branch B, so leaving it prunes its cached analysis (and the
 	// deeper branch-A nodes', by falling off the path); no nodes are
 	// added, so the tree field can't differ for that reason.
-	if _, err := s.Goto(tipB); err != nil {
+	if _, err := s.Goto(tipB, View{}); err != nil {
 		t.Fatal(err)
 	}
-	after, err := s.Goto(midID)
+	after, err := s.Goto(midID, View{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,10 +10,9 @@ export const WASM = import.meta.env.VITE_MHJDOJO_TARGET === 'wasm';
 
 export type Tile = string; // e.g. "1m", "0m" (red five), "7z"
 
-export interface UkeireEntry {
-  tile: Tile; // tile type, no red notation
-  remaining: number;
-}
+// Unseen copies of each tile kind (docs/api.md "remaining"): every ukeire
+// list of a state counts its tiles from its one map.
+export type Remaining = Record<Tile, number>;
 
 export interface YakuRow {
   key: string;
@@ -22,8 +21,20 @@ export interface YakuRow {
   han: number; // han for the hand, lowered when open (kuisagari); 13 for yakuman, 0 for the normal row
   shanten: number | null; // 0 = tenpai, null = impossible
   approx: boolean;
-  ukeire: UkeireEntry[];
+  ukeire: Tile[]; // tile types, no red notation
   ukeire_total: number;
+}
+
+// A by_discard row: name, yakuman and han are the analysis row's of the same key.
+export type DiscardRow = Pick<YakuRow, 'key' | 'shanten' | 'approx' | 'ukeire' | 'ukeire_total'>;
+
+/** A discard's preview rows as whole rows, joined with the analysis by key. */
+export function withNames(rows: DiscardRow[], analysis: YakuRow[]): YakuRow[] {
+  const byKey = new Map(analysis.map((r) => [r.key, r]));
+  return rows.flatMap((r) => {
+    const a = byKey.get(r.key);
+    return a ? [{ ...a, ...r }] : [];
+  });
 }
 
 // A combination of yaku one complete hand scores together (docs/api.md "Yaku combos").
@@ -33,7 +44,7 @@ export interface ComboRow {
   han: number; // sum of the rows' han (open-hand han after a call)
   shanten: number; // 0 = tenpai
   approx: boolean;
-  ukeire: UkeireEntry[];
+  ukeire: Tile[];
   ukeire_total: number;
 }
 
@@ -102,14 +113,16 @@ export interface SessionState {
   wall_remaining: number;
   can_tsumo: boolean;
   analysis: YakuRow[];
-  by_discard: Record<Tile, YakuRow[]>;
+  by_discard: Record<Tile, DiscardRow[]>;
   combos: ComboRow[]; // best yaku combinations, at most 5
   combos_by_discard: Record<Tile, ComboRow[]>;
+  remaining: Remaining;
   history: HistoryEntry[];
-  tree: TreeNode[];
+  node_count: number; // nodes in the whole tree
+  tree: TreeNode[]; // the nodes from the view's treeFrom on (all of them once App has merged them)
   win: Win | null;
-  advice: Advice | null; // only while playing
-  discard_review: DiscardReview | null; // the discard that led to this node
+  advice: Advice | null; // only while playing, and asked for
+  discard_review: DiscardReview | null; // the discard that led to this node, if asked for
 }
 
 // Rule-based advice for the pending discard (docs/api.md "Advice").
@@ -173,7 +186,7 @@ export class ApiError extends Error {
  * without any operation after the id. null for a path that names none.
  */
 function tabKey(path: string): string | null {
-  return /^\/api\/(sessions|games)\/[^/]+/.exec(path)?.[0] ?? null;
+  return /^\/api\/(sessions|games)\/[^/?]+/.exec(path)?.[0] ?? null;
 }
 
 export const sessionKey = (id: string) => `/api/sessions/${encodeURIComponent(id)}`;
@@ -219,36 +232,54 @@ async function send<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function createSession(opts: { seed?: number; max_turns?: number } = {}): Promise<SessionState> {
-  return request<SessionState>('/api/sessions', {
+// The optional parts of a practice state to ask for (docs/api.md "View
+// options"): the advice (and the review of the discard), and only the tree
+// nodes from treeFrom on, when the page holds the ones before.
+export interface SessionView {
+  advice: boolean;
+  treeFrom: number;
+}
+
+const FULL_VIEW: SessionView = { advice: true, treeFrom: 0 };
+
+function sessionPath(path: string, view: SessionView): string {
+  const q = new URLSearchParams();
+  if (!view.advice) q.set('advice', '0');
+  if (view.treeFrom > 0) q.set('tree_from', String(view.treeFrom));
+  const query = q.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+export function createSession(opts: { seed?: number; max_turns?: number } = {}, view = FULL_VIEW): Promise<SessionState> {
+  return request<SessionState>(sessionPath('/api/sessions', view), {
     method: 'POST',
     body: JSON.stringify(opts),
   });
 }
 
-export function getSession(id: string): Promise<SessionState> {
-  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}`);
+export function getSession(id: string, view = FULL_VIEW): Promise<SessionState> {
+  return request<SessionState>(sessionPath(`/api/sessions/${encodeURIComponent(id)}`, view));
 }
 
 // nodeId is the node the page showed when the user acted (state.node_id):
 // the server rejects the request (409) if the session has since moved on
 // from it in another tab (docs/api.md, issue #53).
-export function discard(id: string, tile: Tile, nodeId: number): Promise<SessionState> {
-  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/discard`, {
+export function discard(id: string, tile: Tile, nodeId: number, view = FULL_VIEW): Promise<SessionState> {
+  return request<SessionState>(sessionPath(`/api/sessions/${encodeURIComponent(id)}/discard`, view), {
     method: 'POST',
     body: JSON.stringify({ tile, node_id: nodeId }),
   });
 }
 
-export function tsumo(id: string, nodeId: number): Promise<SessionState> {
-  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/tsumo`, {
+export function tsumo(id: string, nodeId: number, view = FULL_VIEW): Promise<SessionState> {
+  return request<SessionState>(sessionPath(`/api/sessions/${encodeURIComponent(id)}/tsumo`, view), {
     method: 'POST',
     body: JSON.stringify({ node_id: nodeId }),
   });
 }
 
-export function goto(id: string, nodeId: number): Promise<SessionState> {
-  return request<SessionState>(`/api/sessions/${encodeURIComponent(id)}/goto`, {
+export function goto(id: string, nodeId: number, view = FULL_VIEW): Promise<SessionState> {
+  return request<SessionState>(sessionPath(`/api/sessions/${encodeURIComponent(id)}/goto`, view), {
     method: 'POST',
     body: JSON.stringify({ node_id: nodeId }),
   });
@@ -414,9 +445,10 @@ export interface GameState {
   events_from: number; // the round's index of events[0]
   events_wall_remaining: number; // the wall just before events[0]
   analysis: YakuRow[];
-  by_discard: Record<Tile, YakuRow[]>;
+  by_discard: Record<Tile, DiscardRow[]>;
   combos: ComboRow[]; // best yaku combinations, at most 5
   combos_by_discard: Record<Tile, ComboRow[]>;
+  remaining: Remaining;
   history: HistoryEntry[];
   result: GameResult | null;
 }

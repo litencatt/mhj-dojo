@@ -658,3 +658,176 @@ test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the scre
   const table = await yaku.locator('.yaku-table').boundingBox();
   expect(table!.x + table!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
 });
+
+/** The page's saved moves (localStorage), for the session in its URL. */
+function savedMoveList(page: Page) {
+  return page.evaluate(() => {
+    const id = new URL(location.href).searchParams.get('session')!;
+    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? '{}') as {
+      sessions?: Record<string, { moves: { parent: number; tile?: string }[] }>;
+    };
+    return all.sessions?.[id]?.moves ?? null;
+  });
+}
+
+/**
+ * Counts the GETs the page sends its engine. With the advice panel
+ * minimized the page itself sends one only to load a session, so any other
+ * is wasm.ts asking for the whole tree because the moves it saves from did
+ * not add up (see saveSession).
+ */
+async function spyEngineGets(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { engineGets: string[] };
+    w.engineGets = [];
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, m: { fn?: string; args?: string[] }) {
+      if (m?.fn === 'request' && m.args?.[0] === 'GET') w.engineGets.push(m.args[1]);
+      return post.call(this, m as never);
+    } as typeof Worker.prototype.postMessage;
+  });
+  return async () => {
+    const gets = await page.evaluate(() => (window as unknown as { engineGets: string[] }).engineGets.splice(0));
+    return gets;
+  };
+}
+
+// Responses carry only the tree nodes the page lacks (?tree_from=), so the
+// save adds each new move to the ones it already holds, without asking the
+// engine for the whole tree: it stays whole across moves, gotos, a branch,
+// an eviction rebuild and a reload.
+test('the save keeps every move while responses carry only the new nodes', async ({ page }) => {
+  await openTree(page);
+  const engineGets = await spyEngineGets(page);
+  await page.goto('./?seed=8&turns=18');
+  const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await discardDrawn(page);
+  await engineGets(); // the page's own load, if any
+  const second = await discardDrawn(page);
+  await expect(nodes).toHaveCount(3);
+  await nodes.nth(1).click();
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  const labelsAt1 = await labels(page, '.hand-tiles');
+  const other = labelsAt1.findIndex((l) => l !== second);
+  await hand.locator('.hand-tiles button').nth(other).click();
+  await expect(nodes).toHaveCount(4);
+  let moves = await savedMoveList(page);
+  expect(moves).toHaveLength(3);
+  expect(moves!.map((m) => m.parent)).toEqual([0, 1, 1]);
+  expect(await engineGets()).toEqual([]);
+
+  await evictEverything(page, 4000);
+  await discardDrawn(page); // rebuilt from the save, then one more node
+  await expect(nodes).toHaveCount(5);
+  moves = await savedMoveList(page);
+  expect(moves!.map((m) => m.parent)).toEqual([0, 1, 1, 3]);
+  expect(await engineGets()).toEqual([]);
+
+  const before = await nodes.evaluateAll((els) => els.map((e) => e.textContent));
+  await page.reload();
+  await expect(nodes).toHaveCount(5);
+  expect(await nodes.evaluateAll((els) => els.map((e) => e.textContent))).toEqual(before);
+  await engineGets(); // the page loading the session (answered by the rebuild)
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(6);
+  expect((await savedMoveList(page))!.map((m) => m.parent)).toEqual([0, 1, 1, 3, 4]);
+  expect(await engineGets()).toEqual([]);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// With storage refusing every write (private mode, a full quota) nothing is
+// saved, but the moves this tab built are kept: the new ones are added to
+// them without asking the engine for the whole tree, and an evicted session
+// is rebuilt from them.
+test('storage refusing writes: moves are kept in the tab, no whole-tree requests', async ({ page }) => {
+  await openTree(page);
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
+      if (key === 'mhj-dojo.site.practice') throw new DOMException('quota', 'QuotaExceededError');
+      return set.call(this, key, value);
+    };
+  });
+  const engineGets = await spyEngineGets(page);
+  await page.goto('./?seed=10&turns=18');
+  const nodes = page.getByRole('region', { name: '履歴ツリー' }).locator('.tree-node-btn');
+  await discardDrawn(page);
+  await engineGets();
+  const second = await discardDrawn(page);
+  await discardDrawn(page);
+  await nodes.nth(1).click();
+  await expect(nodes.nth(1)).toHaveAttribute('aria-current', 'true');
+  const other = (await labels(page, '.hand-tiles')).findIndex((l) => l !== second);
+  await page.getByRole('region', { name: '手牌' }).locator('.hand-tiles button').nth(other).click();
+  await expect(nodes).toHaveCount(5);
+  expect(await savedMoveList(page)).toBeNull();
+  expect(await engineGets()).toEqual([]);
+
+  await evictEverything(page, 5000);
+  await discardDrawn(page);
+  await expect(nodes).toHaveCount(6);
+  expect(await engineGets()).toEqual([]);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+/** The review of the last of tiles discarded on a new session of seed, made with the advice all along. */
+async function reviewAllAlong(page: Page, seed: number, tiles: string[]) {
+  return (await page.workers()[0].evaluate(
+    ({ seed, tiles }) => {
+      const call = (method: string, path: string, body: unknown) =>
+        JSON.parse(mhjDojoRequest(method, path, JSON.stringify(body)).body) as {
+          session_id: string;
+          discard_review: { text: string };
+        };
+      let st = call('POST', '/api/sessions', { seed, max_turns: 18 });
+      for (const tile of tiles) st = call('POST', `/api/sessions/${st.session_id}/discard`, { tile });
+      return st.discard_review.text;
+    },
+    { seed, tiles },
+  )) as string;
+}
+
+/** The tiles of the page's saved moves (all discards). */
+function savedTiles(page: Page) {
+  return page.evaluate(() => {
+    const id = new URL(location.href).searchParams.get('session')!;
+    const all = JSON.parse(localStorage.getItem('mhj-dojo.site.practice')!) as {
+      sessions: Record<string, { moves: { tile?: string }[] }>;
+    };
+    return all.sessions[id].moves.map((m) => m.tile!);
+  });
+}
+
+async function openAdvice(page: Page) {
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
+  await expect(panel.locator('.advice-candidate')).toHaveCount(3);
+  return panel;
+}
+
+// The advice panel starts minimized, so the discards leave their reviews
+// pending; opening the panel fills in the advice and the review, the same as
+// a session that had them all along: on the session as played, and after a
+// reload (a rebuild from the moves).
+test('advice opened after discards: the review is the one computed all along', async ({ page }) => {
+  await page.goto('./?seed=9&turns=18');
+  await discardDrawn(page);
+  await discardDrawn(page);
+  const panel = await openAdvice(page);
+  await expect(panel.locator('.advice-review')).toHaveText(await reviewAllAlong(page, 9, await savedTiles(page)));
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('advice opened after discards and a reload: the review is the one computed all along', async ({ page }) => {
+  await page.goto('./?seed=9&turns=18');
+  const hand = page.getByRole('region', { name: '手牌' });
+  await discardDrawn(page);
+  await discardDrawn(page);
+  await page.reload();
+  await expect(hand.locator('.discard-river .tile')).toHaveCount(2);
+  const want = await reviewAllAlong(page, 9, await savedTiles(page));
+  const panel = await openAdvice(page);
+  await expect(panel.locator('.advice-review')).toHaveText(want);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});

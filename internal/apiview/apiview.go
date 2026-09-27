@@ -17,14 +17,19 @@ type YakuRow struct {
 	Han         int      `json:"han"` // han for the hand, open or closed (13 for yakuman); 0 for the normal row
 	Shanten     *int     `json:"shanten"`
 	Approx      bool     `json:"approx"`
-	Ukeire      []Ukeire `json:"ukeire"`
+	Ukeire      []string `json:"ukeire"` // accepting tile kinds; the state's remaining map counts their copies
 	UkeireTotal int      `json:"ukeire_total"`
 }
 
-// Ukeire is an accepting tile type and how many copies remain unseen.
-type Ukeire struct {
-	Tile      string `json:"tile"`
-	Remaining int    `json:"remaining"`
+// DiscardRow is a row of a per-discard preview (by_discard): a YakuRow
+// without the fields that depend only on its key within one state (name,
+// yakuman, han), which the state's analysis carries under the same key.
+type DiscardRow struct {
+	Key         string   `json:"key"`
+	Shanten     *int     `json:"shanten"`
+	Approx      bool     `json:"approx"`
+	Ukeire      []string `json:"ukeire"`
+	UkeireTotal int      `json:"ukeire_total"`
 }
 
 // HistoryEntry is one point of the shanten history: a practice node on the
@@ -37,25 +42,54 @@ type HistoryEntry struct {
 	Shanten map[string]*int `json:"shanten"`
 }
 
+// Remaining returns how many copies of each tile kind remain unseen: 4
+// minus the visible copies. Every ukeire list of a state counts its tiles
+// from this one map.
+func Remaining(visible *tile.Counts) map[string]int {
+	out := make(map[string]int, tile.NumKinds)
+	for k := range tile.Kind(tile.NumKinds) {
+		out[k.String()] = max(4-visible[k], 0)
+	}
+	return out
+}
+
 // Rows converts analysis results to API rows: han comes from han(key) and
-// each accepting tile's remaining count is 4 minus the visible copies.
+// ukeire_total adds up each accepting tile's remaining copies, 4 minus the
+// visible ones.
 func Rows(res []yakushanten.Result, visible *tile.Counts, han func(key string) int) []YakuRow {
 	out := make([]YakuRow, len(res))
 	shanten := make([]int, len(res)) // the rows' Shanten point into it
 	for i, r := range res {
-		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Approx: r.Approx, Ukeire: make([]Ukeire, 0, len(r.Ukeire))}
+		row := YakuRow{Key: r.Key, Name: r.Name, Yakuman: r.Yakuman, Han: han(r.Key), Approx: r.Approx}
 		if r.Possible {
 			shanten[i] = r.Shanten
 			row.Shanten = &shanten[i]
 		}
-		for _, k := range r.Ukeire {
-			rem := max(4-visible[k], 0)
-			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
-			row.UkeireTotal += rem
-		}
+		row.Ukeire, row.UkeireTotal = ukeire(r.Ukeire, visible)
 		out[i] = row
 	}
 	return out
+}
+
+// DiscardRows drops from rows what a by_discard preview leaves to the
+// analysis (see DiscardRow).
+func DiscardRows(rows []YakuRow) []DiscardRow {
+	out := make([]DiscardRow, len(rows))
+	for i, r := range rows {
+		out[i] = DiscardRow{Key: r.Key, Shanten: r.Shanten, Approx: r.Approx, Ukeire: r.Ukeire, UkeireTotal: r.UkeireTotal}
+	}
+	return out
+}
+
+// ukeire returns the accepting kinds as strings and their remaining copies
+// in total.
+func ukeire(kinds []tile.Kind, visible *tile.Counts) ([]string, int) {
+	out, total := make([]string, len(kinds)), 0
+	for i, k := range kinds {
+		out[i] = k.String()
+		total += max(4-visible[k], 0)
+	}
+	return out, total
 }
 
 // ComboRow is one combination of yaku (docs/api.md "Yaku combos").
@@ -65,7 +99,7 @@ type ComboRow struct {
 	Han         int      `json:"han"`
 	Shanten     int      `json:"shanten"`
 	Approx      bool     `json:"approx"`
-	Ukeire      []Ukeire `json:"ukeire"`
+	Ukeire      []string `json:"ukeire"`
 	UkeireTotal int      `json:"ukeire_total"`
 }
 
@@ -73,12 +107,8 @@ type ComboRow struct {
 func Combos(combos []yakushanten.Combo, visible *tile.Counts) []ComboRow {
 	out := make([]ComboRow, len(combos))
 	for i, c := range combos {
-		row := ComboRow{Keys: c.Keys, Name: c.Name, Han: c.Han, Shanten: c.Shanten, Approx: c.Approx, Ukeire: make([]Ukeire, 0, len(c.Ukeire))}
-		for _, k := range c.Ukeire {
-			rem := max(4-visible[k], 0)
-			row.Ukeire = append(row.Ukeire, Ukeire{Tile: k.String(), Remaining: rem})
-			row.UkeireTotal += rem
-		}
+		row := ComboRow{Keys: c.Keys, Name: c.Name, Han: c.Han, Shanten: c.Shanten, Approx: c.Approx}
+		row.Ukeire, row.UkeireTotal = ukeire(c.Ukeire, visible)
 		out[i] = row
 	}
 	return out
