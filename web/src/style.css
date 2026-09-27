@@ -2102,7 +2102,7 @@ section {
     grid-auto-columns: minmax(0, 96px);
     justify-content: center;
     gap: 4px;
-    padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    padding: 3px max(8px, env(safe-area-inset-right)) calc(3px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     background: var(--panel-bg);
     border-top: 1px solid var(--border);
     box-shadow: 0 -4px 14px rgb(0 0 0 / 0.1);
@@ -2113,17 +2113,17 @@ section {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
-    min-height: 48px;
-    padding: 4px 2px;
+    min-height: 34px;
+    padding: 2px;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--bg);
     box-shadow: none;
     font-size: 0.7rem;
     letter-spacing: 0;
-    line-height: 1.2;
+    line-height: 1.15;
   }
   .dock-tab-label {
     display: none;
@@ -2139,24 +2139,36 @@ section {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: var(--accent);
     color: var(--accent-fg);
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     font-weight: 700;
     line-height: 1;
   }
   .app.has-dock {
     padding-right: max(8px, env(safe-area-inset-right));
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
   }
   .app-practice.has-dock {
-    --yaku-bottom: 84px;
+    --yaku-bottom: 60px;
   }
   /* The site's update notice sits above the dock bar. */
   body:has(.panel-dock) .update-banner {
-    bottom: calc(76px + env(safe-area-inset-bottom));
+    bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+}
+/* The narrowest phones: tighter gaps and a smaller font, so five short
+   names (アドバイス the longest) still fit without clipping. */
+@media (width <= 340px) and (orientation: portrait) {
+  .panel-dock {
+    gap: 2px;
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+  .dock-tab {
+    font-size: 0.64rem;
   }
 }
