@@ -165,6 +165,23 @@ test('a saved tsumo node is rebuilt with its win', async ({ page }) => {
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
+// Rows at 聴牌 (or 和了) are light red, taking over from the yellow of the
+// closest rows; the rest stay plain. Seed 2 reaches 聴牌 after 8 discards
+// (一般形, 断么九, 平和 and the 断么九＋平和 combo).
+test('yaku rows at tenpai are marked', async ({ page }) => {
+  await seedStorage(page, 'e2etenpai', 8);
+  await page.goto('./?session=e2etenpai&seed=2&turns=18');
+  const table = page.locator('.yaku-table');
+  await expect(table.locator('tbody tr').first()).toBeVisible();
+  const tenpai = table.locator('tr.row-tenpai');
+  await expect(tenpai).toHaveCount(3);
+  for (const row of await tenpai.all()) await expect(row.locator('.shanten-cell')).toContainText('聴牌');
+  await expect(table.locator('tr.row-best')).toHaveCount(0);
+  await expect(page.locator('.combo-table tr.row-tenpai')).toHaveCount(1);
+  const bg = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).backgroundColor);
+  expect(await bg('.yaku-table tr.row-tenpai')).not.toBe(await bg('.yaku-table tbody tr:not(.row-tenpai)'));
+});
+
 test('a saved session resumes at an inner node', async ({ page }) => {
   await openTree(page);
   await seedStorage(page, 'e2einner', 3);

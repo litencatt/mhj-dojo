@@ -55,6 +55,11 @@ function UkeireCell({ ukeire }: { ukeire: UkeireEntry[] }) {
   );
 }
 
+/** Whether a row is at 聴牌 (0) or already 和了 (-1): shown in light red. */
+function isTenpai(shanten: number | null): boolean {
+  return shanten !== null && shanten <= 0;
+}
+
 /** 複合役: the best combinations of yaku one hand can score together, ranked
  * by the server (docs/api.md "Yaku combos"). While previewing, a combination
  * the current node also lists shows its shanten delta. */
@@ -79,7 +84,7 @@ function ComboTable({ combos, base }: { combos: ComboRow[]; base: ComboRow[] | n
             const b = baseByName.get(c.name);
             const delta = base && b ? deltaLabel(c.shanten, b.shanten) : null;
             return (
-              <tr key={c.name}>
+              <tr key={c.name} class={isTenpai(c.shanten) ? 'row-tenpai' : undefined}>
                 <th scope="row" class="combo-name-cell">
                   {c.name}
                   {c.approx && <span class="badge-approx">近似</span>}
@@ -164,8 +169,9 @@ export function YakuTable(props: YakuTableProps) {
     if (!row) return null;
     const delta = baseline ? deltaLabel(row.shanten, base.get(key)?.shanten ?? null) : null;
     const isBest = !row.yakuman && row.shanten !== null && row.shanten === minShanten;
+    const rowClass = isTenpai(row.shanten) ? 'row-tenpai' : isBest ? 'row-best' : undefined;
     return (
-      <tr key={row.key} class={isBest ? 'row-best' : undefined}>
+      <tr key={row.key} class={rowClass}>
         <th scope="row" class="yaku-name-cell">
           <span
             class="yaku-name"
