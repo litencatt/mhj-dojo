@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // Solo practice mode (the root page): load a fixed seed and discard once,
 // checking that both the table (discard river) and the analysis (yaku
@@ -47,15 +47,16 @@ test('practice mode loads and a discard updates the table and analysis', async (
   await expect(analysisBody).not.toHaveText(analysisBefore);
 });
 
-// Two tabs on the same practice session (issue #53): page A discards first,
-// moving the session on; page B, still showing the pre-discard node, then
-// discards too. Its request carries the node it acted from (node_id), the
+// Two browsers on the same practice session (issue #53; two tabs of one
+// browser would stop each other, see below): page A discards first, moving
+// the session on; page B, still showing the pre-discard node, then discards
+// too. Its request carries the node it acted from (node_id), the
 // server rejects it as stale (409, mirroring the game stale-tab test in
 // game.spec.ts), and the client's re-fetch-on-real-change logic shows the
 // notice instead of an error and lands page B on the current node.
-test('a stale tab: discarding after another tab moved the session on shows a notice, not an error', async ({
+test('a stale browser: discarding after another browser moved the session on shows a notice, not an error', async ({
   page,
-  context,
+  browser,
 }) => {
   await page.goto('/?seed=1&turns=18');
   const handA = page.getByRole('region', { name: '手牌' });
@@ -67,7 +68,7 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(page).toHaveURL(/[?&]session=/);
   const sessionId = new URL(page.url()).searchParams.get('session');
   expect(sessionId, 'the URL should carry the server-assigned session id').toBeTruthy();
-  const pageB = await context.newPage();
+  const pageB = await (await browser.newContext()).newPage();
   await pageB.goto(`/?session=${sessionId}`);
   const handB = pageB.getByRole('region', { name: '手牌' });
   const drawnB = handB.locator('.hand-drawn button');
@@ -93,6 +94,90 @@ test('a stale tab: discarding after another tab moved the session on shows a not
   await expect(pageB.locator('.notice-banner')).toBeVisible({ timeout: 15_000 });
   await expect(pageB.locator('.error-banner')).toBeHidden();
   await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
+  for (const p of [page, pageB]) await expect(stoppedDialog(p)).toHaveCount(0);
+  await pageB.context().close();
+});
+
+// One tab of a browser at a time plays a session (src/singleTab.ts): the
+// newest tab to open it wins, and the one before stops until taken back.
+function stoppedDialog(page: Page) {
+  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+async function discardDrawn(page: Page) {
+  const hand = page.getByRole('region', { name: '手牌' });
+  const river = hand.locator('.discard-river .tile');
+  const before = await river.count();
+  const drawn = hand.locator('.hand-drawn button');
+  await expect(drawn).toBeEnabled();
+  await drawn.click();
+  await expect(river).toHaveCount(before + 1);
+}
+
+function riverOf(page: Page) {
+  return page
+    .getByRole('region', { name: '手牌' })
+    .locator('.discard-river .tile')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+}
+
+test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
+  await page.goto('/?seed=21&turns=18');
+  await discardDrawn(page);
+  await expect(page).toHaveURL(/[?&]session=/);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+
+  // A stops: the dialog covers it, nothing under it can be clicked, and it
+  // sends nothing more.
+  await expect(stoppedDialog(page)).toBeVisible();
+  await expect(stoppedDialog(other)).toHaveCount(0);
+  const sent: string[] = [];
+  page.on('request', (req) => {
+    if (req.url().includes('/api/')) sent.push(`${req.method()} ${req.url()}`);
+  });
+  const handA = page.getByRole('region', { name: '手牌' });
+  await expect(handA.locator('.hand-drawn button').click({ timeout: 1000 })).rejects.toThrow();
+  await expect(page.getByRole('button', { name: '新規対局' }).click({ timeout: 1000 })).rejects.toThrow();
+
+  // B plays on.
+  await discardDrawn(other);
+  await discardDrawn(other);
+  expect(sent).toEqual([]);
+
+  // A takes it back with a GET, from where B left it; now B stops.
+  const get = page.waitForRequest((req) => req.method() === 'GET' && /\/api\/sessions\/[^/]+$/.test(req.url()));
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await get;
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
+  expect(await riverOf(page)).toEqual(await riverOf(other));
+  await expect(stoppedDialog(other)).toBeVisible();
+  await discardDrawn(page);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('tabs on different sessions both play, and a new session lets go of the one before', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/?seed=31&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const first = page.url();
+  await page.locator('.new-game-form input[type="number"]').first().fill('32');
+  await page.getByRole('button', { name: '新規対局' }).click();
+  await expect(page).toHaveURL(/[?&]seed=32(&|$)/);
+
+  const other = await context.newPage();
+  await other.goto(first);
+  await discardDrawn(other);
+  await discardDrawn(page);
+  await discardDrawn(other);
+  for (const p of [page, other]) {
+    await expect(stoppedDialog(p)).toHaveCount(0);
+    await expect(p.locator('.error-banner')).toHaveCount(0);
+  }
 });
 
 // The 面子表示 toggle regroups the hand under labelled brackets without a

@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { hideTab, showTab } from './tabs';
 
 // The static site (issue #67): practice mode with the engine running as
 // WebAssembly in a Web Worker, no mhj-dojo server behind it.
@@ -130,106 +129,160 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
     await expect(p.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(n);
     await expect(p.locator('.error-banner')).toHaveCount(0);
   }
+  // Different sessions: neither tab stops the other.
+  await discardDrawn(page);
+  await discardDrawn(other);
+  for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
 
-// Two tabs on one session share its save, as two tabs on the server share
-// the session: a move on a screen the other tab has moved on from is not
-// made; the tab shows the latest state with a notice instead. Both tabs are
-// switched away from here, so neither catches up by itself.
-test('two tabs on the same session stay in step', async ({ page, context }) => {
-  await hideTab(page);
+// One tab at a time plays a session (src/singleTab.ts): the newest tab to
+// open it wins, and the one before stops until taken back.
+function stoppedDialog(page: Page) {
+  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+function savedMoves(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
+      sessions: Record<string, { moves: unknown[] }>;
+    } | null;
+    return s?.sessions[id!]?.moves.length;
+  }, new URL(page.url()).searchParams.get('session'));
+}
+
+test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
   await page.goto('./?seed=21&turns=18');
+  await discardDrawn(page);
   await expect(page).toHaveURL(/[?&]session=/);
   const other = await context.newPage();
-  await hideTab(other);
   await other.goto(page.url());
   const handA = page.getByRole('region', { name: '手牌' });
   const handB = other.getByRole('region', { name: '手牌' });
-  await expect(handB.locator('.hand-drawn button')).toBeEnabled();
+  await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
 
-  await discardDrawn(page);
-  await discardDrawn(page);
+  // A stops: the dialog covers it, and nothing under it can be clicked.
+  await expect(stoppedDialog(page)).toBeVisible();
+  await expect(stoppedDialog(other)).toHaveCount(0);
+  await expect(handA.locator('.hand-drawn button').click({ timeout: 1000 })).rejects.toThrow();
+  await expect(page.getByRole('button', { name: '新規対局' }).click({ timeout: 1000 })).rejects.toThrow();
 
-  // B still shows the start: its discard is refused, and it catches up.
-  await handB.locator('.hand-drawn button').click();
-  await expect(other.locator('.notice-banner')).toBeVisible();
-  await expect(other.locator('.error-banner')).toHaveCount(0);
-  await expect(handB.locator('.discard-river .tile')).toHaveCount(2);
-  expect(await labels(other, '.discard-river')).toEqual(await labels(page, '.discard-river'));
-  expect(await labels(other, '.hand-tiles')).toEqual(await labels(page, '.hand-tiles'));
-
-  // B plays on from there; now A is behind and is told in turn.
+  // B plays on and saves.
   await discardDrawn(other);
-  await handA.locator('.hand-drawn button').click();
-  await expect(page.locator('.notice-banner')).toBeVisible();
-  await expect(page.locator('.error-banner')).toHaveCount(0);
+  await discardDrawn(other);
+  expect(await savedMoves(other)).toBe(3);
+
+  // A takes it back, from where B left it; now B stops.
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(stoppedDialog(page)).toHaveCount(0);
   await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
-
-  // Both keep the same state across a reload.
-  const river = await labels(other, '.discard-river');
-  for (const p of [page, other]) {
-    await p.reload();
-    await expect(p.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(3);
-    expect(await labels(p, '.discard-river')).toEqual(river);
-    await expect(p.locator('.error-banner')).toHaveCount(0);
-  }
-});
-
-test('a tab brought back into view shows what another tab played meanwhile', async ({ page, context }) => {
-  await hideTab(page);
-  await page.goto('./?seed=22&turns=18');
-  await expect(page).toHaveURL(/[?&]session=/);
-  const other = await context.newPage();
-  await hideTab(other);
-  await other.goto(page.url());
-  const handA = page.getByRole('region', { name: '手牌' });
-  const handB = other.getByRole('region', { name: '手牌' });
-  await expect(handB.locator('.hand-drawn button')).toBeEnabled();
-
+  expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
+  expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
+  await expect(stoppedDialog(other)).toBeVisible();
   await discardDrawn(page);
-  await showTab(other);
-  await expect(other.locator('.notice-banner')).toBeVisible();
-  await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
-  expect(await labels(other, '.discard-river')).toEqual(await labels(page, '.discard-river'));
-
-  // B plays on; showing it again changes nothing, as nothing is new to it.
-  await discardDrawn(other);
-  await expect(other.locator('.notice-banner')).toHaveCount(0);
-  await other.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await other.waitForTimeout(500);
-  await expect(handB.locator('.discard-river .tile')).toHaveCount(2);
-  await expect(other.locator('.notice-banner')).toHaveCount(0);
-
-  // A, still hidden, has not caught up; shown, it does.
-  await expect(handA.locator('.discard-river .tile')).toHaveCount(1);
-  await showTab(page);
-  await expect(page.locator('.notice-banner')).toBeVisible();
-  await expect(handA.locator('.discard-river .tile')).toHaveCount(2);
-});
-
-test('a tab in view side by side follows the other tab with no action of its own', async ({ page, context }) => {
-  await page.goto('./?seed=23&turns=18');
-  await expect(page).toHaveURL(/[?&]session=/);
-  const other = await context.newPage();
-  await other.goto(page.url());
-  const handB = other.getByRole('region', { name: '手牌' });
-  await expect(handB.locator('.hand-drawn button')).toBeEnabled();
-
-  await discardDrawn(page);
-  await expect(other.locator('.notice-banner')).toBeVisible();
-  await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
-  expect(await labels(other, '.discard-river')).toEqual(await labels(page, '.discard-river'));
-
-  // B catching up saves too (only when it was used): that is nothing new
-  // for A, which stays as it is, with no notice.
-  await page.waitForTimeout(500);
-  await expect(page.locator('.notice-banner')).toHaveCount(0);
+  expect(await savedMoves(page)).toBe(4);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 
-  // And the other way round.
+  // 閉じる: a tab the page did not open stays open, with a hint.
+  await stoppedDialog(other).getByRole('button', { name: '閉じる' }).click();
+  await expect(stoppedDialog(other)).toContainText('このタブはそのまま閉じてかまいません');
+  expect(other.isClosed()).toBe(false);
+});
+
+test('an answer that comes after the tab stopped is neither shown nor saved', async ({ page, context }) => {
+  await page.goto('./?seed=24&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const handA = page.getByRole('region', { name: '手牌' });
+  await expect(handA.locator('.hand-drawn button')).toBeEnabled();
+  // A's engine holds its next move until released.
+  const worker = page.workers()[0];
+  await worker.evaluate(() => {
+    const w = self as unknown as { held: boolean };
+    w.held = true;
+    const orig = self.onmessage!;
+    self.onmessage = async (e: MessageEvent) => {
+      if (e.data.fn === 'request' && e.data.args[0] === 'POST') {
+        while (w.held) await new Promise((r) => setTimeout(r, 10));
+      }
+      return orig.call(self, e);
+    };
+  });
+  await handA.locator('.hand-drawn button').click();
+
+  // B opens the session meanwhile, from the save without A's move, and
+  // plays two moves of its own.
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expect(stoppedDialog(page)).toBeVisible();
+  await expect(stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' })).toBeDisabled();
   await discardDrawn(other);
-  await expect(page.locator('.notice-banner')).toBeVisible();
-  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(2);
+  await discardDrawn(other);
+  expect(await savedMoves(other)).toBe(2);
+
+  // A's move is answered now: B's save stands, and A shows nothing new.
+  await worker.evaluate(() => {
+    (self as unknown as { held: boolean }).held = false;
+  });
+  const resume = stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' });
+  await expect(resume).toBeEnabled();
+  expect(await savedMoves(page)).toBe(2);
+  await expect(handA.locator('.discard-river')).toHaveCount(0);
+
+  await resume.click();
+  await expect(handA.locator('.discard-river .tile')).toHaveCount(2);
+  expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('a new session lets go of the one before', async ({ page, context }) => {
+  await page.goto('./?seed=25&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const first = page.url();
+  await page.locator('.new-game-form input[type="number"]').first().fill('26');
+  await page.getByRole('button', { name: '新規対局' }).click();
+  await expect(page).not.toHaveURL(first);
+  await expect(page).toHaveURL(/[?&]seed=26(&|$)/);
+
+  const other = await context.newPage();
+  await other.goto(first);
+  await discardDrawn(other);
+  await discardDrawn(page);
+  for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
+});
+
+// A tab that missed the claim (frozen, say) checks again as it comes back
+// into view, and stops then.
+test('a tab that missed another tab opening its session stops when shown again', async ({ page, context }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { deaf: boolean };
+    w.deaf = false;
+    const Channel = BroadcastChannel;
+    // Drops the messages that arrive while deaf, as a frozen tab would.
+    window.BroadcastChannel = class extends Channel {
+      set onmessage(fn: ((e: MessageEvent) => void) | null) {
+        super.onmessage = fn && ((e: MessageEvent) => void (w.deaf || fn.call(this, e)));
+      }
+      get onmessage() {
+        return super.onmessage;
+      }
+    };
+  });
+  await page.goto('./?seed=27&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await page.evaluate(() => ((window as unknown as { deaf: boolean }).deaf = true));
+
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await page.waitForTimeout(300);
+  await expect(stoppedDialog(page)).toHaveCount(0);
+
+  await page.evaluate(() => {
+    (window as unknown as { deaf: boolean }).deaf = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(stoppedDialog(page)).toBeVisible();
+  await expect(stoppedDialog(other)).toHaveCount(0);
 });
 
 // Seed 2's best-advice line: eleven discards, then tsumo on the twelfth draw.

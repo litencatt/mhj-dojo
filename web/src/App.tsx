@@ -10,9 +10,11 @@ import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
+import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { sessionMovedOn, useRefreshOnSave, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { sessionMovedOn, useRowNames, useSerialRequest, useSingleTab, useUrlResume } from './hooks';
+import { claim } from './singleTab';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -21,16 +23,19 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
-  const { busy, error, notice, request, refresh } = useSerialRequest<SessionState>(
+  const { busy, error, notice, request } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
       setHighlightTile(null);
     },
-    state ? () => api.getSession(state.session_id) : undefined,
+    // On the static site no other tab plays this session meanwhile (see
+    // useSingleTab): a 409 is never another tab's doing. On the server it
+    // may be another browser's.
+    state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
     sessionMovedOn,
   );
-  useRefreshOnSave(state?.session_id ?? null, api.sessionSavedElsewhere, busy, refresh);
+  const tab = useSingleTab(state ? api.sessionKey(state.session_id) : null);
 
   function startGame(seed?: number, maxTurns?: number) {
     return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
@@ -41,7 +46,11 @@ export function App() {
   useUrlResume({
     idKey: 'session',
     request,
-    get: api.getSession,
+    get: (id) => {
+      // Before asking for it, so that another tab stops saving it first.
+      claim(api.sessionKey(id));
+      return api.getSession(id);
+    },
     create: (params) =>
       api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }),
     sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns) },
@@ -71,6 +80,14 @@ export function App() {
   function handleGoto(nodeId: number) {
     if (!state) return;
     void request(() => api.goto(state.session_id, nodeId));
+  }
+
+  // Takes the session back from the tab that took it, and shows where that
+  // tab left it.
+  function handleContinue() {
+    if (!state) return;
+    tab.reclaim();
+    void request(() => api.getSession(state.session_id));
   }
 
   const rowNames = useRowNames(state?.analysis);
@@ -251,6 +268,7 @@ export function App() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
+      {tab.stopped && <TabStopped busy={busy} onContinue={handleContinue} />}
     </div>
   );
 }
