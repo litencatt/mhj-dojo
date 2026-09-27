@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.0927.6](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.5...v2026.0927.6) - 2026-09-27
+
+### 新機能
+- 役別向聴で聴牌になった役の行を薄い赤にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/111
+
 ## [v2026.0927.5](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.4...v2026.0927.5) - 2026-09-27
 
 ### 修正
