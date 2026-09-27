@@ -344,6 +344,7 @@ type Analyzer struct {
 	comboMelds   []yaku.Meld
 	comboTargets [][]shanten.Target
 	folds        map[[2]*shanten.Table]*shanten.Table // see comboDist
+	names        map[string]string                    // see comboNames
 }
 
 // NewAnalyzer returns a practice-mode (East, East) analyzer with an empty memo.
@@ -352,6 +353,15 @@ func NewAnalyzer() *Analyzer { return NewAnalyzerFor(EastEast) }
 // NewAnalyzerFor returns an analyzer whose rows follow the given winds.
 func NewAnalyzerFor(w Winds) *Analyzer {
 	return &Analyzer{eng: shanten.NewEngine(), winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+}
+
+// ForWinds returns an analyzer whose rows follow the given winds and that
+// shares this one's memo: the suit tables (and the folds of two of them) do
+// not depend on the winds, so a game's next round starts warm instead of
+// recomputing the tables its hands share with the last round's. The two
+// must not be used concurrently, as one analyzer may not be either.
+func (a *Analyzer) ForWinds(w Winds) *Analyzer {
+	return &Analyzer{eng: a.eng, folds: a.folds, winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
 }
 
 // Rows returns the analyzer's rows in API order.

@@ -133,13 +133,18 @@ func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 	return m
 }
 
-// startRound resets what is kept per round: the analyzer (its wind rows
-// follow the round), the events and the history.
+// startRound resets what is kept per round: the analyzer's rows (they
+// follow the round's winds; its memo carries over, see analyze), the events
+// and the history.
 func (m *Match) startRound() {
 	if m.replaying {
 		return
 	}
-	m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
+	if w := m.game.Round.Winds(Human); m.analyzer == nil {
+		m.analyzer = yakushanten.NewAnalyzerFor(w)
+	} else {
+		m.analyzer = m.analyzer.ForWinds(w)
+	}
 	m.since = 0
 	m.history = nil
 	m.recordHand()
