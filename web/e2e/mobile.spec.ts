@@ -72,17 +72,22 @@ for (const width of [320, 360, 390]) {
       // (The tap area reaches 8px above and below the tile.)
       expect(tile.height).toBeGreaterThanOrEqual(21);
 
-      // Five tabs in one row along the bottom edge, each easy to tap.
+      // Five tabs in one compact row along the bottom edge, still easy to tap
+      // (34px tall, and wide), their short names unclipped.
       const dock = page.getByRole('navigation', { name: '最小化したパネル' });
       const dockBox = await box(dock);
       expect(dockBox.y + dockBox.height).toBeCloseTo(800, 0);
+      expect(dockBox.height).toBeLessThanOrEqual(44);
       expect(dockBox.width).toBeCloseTo(width, 0);
       const tabs = dock.getByRole('button');
       await expect(tabs).toHaveCount(5);
       for (const t of await tabs.all()) {
         const b = await box(t);
-        expect(b.height).toBeGreaterThanOrEqual(40);
+        expect(b.height).toBeGreaterThanOrEqual(34);
+        expect(b.width).toBeGreaterThanOrEqual(48);
         expect(b.y).toBeGreaterThanOrEqual(dockBox.y);
+        const short = t.locator('.dock-tab-short');
+        expect(await short.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
       }
       // Nothing on the page sits under it, even scrolled to the very end.
       for (const section of await page.locator('.app-header, section').filter({ visible: true }).all()) {
