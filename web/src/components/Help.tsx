@@ -84,11 +84,11 @@ export function Help({ onShowGlossary }: HelpProps) {
               </button>
             </div>
             <p class="help-lead">
-              画面の用語は
+              麻雀の用語は
               <button type="button" class="help-link" onClick={showGlossary}>
                 用語表
               </button>
-              で調べられます。
+              で調べられます。このアプリの画面の項目は、下の「画面の用語」にあります。
             </p>
 
             <section aria-labelledby="help-about">
@@ -97,6 +97,28 @@ export function Help({ onShowGlossary }: HelpProps) {
                 日本式リーチ麻雀の練習アプリです。一人打ちでツモと打牌を繰り返しながら、役ごとにあと何向聴か・どの牌が有効牌かを確認できます。
                 パソコンで動かすローカル版（<code>mhj-dojo</code> コマンド）と、ブラウザだけで動く公開版があります。
               </p>
+            </section>
+
+            <section aria-labelledby="help-terms">
+              <h3 id="help-terms">画面の用語</h3>
+              <dl class="help-terms">
+                <dt>シード</dt>
+                <dd>山の並びを決める数。同じシードなら、配牌もツモ順も毎回同じになります。空欄で「新規対局」を押すとランダムに決まります。</dd>
+                <dt>巡目・最大巡目</dt>
+                <dd>巡目は打牌した回数です。最大巡目（既定18）まで打つと流局になります。</dd>
+                <dt>残り牌</dt>
+                <dd>山に残っている牌の枚数です。</dd>
+                <dt>役別向聴</dt>
+                <dd>役ごとに、その役を満たす和了形まであと何向聴かを示す表です。手牌を最小何枚入れ替えればよいか − 1 で数えるので、役ごとの近道が分かります。</dd>
+                <dt>合計枚数</dt>
+                <dd>役別向聴の表で、その役の有効牌の残り枚数を合計したものです。</dd>
+                <dt>近似</dt>
+                <dd>平和の1向聴以上の値に付く印です。両面待ちの条件を除いて数えた目安で、実際はそれ以上かかることがあります。</dd>
+                <dt>打牌プレビュー</dt>
+                <dd>手牌の牌にカーソルを合わせる（タッチ操作では1回タップ）と、その牌を切った後の役別向聴と今との差を表示します。</dd>
+                <dt>履歴ツリー</dt>
+                <dd>打牌の履歴です。任意の巡目に戻って別の牌を切ると枝が増え、元の枝も残ります。</dd>
+              </dl>
             </section>
 
             <section aria-labelledby="help-practice">
