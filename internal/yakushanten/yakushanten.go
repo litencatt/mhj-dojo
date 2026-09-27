@@ -367,7 +367,8 @@ func (a *Analyzer) ForWinds(w Winds) *Analyzer {
 // Rows returns the analyzer's rows in API order.
 func (a *Analyzer) Rows() []RowDef { return a.rows }
 
-// MemoSize returns the number of memoized suit tables.
+// MemoSize returns the number of memoized suit tables, both generations
+// counted (see memo.Memo.Len: a table copied forward counts twice).
 func (a *Analyzer) MemoSize() int { return a.eng.MemoSize() }
 
 // Analyze returns every row for a 13-tile hand, in the analyzer's row order. A 14-tile hand

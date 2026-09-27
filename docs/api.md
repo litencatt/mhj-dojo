@@ -770,7 +770,7 @@ so one a client keeps polling or acting on stays in): up to
 CPU games. Each session or game owns a
 `yakushanten.Analyzer`, and a game's three CPU seats additionally share one
 `cpu.Player`; each keeps a shanten memo bounded as described under "Memo
-bounds" below (~7.7 MiB per analyzer and ~1 MiB per CPU player at most).
+bounds" below (at most ~8.8 MiB per analyzer and ~1 MiB per CPU player).
 
 The wasm build (`cmd/mhj-dojo-wasm`) passes a much smaller max — 4, via
 `session.NewStoreWithMax` — instead of `session.MaxSessions`: it runs in a
@@ -829,7 +829,7 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
   thousands of alternate lines, to grow it well past what one played-out
   line ever needs. It was bounded only by a reset at 200,000 tables
   (~28 MiB), and is now bounded like every other memo (see "Memo bounds"
-  below: ~7.7 MiB at most), independent of `MaxNodes`; measured again with
+  below: at most ~8.8 MiB), independent of `MaxNodes`; measured again with
   those bounds, the benchmark is ~4.9 MiB per session (it was ~7.2 MiB
   just before). The rest — 2000 nodes' own data (hand,
   per-node child map) plus the current node and its history path's pruned
@@ -870,19 +870,33 @@ immutable and stay valid after they are dropped (the caller's pointer keeps
 them alive), so a turnover in the middle of a turn only costs recomputation,
 never correctness; the fold memo is keyed by table pointers, so a table
 dropped and rebuilt only misses its old folds. `TestMemoTurnover`
-(`internal/yakushanten/memo_test.go`) checks an analyzer past two turnovers
-against a fresh one, and the bounds below.
+(`internal/yakushanten/memo_test.go`) checks an analyzer for ~200 hands
+past its memo's turnovers against a fresh one, and the bounds below;
+`TestTinyMemos` does the same, on every hand, with generations of 64
+tables and 16 folds, so tables are dropped and rebuilt under their folds'
+keys all the time.
 
 | memo | per generation | bytes per entry | at most |
 |---|---|---|---|
 | suit tables, `shanten.MemoGen` (analyzer) | 28,000 | ~127 | ~7 MiB |
 | folds, `foldGen` (`internal/yakushanten/combo.go`) | 4,000 | ~100 | ~0.8 MiB |
+| tables kept alive only by fold keys (2 per fold) | | 64 | ~1 MiB |
+| **one analyzer** | | | **~8.8 MiB** |
 | suit tables, `cpu` `memoGen` | 4,000 | ~127 | ~1 MiB |
+
+A fold's key names two tables, which it keeps alive even after the engine's
+memo dropped them: at most `2 × foldGen × 2` = 16,000 tables, hence the
+third row.
 
 The bytes per entry are `HeapAlloc` deltas (after `runtime.GC()`) of an
 analyzer filled from random hands, divided by its entries: a table is 50
 bytes allocated in a 64-byte size class plus its map slot and the map's
-slack; ~7.7 MiB is the measured peak of one analyzer (both memos full).
+slack. The measured peak of one analyzer, filled the same way, was ~7.7
+MiB (both memos full; the fold keys' tables were mostly still in the
+engine's memo), under the ~8.8 MiB bound. At a turnover the dropped
+generation stays on the heap until the next GC, so for that moment a memo
+briefly holds three generations (~3.5 MiB more for the analyzer's tables):
+ordinary GC slack, not a lasting cost.
 
 The sizes come from counting cache misses (computed tables and folds) on
 real play, which unlike timings is deterministic: 8 practice sessions of
@@ -910,19 +924,21 @@ kept small (4,000 per generation: +77% fold misses, ~0.3 ms per request).
 The CPU seats build only ~3,000–6,500 tables over a whole game, so 4,000
 per generation leaves their misses unchanged.
 
-Measured per-request time (a native build, 3 alternating runs of the same
-play as above, against the old caps; noisy, ±1 ms): an 18-turn session's
-requests went from ~11.4 to ~11.9 ms (+4%), a 109-turn session's from ~11.0
-to ~12.1 ms (+11%, long sessions revisit hands from many turns back), a CPU
-game's human moves from ~11.7 to ~12.2 ms (+4%).
+Latency cost, against the old caps: **+4%** per request in 18-turn practice
+sessions and per move in CPU games, **+11%** per request in long (109-turn)
+sessions, which revisit hands from many turns back. Measured on a native
+build over 3 alternating runs of the same play as above (noisy, ±1 ms):
+18-turn session requests ~11.4 → ~11.9 ms, 109-turn ~11.0 → ~12.1 ms, CPU
+game moves ~11.7 → ~12.2 ms.
 `BenchmarkAnalyzeAllDiscards` (one fresh analyzer per call) is unchanged
 at ~22.5 ms, so the generational lookup itself costs nothing measurable.
 
-Worst case, native server: a session ≈ 7.7 MiB (analyzer) + ~0.7 MiB (a
-2000-node tree) ≈ 8.4 MiB, a game ≈ 7.7 + 1 (CPU) + ~0.5 (game state) ≈
-9.2 MiB, so 256 sessions + 256 games ≈ 2.1 + 2.3 ≈ 4.4 GiB, down from ~18
+Worst case, native server: a session ≈ 8.8 MiB (analyzer) + ~0.7 MiB (a
+2000-node tree) ≈ 9.5 MiB, a game ≈ 8.8 + 1 (CPU) + ~0.5 (game state) ≈
+10.3 MiB, so 256 sessions + 256 games ≈ 2.4 + 2.6 ≈ 5.0 GiB, down from ~18
 GiB under the old caps (~30 MiB per session, ~42 MiB per game). The
-WebAssembly build (4 sessions, 2 games) is bounded at ~52 MiB, down from
-~200 MiB. A lower `shanten.MemoGen` trades latency for memory along the
-table above (12,000 per generation would be ~4 MiB per analyzer and ~2.6
-GiB in total, at +47% table misses in ordinary practice).
+WebAssembly build (4 sessions, 2 games) is bounded at ~58 MiB, down from
+~200 MiB (plus a turnover's brief extra generation, see above). A lower
+`shanten.MemoGen` trades latency for memory along the table above (12,000
+per generation would be ~5 MiB per analyzer and ~3 GiB in total, at +47%
+table misses in ordinary practice).

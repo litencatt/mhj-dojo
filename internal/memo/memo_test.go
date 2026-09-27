@@ -33,3 +33,12 @@ func TestKeepsWhatIsUsed(t *testing.T) {
 		}
 	}
 }
+
+func TestNewPanicsOnNonPositiveMax(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("New(0) did not panic")
+		}
+	}()
+	New[int, int](0)
+}

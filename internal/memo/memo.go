@@ -16,8 +16,12 @@ type Memo[K comparable, V any] struct {
 	max      int
 }
 
-// New returns an empty memo whose generations hold max entries each.
+// New returns an empty memo whose generations hold max entries each. It
+// panics if max is not positive.
 func New[K comparable, V any](max int) *Memo[K, V] {
+	if max <= 0 {
+		panic("memo: generation size must be positive")
+	}
 	return &Memo[K, V]{cur: make(map[K]V), max: max}
 }
 
@@ -33,7 +37,9 @@ func (m *Memo[K, V]) Get(k K) (V, bool) {
 	return v, ok
 }
 
-// Put memoizes v for k.
+// Put memoizes v for k, which must not be in the current generation (call
+// it after a Get miss): Put does not check, and a Put of a key already
+// there could turn the generation over needlessly.
 func (m *Memo[K, V]) Put(k K, v V) {
 	if len(m.cur) >= m.max {
 		m.old, m.cur = m.cur, make(map[K]V, m.max)
