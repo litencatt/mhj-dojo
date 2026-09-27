@@ -61,7 +61,11 @@ export function GameApp() {
       setPreviewTile(null);
       setRiichiMode(false);
     },
-    state ? () => api.getGame(state.game_id) : undefined,
+    // On the static site each tab runs its own engine, the CPU turns within
+    // the request: two tabs on the same game play separate copies (the last
+    // save wins on a reload), so a 409 is never another tab's (or a
+    // finishing CPU turn's) doing.
+    state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
     gameMovedOn,
   );
 
@@ -79,7 +83,7 @@ export function GameApp() {
 
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again after
-  // a server restart.
+  // a server restart (on the static site, if the game's save is gone).
   useUrlResume({
     idKey: 'game',
     request,
@@ -242,7 +246,11 @@ export function GameApp() {
               {notice}
             </div>
           )}
-          {!state && !error && <p class="muted">対局を準備しています…</p>}
+          {!state && !error && (
+            <p class="muted">
+              {api.WASM ? '計算エンジンを読み込んでいます…' : '対局を準備しています…'}
+            </p>
+          )}
         </div>
         {state && me && (
           <>

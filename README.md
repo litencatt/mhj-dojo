@@ -4,7 +4,7 @@ A local web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI a
 
 [日本語版 README](README_jp.md)
 
-Static site (practice mode only, CPU games not yet): https://mhj-dojo.lolipop-now.app/
+Static site (practice and CPU games, no install): https://mhj-dojo.lolipop-now.app/
 
 ## Practice mode
 
@@ -91,9 +91,9 @@ cd web && npx playwright install --with-deps chromium   # once
 cd web && npm run build && npm run e2e
 ```
 
-### Static site (WebAssembly, practice mode only)
+### Static site (WebAssembly)
 
-The practice mode can also be built as a static site that needs no server: the Go practice engine (`cmd/mhj-dojo-wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
+The app can also be built as a static site that needs no server: the Go engine (`cmd/mhj-dojo-wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
 
 ```sh
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
@@ -103,11 +103,11 @@ The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `work
 
 Differences from the local version:
 
-- Practice mode only; the CPU game (**CPU対戦へ**, `?mode=game`) is not available yet.
+- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser too, CPU turns included.
 - Each tab runs its own sessions, so there is no "another tab moved on" handling.
-- Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL.
+- Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL. CPU games are saved the same way (the 5 most recently used games); a random seed stays hidden until the game ends.
 
-It's published at https://mhj-dojo.lolipop-now.app/ (practice mode only; CPU games not yet) on Lolipop Deploy Now.
+It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 
 #### Deploying
 
@@ -134,7 +134,7 @@ The site build's `index.html` also carries absolute Open Graph/Twitter share tag
 
 ```
 cmd/mhj-dojo/        CLI entry point
-cmd/mhj-dojo-wasm/   practice engine as WebAssembly for the static site
+cmd/mhj-dojo-wasm/   engine (practice and CPU games) as WebAssembly for the static site
 internal/tile/       tile representation and notation
 internal/wall/       seeded wall, deal, draws
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire

@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/litencatt/mhj-dojo/internal/match"
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 func call(t *testing.T, store *session.Store, method, path, body string) (int, []byte) {
 	t.Helper()
-	status, v := Route(store, method, path, strings.NewReader(body))
+	status, v := Route(store, match.NewStore(), method, path, strings.NewReader(body))
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +73,6 @@ func TestSessionErrors(t *testing.T) {
 		{"GET", "/api/sessions/", "", statusNotFound},
 		{"POST", base + "/unknown", "{}", statusNotFound},
 		{"POST", base + "/discard/x", "{}", statusNotFound},
-		{"GET", "/api/games", "", statusNotFound},
 		{"POST", "/api/sessions", `{"max_turns":999}`, statusBadRequest},
 		{"POST", base + "/discard", "", statusBadRequest},
 		{"POST", base + "/discard", "{}", statusBadRequest},

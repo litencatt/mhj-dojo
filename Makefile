@@ -15,8 +15,9 @@ vet:
 run:
 	go run ./cmd/mhj-dojo
 
-# The practice engine as WebAssembly for the static site (issue #67), with
-# the matching Go's JS glue, into web/site-public/ (not committed).
+# The engine (practice and CPU games) as WebAssembly for the static site
+# (issue #67), with the matching Go's JS glue, into web/site-public/ (not
+# committed).
 #
 # GOEXPERIMENT=nojsonv2 drops the encoding/json v2 machinery (default on
 # since Go 1.25) that our own JSON code never uses: apicall only calls the
@@ -31,7 +32,7 @@ wasm:
 	GOOS=js GOARCH=wasm GOEXPERIMENT=nojsonv2 go build -trimpath -ldflags="-s -w" -o web/site-public/mhj-dojo.wasm ./cmd/mhj-dojo-wasm
 	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" web/site-public/wasm_exec.js
 
-# The static site (practice mode only) into web/dist-site/ (not committed).
+# The static site into web/dist-site/ (not committed).
 site: wasm
 	cd web && npm ci && npm run build:site
 

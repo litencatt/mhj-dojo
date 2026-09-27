@@ -198,7 +198,7 @@ jobs:
           path: web/playwright-report/
           retention-days: 7
 
-  # The static site (issue #67): the practice engine built as WebAssembly
+  # The static site (issue #67): the engine built as WebAssembly
   # and the site built on it, then its E2E tests in the browser with no
   # mhj-dojo server (vite preview serves web/dist-site).
   site:

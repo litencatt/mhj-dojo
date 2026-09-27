@@ -364,14 +364,14 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			a.comboTargets[i] = withMelds(defs[i].targets, melds)
 		}
 	}
-	rowShanten := map[string]int{}
+	rowShanten := make(map[string]int, len(rows))
 	for _, r := range rows {
 		if r.Possible {
 			rowShanten[r.Key] = r.Shanten
 		}
 	}
 	type pending struct{ i, han, lb, minDist int }
-	var todo []pending
+	todo := make([]pending, 0, len(defs))
 	for i := range defs {
 		d := &defs[i]
 		// lb bounds the combo's shanten (its rank), dlb its relaxed
@@ -409,7 +409,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 	if prune {
 		slices.SortStableFunc(todo, func(x, y pending) int { return x.lb - y.lb })
 	}
-	var evald []comboCand
+	evald := make([]comboCand, 0, len(todo))
 	dd := a.comboDist(&full)
 	bound, level, seen := math.MaxInt, math.MinInt, 0
 	for _, p := range todo {
@@ -434,11 +434,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			evald = append(evald, cd)
 		}
 	}
-	names := map[string]string{}
-	for _, r := range a.rows {
-		names[r.Key] = r.Name
-	}
-	names["shousangen"] += "（役牌×2込み）"
+	names := a.comboNames()
 	var out []Combo
 	for _, cd := range selectCombos(evald) {
 		var ns []string
@@ -450,6 +446,20 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 		out = append(out, co)
 	}
 	return out
+}
+
+// comboNames returns each row's name by key for the combo names, shousangen's
+// noting the two yakuhai it brings. It is built once per analyzer (its rows
+// are fixed) rather than on each of a turn's discard candidates.
+func (a *Analyzer) comboNames() map[string]string {
+	if a.names == nil {
+		a.names = make(map[string]string, len(a.rows))
+		for _, r := range a.rows {
+			a.names[r.Key] = r.Name
+		}
+		a.names["shousangen"] += "（役牌×2込み）"
+	}
+	return a.names
 }
 
 // comboDist computes target distances for one hand (with its meld tiles),

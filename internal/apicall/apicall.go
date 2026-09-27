@@ -1,8 +1,8 @@
 // Package apicall is the transport-independent part of the JSON API
-// (docs/api.md): decoding request bodies, running the practice operations
-// and mapping errors to HTTP statuses. The HTTP server (internal/server) and
-// the WebAssembly build (cmd/mhj-dojo-wasm) share it, so both answer the same
-// request with the same JSON.
+// (docs/api.md): decoding request bodies, running the practice and game
+// operations and mapping errors to HTTP statuses. The HTTP server
+// (internal/server) and the WebAssembly build (cmd/mhj-dojo-wasm) share it,
+// so both answer the same request with the same JSON.
 package apicall
 
 import (
@@ -139,6 +139,53 @@ func Goto(s *session.Session, body io.Reader) (session.State, error) {
 	return s.Goto(*req.NodeID)
 }
 
+// CreateGame is POST /api/games.
+func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
+	var req struct {
+		Seed        *int64 `json:"seed"`
+		Length      string `json:"length"`
+		FirstDealer string `json:"first_dealer"`
+		CPU         string `json:"cpu"`
+	}
+	if err := Decode(body, &req, false); err != nil {
+		return match.State{}, err
+	}
+	m, err := games.Create(req.Seed, match.Options{Length: req.Length, FirstDealer: req.FirstDealer, CPU: req.CPU})
+	if err != nil {
+		return match.State{}, err
+	}
+	return m.State(), nil
+}
+
+// GameAction is POST /api/games/{id}/action: one of the human's moves, or
+// "next".
+func GameAction(m *match.Match, body io.Reader) (match.State, error) {
+	var req struct {
+		Type  game.ActionType `json:"type"`
+		Tile  string          `json:"tile"`
+		Tiles []string        `json:"tiles"`
+	}
+	if err := Decode(body, &req, true); err != nil {
+		return match.State{}, err
+	}
+	switch req.Type {
+	case game.Discard, game.Riichi:
+		if req.Tile == "" {
+			return match.State{}, Invalid("tile is required for " + string(req.Type))
+		}
+	case game.Chii:
+		if len(req.Tiles) != 2 {
+			return match.State{}, Invalid("tiles (two) are required for chii")
+		}
+	case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
+	case match.ActionNext:
+		return m.Next()
+	default:
+		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
+	}
+	return m.Act(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles})
+}
+
 // VersionInfo is the body of GET /api/version: the commit the answering
 // binary (the server, or the WebAssembly engine) was built from, as the go
 // command stamped it (debug.ReadBuildInfo). A build without that stamp, such
@@ -174,17 +221,17 @@ func versionOf(bi *debug.BuildInfo, ok bool) VersionInfo {
 	return v
 }
 
-// Route runs one practice-session request given as its HTTP method and
-// API path (such as "POST", "/api/sessions/{id}/discard"), for a transport
-// without an HTTP router (the WebAssembly build). It returns the status and
-// the response value the HTTP server would send. GET /api/version is
-// answered too; any other path, game endpoints included, is a 404 as for an
-// unknown endpoint.
-func Route(store *session.Store, method, path string, body io.Reader) (int, any) {
+// Route runs one request given as its HTTP method and API path (such as
+// "POST", "/api/sessions/{id}/discard"), for a transport without an HTTP
+// router (the WebAssembly build). It returns the status and the response
+// value the HTTP server would send: a session.State, a match.State, a
+// VersionInfo or an ErrorBody. Any other path is a 404 as for an unknown
+// endpoint.
+func Route(store *session.Store, games *match.Store, method, path string, body io.Reader) (int, any) {
 	if method == methodGet && path == "/api/version" {
 		return statusOK, Version()
 	}
-	return result(route(store, method, path, body))
+	return result(route(store, games, method, path, body))
 }
 
 // Restore rebuilds a session from its moves in one call (session.Replay)
@@ -217,46 +264,98 @@ func Restore(store *session.Store, body io.Reader) (int, any) {
 	return result(st, err)
 }
 
-func result(st session.State, err error) (int, any) {
+// RestoreGame rebuilds a game under a new id from its match.Save (the JSON
+// body) and returns the status and response value of its state. Like
+// Restore it is not an HTTP endpoint: the WebAssembly build uses it to bring
+// a game back after a page reload.
+func RestoreGame(games *match.Store, body io.Reader) (int, any) {
+	var req match.Save
+	if err := Decode(body, &req, true); err != nil {
+		return result(match.State{}, err)
+	}
+	m, err := games.Restore(req)
+	if err != nil {
+		return result(match.State{}, err)
+	}
+	return result(m.State(), nil)
+}
+
+func result(v any, err error) (int, any) {
 	if err != nil {
 		return Status(err), ErrorBody(Message(err))
 	}
-	return statusOK, st
+	return statusOK, v
 }
 
-func route(store *session.Store, method, path string, body io.Reader) (session.State, error) {
+func route(store *session.Store, games *match.Store, method, path string, body io.Reader) (any, error) {
 	// The server's message for a path no endpoint matches.
 	noEndpoint := errors.Join(session.ErrNotFound, errors.New("no such endpoint: "+method+" "+path))
-	rest, ok := strings.CutPrefix(path, "/api/sessions")
-	if !ok {
-		return session.State{}, noEndpoint
-	}
-	if rest == "" {
-		if method != methodPost {
-			return session.State{}, noEndpoint
+	if rest, ok := strings.CutPrefix(path, "/api/sessions"); ok {
+		if rest == "" {
+			if method != methodPost {
+				return nil, noEndpoint
+			}
+			return CreateSession(store, body)
 		}
-		return CreateSession(store, body)
+		id, op, ok := resource(rest)
+		if !ok {
+			return nil, noEndpoint
+		}
+		var f func(*session.Session, io.Reader) (session.State, error)
+		switch {
+		case method == methodGet && op == "":
+			f = func(s *session.Session, _ io.Reader) (session.State, error) { return s.State(), nil }
+		case method == methodPost && op == "discard":
+			f = Discard
+		case method == methodPost && op == "tsumo":
+			f = Tsumo
+		case method == methodPost && op == "goto":
+			f = Goto
+		default:
+			return nil, noEndpoint
+		}
+		s, err := store.Get(id)
+		if err != nil {
+			return nil, err
+		}
+		return f(s, body)
 	}
+	if rest, ok := strings.CutPrefix(path, "/api/games"); ok {
+		if rest == "" {
+			if method != methodPost {
+				return nil, noEndpoint
+			}
+			return CreateGame(games, body)
+		}
+		id, op, ok := resource(rest)
+		if !ok {
+			return nil, noEndpoint
+		}
+		var f func(*match.Match, io.Reader) (match.State, error)
+		switch {
+		case method == methodGet && op == "":
+			f = func(m *match.Match, _ io.Reader) (match.State, error) { return m.State(), nil }
+		case method == methodPost && op == "action":
+			f = GameAction
+		default:
+			return nil, noEndpoint
+		}
+		m, err := games.Get(id)
+		if err != nil {
+			return nil, err
+		}
+		return f(m, body)
+	}
+	return nil, noEndpoint
+}
+
+// resource splits the rest of a path after its collection ("/{id}" or
+// "/{id}/{op}") into the id and the op ("" for none); ok is false for any
+// other shape, such as an empty id or a trailing slash.
+func resource(rest string) (id, op string, ok bool) {
 	id, op, sub := strings.Cut(strings.TrimPrefix(rest, "/"), "/")
 	if id == "" || !strings.HasPrefix(rest, "/") || (sub && op == "") || strings.Contains(op, "/") {
-		return session.State{}, noEndpoint
+		return "", "", false
 	}
-	var f func(*session.Session, io.Reader) (session.State, error)
-	switch {
-	case method == methodGet && op == "":
-		f = func(s *session.Session, _ io.Reader) (session.State, error) { return s.State(), nil }
-	case method == methodPost && op == "discard":
-		f = Discard
-	case method == methodPost && op == "tsumo":
-		f = Tsumo
-	case method == methodPost && op == "goto":
-		f = Goto
-	default:
-		return session.State{}, noEndpoint
-	}
-	s, err := store.Get(id)
-	if err != nil {
-		return session.State{}, err
-	}
-	return f(s, body)
+	return id, op, true
 }

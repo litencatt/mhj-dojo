@@ -2,12 +2,14 @@
 
 All endpoints return JSON (`Content-Type: application/json`). Errors: HTTP 4xx/5xx with `{"error": "message"}`.
 
-The static site (README, "Static site") has no server: the practice engine built as WebAssembly
+The static site (README, "Static site") has no server: the engine built as WebAssembly
 (`cmd/mhj-dojo-wasm`) defines `mhjDojoRequest(method, path, body)` in its Web Worker, which takes a
-practice request below (`/api/sessions…`) as its method, path and JSON body and returns
-`{status, body}` with the status and JSON body the server would send (both use
-`internal/apicall`); it also answers `GET /api/version`. Game endpoints answer 404 there. It also defines `mhjDojoRestore(body)`, not an
-HTTP endpoint, which rebuilds a session from its moves in one call after a page reload.
+request below — practice (`/api/sessions…`), game (`/api/games…`) or `GET /api/version` — as its
+method, path and JSON body and returns `{status, body, save}` with the status and JSON body the
+server would send (both use `internal/apicall`). It also defines two functions that are not HTTP
+endpoints: `mhjDojoRestore(body)`, which rebuilds a session from its moves in one call after a page
+reload, and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
+(WebAssembly)").
 
 ## Tile notation
 
@@ -615,6 +617,62 @@ Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
 Errors: `400` malformed body, unknown type or a tile you do not hold, `404`
 unknown game, `409` a move that is not legal now.
 
+### Game saves (WebAssembly)
+
+The WebAssembly engine keeps games in the tab's memory only, so the page keeps
+a save of each game to rebuild it after a reload or an eviction (see Memory).
+The CPU players decide deterministically, so a game is rebuilt by replaying
+the human's moves on the same seed and options.
+
+- `mhjDojoRequest(method, path, body)` returns `{status, body, save}`. `save`
+  is a JSON string (below) when `body` is a `GameState` (`POST /api/games`,
+  `GET /api/games/{id}` and `POST /api/games/{id}/action` with status `200`),
+  and `""` for any other response (practice, version, errors). Take each new
+  save as the game's latest.
+- `mhjDojoRestoreGame(save)` takes such a save string and returns
+  `{status, body, save}` like a request: `200` with the rebuilt game's
+  `GameState` and its save, or an error (`400` a malformed save or an invalid
+  option or move, `409` a move that is not legal where it is replayed, or a
+  replay that does not match the save's `check`). The
+  game gets a **new** `game_id`, as `mhjDojoRestore` gives a session a new id:
+  the page keeps its own id for the game and maps it to the engine's current
+  one. Its state equals the saved game's (the events of the last move
+  included), the id aside; a seed the player did not choose stays `null`.
+  Replaying a whole 半荘戦 takes ~0.17 s natively (the state is built only
+  once, at the end, and the per-discard history analysis only for the last
+  round, the one the state shows).
+
+The save (`match.Save`):
+
+```jsonc
+{
+  "seed": 1234567890123,     // the game's seed, also while GameState.seed is null: don't show it
+  "seed_known": false,       // the player chose the seed (GameState shows it)
+  "length": "tonpuu",        // the options, filled in: tonpuu|hanchan
+  "first_dealer": "random",  // random|you
+  "cpu": "normal",           // normal|weak
+  "actions": [               // the human's successful moves in order, "next" included
+    {"type": "discard", "tile": "5m"},
+    {"type": "chii", "tiles": ["3m", "4m"]},
+    {"type": "next"}
+  ],
+  "check": "8c3f0e2a91b4d7c5" // FNV-1a digest of every round's moves, CPU moves included
+}
+```
+
+An action is the body of `POST /api/games/{id}/action` as it was accepted
+(`tile` and `tiles` are left out when empty). Moves that failed are not
+recorded, nor are the discards the engine plays for you in riichi. `check`
+guards against a save made by another engine version (say, one whose CPU
+plays differently after a deploy): the same moves would replay into another
+game, so a replay whose moves differ from the digest is refused with `409`
+("save does not match this engine") instead. A save without `check` is not
+checked. The seed in the save is not a security boundary: `localStorage` and
+the WebAssembly memory can both be inspected, so hiding it only keeps it out of
+sight during play. Treat the save as opaque: keep the string as it is rather than re-encoding it, since a
+seed chosen above 2^53 is exact only in the string. A 半荘戦 save is ~6–7 KB, well
+under the 64 KiB body limit.
+
 ### `GameState`
 
 ```jsonc
@@ -716,6 +774,11 @@ to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
 works; `web/e2e-site/practice.spec.ts` checks the eviction and rebuild
 together.
+
+Games get the same treatment with a max of 2 (`match.NewStoreWithMax`): a
+game holds its analyzer memo and its CPU players' memo, and an evicted or
+reloaded game is rebuilt from its save (`mhjDojoRestoreGame`, "Game saves
+(WebAssembly)").
 
 Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
 `internal/session/memory_test.go`'s `BenchmarkSessionMemory` (not run by
