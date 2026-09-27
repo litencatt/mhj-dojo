@@ -266,6 +266,7 @@ function leadStep(build: PlaybackBuild, state: GameState): number {
  */
 export function usePlayback(state: GameState | null): Playback {
   const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
+  // build is memoized on state, so [build] also covers the state read here.
   const lead = useMemo(() => (build && state ? leadStep(build, state) : 0), [build]);
   // The step, with the build it was set for. Until the first tick (or skip)
   // sets it for a new build, the step is that build's lead step: derived
@@ -308,9 +309,13 @@ export function usePlayback(state: GameState | null): Playback {
   const highlight = build && view ? playbackHighlight(build, view.seats, step) : null;
 
   // A hidden tab would only queue up the steps' renders for nobody: jump to
-  // the end instead.
+  // the end instead, at once if it is hidden already.
   useEffect(() => {
     if (!playing) return;
+    if (document.visibilityState === 'hidden') {
+      skip();
+      return;
+    }
     const onHide = () => {
       if (document.visibilityState === 'hidden') skip();
     };
