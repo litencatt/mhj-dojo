@@ -16,6 +16,7 @@
   --tile-border: #c9c2a8;
   --tile-back: #3f7d5c;
   --row-best-bg: #fef3c7;
+  --row-tenpai-bg: #fde4e4; /* a yaku (or combo) already at 聴牌 or 和了 */
   --chart-grid: #e5e7eb;
   --group-taatsu: #b45309;
 }
@@ -38,6 +39,7 @@
     --tile-border: #8a8264;
     --tile-back: #2f6b4c;
     --row-best-bg: #3a3110;
+    --row-tenpai-bg: #3d1a1d;
     --chart-grid: #2c313a;
     --group-taatsu: #fbbf24;
   }
@@ -904,6 +906,10 @@ section {
 }
 .row-best {
   background: var(--row-best-bg);
+}
+/* After .row-best: a row at 聴牌 (or 和了) takes the red even when it is also the closest. */
+.row-tenpai {
+  background: var(--row-tenpai-bg);
 }
 .badge-approx {
   margin-left: 6px;
