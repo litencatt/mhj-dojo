@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/litencatt/mhj-dojo/internal/apiview"
 	"github.com/litencatt/mhj-dojo/internal/testmode"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
@@ -16,7 +17,7 @@ import (
 // the same state on every request. After each request it checks what the
 // nodes cache against a fresh analysis of their hands: the analysis and
 // combos a discard takes from its parent's preview, and the per-row shanten
-// the history is built from. Only nodes on the current path may hold an
+// the history is built from, the history itself included. Only nodes on the current path may hold an
 // analysis (pruneAnalysisCache).
 func TestCachesMatchFresh(t *testing.T) {
 	requests, seeded := 0, 0
@@ -60,6 +61,15 @@ func TestCachesMatchFresh(t *testing.T) {
 				t.Fatalf("seed %d node %d: state differs without the result memo", seed, got.NodeID)
 			}
 			requests++
+			for _, h := range got.History {
+				n := s.nodes[h.NodeID]
+				if n.status == StatusTsumo {
+					continue
+				}
+				if want := apiview.ShantenMap(fresh.Analyze(tile.CountsOf(n.hand))); !reflect.DeepEqual(h.Shanten, want) {
+					t.Fatalf("seed %d: history of node %d differs from a fresh analysis", seed, n.id)
+				}
+			}
 			path := s.path(s.nodes[s.current])
 			for _, n := range s.nodes {
 				c := tile.CountsOf(n.hand)

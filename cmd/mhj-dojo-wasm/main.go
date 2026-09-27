@@ -39,7 +39,7 @@ import (
 // maxSessions bounds the engine's in-memory sessions much tighter than the
 // native server's session.MaxSessions (256): this runs in a browser tab's
 // memory, and each practice session (its branch tree plus its own
-// yakushanten.Analyzer memo) can hold up to ~9.5 MiB (briefly a few MiB
+// yakushanten.Analyzer memo) can hold up to ~9.8 MiB (briefly a few MiB
 // more as a memo turns over), never released by Go's wasm runtime back to
 // the OS (docs/api.md "Memory"). 4 is enough for the
 // one game actually being played plus room to return to a couple of others

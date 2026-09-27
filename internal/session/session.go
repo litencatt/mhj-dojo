@@ -270,6 +270,9 @@ func (s *Session) seedAnalysis(n, cur *node) {
 		return
 	}
 	n.analysis = res
+	if n.rowShanten == nil {
+		n.rowShanten = compactShanten(res)
+	}
 	if combos, ok := cur.combosByDiscard[k]; ok && n.combos == nil {
 		n.combos = append([]yakushanten.Combo{}, combos...)
 	}

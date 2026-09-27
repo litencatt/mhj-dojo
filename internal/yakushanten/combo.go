@@ -355,8 +355,10 @@ func ComboRank(han, shanten int) int {
 //  3. a combo that differs from a better-ranked one only in which value
 //     tiles it uses, with the same han and shanten, is dropped.
 //
-// The last results are memoized by hand (rows being the same hand's), so
-// the result may be shared with other calls: callers must not modify it.
+// The last results are memoized by hand: the concealed tiles and the melds.
+// rows is not part of the key, as it only feeds the pruning's lower bounds
+// and must be the same hand's rows anyway. The result may be shared with
+// other calls: callers must not modify it.
 func (a *Analyzer) Combos(c tile.Counts, melds []yaku.Meld, rows []Result) []Combo {
 	k, ok := keyOf(&c, melds)
 	if ok {
