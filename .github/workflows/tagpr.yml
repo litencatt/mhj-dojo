@@ -3,8 +3,10 @@ name: tagpr
 # Releases (.tagpr): on every push to main, tagpr keeps a release pull request
 # up to date (CHANGELOG.md from GitHub's generated release notes). When that
 # pull request is merged, the next run tags the merge (v2026.0927.0) and
-# creates the GitHub Release, and the release-site job opens the site release
-# pull request into lolipop-deploy-now for Lolipop Deploy Now to publish.
+# creates the GitHub Release, and build-site-release.yml builds the site,
+# attaches it to that Release, and (via deploy-lolipop.yml) opens the site
+# release pull request into lolipop-deploy-now for Lolipop Deploy Now to
+# publish.
 on:
   push:
     branches: [main]
@@ -36,13 +38,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TZ: Asia/Tokyo # the CalVer date is the date in Japan
 
-  # A tag made with GITHUB_TOKEN starts no other workflow, so the site release
-  # is called from here.
-  release-site:
-    name: Site release pull request
+  # A tag made with GITHUB_TOKEN starts no other workflow, so the site build
+  # (and, through it, the deploy) is called from here.
+  build-site-release:
+    name: Build site release
     needs: tagpr
     if: needs.tagpr.outputs.tag != ''
-    uses: ./.github/workflows/release-site.yml
+    uses: ./.github/workflows/build-site-release.yml
     with:
       tag: ${{ needs.tagpr.outputs.tag }}
     permissions:
