@@ -1,5 +1,9 @@
 # Changelog
 
+## [v2026.0927.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.0...v2026.0927.1) - 2026-09-27
+
+- 公開サイト版 E2E: リリースのビルドではヘッダーのタグ表示を期待する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/89
+
 ## [v2026.0927.0](https://github.com/litencatt/mhj-dojo/commits/v2026.0927.0) - 2026-09-27
 
 - Fix UI request races and tsumo chart overlap; add READMEs by @litencatt in https://github.com/litencatt/mhj-dojo/pull/1
