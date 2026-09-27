@@ -113,7 +113,7 @@ It's published at https://mhj-dojo.lolipop-now.app/ (practice mode only; CPU gam
 
 The site is published from the `lolipop-deploy-now` branch: Lolipop Deploy Now's GitHub integration watches it (framework: static, no install or build command, output directory `web/dist-site`) and publishes each merge into it. Releases go through [tagpr](https://github.com/Songmu/tagpr) (`.tagpr`, `.github/workflows/tagpr.yml`):
 
-1. On every push to `main`, tagpr keeps a release pull request open that updates `CHANGELOG.md` from GitHub's generated release notes (`.github/release.yml`).
+1. On every push to `main`, tagpr keeps a release pull request open that updates `CHANGELOG.md` from GitHub's generated release notes, grouped into categories (`.github/release.yml`) by the label **Label pull requests** (`.github/workflows/labeler.yml`) adds from each pull request's head branch prefix (`feat/` → enhancement, `fix/` → bug, `docs/` → documentation, `ci/`/`chore/` → ci/chore, `dependabot/` → dependencies).
 2. Merging it tags the release, named by the date in Japan and the release's number that day (`v2026.0927.0`, then `v2026.0927.1`), and creates the GitHub Release. The same workflow then runs **Release site** (`.github/workflows/release-site.yml`) for the tag: it builds the tagged commit with the release in the header (`MHJDOJO_RELEASE`), runs the site's E2E tests on the build, merges the tag into a release branch cut from `lolipop-deploy-now`, commits the built site there (`web/dist-site`, gitignored on `main`, since Deploy Now can't build the Go WebAssembly engine) and opens a pull request into `lolipop-deploy-now`.
 3. Merging that pull request with a merge commit (not squash) publishes the release.
 
