@@ -1881,9 +1881,6 @@ section {
   .app-practice {
     --yaku-bottom: 32px;
   }
-  .app-practice.has-dock {
-    --yaku-bottom: 84px;
-  }
   .app-practice .area-hand:not(:has(.win-panel)) {
     position: sticky;
     top: env(safe-area-inset-top, 0px);
@@ -2035,6 +2032,63 @@ section {
     font-size: 1rem;
   }
 
+
+  /* Help: nearly the whole screen, with a bigger close button. */
+  .help-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 32px);
+  }
+  .help-content {
+    padding: 12px 14px 16px;
+  }
+  .help-heading {
+    margin: -12px -14px 0;
+    padding: 8px 14px 6px;
+  }
+  .help-close {
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+
+  /* The site's update notice: fitted to the screen. */
+  .update-banner {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    font-size: 0.85rem;
+  }
+  .update-banner-reload,
+  .update-banner-close {
+    min-height: 36px;
+  }
+}
+
+/* A short screen (a phone on its side): the right-edge tabs take their short
+   names (チャート, 履歴) and less padding, so they fit the height; the column
+   scrolls if it still doesn't. */
+@media (height <= 500px) {
+  .panel-dock {
+    gap: 4px;
+    max-height: calc(100dvh - 8px);
+    overflow-y: auto;
+  }
+  .dock-tab {
+    padding: 6px 5px;
+    letter-spacing: 0;
+  }
+  .dock-tab-label {
+    display: none;
+  }
+  .dock-tab-short {
+    display: block;
+  }
+}
+
+/* A phone upright: the minimized panels as a tab bar along the bottom. On
+   its side the screen is short, so the tabs stay on the right edge as on a
+   desktop (the rules above). */
+@media (width <= 760px) and (orientation: portrait) {
   /* Minimized panels: a tab bar along the bottom, one equal-width tab per
      panel (up to five), above the home indicator. */
   .panel-dock {
@@ -2098,37 +2152,11 @@ section {
     padding-right: max(8px, env(safe-area-inset-right));
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
-
-  /* Help: nearly the whole screen, with a bigger close button. */
-  .help-dialog {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 32px);
+  .app-practice.has-dock {
+    --yaku-bottom: 84px;
   }
-  .help-content {
-    padding: 12px 14px 16px;
-  }
-  .help-heading {
-    margin: -12px -14px 0;
-    padding: 8px 14px 6px;
-  }
-  .help-close {
-    width: 38px;
-    height: 32px;
-    font-size: 1.1rem;
-  }
-
   /* The site's update notice sits above the dock bar. */
-  .update-banner {
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    width: max-content;
-    max-width: calc(100vw - 16px);
-    font-size: 0.85rem;
-  }
   body:has(.panel-dock) .update-banner {
     bottom: calc(76px + env(safe-area-inset-bottom));
-  }
-  .update-banner-reload,
-  .update-banner-close {
-    min-height: 36px;
   }
 }
