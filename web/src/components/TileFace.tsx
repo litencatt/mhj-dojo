@@ -141,15 +141,51 @@ function Jihai({ rank }: { rank: number }) {
   );
 }
 
-/** The face of one tile, e.g. "5p" or "0s", as an SVG filling its container. */
-export function TileFace({ tile }: { tile: string }) {
+/** One tile face's markup, e.g. "5p" or "0s" (used inside a `<symbol>`). */
+function Face({ tile }: { tile: string }) {
   const { suit, rank, red } = parseTile(tile);
   return (
-    <svg class="tile-face" viewBox="0 0 30 40" aria-hidden="true">
+    <>
       {suit === 'p' && <Pinzu rank={rank} red={red} />}
       {suit === 's' && <Souzu rank={rank} red={red} />}
       {suit === 'm' && <Manzu rank={rank} red={red} />}
       {suit === 'z' && <Jihai rank={rank} />}
+    </>
+  );
+}
+
+// Every tile kind the game deals: 1-9 of each suit, the red fives (0m/0p/0s),
+// and the seven honors.
+const KINDS = ['m', 'p', 's']
+  .flatMap((suit) => [...'0123456789'].map((rank) => `${rank}${suit}`))
+  .concat([1, 2, 3, 4, 5, 6, 7].map((rank) => `${rank}z`));
+
+// Renders every tile face once as a <symbol>, so <TileFace> can reference it
+// with <use> instead of redrawing ~16 SVG nodes per tile on the board (a
+// yaku table alone has ~285 tile faces). Mount this once near the app root,
+// before any <TileFace> (see main.tsx): the sprite is shared across practice
+// and CPU-game mode, and across the embedded and static-site builds, since
+// both render through that same root.
+export function TileSprite() {
+  return (
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        {KINDS.map((kind) => (
+          <symbol id={`tf-${kind}`} viewBox="0 0 30 40" key={kind}>
+            <Face tile={kind} />
+          </symbol>
+        ))}
+      </defs>
+    </svg>
+  );
+}
+
+/** The face of one tile, e.g. "5p" or "0s", as an SVG filling its container.
+ * Draws nothing on its own; it references a `<symbol>` from <TileSprite>. */
+export function TileFace({ tile }: { tile: string }) {
+  return (
+    <svg class="tile-face" viewBox="0 0 30 40" aria-hidden="true">
+      <use href={`#tf-${tile}`} />
     </svg>
   );
 }
