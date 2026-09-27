@@ -38,8 +38,14 @@ type Store struct {
 	DefaultSeed *int64
 }
 
-// NewStore returns an empty store.
-func NewStore() *Store { return &Store{games: store.New[*Match](MaxGames)} }
+// NewStore returns an empty store that keeps at most MaxGames games.
+func NewStore() *Store { return NewStoreWithMax(MaxGames) }
+
+// NewStoreWithMax returns an empty store that keeps at most max games,
+// evicting the least recently used one beyond that. The wasm build
+// (cmd/mhj-dojo-wasm) uses a much smaller max than MaxGames: it runs in a
+// browser tab's memory (see docs/api.md "Memory").
+func NewStoreWithMax(max int) *Store { return &Store{games: store.New[*Match](max)} }
 
 // Lengths of a game.
 const (
@@ -63,6 +69,22 @@ type Options struct {
 // Create deals a game with the given options. A nil seed picks the default
 // or a random seed.
 func (st *Store) Create(seed *int64, o Options) (*Match, error) {
+	o, rules, err := o.normalize()
+	if err != nil {
+		return nil, err
+	}
+	// A random seed is hidden until the game ends: it rebuilds every wall.
+	// 2^53 keeps it exact in JSON while making a search from the dealt tiles
+	// impractical (2^32 would take minutes).
+	s := wall.PickSeed(seed, st.DefaultSeed, 1<<53)
+	m := newMatch(deal(s, rules, o), o, seed != nil || st.DefaultSeed != nil)
+	m.id = st.games.Add(m)
+	return m, nil
+}
+
+// normalize fills in the defaults of o and checks its values, returning the
+// rules of its length.
+func (o Options) normalize() (Options, game.Rules, error) {
 	var rules game.Rules
 	switch o.Length {
 	case "", Tonpuu:
@@ -70,33 +92,31 @@ func (st *Store) Create(seed *int64, o Options) (*Match, error) {
 	case Hanchan:
 		rules = game.HanchanRule
 	default:
-		return nil, fmt.Errorf("%w: length must be %q or %q", game.ErrInvalid, Tonpuu, Hanchan)
+		return o, rules, fmt.Errorf("%w: length must be %q or %q", game.ErrInvalid, Tonpuu, Hanchan)
 	}
 	switch o.FirstDealer {
 	case "":
 		o.FirstDealer = DealerRandom
 	case DealerRandom, DealerYou:
 	default:
-		return nil, fmt.Errorf("%w: first_dealer must be %q or %q", game.ErrInvalid, DealerRandom, DealerYou)
+		return o, rules, fmt.Errorf("%w: first_dealer must be %q or %q", game.ErrInvalid, DealerRandom, DealerYou)
 	}
 	switch o.CPU {
 	case "":
 		o.CPU = cpu.Normal
 	case cpu.Normal, cpu.Weak:
 	default:
-		return nil, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
+		return o, rules, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
 	}
-	// A random seed is hidden until the game ends: it rebuilds every wall.
-	// 2^53 keeps it exact in JSON while making a search from the dealt tiles
-	// impractical (2^32 would take minutes).
-	s := wall.PickSeed(seed, st.DefaultSeed, 1<<53)
-	h := game.NewHanchan(s, rules)
+	return o, rules, nil
+}
+
+// deal sets up the rounds of a game from its seed and filled-in options.
+func deal(seed int64, rules game.Rules, o Options) *game.Hanchan {
 	if o.FirstDealer == DealerYou {
-		h = game.NewHanchanFrom(s, rules, Human)
+		return game.NewHanchanFrom(seed, rules, Human)
 	}
-	m := newMatch(h, o, seed != nil || st.DefaultSeed != nil)
-	m.id = st.games.Add(m)
-	return m, nil
+	return game.NewHanchan(seed, rules)
 }
 
 // newMatch starts a match and plays the CPUs up to the human's first
@@ -116,6 +136,9 @@ func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 // startRound resets what is kept per round: the analyzer (its wind rows
 // follow the round), the events and the history.
 func (m *Match) startRound() {
+	if m.replaying {
+		return
+	}
 	m.analyzer = yakushanten.NewAnalyzerFor(m.game.Round.Winds(Human))
 	m.since = 0
 	m.history = nil
@@ -149,6 +172,13 @@ type Match struct {
 	opts      Options
 	// rounds sums up the finished rounds.
 	rounds []RoundSummary
+	// actions are the human's moves and Nexts that succeeded, in order: with
+	// the seed and options they replay the game (Save, Store.Restore).
+	actions []SavedAction
+	// replaying, set while Store.Restore replays the rounds before the
+	// last one, has startRound leave out the analysis: those rounds'
+	// history is dropped at the next anyway.
+	replaying bool
 }
 
 // ID returns the game id.
@@ -166,12 +196,22 @@ func (m *Match) State() State {
 func (m *Match) Act(a game.Action) (State, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	before := len(m.game.Round.Events())
-	if err := m.game.Act(a); err != nil {
+	if err := m.act(a); err != nil {
 		return State{}, err
 	}
-	m.since = before
 	return m.state(), nil
+}
+
+// act is Act without the state, which a replay (Store.Restore) needs only
+// at its end. Callers hold m.mu.
+func (m *Match) act(a game.Action) error {
+	before := len(m.game.Round.Events())
+	if err := m.game.Act(a); err != nil {
+		return err
+	}
+	m.since = before
+	m.actions = append(m.actions, SavedAction{Type: a.Type, Tile: a.Tile, Tiles: slices.Clone(a.Tiles)})
+	return nil
 }
 
 // Next deals the next round once the current one has ended and plays the
@@ -179,13 +219,22 @@ func (m *Match) Act(a game.Action) (State, error) {
 func (m *Match) Next() (State, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	ended := m.summary()
-	if err := m.game.Next(); err != nil {
+	if err := m.next(); err != nil {
 		return State{}, err
 	}
-	m.rounds = append(m.rounds, *ended)
-	m.startRound()
 	return m.state(), nil
+}
+
+// next is Next without the state. Callers hold m.mu.
+func (m *Match) next() error {
+	ended := m.summary()
+	if err := m.game.Next(); err != nil {
+		return err
+	}
+	m.rounds = append(m.rounds, *ended)
+	m.actions = append(m.actions, SavedAction{Type: ActionNext})
+	m.startRound()
+	return nil
 }
 
 func (m *Match) analyze(c tile.Counts, melds []yaku.Meld) []yakushanten.Result {
