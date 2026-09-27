@@ -225,8 +225,17 @@ jobs:
         run: make wasm
       - name: WASM size
         working-directory: .
+        # Budget guards against a size regression, including GOEXPERIMENT=
+        # nojsonv2 (Makefile's wasm target) silently stopping being applied,
+        # e.g. after a Go upgrade removes the experiment.
         run: |
-          echo "mhj-dojo.wasm: $(wc -c < web/site-public/mhj-dojo.wasm) bytes, gzip -9 $(gzip -9c web/site-public/mhj-dojo.wasm | wc -c) bytes" >> "$GITHUB_STEP_SUMMARY"
+          size=$(wc -c < web/site-public/mhj-dojo.wasm)
+          budget=4823449 # 4.6 MiB
+          echo "mhj-dojo.wasm: $size bytes, gzip -9 $(gzip -9c web/site-public/mhj-dojo.wasm | wc -c) bytes" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$size" -gt "$budget" ]; then
+            echo "::error::mhj-dojo.wasm is $size bytes, over the $budget budget"
+            exit 1
+          fi
       - run: npm ci
       - run: npm run build:site
       - name: Get installed Playwright version

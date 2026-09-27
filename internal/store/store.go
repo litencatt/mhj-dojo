@@ -7,8 +7,9 @@ import (
 	"sync"
 )
 
-// Store holds up to max items; adding beyond that evicts the oldest. It is
-// safe for concurrent use.
+// Store holds up to max items; adding beyond that evicts the least recently
+// used one (by Add or Get, whichever was more recent). It is safe for
+// concurrent use.
 type Store[T any] struct {
 	mu    sync.Mutex
 	items map[string]T
@@ -51,12 +52,28 @@ func (s *Store[T]) Delete(id string) {
 	}
 }
 
-// Get returns the item stored under id.
+// Get returns the item stored under id, marking it most recently used (so a
+// session in active use isn't the one evicted just because it's old).
 func (s *Store[T]) Get(id string) (T, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	v, ok := s.items[id]
+	if ok {
+		s.touch(id)
+	}
 	return v, ok
+}
+
+// touch moves id to the most-recently-used end of the eviction order.
+// Callers hold s.mu already.
+func (s *Store[T]) touch(id string) {
+	for i, x := range s.order {
+		if x == id {
+			s.order = append(s.order[:i], s.order[i+1:]...)
+			break
+		}
+	}
+	s.order = append(s.order, id)
 }
 
 // NewID returns a random 12-hex-digit id.

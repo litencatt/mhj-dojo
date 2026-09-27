@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { App } from './App';
 import { GameApp } from './GameApp';
+import { TileSprite } from './components/TileFace';
 import { UpdateBanner } from './components/UpdateBanner';
 import { WASM } from './api';
 import './style.css';
@@ -12,6 +13,9 @@ if (!root) throw new Error('#app root element not found');
 const game = !WASM && new URLSearchParams(location.search).get('mode') === 'game';
 render(
   <>
+    {/* Every <TileFace> on the page (practice or game mode) references this
+    sprite by id, so it must render before any tile does. */}
+    <TileSprite />
     {game ? <GameApp /> : <App />}
     <UpdateBanner />
   </>,

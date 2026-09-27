@@ -38,7 +38,8 @@ const (
 const (
 	// DefaultMaxTurns is the default number of discards before the game ends.
 	DefaultMaxTurns = 18
-	// MaxSessions bounds memory; the oldest session is evicted beyond it.
+	// MaxSessions bounds memory; the least recently used session is evicted
+	// beyond it.
 	MaxSessions = 256
 	// MaxNodes bounds a session's tree (every state carries the whole tree).
 	MaxNodes = 2000
@@ -59,8 +60,15 @@ type Store struct {
 	DefaultSeed *int64
 }
 
-// NewStore returns an empty store.
-func NewStore() *Store { return &Store{sessions: store.New[*Session](MaxSessions)} }
+// NewStore returns an empty store that keeps at most MaxSessions sessions.
+func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
+
+// NewStoreWithMax returns an empty store that keeps at most max sessions,
+// evicting the least recently used one beyond that. The wasm build
+// (cmd/mhj-dojo-wasm) uses a much smaller max than MaxSessions: it runs in a
+// browser tab's memory rather than a server's, so it can't afford to hold
+// hundreds of sessions' trees and analyzer memos (see docs/api.md "Memory").
+func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
 // Create starts a session. A nil seed picks the default or a random seed;
 // maxTurns 0 means DefaultMaxTurns.
