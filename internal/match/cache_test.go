@@ -23,7 +23,7 @@ func fullCheck(m *Match) string {
 	h := fnv.New64a()
 	for _, log := range m.game.H.Logs() {
 		for _, a := range log {
-			fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
+			_, _ = fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
 		}
 		h.Write([]byte{'|'})
 	}
