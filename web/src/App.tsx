@@ -12,7 +12,7 @@ import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
-import { sessionMovedOn, useRowNames, useSerialRequest, useUrlResume } from './hooks';
+import { sessionMovedOn, useRefreshOnSave, useRowNames, useSerialRequest, useUrlResume } from './hooks';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -21,17 +21,16 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
-  const { busy, error, notice, request } = useSerialRequest<SessionState>(
+  const { busy, error, notice, request, refresh } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
       setHighlightTile(null);
     },
-    // The static site runs the session in this tab alone: nothing else can
-    // move it on, so a 409 is never another tab's doing.
-    state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
+    state ? () => api.getSession(state.session_id) : undefined,
     sessionMovedOn,
   );
+  useRefreshOnSave(state?.session_id ?? null, api.sessionSavedElsewhere, busy, refresh);
 
   function startGame(seed?: number, maxTurns?: number) {
     return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
