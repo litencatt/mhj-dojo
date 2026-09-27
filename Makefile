@@ -17,8 +17,18 @@ run:
 
 # The practice engine as WebAssembly for the static site (issue #67), with
 # the matching Go's JS glue, into web/site-public/ (not committed).
+#
+# GOEXPERIMENT=nojsonv2 drops the encoding/json v2 machinery (default on
+# since Go 1.25) that our own JSON code never uses: apicall only calls the
+# v1 encoding/json API, so the v2 decoder/encoder tables it pulls in are
+# dead weight here, worth ~22% of the wasm's raw size (measured on go1.27).
+# It only applies here, not to `build`'s native binary: the JSON bytes are
+# unaffected (checked field-by-field across builds), but a future Go release
+# could remove this experiment once encoding/json fully migrates to v2, so
+# re-check `go env GOEXPERIMENT` (or this GOROOT's internal/goexperiment)
+# after a Go upgrade breaks this build.
 wasm:
-	GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o web/site-public/mhj-dojo.wasm ./cmd/mhj-dojo-wasm
+	GOOS=js GOARCH=wasm GOEXPERIMENT=nojsonv2 go build -trimpath -ldflags="-s -w" -o web/site-public/mhj-dojo.wasm ./cmd/mhj-dojo-wasm
 	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" web/site-public/wasm_exec.js
 
 # The static site (practice mode only) into web/dist-site/ (not committed).
