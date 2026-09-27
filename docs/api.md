@@ -710,8 +710,16 @@ under the 64 KiB body limit.
   "last_discard": null,         // the tile you may claim, in the call phase
   "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false,
              "pon": false, "chii": [["3m", "4m"]], "kan": [] },
-  "events": [ {"seat": 1, "type": "discard", "tile": "2z"},
-              {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"]} ],  // moves since your previous move; no skips
+  "events": [ {"seat": 1, "type": "discard", "tile": "2z", "wall_remaining": 70},
+              {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"], "wall_remaining": 70} ],  // moves since your previous move; no skips
+                                // wall_remaining: live draws left right after the move (an open or concealed kan's replacement
+                                // draw included, an added kan's with the declarer's next move, the next seat's draw not);
+                                // new_dora_indicators: kan dora indicators the move turned over (a concealed kan's at once, an
+                                // open or added kan's on the declarer's next discard or kan; one turned over with no move of its own,
+                                // as an added kan completes, on the response's last move), omitted if none. None is reported
+                                // twice: a round's new_dora_indicators add up to dora_indicators[1:]
+  "events_from": 12,            // the round's index of events[0]: the round's earlier events came in earlier responses
+  "events_wall_remaining": 70,  // live draws left just before events[0] (its mover's draw taken); wall_remaining with no events
   "analysis": [YakuRow],        // your hand of 13 - 3 per meld tiles, melds held fixed (right after a pon or chii: the best row over by_discard);
                                 // wind rows follow your seat and the round
   "by_discard": { "1m": [YakuRow] },  // on your turn: rows after each legal discard
