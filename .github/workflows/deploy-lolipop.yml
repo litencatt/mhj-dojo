@@ -1,7 +1,7 @@
 name: Deploy to Lolipop
 
-# Publishes a built site release to Lolipop Deploy Now (issue #75; split out
-# of release-site.yml in issue #96 so the build is host-independent). The
+# Publishes a built site release to Lolipop Deploy Now (issue #75; kept apart
+# from build-site-release.yml so the build is host-independent). The
 # site is published from the lolipop-deploy-now branch: Lolipop Deploy Now's
 # GitHub integration watches it (framework: static, no install or build
 # command, output directory web/dist-site) and publishes each merge into it.
