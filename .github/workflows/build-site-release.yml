@@ -1,0 +1,135 @@
+name: Build site release
+
+# Builds the static site release and hands it off for deployment (issue #75,
+# issue #96: a host-independent release artifact). tagpr.yml calls this with
+# the tag of each release (v2026.0927.0), right after tagpr creates it; it
+# can also be run by hand, for a tag or for main as it is (no release
+# version then).
+#
+# This workflow builds the tag (or main) with the release version in the
+# header, runs the site's E2E tests on the build, and — when given a tag —
+# packages web/dist-site as mhj-dojo-site-<tag>.tar.gz (plus a .sha256) and
+# attaches it to that tag's GitHub Release (created by tagpr before calling
+# here). That artifact is what a deploy workflow consumes, so publishing to
+# a different host later only needs a new deploy-<host>.yml reading the same
+# asset — see deploy-lolipop.yml, which this workflow calls for the current
+# host. A dispatch run with no tag only builds and tests, and is not
+# deployed: the build is kept as a workflow artifact instead, since there is
+# no Release to attach it to.
+#
+# Pull requests opened with the deploy workflow's token don't trigger CI, so
+# the site's E2E tests run here; main's own CI has run the rest.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag to build (e.g. v2026.0927.0)
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to build (e.g. v2026.0927.0; its GitHub Release must already exist); empty to build and test main without deploying
+        type: string
+        required: false
+
+permissions:
+  contents: write # attach the release artifact to the tag's GitHub Release
+
+jobs:
+  build:
+    name: Build, test and package the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: build-site-release
+      cancel-in-progress: false
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || 'main' }}
+
+      # Build the tagged commit itself, so the site and its engine report
+      # its commit, and the header shows the release.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the site
+        env:
+          MHJDOJO_RELEASE: ${{ inputs.tag }}
+          # The public site's base URL (OGP tags etc.), one place to change
+          # when the published host moves: set the SITE_URL repository
+          # variable, or this falls back to the current host.
+          MHJDOJO_SITE_URL: ${{ vars.SITE_URL || 'https://mhj-dojo.lolipop-now.app/' }}
+        run: make site
+      - name: Get installed Playwright version
+        id: playwright-version
+        working-directory: web
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright's OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: web
+        run: npx playwright install-deps chromium
+      - name: Site E2E tests
+        working-directory: web
+        run: npm run e2e:site
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report-site
+          path: web/playwright-report-site/
+          retention-days: 7
+
+      - name: Verify the site build
+        run: |
+          for f in index.html version.json mhj-dojo.wasm wasm_exec.js worker.js THIRD_PARTY_LICENSES.txt; do
+            [ -f "web/dist-site/$f" ] || { echo "::error::web/dist-site/$f is missing"; exit 1; }
+          done
+
+      - name: Package the release artifact
+        if: env.TAG != ''
+        run: |
+          tar -C web/dist-site -czf "mhj-dojo-site-$TAG.tar.gz" .
+          sha256sum "mhj-dojo-site-$TAG.tar.gz" > "mhj-dojo-site-$TAG.tar.gz.sha256"
+      - name: Attach the release artifact to the GitHub Release
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "mhj-dojo-site-$TAG.tar.gz" "mhj-dojo-site-$TAG.tar.gz.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+
+      # No tag (a manual dispatch building main as it is): there is no
+      # Release to attach to, so keep the build reachable as a workflow
+      # artifact instead.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: env.TAG == ''
+        with:
+          name: mhj-dojo-site
+          path: web/dist-site/
+          retention-days: 7
+
+  deploy-lolipop:
+    name: Deploy to Lolipop
+    needs: build
+    if: inputs.tag != ''
+    uses: ./.github/workflows/deploy-lolipop.yml
+    with:
+      tag: ${{ inputs.tag }}
+    permissions:
+      contents: write
+      pull-requests: write

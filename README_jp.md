@@ -113,17 +113,24 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 #### デプロイ
 
-公開サイトは `lolipop-deploy-now` ブランチから公開します。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。リリースには [tagpr](https://github.com/Songmu/tagpr) を使います（`.tagpr`、`.github/workflows/tagpr.yml`）。
+ビルドとデプロイは 2 つのワークフローに分かれていて、リリースの成果物は特定のホストに縛られません。リリースには [tagpr](https://github.com/Songmu/tagpr) を使います（`.tagpr`、`.github/workflows/tagpr.yml`）。
 
 1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` をカテゴリ別（新機能・修正・ドキュメント・CI・リポジトリ・依存関係・その他）に更新します。カテゴリは、各 PR の head ブランチ名の接頭辞から **Label pull requests**（`.github/workflows/labeler.yml`）が付けるラベル（`feat/` → enhancement、`fix/` → bug、`docs/` → documentation、`ci/`/`chore/` → ci/chore、`dependabot/` → dependencies）で決まります。
-2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.0927.0`、次は `v2026.0927.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Release site**（`.github/workflows/release-site.yml`）を実行します。Release site は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行します。そして `lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、ビルドした公開サイト（`web/dist-site`。Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）をコミットして、`lolipop-deploy-now` 向けの PR を作ります。
-3. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
+2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.0927.0`、次は `v2026.0927.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Build site release**（`.github/workflows/build-site-release.yml`）を実行します。Build site release は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行し、`web/dist-site` を `mhj-dojo-site-<tag>.tar.gz`（と `.sha256`）にまとめて、そのタグの GitHub Release に添付します。
+3. Build site release は続けて **Deploy to Lolipop**（`.github/workflows/deploy-lolipop.yml`）をそのタグで呼び出します。この成果物をダウンロード・検証し、`lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、そのブランチの `web/dist-site` を成果物の内容に完全に置き換えて（Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）、`lolipop-deploy-now` 向けの PR を作ります。公開サイトはこの `lolipop-deploy-now` ブランチから公開されます。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。
+4. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
 
-Release site は手動でも実行できます（Actions → Release site → Run workflow）。タグを指定するか、空欄で `main` をそのまま公開します。どちらのワークフローにも「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、これらが作る PR では CI が動きません（公開サイトの E2E は Release site 自身が実行し、それ以外は `main` の CI で確認済みです）。
+どちらのワークフローも手動で実行できます（Actions → 各ワークフロー → Run workflow）。Build site release はタグを指定するか、空欄で `main` をそのまま対象にします（タグなしの場合はビルドと E2E のみを行い、成果物はワークフローアーティファクトとして残すだけで、Release への添付やデプロイの呼び出しは行いません）。Deploy to Lolipop は、成果物がまだ Release に残っている既存のタグを指定して再デプロイ、または**ロールバック**に使えます。`web/dist-site` はファイル単位でマージせず完全に置き換えるため、どちらの操作でも、ブランチには間のタグの内容を持ち込まず、指定したタグどおりのファイルだけが残ります。どちらのワークフローにも「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、これらが作る PR では CI が動きません（公開サイトの E2E は Build site release 自身が実行し、それ以外は `main` の CI で確認済みです）。
+
+サイトの公開先 URL（OGP タグなどに使用）は 1 か所に集約しています。ビルド時変数 `MHJDOJO_SITE_URL` が、リポジトリ変数 `SITE_URL` から読み込まれ（`gh variable set SITE_URL --body https://your-host.example/` のように末尾のスラッシュ込みで設定）、未設定なら現在の `https://mhj-dojo.lolipop-now.app/` にフォールバックします。`web/playwright.live.config.ts`（`web/` で `npm run e2e:live`。直接 URL を指定するときは `LIVE_BASE_URL=... npm run e2e:live`）も同じ変数をデフォルトのベース URL として読みます。
+
+**別のホストへ移行するとき**: `deploy-lolipop.yml` と同じ `mhj-dojo-site-<tag>.tar.gz` を Release からダウンロードする `deploy-<host>.yml`（`workflow_call` + `workflow_dispatch`、入力は `tag`）を追加し、そのホストに合わせて公開する処理を書いたら、`build-site-release.yml` の呼び出し先を新しいワークフローに変更してください（あわせてリポジトリ変数 `SITE_URL` も新しいホストに変更します）。ビルド自体はホストに依存しない成果物を作るだけなので、変更は不要です。
 
 手動でデプロイする場合は、初回のみ `npx lolipop login`（ブラウザでの認可）を実行し、あとは `DEPLOY_PROJECT=<id> make deploy`（または事前に `export DEPLOY_PROJECT=<id>`）でビルドから公開まで行います。プロジェクトIDはコミットしておらず、Lolipopアカウントごとに異なるため、`npx lolipop project list` で確認してください（`DEPLOY_PROJECT` が未設定だと `make deploy` はその旨のメッセージを出して即座に失敗します）。Lolipop のプロジェクトは `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."` で一度だけ作成済みで、`make deploy` はそのプロジェクトへビルドを送るだけです。`make deploy` は `web/dist-site/` をこのリポジトリの外の一時ディレクトリにコピーしてからデプロイします。`web/dist-site/` と `mhj-dojo.wasm` は `.gitignore` 対象で、`lolipop` CLI は `--dir` が git リポジトリ内にあると gitignore されたファイルを無視してしまうためです。Deploy Now は `index.html` を `max-age=86400` で配信するため、再訪問者のキャッシュに新しいデプロイが届くまで最大で1日かかることがあります。`index.html` はエンジン（worker、`wasm_exec.js`、`mhj-dojo.wasm`）をそれらのハッシュ値の `?v=<hash>` 付きで読み込むので（`web/src/wasm.ts` 参照）、古い `index.html` が新しいエンジンと混ざる（またはその逆）ことはありません。
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
+
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省いてビルド間で内容が変わらないままにします（CI が `internal/server/static` の最新性を確認します）。
 
 ### ディレクトリ構成
 

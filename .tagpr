@@ -2,8 +2,9 @@
 # release pull request open on main that updates CHANGELOG.md. Merging it tags
 # the release (v2026.0927.0: the date in Japan and the number of the release
 # that day, from 0; three parts, as tagpr's CHANGELOG headings read only
-# three), creates the GitHub Release, and opens the site release
-# pull request into lolipop-deploy-now (.github/workflows/release-site.yml).
+# three) and creates the GitHub Release; tagpr.yml then runs
+# build-site-release.yml, which attaches the built site to the Release and
+# calls deploy-lolipop.yml to open the pull request into lolipop-deploy-now.
 [tagpr]
 	vPrefix = true
 	releaseBranch = main

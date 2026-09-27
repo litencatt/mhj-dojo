@@ -310,6 +310,22 @@ for (const [label, viewport] of [
   });
 }
 
+// A phone on its side is short: the dock stays on the right edge as on a
+// desktop (not a bottom bar), with the short names so all tabs fit.
+test('a phone on its side keeps the dock on the right edge, with short names', async ({ page }) => {
+  await page.setViewportSize({ width: 667, height: 375 });
+  await openPractice(page, ALL_PANELS);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const tab = dock.getByRole('button', { name: 'アドバイス' });
+  const b = await box(tab);
+  expect(b.x + b.width).toBeCloseTo(667, 0);
+  expect(b.height).toBeGreaterThan(b.width); // vertical text
+  await expect(dock.getByRole('button', { name: '時系列チャート' }).locator('.dock-tab-short')).toBeVisible();
+  const d = await box(dock);
+  expect(d.y).toBeGreaterThanOrEqual(0);
+  expect(d.y + d.height).toBeLessThanOrEqual(375);
+});
+
 test('the desktop layout keeps the dock on the right edge', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openPractice(page, ['advice']);
