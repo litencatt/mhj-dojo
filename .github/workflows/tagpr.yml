@@ -2,7 +2,7 @@ name: tagpr
 
 # Releases (.tagpr): on every push to main, tagpr keeps a release pull request
 # up to date (CHANGELOG.md from GitHub's generated release notes). When that
-# pull request is merged, the next run tags the merge (v2026.09.27.0) and
+# pull request is merged, the next run tags the merge (v2026.0927.0) and
 # creates the GitHub Release, and the release-site job opens the site release
 # pull request into lolipop-deploy-now for Lolipop Deploy Now to publish.
 on:

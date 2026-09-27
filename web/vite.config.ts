@@ -52,12 +52,12 @@ export default defineConfig(({ command, mode }) => {
     // every build (CI checks it), so the local version shows the server's
     // GET /api/version.
     const version = process.env.MHJDOJO_VERSION || gitShortSha() || 'dev';
-    // The release (v2026.09.27.0: the date and the release's number that day,
+    // The release (v2026.0927.0: the date and the release's number that day,
     // from 0) when the Release site workflow builds it for a tag; the header shows it instead
     // of the commit. Empty for `make deploy` and local builds.
     const release = process.env.MHJDOJO_RELEASE || null;
-    if (release !== null && !/^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$/.test(release)) {
-      throw new Error(`MHJDOJO_RELEASE must look like v2026.09.27.0, not ${JSON.stringify(release)}`);
+    if (release !== null && !/^v\d{4}\.\d{4}\.\d+$/.test(release)) {
+      throw new Error(`MHJDOJO_RELEASE must look like v2026.0927.0, not ${JSON.stringify(release)}`);
     }
     const src = readdirSync(new URL('src/', import.meta.url), { recursive: true, encoding: 'utf8' })
       .sort()
