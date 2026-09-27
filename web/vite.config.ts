@@ -52,6 +52,13 @@ export default defineConfig(({ command, mode }) => {
     // every build (CI checks it), so the local version shows the server's
     // GET /api/version.
     const version = process.env.MHJDOJO_VERSION || gitShortSha() || 'dev';
+    // The release (v2026.09.27.0: the date and the release's number that day,
+    // from 0) when the Release site workflow builds it for a tag; the header shows it instead
+    // of the commit. Empty for `make deploy` and local builds.
+    const release = process.env.MHJDOJO_RELEASE || null;
+    if (release !== null && !/^v\d{4}\.\d{2}\.\d{2}(\.\d+)?$/.test(release)) {
+      throw new Error(`MHJDOJO_RELEASE must look like v2026.09.27.0, not ${JSON.stringify(release)}`);
+    }
     const src = readdirSync(new URL('src/', import.meta.url), { recursive: true, encoding: 'utf8' })
       .sort()
       .map((f) => new URL(`src/${f}`, import.meta.url))
@@ -66,7 +73,7 @@ export default defineConfig(({ command, mode }) => {
           name: 'mhj-dojo-version-json',
           apply: 'build',
           generateBundle() {
-            this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ version, id, built })}\n` });
+            this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ version, release, id, built })}\n` });
           },
         },
       ],
@@ -75,6 +82,7 @@ export default defineConfig(({ command, mode }) => {
         __MHJDOJO_SITE_VERSION__: JSON.stringify(version),
         __MHJDOJO_SITE_ID__: JSON.stringify(id),
         __MHJDOJO_SITE_BUILT__: JSON.stringify(built),
+        __MHJDOJO_SITE_RELEASE__: JSON.stringify(release),
       },
       base: './',
       publicDir: 'site-public',
@@ -90,6 +98,7 @@ export default defineConfig(({ command, mode }) => {
       __MHJDOJO_SITE_VERSION__: 'null',
       __MHJDOJO_SITE_ID__: 'null',
       __MHJDOJO_SITE_BUILT__: 'null',
+      __MHJDOJO_SITE_RELEASE__: 'null',
     },
     build: {
       outDir: '../internal/server/static',

@@ -113,7 +113,13 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 #### デプロイ
 
-公開サイトは `lolipop-deploy-now` ブランチから公開します。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。リリースするときは **Release site** ワークフローを実行します（Actions → Release site → Run workflow）。このワークフローは `main` をビルドし、そのビルドで公開サイトの E2E テストを実行します。そして `lolipop-deploy-now` から切ったリリース用ブランチに `main` を取り込み、ビルドした公開サイト（`web/dist-site`。Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）をコミットして、前回のリリース以降の変更を載せた `lolipop-deploy-now` 向けの PR を作ります。その PR を「Create a merge commit」でマージすると（squash しない）、Deploy Now が公開します。このワークフローには「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、作られた PR では CI が動きません（公開サイトの E2E はワークフロー自身が実行し、それ以外は `main` の CI で確認済みです）。
+公開サイトは `lolipop-deploy-now` ブランチから公開します。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。リリースには [tagpr](https://github.com/Songmu/tagpr) を使います（`.tagpr`、`.github/workflows/tagpr.yml`）。
+
+1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` を更新します。
+2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.09.27.0`、次は `v2026.09.27.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Release site**（`.github/workflows/release-site.yml`）を実行します。Release site は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行します。そして `lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、ビルドした公開サイト（`web/dist-site`。Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）をコミットして、`lolipop-deploy-now` 向けの PR を作ります。
+3. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
+
+Release site は手動でも実行できます（Actions → Release site → Run workflow）。タグを指定するか、空欄で `main` をそのまま公開します。どちらのワークフローにも「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、これらが作る PR では CI が動きません（公開サイトの E2E は Release site 自身が実行し、それ以外は `main` の CI で確認済みです）。
 
 手動でデプロイする場合は、初回のみ `npx lolipop login`（ブラウザでの認可）を実行し、あとは `DEPLOY_PROJECT=<id> make deploy`（または事前に `export DEPLOY_PROJECT=<id>`）でビルドから公開まで行います。プロジェクトIDはコミットしておらず、Lolipopアカウントごとに異なるため、`npx lolipop project list` で確認してください（`DEPLOY_PROJECT` が未設定だと `make deploy` はその旨のメッセージを出して即座に失敗します）。Lolipop のプロジェクトは `npx lolipop project create --name mhj-dojo --framework static --install "" --build "" --output "."` で一度だけ作成済みで、`make deploy` はそのプロジェクトへビルドを送るだけです。`make deploy` は `web/dist-site/` をこのリポジトリの外の一時ディレクトリにコピーしてからデプロイします。`web/dist-site/` と `mhj-dojo.wasm` は `.gitignore` 対象で、`lolipop` CLI は `--dir` が git リポジトリ内にあると gitignore されたファイルを無視してしまうためです。Deploy Now は `index.html` を `max-age=86400` で配信するため、再訪問者のキャッシュに新しいデプロイが届くまで最大で1日かかることがあります。`index.html` はエンジン（worker、`wasm_exec.js`、`mhj-dojo.wasm`）をそれらのハッシュ値の `?v=<hash>` 付きで読み込むので（`web/src/wasm.ts` 参照）、古い `index.html` が新しいエンジンと混ざる（またはその逆）ことはありません。
 
