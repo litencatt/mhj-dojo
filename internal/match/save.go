@@ -2,7 +2,6 @@ package match
 
 import (
 	"fmt"
-	"hash/fnv"
 	"slices"
 	"strconv"
 
@@ -58,17 +57,48 @@ func (m *Match) Save() Save {
 }
 
 // check returns an FNV-1a digest, in hex, of the action logs of every round
-// so far, CPU moves and skips included. Callers hold m.mu.
+// so far, CPU moves and skips included. The finished rounds' logs no longer
+// change, so the hash after them is kept (checked) and only the current
+// round is hashed on each call. Callers hold m.mu.
 func (m *Match) check() string {
-	// Writing to a hash never fails.
-	h := fnv.New64a()
-	for _, log := range m.game.H.Logs() {
-		for _, a := range log {
-			_, _ = fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
-		}
-		h.Write([]byte{'|'})
+	logs := m.game.H.Logs()
+	done, cur := logs[:len(logs)-1], logs[len(logs)-1]
+	if m.checkedRounds == 0 || m.checkedRounds > len(done) {
+		m.checked, m.checkedRounds = fnvOffset, 0
 	}
-	return strconv.FormatUint(h.Sum64(), 16)
+	for _, log := range done[m.checkedRounds:] {
+		m.checked.writeLog(log)
+	}
+	m.checkedRounds = len(done)
+	h := m.checked
+	h.writeLog(cur)
+	return strconv.FormatUint(uint64(h), 16)
+}
+
+// fnv1a is a 64-bit FNV-1a hash (hash/fnv's New64a), whose whole state is
+// its value, so check can keep it and carry on from a copy.
+type fnv1a uint64
+
+const (
+	fnvOffset fnv1a = 14695981039346656037
+	fnvPrime  fnv1a = 1099511628211
+)
+
+func (h *fnv1a) Write(p []byte) (int, error) {
+	for _, b := range p {
+		*h ^= fnv1a(b)
+		*h *= fnvPrime
+	}
+	return len(p), nil
+}
+
+// writeLog hashes one round's actions for check.
+func (h *fnv1a) writeLog(log []game.Action) {
+	for _, a := range log {
+		// Writing to a hash never fails.
+		_, _ = fmt.Fprintf(h, "%d %s %s %v;", a.Seat, a.Type, a.Tile, a.Tiles)
+	}
+	_, _ = h.Write([]byte{'|'})
 }
 
 // Restore rebuilds a saved game under a new id by replaying its moves. The

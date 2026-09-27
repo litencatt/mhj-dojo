@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/bits"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -84,6 +83,9 @@ type comboDef struct {
 	targets []shanten.Target
 	pairs   []uint64 // seven-pairs form: bit k = kind k allowed; one mask per member
 	order   int      // index in the list, the last tie-break of the ranking
+	// shape numbers the combos by their keys other than the value tiles:
+	// combos of the same shape differ only in which value tiles they use.
+	shape int
 }
 
 func (d *comboDef) has(key string) bool { return slices.Contains(d.keys, key) }
@@ -209,9 +211,21 @@ func buildCombos(w Winds) []comboDef {
 	for i, r := range RowsFor(w) {
 		order[r.Key] = i
 	}
+	shapes := map[string]int{}
 	for i := range out {
 		out[i].order = i
 		slices.SortFunc(out[i].keys, func(a, b string) int { return order[a] - order[b] })
+		var shape []string
+		for _, k := range out[i].keys {
+			if !isYakuhai(k) {
+				shape = append(shape, k)
+			}
+		}
+		sig := strings.Join(shape, "+")
+		if _, ok := shapes[sig]; !ok {
+			shapes[sig] = len(shapes)
+		}
+		out[i].shape = shapes[sig]
 	}
 	return out
 }
@@ -340,9 +354,26 @@ func ComboRank(han, shanten int) int {
 //     same shanten (it scores more for the same work);
 //  3. a combo that differs from a better-ranked one only in which value
 //     tiles it uses, with the same han and shanten, is dropped.
+//
+// The last results are memoized by hand (rows being the same hand's), so
+// the result may be shared with other calls: callers must not modify it.
 func (a *Analyzer) Combos(c tile.Counts, melds []yaku.Meld, rows []Result) []Combo {
-	return a.combos(c, melds, rows, true)
+	k, ok := keyOf(&c, melds)
+	if ok {
+		if res, hit := a.combosMemo.get(&k); hit {
+			return res
+		}
+	}
+	res := a.combos(c, melds, rows, true)
+	if ok {
+		a.combosMemo.put(&k, res)
+	}
+	return res
 }
+
+// pending is a combo to evaluate: its index in the list, its han and the
+// lower bounds of its rank and distance.
+type pending struct{ i, han, lb, minDist int }
 
 // combos is Combos; prune evaluates the combos best-first by a lower bound
 // on their rank and stops once no unevaluated combo can enter the result.
@@ -371,8 +402,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			rowShanten[r.Key] = r.Shanten
 		}
 	}
-	type pending struct{ i, han, lb, minDist int }
-	todo := make([]pending, 0, len(defs))
+	todo := a.todo[:0]
 	for i := range defs {
 		d := &defs[i]
 		// lb bounds the combo's shanten (its rank), dlb its relaxed
@@ -410,7 +440,8 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 	if prune {
 		slices.SortStableFunc(todo, func(x, y pending) int { return x.lb - y.lb })
 	}
-	evald := make([]comboCand, 0, len(todo))
+	a.todo = todo
+	evald := a.evald[:0]
 	dd := a.comboDist(&full)
 	bound, level, seen := math.MaxInt, math.MinInt, 0
 	for _, p := range todo {
@@ -418,7 +449,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			level = p.lb
 			if len(evald) >= MaxCombos && len(evald) != seen {
 				seen = len(evald)
-				if sel := selectCombos(evald); len(sel) == MaxCombos {
+				if sel := a.selectCombos(evald); len(sel) == MaxCombos {
 					bound = ComboRank(sel[MaxCombos-1].han, sel[MaxCombos-1].shanten)
 				}
 			}
@@ -435,9 +466,10 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			evald = append(evald, cd)
 		}
 	}
+	a.evald = evald
 	names := a.comboNames()
 	var out []Combo
-	for _, cd := range selectCombos(evald) {
+	for _, cd := range a.selectCombos(evald) {
 		var ns []string
 		for _, k := range cd.def.keys {
 			ns = append(ns, names[k])
@@ -573,8 +605,9 @@ func (a *Analyzer) comboUkeire(cd *comboCand, c tile.Counts, dd *comboDist) []ti
 }
 
 // selectCombos applies the ranking of Combos to the evaluated combos.
-func selectCombos(evald []comboCand) []comboCand {
-	sorted := slices.Clone(evald)
+func (a *Analyzer) selectCombos(evald []comboCand) []comboCand {
+	sorted := append(a.sel[:0], evald...)
+	a.sel = sorted
 	slices.SortStableFunc(sorted, func(x, y comboCand) int {
 		if d := ComboRank(x.han, x.shanten) - ComboRank(y.han, y.shanten); d != 0 {
 			return d
@@ -584,25 +617,19 @@ func selectCombos(evald []comboCand) []comboCand {
 		}
 		return x.def.order - y.def.order // equal rank and han: equal shanten too
 	})
-	var out []comboCand
-	seen := map[string]bool{}
+	out := make([]comboCand, 0, MaxCombos)
 	for _, x := range sorted {
 		if slices.ContainsFunc(evald, func(y comboCand) bool {
 			return len(y.def.keys) > len(x.def.keys) && y.shanten <= x.shanten && subset(x.def.keys, y.def.keys)
 		}) {
 			continue
 		}
-		var shape []string
-		for _, k := range x.def.keys {
-			if !isYakuhai(k) {
-				shape = append(shape, k)
-			}
-		}
-		sig := strings.Join(shape, "+") + "/" + strconv.Itoa(x.han) + "/" + strconv.Itoa(x.shanten)
-		if seen[sig] {
+		// Only the value tiles differ from a combo already selected.
+		if slices.ContainsFunc(out, func(y comboCand) bool {
+			return y.def.shape == x.def.shape && y.han == x.han && y.shanten == x.shanten
+		}) {
 			continue
 		}
-		seen[sig] = true
 		if out = append(out, x); len(out) == MaxCombos {
 			break
 		}

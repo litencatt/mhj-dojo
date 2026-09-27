@@ -820,6 +820,10 @@ Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
     path (`pruneAnalysisCache`), instead of being kept forever. A node whose
     cache was pruned just recomputes it, from the still-memoized suit
     tables, if it's revisited.
+  - The `history` field only needs each row's shanten, which every node
+    keeps permanently once known (`rowShanten`, one byte per row), so
+    switching to another branch reads its history path from them instead of
+    re-analyzing the path's nodes.
 
   Result: ~2.51 MiB per maximally branched session (a 34x cut), 256 sessions
   ≈ 644 MiB. Most of what's left (~72% in this benchmark, measured by
@@ -887,6 +891,15 @@ keys all the time.
 A fold's key names two tables, which it keeps alive even after the engine's
 memo dropped them: at most `2 × foldGen × 2` = 16,000 tables, hence the
 third row.
+
+An analyzer also keeps its last results: the rows and the combos of the
+last `resultMemoSize` = 32 hands each (`internal/yakushanten/yakushanten.go`),
+because a request asks for the same hand more than once (a game's
+`analysis` is also its drawn tile's `by_discard` preview, and the hand
+recorded in the history after a discard is that discard's preview). That is
+~4 KiB per hand, ~0.15 MiB in all, mostly results the current node or state
+holds anyway: small enough next to the tables not to change the figures
+here.
 
 The bytes per entry are `HeapAlloc` deltas (after `runtime.GC()`) of an
 analyzer filled from random hands, divided by its entries: a table is 50

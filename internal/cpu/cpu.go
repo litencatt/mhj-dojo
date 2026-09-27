@@ -159,15 +159,24 @@ type option struct {
 // before terminals before simples, then tile order, keeping red fives.
 func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, visible *tile.Counts) []option {
 	var opts []option
+	all := tile.CountsOf(tiles)
 	for _, s := range discards {
 		i := slices.IndexFunc(tiles, func(t tile.Tile) bool { return t.String() == s })
-		c := tile.CountsOf(slices.Delete(slices.Clone(tiles), i, i+1))
-		sh, acc := p.shanten(c, melds)
-		n := 0
-		for _, k := range acc {
-			n += max(0, 4-visible[k])
+		o := option{tile: s, kind: tiles[i].Kind, red: tiles[i].Red}
+		// A red five and a plain one leave the same hand.
+		if j := slices.IndexFunc(opts, func(x option) bool { return x.kind == o.kind }); j >= 0 {
+			o.shanten, o.ukeire = opts[j].shanten, opts[j].ukeire
+			opts = append(opts, o)
+			continue
 		}
-		opts = append(opts, option{tile: s, kind: tiles[i].Kind, red: tiles[i].Red, shanten: sh, ukeire: n})
+		c := all
+		c[o.kind]--
+		sh, acc := p.shanten(c, melds)
+		for _, k := range acc {
+			o.ukeire += max(0, 4-visible[k])
+		}
+		o.shanten = sh
+		opts = append(opts, o)
 	}
 	slices.SortStableFunc(opts, func(a, b option) int {
 		switch {

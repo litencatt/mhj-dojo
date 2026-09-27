@@ -53,12 +53,24 @@ func (k Kind) IsTerminal() bool { return !k.IsHonor() && (k.Num() == 1 || k.Num(
 // IsYaochu reports whether k is a terminal or honor.
 func (k Kind) IsYaochu() bool { return k.IsHonor() || k.IsTerminal() }
 
+// kindNames and redNames are the strings of each kind and of the red fives
+// (by suit), built once: tiles are formatted on every response.
+var kindNames, redNames = func() (k [NumKinds]string, r [3]string) {
+	for i := range k {
+		k[i] = string([]byte{byte('0' + Kind(i).Num()), suitChars[Kind(i).Suit()]})
+	}
+	for s := range r {
+		r[s] = string([]byte{'0', suitChars[s]})
+	}
+	return
+}()
+
 // String formats a kind without red notation, e.g. "5m".
 func (k Kind) String() string {
 	if k >= NumKinds {
 		return "??"
 	}
-	return fmt.Sprintf("%d%c", k.Num(), suitChars[k.Suit()])
+	return kindNames[k]
 }
 
 // MakeKind builds a kind from a suit index and 1-based number.
@@ -73,6 +85,9 @@ type Tile struct {
 // String formats a tile, using "0" for red fives (e.g. "0p").
 func (t Tile) String() string {
 	if t.Red {
+		if t.Kind < East {
+			return redNames[t.Kind.Suit()]
+		}
 		return fmt.Sprintf("0%c", suitChars[t.Kind.Suit()])
 	}
 	return t.Kind.String()

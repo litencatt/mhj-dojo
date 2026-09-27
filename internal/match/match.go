@@ -186,6 +186,10 @@ type Match struct {
 	// last one, has startRound leave out the analysis: those rounds'
 	// history is dropped at the next anyway.
 	replaying bool
+	// checked is check's hash of the first checkedRounds rounds' logs
+	// (none while checkedRounds is 0).
+	checked       fnv1a
+	checkedRounds int
 }
 
 // ID returns the game id.
