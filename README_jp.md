@@ -130,7 +130,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ （練習モードの�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
-サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`）も入ります。これは `MHJDOJO_SITE_URL`（`http(s)://` で始まり `/` で終わる絶対URL。既定値は公開サイトのURL）から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省いてビルド間で内容が変わらないままにします（CI が `internal/server/static` の最新性を確認します）。
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省いてビルド間で内容が変わらないままにします（CI が `internal/server/static` の最新性を確認します）。
 
 ### ディレクトリ構成
 
