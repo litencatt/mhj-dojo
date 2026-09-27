@@ -32,7 +32,9 @@ export function TabStopped({ busy, onContinue }: TabStoppedProps) {
     <dialog
       ref={ref}
       class="tab-stopped"
+      role="alertdialog"
       aria-labelledby="tab-stopped-title"
+      aria-describedby="tab-stopped-desc"
       // Escape would close it and leave the page usable.
       onCancel={(e) => e.preventDefault()}
       onClose={show}
@@ -40,13 +42,28 @@ export function TabStopped({ busy, onContinue }: TabStoppedProps) {
       <p id="tab-stopped-title" class="tab-stopped-title">
         このタブは別のタブで開かれたため停止しました
       </p>
+      <p id="tab-stopped-desc" class="tab-stopped-desc">
+        「このタブで続ける」を押すと、もう一方のタブが最後に進めた状態から続けます。
+      </p>
       <div class="tab-stopped-actions">
-        <button type="button" class="action-primary" disabled={busy} onClick={onContinue}>
+        <button
+          type="button"
+          class="action-primary"
+          autofocus
+          disabled={busy}
+          aria-describedby={busy ? 'tab-stopped-wait' : undefined}
+          onClick={onContinue}
+        >
           このタブで続ける
         </button>
         <button type="button" onClick={close}>
           閉じる
         </button>
+        {busy && (
+          <span id="tab-stopped-wait" class="tab-stopped-wait">
+            前の操作の応答を待っています
+          </span>
+        )}
       </div>
       {closeFailed && (
         <p class="tab-stopped-hint" role="status">

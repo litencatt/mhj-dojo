@@ -101,7 +101,13 @@ test('a stale browser: discarding after another browser moved the session on sho
 // One tab of a browser at a time plays a session (src/singleTab.ts): the
 // newest tab to open it wins, and the one before stops until taken back.
 function stoppedDialog(page: Page) {
-  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
 }
 
 async function discardDrawn(page: Page) {
@@ -129,17 +135,14 @@ test('a second tab on the same session stops the first, until taken back', async
   await other.goto(page.url());
   await expect(other.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
 
-  // A stops: the dialog covers it, nothing under it can be clicked, and it
-  // sends nothing more.
-  await expect(stoppedDialog(page)).toBeVisible();
+  // A stops: the dialog covers it, and it sends nothing more.
+  await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
   const sent: string[] = [];
   page.on('request', (req) => {
     if (req.url().includes('/api/')) sent.push(`${req.method()} ${req.url()}`);
   });
   const handA = page.getByRole('region', { name: '手牌' });
-  await expect(handA.locator('.hand-drawn button').click({ timeout: 1000 })).rejects.toThrow();
-  await expect(page.getByRole('button', { name: '新規対局' }).click({ timeout: 1000 })).rejects.toThrow();
 
   // B plays on.
   await discardDrawn(other);
@@ -153,7 +156,7 @@ test('a second tab on the same session stops the first, until taken back', async
   await expect(stoppedDialog(page)).toHaveCount(0);
   await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
   expect(await riverOf(page)).toEqual(await riverOf(other));
-  await expect(stoppedDialog(other)).toBeVisible();
+  await expectStopped(other);
   await discardDrawn(page);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

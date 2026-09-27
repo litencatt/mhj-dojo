@@ -35,7 +35,7 @@ export function App() {
     state && !api.WASM ? () => api.getSession(state.session_id) : undefined,
     sessionMovedOn,
   );
-  const tab = useSingleTab(state ? api.sessionKey(state.session_id) : null);
+  const stopped = useSingleTab(state ? api.sessionKey(state.session_id) : null);
 
   function startGame(seed?: number, maxTurns?: number) {
     return request(() => api.createSession({ seed, max_turns: maxTurns ?? 18 }));
@@ -43,7 +43,7 @@ export function App() {
 
   // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
   // replays the same wall from the seed after a server restart.
-  useUrlResume({
+  const resume = useUrlResume({
     idKey: 'session',
     request,
     get: (id) => {
@@ -80,14 +80,6 @@ export function App() {
   function handleGoto(nodeId: number) {
     if (!state) return;
     void request(() => api.goto(state.session_id, nodeId));
-  }
-
-  // Takes the session back from the tab that took it, and shows where that
-  // tab left it.
-  function handleContinue() {
-    if (!state) return;
-    tab.reclaim();
-    void request(() => api.getSession(state.session_id));
   }
 
   const rowNames = useRowNames(state?.analysis);
@@ -268,7 +260,8 @@ export function App() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
-      {tab.stopped && <TabStopped busy={busy} onContinue={handleContinue} />}
+      {/* 「このタブで続ける」 takes the session back, from where the other tab left it. */}
+      {stopped && <TabStopped busy={busy} onContinue={resume} />}
     </div>
   );
 }

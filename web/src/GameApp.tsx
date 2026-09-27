@@ -79,7 +79,7 @@ export function GameApp() {
     state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
     gameMovedOn,
   );
-  const tab = useSingleTab(state ? api.gameKey(state.game_id) : null);
+  const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
   function startGame(options: GameOptions, seed?: number) {
     return request(() => api.createGame({ seed, ...options }));
@@ -96,7 +96,7 @@ export function GameApp() {
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again after
   // a server restart (on the static site, if the game's save is gone).
-  useUrlResume({
+  const resume = useUrlResume({
     idKey: 'game',
     request,
     get: (id) => {
@@ -129,14 +129,6 @@ export function GameApp() {
   function handleNewGame(e: Event) {
     e.preventDefault();
     void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
-  }
-
-  // Takes the game back from the tab that took it, and shows where that tab
-  // left it.
-  function handleContinue() {
-    if (!state) return;
-    tab.reclaim();
-    void request(() => api.getGame(state.game_id));
   }
 
   // After a call the analysis is empty; the chart keeps the rows from before.
@@ -366,7 +358,8 @@ export function GameApp() {
           onRestore={(k) => restore(k as PanelKey)}
         />
       )}
-      {tab.stopped && <TabStopped busy={busy} onContinue={handleContinue} />}
+      {/* 「このタブで続ける」 takes the game back, from where the other tab left it. */}
+      {stopped && <TabStopped busy={busy} onContinue={resume} />}
     </div>
   );
 }

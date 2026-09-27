@@ -311,7 +311,13 @@ test('a stale browser: acting after another browser moved the game on shows a no
 // One tab of a browser at a time plays a game (src/singleTab.ts): the
 // newest tab to open it wins, and the one before stops until taken back.
 function stoppedDialog(page: Page) {
-  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
 }
 
 // Every river, your hand and the status line.
@@ -340,9 +346,8 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await waitForPlayback(other);
   await expect(handPanel(other)).toBeVisible();
 
-  await expect(stoppedDialog(page)).toBeVisible();
+  await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
-  await expect(page.locator('.new-game-form button').click({ timeout: 1000 })).rejects.toThrow();
 
   // B plays on.
   await playOneStep(other);
@@ -355,7 +360,7 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await expect(stoppedDialog(page)).toHaveCount(0);
   await waitForPlayback(page);
   await expect.poll(() => tableState(page)).toEqual(b);
-  await expect(stoppedDialog(other)).toBeVisible();
+  await expectStopped(other);
   await playOneStep(page);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

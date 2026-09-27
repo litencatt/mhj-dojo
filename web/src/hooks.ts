@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import * as api from './api';
 import type { GameEvent, GameState, SessionState, YakuRow } from './api';
 import { errorMessage } from './panels';
-import { claim, onStop } from './singleTab';
+import { claim, isStopped, onChange } from './singleTab';
 import {
   buildPlayback,
   PLAYBACK_STEP_MS,
@@ -75,23 +75,18 @@ export function useSerialRequest<T>(
 
 /**
  * Holds key (a singleTab key: api.sessionKey or api.gameKey) for this tab
- * while the page shows it, and tells when another tab has taken it over:
- * stopped, until reclaim takes it back (the page then shows the latest
- * state afresh). A new key lets go of the one before.
+ * while the page shows it (a new key lets go of the one before), and
+ * returns whether another tab has taken over the one this tab holds: also
+ * the one it was loading, before there is a state to show. Claiming it
+ * again (as useUrlResume's resume does) ends that.
  */
-export function useSingleTab(key: string | null) {
-  const [stoppedKey, setStoppedKey] = useState<string | null>(null);
+export function useSingleTab(key: string | null): boolean {
+  const [stopped, setStopped] = useState(isStopped);
   useEffect(() => {
     if (key) claim(key);
   }, [key]);
-  useEffect(() => onStop(setStoppedKey), []);
-  const stopped = key !== null && stoppedKey === key;
-  function reclaim() {
-    if (!key) return;
-    claim(key);
-    setStoppedKey(null);
-  }
-  return { stopped, reclaim };
+  useEffect(() => onChange(() => setStopped(isStopped())), []);
+  return stopped;
 }
 
 /**
@@ -127,10 +122,11 @@ export interface UrlResumeOptions<T> {
 /**
  * Keeps the id in the URL so a reload resumes the same session or game. They
  * live only in server memory, so after a server restart (404) the same wall is
- * dealt again from the params instead.
+ * dealt again from the params instead. Returns resume, which does it again
+ * (for a tab taking the session or game back from another tab).
  */
 export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
-  useEffect(() => {
+  function resume() {
     const params = new URLSearchParams(location.search);
     const id = params.get(idKey);
     if (!id) {
@@ -145,6 +141,10 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
         throw err;
       }
     });
+  }
+
+  useEffect(() => {
+    resume();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -158,6 +158,8 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
     }
     history.replaceState(null, '', url);
   }, [syncKey]);
+
+  return resume;
 }
 
 /** Yaku key → display name, for the chart legend. */

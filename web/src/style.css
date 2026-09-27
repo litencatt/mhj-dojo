@@ -1205,13 +1205,23 @@ section {
   background: rgb(0 0 0 / 0.45);
 }
 .tab-stopped-title {
-  margin: 0 0 14px;
+  margin: 0 0 8px;
   font-weight: 600;
+}
+.tab-stopped-desc {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 .tab-stopped-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+.tab-stopped-wait {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 .tab-stopped .action-primary {
   background: var(--accent);

@@ -14,10 +14,12 @@
 // time plays a session or game (singleTab.ts). A tab another one stopped
 // neither asks its engine about that one nor saves it, even for a request
 // the engine was already working on, and drops its copy, so that taking the
-// session or game back rebuilds it from the other tab's save.
+// session or game back rebuilds it from the other tab's save. That save may
+// come from a newer version of the site than this tab runs: one this tab's
+// engine can't rebuild is kept, and the page asked to reload.
 
 import type { GameState, SessionState } from './api';
-import { lease, live, onStop, STOPPED, STOPPED_MESSAGE } from './singleTab';
+import { lease, live, onChange, settled, STOPPED, STOPPED_MESSAGE } from './singleTab';
 
 export interface WasmResponse {
   status: number;
@@ -259,6 +261,9 @@ interface Kind {
   publicOf: Map<string, string>; // engine id → public id
   known: Set<string>; // engine ids the current worker holds
   failures: Map<string, number>; // public id → restores in a row the engine failed (500)
+  // Public ids whose save another tab has written since this tab last
+  // rebuilt it (it took them over). Kept across workers.
+  foreign: Set<string>;
 }
 
 const kinds: Kind[] = [
@@ -278,6 +283,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    foreign: new Set(),
   },
   {
     base: GAMES,
@@ -298,6 +304,7 @@ const kinds: Kind[] = [
     publicOf: new Map(),
     known: new Set(),
     failures: new Map(),
+    foreign: new Set(),
   },
 ];
 
@@ -329,13 +336,19 @@ function splitPath(path: string): { kind: Kind; id: string; with: (id: string) =
 
 // Another tab took over a session or game: the copy in this tab's engine is
 // out of date from now on, and taking it back rebuilds it from the save.
-onStop((key) => {
-  const target = splitPath(key);
-  target?.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
+onChange((key, stopped) => {
+  const target = stopped && splitPath(key);
+  if (!target) return;
+  target.kind.known.delete(target.kind.engineOf.get(target.id) ?? target.id);
+  target.kind.foreign.add(target.id);
 });
 
 // The answer to a request on a session or game another tab has taken over.
 const stoppedResponse = (): WasmResponse => ({ status: STOPPED, data: { error: STOPPED_MESSAGE } });
+
+// The answer when this tab's engine can't rebuild another tab's save (most
+// likely that tab runs a newer version of the site).
+const NEWER_SAVE = '別の画面で新しい版に保存されています。再読み込みしてください';
 
 const MAX_RESTORE_FAILURES = 2;
 
@@ -346,9 +359,14 @@ const MAX_RESTORE_FAILURES = 2;
 // other failure (the engine broke) keeps the save for the next try, unless
 // the engine failed on it MAX_RESTORE_FAILURES times in a row: the save may
 // be what breaks it, so it is dropped (the error is still returned).
-// Should another tab take it over meanwhile (stopped), none of that is
-// done: that tab's save is its own, and this tab's copy is out of date.
+// A save another tab wrote (foreign) is never dropped: any failure is a
+// 409 asking for a reload, as that tab may run a newer engine. Should
+// another tab take it over meanwhile (stopped), none of this is done: that
+// tab's save is its own, and this tab's copy is out of date.
 async function restore(kind: Kind, publicId: string, stopped: () => boolean): Promise<WasmResponse | null> {
+  // Once the tab this one just took it from has stopped saving it; the
+  // engine starts meanwhile.
+  await Promise.all([settled(`${kind.base}/${encodeURIComponent(publicId)}`), start()]);
   const saved = kind.saved(publicId);
   if (saved === null) return null;
   const res = await call(kind.restoreFn, saved);
@@ -366,6 +384,9 @@ async function restore(kind: Kind, publicId: string, stopped: () => boolean): Pr
     kind.publicOf.set(id, publicId);
     kind.known.add(id);
     kind.failures.delete(publicId);
+    kind.foreign.delete(publicId);
+  } else if (kind.foreign.has(publicId)) {
+    return { status: 409, data: { error: NEWER_SAVE } };
   } else if ([400, 404, 409, 422].includes(res.status)) {
     kind.failures.delete(publicId);
     kind.forget(publicId);

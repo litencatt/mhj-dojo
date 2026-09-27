@@ -40,7 +40,7 @@ Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to
 - **Per-yaku shanten for open hands** — melds count as fixed groups, so shanten only counts your concealed tiles; a meld that can't satisfy a yaku's shape makes that row impossible. Any meld drops chiitoitsu, kokushi, chuuren, pinfu and ryanpeikou; a chii, pon or open kan additionally opens the hand, dropping iipeikou and suuankou too (a concealed kan alone keeps the hand closed).
 - **CPU players** — **CPU: 普通** takes every win, riichis when tenpai, calls when it keeps a yaku, kans when it doesn't set the hand back, discards for tile efficiency, and folds against a riichi two or more steps from tenpai. **CPU: 弱い** also wins and riichis but never calls, kans or folds, and often picks a less efficient discard — both are reproducible from the seed.
 - **Practice tools stay on** — the per-yaku shanten table (its wind rows follow your seat and the round), the discard preview, the time-series chart and the glossary. There is no rewinding in a game.
-- **Seed** — a seed you choose makes the whole game (CPU moves included) repeatable; a random seed is revealed when the game ends. If another tab (or a CPU turn finishing mid-request) has already moved the game on, your next action re-fetches the current state instead of failing.
+- **Seed** — a seed you choose makes the whole game (CPU moves included) repeatable; a random seed is revealed when the game ends. Only one tab of a browser plays a game or practice session at a time: opening it in another tab stops the first one, which can take it back with 「このタブで続ける」. If another browser (or a CPU turn finishing mid-request) has already moved the game on, your next action re-fetches the current state instead of failing.
 
 ### How yaku shanten is defined
 
@@ -104,7 +104,7 @@ The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `work
 Differences from the local version:
 
 - CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser too, CPU turns included.
-- Each tab runs its own sessions, so there is no "another tab moved on" handling.
+- Only one tab plays a session or game at a time, as in the local version; there is no other browser to move it on, so there is no "moved on elsewhere" handling.
 - Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL. CPU games are saved the same way (the 5 most recently used games); a random seed stays hidden until the game ends.
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.

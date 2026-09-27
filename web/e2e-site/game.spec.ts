@@ -166,7 +166,13 @@ test('a CPU game plays a round to its result and the next round, across a reload
 // One tab at a time plays a game (src/singleTab.ts): the newest tab to open
 // it wins, and the one before stops until taken back.
 function stoppedDialog(page: Page) {
-  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
 }
 
 // A game one step in, then a second tab on it.
@@ -192,10 +198,9 @@ test('a second tab on the same game stops the first, until taken back', async ({
   const other = await twoTabs(page, context);
   expect(await tableState(other)).toEqual(await tableState(page));
 
-  await expect(stoppedDialog(page)).toBeVisible();
+  await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
   const move = await nextMove(other);
-  await expect(page.locator('.new-game-form button').click({ timeout: 1000 })).rejects.toThrow();
 
   // B plays on and saves.
   await clickAndWait(other, move);
@@ -208,11 +213,48 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await expect(stoppedDialog(page)).toHaveCount(0);
   await waitForPlayback(page);
   await expect.poll(() => tableState(page)).toEqual(b);
-  await expect(stoppedDialog(other)).toBeVisible();
+  await expectStopped(other);
   expect(await savedGame(page)).toBe(save);
   await playOneStep(page);
   expect(await savedGame(page)).not.toBe(save);
   await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+test('a save from a newer engine is kept when this tab takes the game back, and asks for a reload', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  const other = await twoTabs(page, context);
+  await expectStopped(page);
+  await playOneStep(other);
+  const b = await tableState(other);
+  const save = await savedGame(other);
+  // A's engine refuses B's save, as an older engine refuses one from a newer
+  // version of the site.
+  await page.workers()[0].evaluate(() => {
+    const orig = self.onmessage!;
+    self.onmessage = (e: MessageEvent) =>
+      e.data.fn === 'restoreGame'
+        ? self.postMessage({ id: e.data.id, status: 409, body: '{"error":"save does not match this engine"}' })
+        : orig.call(self, e);
+  });
+
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(page.locator('.error-banner')).toContainText('再読み込み');
+  expect(await savedGame(page)).toBe(save);
+  // A move on the old screen is refused the same way.
+  await (await nextMove(page)).click();
+  await expect(page.locator('.error-banner')).toContainText('再読み込み');
+  expect(await savedGame(page)).toBe(save);
+
+  // Reloaded (a new engine), A shows B's game.
+  await page.reload();
+  await waitForPlayback(page);
+  await expect(handPanel(page)).toBeVisible();
+  await expect.poll(() => tableState(page)).toEqual(b);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  await expectStopped(other);
 });
 
 test('a move answered after the tab stopped is neither shown nor saved', async ({ page, context }) => {
@@ -242,7 +284,7 @@ test('a move answered after the tab stopped is neither shown nor saved', async (
   const other = await context.newPage();
   await other.emulateMedia({ reducedMotion: 'reduce' });
   await other.goto(page.url());
-  await expect(stoppedDialog(page)).toBeVisible();
+  await expectStopped(page);
   await playOneStep(other);
   await playOneStep(other);
   const b = await tableState(other);

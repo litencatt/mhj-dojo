@@ -138,7 +138,13 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
 // One tab at a time plays a session (src/singleTab.ts): the newest tab to
 // open it wins, and the one before stops until taken back.
 function stoppedDialog(page: Page) {
-  return page.getByRole('dialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
+}
+
+/** The dialog covers the page: shown modal, so everything else is inert. */
+async function expectStopped(page: Page) {
+  await expect(stoppedDialog(page)).toBeVisible();
+  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
 }
 
 function savedMoves(page: Page) {
@@ -160,11 +166,9 @@ test('a second tab on the same session stops the first, until taken back', async
   const handB = other.getByRole('region', { name: '手牌' });
   await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
 
-  // A stops: the dialog covers it, and nothing under it can be clicked.
-  await expect(stoppedDialog(page)).toBeVisible();
+  // A stops: the dialog covers it.
+  await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
-  await expect(handA.locator('.hand-drawn button').click({ timeout: 1000 })).rejects.toThrow();
-  await expect(page.getByRole('button', { name: '新規対局' }).click({ timeout: 1000 })).rejects.toThrow();
 
   // B plays on and saves.
   await discardDrawn(other);
@@ -177,7 +181,7 @@ test('a second tab on the same session stops the first, until taken back', async
   await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
   expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
   expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
-  await expect(stoppedDialog(other)).toBeVisible();
+  await expectStopped(other);
   await discardDrawn(page);
   expect(await savedMoves(page)).toBe(4);
   await expect(page.locator('.error-banner')).toHaveCount(0);
@@ -212,7 +216,7 @@ test('an answer that comes after the tab stopped is neither shown nor saved', as
   // plays two moves of its own.
   const other = await context.newPage();
   await other.goto(page.url());
-  await expect(stoppedDialog(page)).toBeVisible();
+  await expectStopped(page);
   await expect(stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' })).toBeDisabled();
   await discardDrawn(other);
   await discardDrawn(other);
@@ -249,14 +253,13 @@ test('a new session lets go of the one before', async ({ page, context }) => {
   for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
 
-// A tab that missed the claim (frozen, say) checks again as it comes back
-// into view, and stops then.
-test('a tab that missed another tab opening its session stops when shown again', async ({ page, context }) => {
+// Makes page drop the singleTab messages that arrive while deaf (setDeaf),
+// as a frozen tab, or one in the back/forward cache, would miss them.
+async function deafen(page: Page) {
   await page.addInitScript(() => {
     const w = window as unknown as { deaf: boolean };
     w.deaf = false;
     const Channel = BroadcastChannel;
-    // Drops the messages that arrive while deaf, as a frozen tab would.
     window.BroadcastChannel = class extends Channel {
       set onmessage(fn: ((e: MessageEvent) => void) | null) {
         super.onmessage = fn && ((e: MessageEvent) => void (w.deaf || fn.call(this, e)));
@@ -266,10 +269,20 @@ test('a tab that missed another tab opening its session stops when shown again',
       }
     };
   });
+}
+
+async function setDeaf(page: Page, deaf: boolean) {
+  await page.evaluate((d) => ((window as unknown as { deaf: boolean }).deaf = d), deaf);
+}
+
+// A tab that missed the claim (frozen, say) checks again as it comes back
+// into view, and stops then.
+test('a tab that missed another tab opening its session stops when shown again', async ({ page, context }) => {
+  await deafen(page);
   await page.goto('./?seed=27&turns=18');
   await expect(page).toHaveURL(/[?&]session=/);
   await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
-  await page.evaluate(() => ((window as unknown as { deaf: boolean }).deaf = true));
+  await setDeaf(page, true);
 
   const other = await context.newPage();
   await other.goto(page.url());
@@ -277,12 +290,121 @@ test('a tab that missed another tab opening its session stops when shown again',
   await page.waitForTimeout(300);
   await expect(stoppedDialog(page)).toHaveCount(0);
 
-  await page.evaluate(() => {
-    (window as unknown as { deaf: boolean }).deaf = false;
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
-  await expect(stoppedDialog(page)).toBeVisible();
+  await setDeaf(page, false);
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
+});
+
+// Even with the newer tab gone, the tab that missed it must not play on its
+// out-of-date copy: the claim recorded in localStorage stops it.
+test('a tab back from the back/forward cache after the newer tab closed stops', async ({ page, context }) => {
+  await deafen(page);
+  await page.goto('./?seed=28&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  await setDeaf(page, true);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await discardDrawn(other);
+  await discardDrawn(other);
+  await other.close();
+  await setDeaf(page, false);
+
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expectStopped(page);
+  expect(await savedMoves(page)).toBe(2);
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(2);
+  await discardDrawn(page);
+  expect(await savedMoves(page)).toBe(3);
+});
+
+test('a move on a tab that missed being stopped is not made', async ({ page, context }) => {
+  await deafen(page);
+  await page.goto('./?seed=29&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  const handA = page.getByRole('region', { name: '手牌' });
+  await expect(handA.locator('.hand-drawn button')).toBeEnabled();
+  await setDeaf(page, true);
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await discardDrawn(other);
+  await discardDrawn(other);
+  await other.close();
+
+  await handA.locator('.hand-drawn button').click();
+  await expectStopped(page);
+  await expect(handA.locator('.discard-river')).toHaveCount(0);
+  expect(await savedMoves(page)).toBe(2);
+});
+
+test('a tab stopped while it loads shows the dialog, and can take the session back', async ({ page, context }) => {
+  await page.goto('./?seed=30&turns=18');
+  await discardDrawn(page);
+  const url = page.url();
+  // B's engine is slow to load.
+  const other = await context.newPage();
+  let release = () => {};
+  const loaded = new Promise<void>((r) => (release = r));
+  await other.route('**/mhj-dojo.wasm*', async (route) => {
+    await loaded;
+    await route.continue();
+  });
+  await other.goto(url);
+  await expectStopped(page);
+
+  // A takes it back before B has shown anything: B stops, with no state.
+  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(1);
+  await expectStopped(other);
+  release();
+  await expect(stoppedDialog(other).getByRole('button', { name: 'このタブで続ける' })).toBeEnabled();
+  await expect(other.getByRole('region', { name: '手牌' })).toHaveCount(0);
+  await discardDrawn(page);
+
+  await stoppedDialog(other).getByRole('button', { name: 'このタブで続ける' }).click();
+  await expect(other.getByRole('region', { name: '手牌' }).locator('.discard-river .tile')).toHaveCount(2);
+  await expectStopped(page);
+  expect(await savedMoves(other)).toBe(2);
+});
+
+// The claims themselves, sent from another page of the site: of two claims
+// with the same time the tab id decides, and a tab holding the newer claim
+// answers an older one with its own.
+test('crossing claims: the newer wins, the tab id breaking a tie', async ({ page, context }) => {
+  await page.goto('./?seed=31&turns=18');
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
+  const key = `/api/sessions/${encodeURIComponent(new URL(page.url()).searchParams.get('session')!)}`;
+  type Claim = { key: string; tab: string; at: number; stopped?: true };
+  const mine = await page.evaluate((k) => (JSON.parse(localStorage.getItem('mhj-dojo.tabs')!) as Record<string, Claim>)[k], key);
+  expect(mine.tab).toBeTruthy();
+
+  const helper = await context.newPage();
+  await helper.goto('./icon.svg');
+  const post = (m: Claim) =>
+    helper.evaluate(
+      (m) =>
+        new Promise<Claim[]>((resolve) => {
+          const ch = new BroadcastChannel('mhj-dojo.tabs');
+          const got: Claim[] = [];
+          ch.onmessage = (e) => got.push(e.data as Claim);
+          ch.postMessage(m);
+          setTimeout(() => {
+            ch.close();
+            resolve(got);
+          }, 300);
+        }),
+      m,
+    );
+
+  // Older (the same time, a lower tab id): A answers with its own claim.
+  expect(await post({ key, tab: '', at: mine.at })).toEqual([mine]);
+  await expect(stoppedDialog(page)).toHaveCount(0);
+  // Newer (the same time, a higher tab id): A stops, and says so.
+  expect(await post({ key, tab: '~', at: mine.at })).toEqual([{ ...mine, stopped: true }]);
+  await expectStopped(page);
 });
 
 // Seed 2's best-advice line: eleven discards, then tsumo on the twelfth draw.
