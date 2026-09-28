@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.0928.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0928.0...v2026.0928.1) - 2026-09-28
+
+### 新機能
+- CPU 対戦: スマホでヘッダ・CPU の牌・局の動きをコンパクトに by @litencatt in https://github.com/litencatt/mhj-dojo/pull/134
+
 ## [v2026.0928.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.9...v2026.0928.0) - 2026-09-28
 
 ### 修正
