@@ -2300,8 +2300,8 @@ section {
     display: inline-flex;
     align-items: center;
     min-height: 32px;
-    /* Reaches into the center's padding and gap, not growing its row. */
-    margin: -6px 0 -6px 10px;
+    /* Reaches up into the center's padding, not down over the log. */
+    margin: -6px 0 0 10px;
     padding: 2px 10px;
     border: 1px solid var(--border);
     border-radius: 6px;

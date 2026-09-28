@@ -342,11 +342,19 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
   await expectShown(true);
   expect((await toggle.getAttribute('aria-controls'))!.split(' ').sort()).toEqual(['river-left', 'river-right', 'river-top']);
   expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+  // It sits in the round's row, clear of the log of moves under it.
+  const clearOfLog = async () => {
+    const t = (await toggle.boundingBox())!;
+    const log = (await page.getByRole('list', { name: 'この局の動き' }).boundingBox())!;
+    expect(t.y + t.height).toBeLessThanOrEqual(log.y);
+  };
+  await clearOfLog();
   const yakuTop = async () => (await page.locator('.area-yaku').boundingBox())!.y;
   const before = await yakuTop();
 
   await toggle.click();
   await expectShown(false);
+  await clearOfLog();
   // The table got shorter, and the yaku panel starts higher.
   await expect.poll(yakuTop).toBeLessThan(before - 20);
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
