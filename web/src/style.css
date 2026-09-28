@@ -1407,6 +1407,10 @@ section {
   min-width: 2.5em;
   color: var(--muted);
 }
+.event-tiles {
+  display: inline-flex;
+  gap: 4px;
+}
 .seat-box {
   padding: 6px;
   border: 1px solid var(--border);
@@ -2220,10 +2224,7 @@ section {
   /* The seats' tiles (rivers, melds and revealed hands) at 15px, and the
      rivers wrapping at the seat's width instead of six to a row, so each
      seat takes two or three rows less. A revealed hand still shrinks to fit
-     its 14 tiles on one row. The log of moves: three and a half rows. */
-  .event-log {
-    max-height: 90px;
-  }
+     its 14 tiles on one row. */
   .seat-box {
     container-type: inline-size;
   }
@@ -2257,6 +2258,58 @@ section {
   .seat-box .meld-called.meld-added .tile-xs {
     transform: rotate(90deg);
     margin: -2.5px 2.5px;
+  }
+
+  /* The log of moves runs sideways in one row, scrolled to the newest at
+     the right end (GameTable): each move its seat over its tile, a plain
+     discard's 打 read out only, so a call, riichi or win (its word in the
+     accent colour) stands out. */
+  .event-log {
+    align-self: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
+    max-height: none;
+    padding: 0 2px 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .table-center {
+    min-width: 0;
+  }
+  .event-log li {
+    position: relative; /* holds the read-out-only 打 (below) */
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: 2px;
+    row-gap: 1px;
+  }
+  .event-seat,
+  .event-verb {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .event-seat {
+    min-width: 0;
+  }
+  .event-verb:not(.event-verb-discard) {
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .event-verb-discard {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .event-tiles {
+    grid-column: 1 / -1;
+    gap: 1px;
   }
 }
 /* The narrowest phones: a tighter seat head, so the count still fits beside

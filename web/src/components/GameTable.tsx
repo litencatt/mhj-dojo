@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import type { AbortReason, GameEvent, GameLength, GameState, RiverTile, Seat, Tile as TileT } from '../api';
 import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
@@ -49,11 +49,25 @@ export interface GameTableProps {
 export function GameTable({ state, log = state.events, highlight, playing = false }: GameTableProps) {
   const at = (rel: number) => state.seats[(state.you + rel) % 4];
   const logRef = useRef<HTMLOListElement>(null);
-  // The newest move stays in sight: the log scrolls to its end as moves land.
+  // The newest move stays in sight: the log scrolls to its end as moves land
+  // (its bottom, or on a phone, where it runs sideways, its right end).
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      el.scrollLeft = el.scrollWidth;
+    }
   }, [log.length]);
+  // A phone turned on its side keeps the newest in sight too.
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el || typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(() => {
+      el.scrollLeft = el.scrollWidth;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <section class="game-table" aria-label="卓" data-playing={playing ? 'true' : 'false'}>
       <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} />
@@ -69,9 +83,13 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
           {log.map((e, i) => (
             <li key={i}>
               <span class="event-seat">{seatLabel(e.seat, state.you)}</span>
-              {EVENT_VERB[e.type]}
-              {e.tiles?.map((t, j) => <Tile key={j} tile={t} size="xs" />)}
-              {e.tile && <Tile tile={e.tile} size="xs" />}
+              <span class={e.type === 'discard' ? 'event-verb event-verb-discard' : 'event-verb'}>{EVENT_VERB[e.type]}</span>
+              {(e.tiles || e.tile) && (
+                <span class="event-tiles">
+                  {e.tiles?.map((t, j) => <Tile key={j} tile={t} size="xs" />)}
+                  {e.tile && <Tile tile={e.tile} size="xs" />}
+                </span>
+              )}
             </li>
           ))}
         </ol>

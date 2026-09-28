@@ -103,6 +103,24 @@ async function playToResult(page: Page, maxSteps = 150) {
   throw new Error(`round did not reach a result panel within ${maxSteps} steps`);
 }
 
+/** On a phone the round's moves run in one row, about a tile tall, scrolled
+ * to the newest at the right end, and inside the page's width. */
+async function expectPhoneLog(page: Page) {
+  const log = page.getByRole('list', { name: 'この局の動き' });
+  const box = (await log.boundingBox())!;
+  expect(box.height).toBeLessThanOrEqual(48);
+  const tops = await log.locator('li').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(tops.length).toBeGreaterThan(1);
+  expect(new Set(tops).size).toBe(1);
+  await expect
+    .poll(() => log.evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft))
+    .toBeLessThanOrEqual(1);
+  const last = (await log.locator('li').last().boundingBox())!;
+  expect(last.x + last.width).toBeLessThanOrEqual(box.x + box.width + 1);
+  expect(last.x).toBeGreaterThanOrEqual(box.x - 1);
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+}
+
 test('a CPU game: pon offer, round result, next round, and a mobile viewport', async ({ page }) => {
   // It plays a whole round: about 17s locally, but over 30s on a busy CI runner.
   test.setTimeout(60_000);
@@ -173,12 +191,8 @@ for (const width of [360, 390]) {
     for (const seat of ['.seat-top', '.seat-left', '.seat-right']) {
       await expect(page.locator(`${seat} .seat-hand-count`)).toBeVisible();
     }
-    // The round's moves so far scroll in a short box, the newest in sight.
-    const log = page.locator('.event-log');
-    expect((await log.boundingBox())!.height).toBeLessThanOrEqual(90);
-    await expect
-      .poll(() => log.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
-      .toBeLessThanOrEqual(1);
+    // The round's moves so far run sideways in one short row, the newest in sight.
+    await expectPhoneLog(page);
 
     // After the pon, the hand is still one row and the meld sits below it.
     await clickAndWait(page, page.locator('.action-bar').getByRole('button', { name: 'ポン', exact: true }));
@@ -277,7 +291,9 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
 
 // At a round's end, on a phone upright or on its side, every CPU seat's
 // revealed hand, melds and river fit the seat: the rivers wrap at the seat's
-// width (more than six to a row) in 15px tiles.
+// width (more than six to a row) in 15px tiles. The log of moves stays one
+// row with the newest (the win) in sight, its word shown where a plain
+// discard's 打 is only read out.
 test('a phone fits the revealed hands and the rivers in their seats', async ({ page }) => {
   // It plays a whole round.
   test.setTimeout(60_000);
@@ -314,7 +330,15 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
       .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
     expect(tops.length).toBeGreaterThan(6);
     expect(tops.filter((t) => t === tops[0]).length).toBeGreaterThan(6);
+    await expectPhoneLog(page);
   }
+  const entries = page.getByRole('list', { name: 'この局の動き' }).getByRole('listitem');
+  const win = entries.last().locator('.event-verb');
+  await expect(win).toHaveText(/^(ツモ|ロン)$/);
+  await expect(win).toBeVisible();
+  const discard = entries.filter({ has: page.locator('.event-verb-discard') }).first();
+  await expect(discard).toHaveText(/^(自分|下家|対面|上家)打/);
+  expect((await discard.locator('.event-verb').boundingBox())!.width).toBeLessThanOrEqual(1);
 });
 
 // A desktop keeps the new-game options in the header, and the rivers at six
@@ -329,6 +353,11 @@ test('a desktop keeps the header options and six-tile rivers', async ({ page }) 
   expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
   await expect(page.locator('.dora-indicators .tile').first()).toHaveCSS('width', '26px');
   await expect(page.locator('.seat-box .tile-xs').first()).toHaveCSS('width', '18px');
+  // The log of moves: one move to a row.
+  const tops = await page
+    .locator('.event-log li')
+    .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(new Set(tops).size).toBe(tops.length);
 });
 
 test('game options from the URL: first dealer you and a weak CPU survive a reload', async ({ page }) => {
