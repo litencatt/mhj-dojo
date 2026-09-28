@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2026.0928.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.9...v2026.0928.0) - 2026-09-28
+
+### 修正
+- E2E: アドバイスのテストでリクエストを数え始める時点を修正（不安定な失敗の修正） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/130
+### CI・リポジトリ
+- dependabot の対象に web の npm パッケージを追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/129
+### 依存関係
+- Bump vite from 8.3.0 to 8.3.1 in /web in the web-minor group by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/132
+
 ## [v2026.0927.9](https://github.com/litencatt/mhj-dojo/compare/v2026.0927.8...v2026.0927.9) - 2026-09-27
 
 ### 修正
