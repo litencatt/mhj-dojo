@@ -201,6 +201,10 @@ h2 {
   font-size: 0.75rem;
   color: var(--muted);
 }
+/* The CPU game's 「設定」, folding the new-game options away: phones only. */
+.options-toggle {
+  display: none;
+}
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
   background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
@@ -1763,14 +1767,24 @@ section {
   }
   .app-header h1 {
     font-size: 1.1rem;
+    white-space: nowrap;
   }
   .mode-link {
     display: inline-block;
     margin-left: 6px;
     padding: 4px 0;
   }
+  /* Always beside the title: the version gives way (cut short) first. */
   .header-meta {
+    flex: 1 1 0;
+    justify-content: flex-end;
+    min-width: 0;
     margin-left: auto;
+  }
+  .version-tag {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .help-button {
     width: 38px;
@@ -1799,37 +1813,30 @@ section {
     padding: 6px 12px;
     font-size: 0.9rem;
   }
-  /* The dora sit right after 残り牌 as two more status items: no box, short
-     labels, and just the arrow between indicator and dora (the tile's label
-     names it). */
-  .header-status {
-    gap: 8px 10px;
+  /* CPU game: the new-game options fold away under the status once a game
+     is on, 「設定」 at the end of the dora row opening them there. */
+  .new-game-options {
+    order: 1;
   }
-  .game-status {
-    gap: 4px 10px;
-  }
-  .dora-box {
-    margin-left: 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    gap: 4px 10px;
-  }
-  .dora-indicators {
-    gap: 2px;
-  }
-  .dora-label {
+  .new-game-options-closed {
     display: none;
   }
-  /* Just ドラ / 裏ドラ over the tiles; 表示牌 is still read out. */
-  .dora-dt-rest {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+  .options-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    margin-left: auto;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .options-toggle[aria-expanded="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
@@ -2082,24 +2089,13 @@ section {
     display: none;
   }
 
-  /* CPU game: the opponents' revealed hands shrink to one row in their seat,
-     and the log of moves to three and a half rows. */
+  /* CPU game: a tighter table (its seats' tiles and log below). */
   .game-table {
     gap: 4px;
     padding: 6px;
   }
-  .event-log {
-    max-height: 90px;
-  }
   .seat-box {
     padding: 5px;
-    container-type: inline-size;
-  }
-  .seat-hand .tile-xs {
-    width: min(18px, calc((100cqw - 13px) / 14));
-    height: auto;
-    aspect-ratio: 3 / 4;
-    padding: 0.5px;
   }
   .action-bar {
     gap: 8px;
@@ -2163,6 +2159,104 @@ section {
   }
   .seat-hand-hidden .seat-hand-count {
     display: inline-flex;
+  }
+
+  /* The header's status: each label beside its value (the obvious ones,
+     局 and 対局, read out only), and the dora right after them as two more
+     items: no box, short labels, smaller tiles, and just the arrow between
+     indicator and dora (the tile's label names it). */
+  .header-status {
+    gap: 4px 12px;
+    padding-top: 6px;
+  }
+  .game-status {
+    gap: 2px 10px;
+  }
+  .game-status > div {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 3px;
+  }
+  .game-status dd {
+    font-size: 0.85rem;
+  }
+  .dora-box {
+    margin-left: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    gap: 4px 12px;
+  }
+  .dora-box > div {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+  .dora-indicators {
+    gap: 2px;
+  }
+  .dora-indicators .tile-sm {
+    width: 18px;
+    height: 24px;
+    padding: 1px;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--tile-back);
+  }
+  .dora-label {
+    display: none;
+  }
+  /* Just ドラ / 裏ドラ beside the tiles; 表示牌 is still read out. */
+  .status-dt-obvious,
+  .dora-dt-rest {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  /* The seats' tiles (rivers, melds and revealed hands) at 15px, and the
+     rivers wrapping at the seat's width instead of six to a row, so each
+     seat takes two or three rows less. A revealed hand still shrinks to fit
+     its 14 tiles on one row. The log of moves: three and a half rows. */
+  .event-log {
+    max-height: 90px;
+  }
+  .seat-box {
+    container-type: inline-size;
+  }
+  .seat-box .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
+  .seat-hand .tile-xs {
+    width: min(15px, calc((100cqw - 13px) / 14));
+    height: auto;
+    aspect-ratio: 3 / 4;
+  }
+  .seat-river {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    min-height: 20px;
+  }
+  .river-riichi .tile {
+    margin: 0 2.5px;
+  }
+  .seat-box .melds {
+    gap: 3px 6px;
+  }
+  .seat-box .meld-called .tile-xs {
+    transform: translateY(2.5px) rotate(90deg);
+    margin: 0 2.5px;
+  }
+  .seat-box .meld-called.meld-added .tile-xs {
+    transform: rotate(90deg);
+    margin: -2.5px 2.5px;
   }
 }
 /* The narrowest phones: a tighter seat head, so the count still fits beside

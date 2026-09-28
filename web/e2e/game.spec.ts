@@ -241,6 +241,96 @@ test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
   await expect(hand.locator('.seat-hand-backs .tile').first()).toBeVisible();
 });
 
+// On a phone the header is short: the new-game options fold behind 「設定」,
+// the status is one or two dense lines and the dora tiles are small.
+for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390, 844, 130]]) {
+  test(`a ${width}px-wide phone folds the new-game options behind 設定`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    const header = page.locator('.app-header');
+    const form = page.locator('.new-game-form');
+    const toggle = page.getByRole('button', { name: /^設定/ });
+    await expect(form).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect((await header.boundingBox())!.height).toBeLessThanOrEqual(maxHeader);
+    // The status stays in view, and 設定 is easy to tap.
+    await expect(page.locator('.game-status')).toBeVisible();
+    await expect(page.locator('.dora-box')).toBeVisible();
+    expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    expect((await page.locator('.dora-indicators .tile').first().boundingBox())!.height).toBeLessThanOrEqual(24);
+
+    // Open: the options under the status, 新規対局 still a big button.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(form).toBeVisible();
+    await expect(form.getByRole('combobox')).toHaveCount(3);
+    expect((await form.boundingBox())!.y).toBeGreaterThan((await toggle.boundingBox())!.y);
+    expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    ).toBeLessThanOrEqual(0);
+    await toggle.click();
+    await expect(form).toBeHidden();
+  });
+}
+
+// At a round's end, on a phone upright or on its side, every CPU seat's
+// revealed hand, melds and river fit the seat: the rivers wrap at the seat's
+// width (more than six to a row) in 15px tiles.
+test('a phone fits the revealed hands and the rivers in their seats', async ({ page }) => {
+  // It plays a whole round.
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await playToResult(page);
+  const seats = ['.seat-top', '.seat-left', '.seat-right', '.seat-bottom'];
+  for (const [width, height] of [[390, 844], [360, 800], [320, 640], [844, 390]]) {
+    await page.setViewportSize({ width, height });
+    for (const seat of seats.slice(0, 3)) {
+      await expect(page.locator(`${seat} .seat-hand[aria-label="手牌"]`)).toBeVisible();
+    }
+    const outside = await page.evaluate((sel) => {
+      const out: string[] = [];
+      for (const s of sel) {
+        const box = document.querySelector(s)!.getBoundingClientRect();
+        for (const el of document.querySelectorAll(`${s} .seat-hand, ${s} .melds, ${s} .seat-river, ${s} .tile`)) {
+          const r = el.getBoundingClientRect();
+          if (r.left < box.left - 0.5 || r.right > box.right + 0.5) out.push(`${s} ${el.className}`);
+        }
+      }
+      return out;
+    }, seats);
+    expect(outside, `${width}x${height}`).toEqual([]);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    ).toBeLessThanOrEqual(0);
+    const river = page.locator('.seat-top .seat-river');
+    const tile = river.locator('.river-tile:not(.river-riichi) .tile').first();
+    expect((await tile.boundingBox())!.width).toBeLessThanOrEqual(15);
+    // The first row holds more than a desktop's six tiles.
+    const tops = await river
+      .locator('.river-tile')
+      .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(tops.length).toBeGreaterThan(6);
+    expect(tops.filter((t) => t === tops[0]).length).toBeGreaterThan(6);
+  }
+});
+
+// A desktop keeps the new-game options in the header, and the rivers at six
+// 18px tiles to a row.
+test('a desktop keeps the header options and six-tile rivers', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  await expect(page.locator('.new-game-form')).toBeVisible();
+  await expect(page.locator('.options-toggle')).toBeHidden();
+  const river = page.locator('.seat-river').first();
+  expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
+  await expect(page.locator('.dora-indicators .tile').first()).toHaveCSS('width', '26px');
+  await expect(page.locator('.seat-box .tile-xs').first()).toHaveCSS('width', '18px');
+});
+
 test('game options from the URL: first dealer you and a weak CPU survive a reload', async ({ page }) => {
   await page.goto(`/?mode=game&seed=${SEED}&first_dealer=you&cpu=weak`);
   await waitForPlayback(page);
