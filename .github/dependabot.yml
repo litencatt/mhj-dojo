@@ -4,3 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # The web frontend (Vite, Preact, Playwright, TypeScript). Minor and patch
+  # updates come as one grouped PR a week; a major update gets its own PR.
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      web-minor:
+        update-types:
+          - "minor"
+          - "patch"

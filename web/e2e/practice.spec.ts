@@ -420,6 +420,9 @@ async function fullState(page: Page) {
 // same as if they had been there all along.
 test('advice: left out while minimized, filled in (the review too) when the panel opens', async ({ page }) => {
   await page.goto('/?seed=3&turns=18');
+  // The session is created after the page loads: count only what follows it.
+  await expect(page).toHaveURL(/[?&]session=/);
+  await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeEnabled();
   const sent: string[] = [];
   page.on('request', (req) => {
     if (req.url().includes('/api/sessions')) sent.push(`${req.method()} ${new URL(req.url()).pathname}${new URL(req.url()).search}`);
