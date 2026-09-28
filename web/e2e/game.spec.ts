@@ -245,6 +245,79 @@ for (const [width, height] of [[320, 640], [390, 844], [844, 390]]) {
   });
 }
 
+/** The yaku panel's own scroller, and the page's sideways overflow. */
+function yakuScroller(page: Page) {
+  return page.getByRole('region', { name: '役別向聴テーブル' });
+}
+async function pageOverflowX(page: Page) {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
+
+// On a phone, as in practice, the yaku panel fills the screen under the
+// header, the table and the hand, and scrolls on its own: the page stays put
+// (or scrolls a little, the table and the hand then pinned to the top), so
+// the hand stays in sight and nothing covers the panel.
+for (const [width, height] of [[390, 844], [360, 800]]) {
+  test(`a ${width}x${height} phone scrolls the yaku panel on its own, the hand staying in sight`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    const hand = handPanel(page);
+    const yaku = yakuScroller(page);
+    await expect(hand).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.app')).toHaveAttribute('data-hand-fits', 'true');
+    const panel = (await yaku.boundingBox())!;
+    expect(panel.height).toBeGreaterThanOrEqual(199);
+    expect(await yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+    // A wheel over the panel scrolls the panel, not the page.
+    await page.mouse.move(panel.x + panel.width / 2, panel.y + 40);
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => yaku.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    await expect(hand).toBeInViewport({ ratio: 1 });
+
+    // Scrolled to the page's end, the table and the hand stay pinned, clear
+    // of the panel, which still reaches the dock bar.
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(hand).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.game-table')).toBeInViewport({ ratio: 1 });
+    const area = (await page.locator('.area-hand').boundingBox())!;
+    const after = (await page.locator('.area-yaku').boundingBox())!;
+    expect(area.y + area.height).toBeLessThanOrEqual(after.y + 1);
+    expect(after.y + after.height).toBeLessThanOrEqual(height);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  });
+}
+
+// A screen too short for the table, the hand and the panel together doesn't
+// pin them, which would cover the panel: early in the round (short rivers)
+// they fit and are pinned, later the page scrolls instead. Either way the
+// panel scrolls on its own and, at the page's end, is in full view.
+test('a 320x640 phone pins the hand only while it leaves the yaku panel room', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const app = page.locator('.app');
+  const yaku = yakuScroller(page);
+  const check = async (fits: 'true' | 'false') => {
+    await waitForPlayback(page);
+    await expect(app).toHaveAttribute('data-hand-fits', fits);
+    await expect(page.locator('.area-hand')).toHaveCSS('position', fits === 'true' ? 'sticky' : 'static');
+    expect(await yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(yaku).toBeInViewport({ ratio: 1 });
+    const area = (await page.locator('.area-hand').boundingBox())!;
+    const panel = (await page.locator('.area-yaku').boundingBox())!;
+    expect(area.y + area.height).toBeLessThanOrEqual(panel.y + 1);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+    await page.evaluate(() => window.scrollTo(0, 0));
+  };
+  await check('true');
+  // A few turns fill the rivers: the table outgrows the room.
+  for (let i = 0; i < 8; i++) await playOneStep(page);
+  await check('false');
+});
+
 // A desktop keeps the row of backs.
 test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
   await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
@@ -253,6 +326,8 @@ test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
   await expect(hand.locator('.seat-hand-count')).toBeHidden();
   await expect(hand.locator('.seat-hand-backs .tile')).not.toHaveCount(0);
   await expect(hand.locator('.seat-hand-backs .tile').first()).toBeVisible();
+  // Nothing pinned: the columns scroll as before.
+  await expect(page.locator('.area-hand')).toHaveCSS('position', 'static');
 });
 
 // On a phone the header is short: the new-game options fold behind 「設定」,

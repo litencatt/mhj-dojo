@@ -183,6 +183,44 @@ export function useLastAnalysis(analysis: YakuRow[] | undefined): YakuRow[] {
   return analysis && analysis.length > 0 ? analysis : last.current;
 }
 
+// The yaku panel's least height on a phone (style.css).
+const YAKU_MIN_HEIGHT = 200;
+
+/**
+ * On a phone the yaku panel fills the height left under the header and the
+ * hand (style.css): this keeps --yaku-top, where the panel starts on the
+ * page, on the returned app element, and data-hand-fits: whether the hand
+ * (in a CPU game, with the table) and the shortest panel fit the screen
+ * together, so the hand can stick to the top without covering the panel.
+ */
+export function useYakuTop(hasState: boolean) {
+  const appRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    // The panels above the yaku table change the app's height when they
+    // change, and so does a new window width. The hand's own height (a CPU
+    // game's table grows as the rivers fill) may not change the app's.
+    const ro = new ResizeObserver(() => {
+      const yaku = app.querySelector('.area-yaku');
+      if (!yaku) return;
+      const top = `${yaku.getBoundingClientRect().top + window.scrollY}px`;
+      // A write, even of the same value, may restyle the whole app.
+      if (app.style.getPropertyValue('--yaku-top') !== top) app.style.setProperty('--yaku-top', top);
+      const hand = app.querySelector<HTMLElement>('.area-hand');
+      if (!hand) return;
+      const bottom = parseFloat(getComputedStyle(app).getPropertyValue('--yaku-bottom')) || 0;
+      const fits = String(hand.offsetHeight + YAKU_MIN_HEIGHT + bottom <= window.innerHeight);
+      if (app.dataset.handFits !== fits) app.dataset.handFits = fits;
+    });
+    ro.observe(app);
+    const hand = app.querySelector('.area-hand');
+    if (hand) ro.observe(hand);
+    return () => ro.disconnect();
+  }, [hasState]);
+  return appRef;
+}
+
 export function useRowNames(analysis: YakuRow[] | undefined) {
   return useMemo(() => {
     const map: Record<string, string> = {};
