@@ -68,6 +68,35 @@ export function useMinimized() {
   return { minimized, isMin, minimize, restore };
 }
 
+const RIVERS_KEY = 'mhj-dojo.rivers.v1';
+
+function loadRiversShown(): boolean {
+  try {
+    return localStorage.getItem(RIVERS_KEY) !== 'hidden';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Whether the CPU game shows the other seats' rivers (a phone can fold them
+ * away, GameTable), kept in localStorage; shown by default.
+ */
+export function useRiversShown() {
+  const [shown, setShown] = useState(loadRiversShown);
+  const toggle = useCallback(() => {
+    setShown((prev) => {
+      try {
+        localStorage.setItem(RIVERS_KEY, prev ? 'hidden' : 'shown');
+      } catch {
+        // Storage unavailable: the choice just won't persist.
+      }
+      return !prev;
+    });
+  }, []);
+  return { shown, toggle };
+}
+
 /**
  * In the one-column layout (up to 1100px wide, e.g. a phone) a restored panel
  * lands somewhere down the page: scroll it into view once it has rendered.

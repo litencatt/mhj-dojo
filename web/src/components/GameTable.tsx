@@ -4,6 +4,7 @@ import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
+import { useRiversShown } from '../panels';
 
 export const WIND_NAMES: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
 const RELATIVE = ['自分', '下家', '対面', '上家'];
@@ -49,6 +50,7 @@ export interface GameTableProps {
 export function GameTable({ state, log = state.events, highlight, playing = false }: GameTableProps) {
   const at = (rel: number) => state.seats[(state.you + rel) % 4];
   const logRef = useRef<HTMLOListElement>(null);
+  const rivers = useRiversShown();
   // The newest move stays in sight: the log scrolls to its end as moves land
   // (its bottom, or on a phone, where it runs sideways, its right end).
   useLayoutEffect(() => {
@@ -69,13 +71,28 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
     return () => ro.disconnect();
   }, []);
   return (
-    <section class="game-table" aria-label="卓" data-playing={playing ? 'true' : 'false'}>
-      <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} />
-      <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} />
+    <section
+      class="game-table"
+      aria-label="卓"
+      data-playing={playing ? 'true' : 'false'}
+      data-rivers={rivers.shown ? 'shown' : 'hidden'}
+    >
+      <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} riverId="river-top" />
+      <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} riverId="river-left" />
       <div class="table-center">
         <div class="table-round">
           {roundName(state.round_wind, state.round_number, state.honba)}
           <span class="table-remaining">残り {state.wall_remaining}</span>
+          {/* Phones only (style.css): the other seats' rivers fold away. */}
+          <button
+            type="button"
+            class="rivers-toggle"
+            aria-expanded={rivers.shown}
+            aria-controls="river-top river-left river-right"
+            onClick={rivers.toggle}
+          >
+            捨て牌<span aria-hidden="true">{rivers.shown ? ' ▴' : ' ▾'}</span>
+          </button>
         </div>
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
         {/* Focusable so a keyboard can scroll it too. */}
@@ -94,7 +111,7 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
           ))}
         </ol>
       </div>
-      <SeatBox className="seat-right" seat={at(1)} state={state} highlight={highlight} playing={playing} />
+      <SeatBox className="seat-right" seat={at(1)} state={state} highlight={highlight} playing={playing} riverId="river-right" />
       <SeatBox className="seat-bottom" seat={at(0)} state={state} highlight={highlight} playing={playing} />
     </section>
   );
@@ -106,9 +123,10 @@ interface SeatBoxProps {
   state: GameState;
   highlight?: PlaybackHighlight | null;
   playing: boolean;
+  riverId?: string; // a CPU seat's river, which the rivers toggle controls
 }
 
-function SeatBox({ className, seat, state, highlight, playing }: SeatBoxProps) {
+function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBoxProps) {
   const you = seat.seat === state.you;
   // state.actor is who acts once the (possibly still-playing-back) events
   // have all landed: showing it mid-playback would point at the wrong seat.
@@ -146,7 +164,7 @@ function SeatBox({ className, seat, state, highlight, playing }: SeatBoxProps) {
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />
-      <div class="seat-river" aria-label="捨て牌">
+      <div id={riverId} class="seat-river" aria-label="捨て牌">
         {seat.river.map((r, i) => (
           <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
             <Tile
