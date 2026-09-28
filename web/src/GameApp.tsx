@@ -59,6 +59,8 @@ export function GameApp() {
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
+  // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
@@ -128,6 +130,7 @@ export function GameApp() {
 
   function handleNewGame(e: Event) {
     e.preventDefault();
+    setOptionsOpen(false);
     void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
@@ -188,7 +191,11 @@ export function GameApp() {
                 }}
               />
             </div>
-            <form class="new-game-form" onSubmit={handleNewGame}>
+            <form
+              id="new-game-options"
+              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
+              onSubmit={handleNewGame}
+            >
               <label>
                 対局
                 <select value={optionsInput.length} onChange={setOption('length')}>
@@ -229,7 +236,7 @@ export function GameApp() {
                     <dd>{state.seed ?? '終局後に表示'}</dd>
                   </div>
                   <div>
-                    <dt>対局</dt>
+                    <dt class="status-dt-obvious">対局</dt>
                     <dd>{LENGTH_NAMES[state.length]}</dd>
                   </div>
                   <div>
@@ -237,7 +244,7 @@ export function GameApp() {
                     <dd>{CPU_NAMES[state.cpu]}</dd>
                   </div>
                   <div>
-                    <dt>局</dt>
+                    <dt class="status-dt-obvious">局</dt>
                     <dd>
                       {WIND_NAMES[state.round_wind]}
                       {state.round_number}局 {state.honba}本場
@@ -254,6 +261,15 @@ export function GameApp() {
                   uraDoraIndicators={table.ura_dora_indicators}
                   uraDora={table.ura_dora}
                 />
+                <button
+                  type="button"
+                  class="options-toggle"
+                  aria-expanded={optionsOpen}
+                  aria-controls="new-game-options"
+                  onClick={() => setOptionsOpen((open) => !open)}
+                >
+                  設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
+                </button>
               </div>
             )}
           </header>
