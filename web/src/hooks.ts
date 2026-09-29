@@ -37,8 +37,9 @@ export function useSerialRequest<T>(
 
   const inFlight = useRef(false);
 
-  async function request(fn: () => Promise<T>) {
-    if (inFlight.current) return;
+  // Resolves to whether fn's own state was shown (not dropped, and not failed).
+  async function request(fn: () => Promise<T>): Promise<boolean> {
+    if (inFlight.current) return false;
     inFlight.current = true;
     setBusy(true);
     setError(null);
@@ -47,6 +48,7 @@ export function useSerialRequest<T>(
       const next = await fn();
       last.current = next;
       onSuccess(next);
+      return true;
     } catch (err) {
       if (refetch && movedOn && last.current !== null && err instanceof api.ApiError && err.status === 409) {
         try {
@@ -64,6 +66,7 @@ export function useSerialRequest<T>(
       } else {
         setError(errorMessage(err));
       }
+      return false;
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -113,7 +116,7 @@ export function gameMovedOn(prev: GameState, next: GameState): boolean {
 
 export interface UrlResumeOptions<T> {
   idKey: string; // the query key holding the server-side id
-  request: (fn: () => Promise<T>) => Promise<void>;
+  request: (fn: () => Promise<T>) => Promise<unknown>;
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
   sync: Record<string, string | null> | null; // params to write back; null deletes the key

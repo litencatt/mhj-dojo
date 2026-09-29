@@ -205,6 +205,13 @@ h2 {
 .options-toggle {
   display: none;
 }
+/* The CPU game's options come after the status in the page (for a phone's
+   focus order, GameApp) but show on the first row. */
+@media (width > 760px) {
+  .app-game .app-header > .header-status {
+    order: 1;
+  }
+}
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
   background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
@@ -1829,9 +1836,6 @@ section {
   }
   /* CPU game: the new-game options fold away under the status once a game
      is on, 「設定」 at the end of the dora row opening them there. */
-  .new-game-options {
-    order: 1;
-  }
   .new-game-options-closed {
     display: none;
   }

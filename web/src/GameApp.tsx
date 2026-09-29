@@ -67,6 +67,11 @@ export function GameApp() {
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  // The game shown: a new one (from the form, the final panel or the URL)
+  // folds the options away.
+  const shownGame = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const phone = useMediaQuery(PHONE);
   // The first state may be a resumed game: its options fill the selects.
@@ -76,6 +81,10 @@ export function GameApp() {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
         setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
+      }
+      if (shownGame.current !== next.game_id) {
+        shownGame.current = next.game_id;
+        setOptionsOpen(false);
       }
       setState(next);
       setPreviewTile(null);
@@ -135,10 +144,17 @@ export function GameApp() {
     void request(() => api.gameAction(state.game_id, type, tile, tiles));
   }
 
-  function handleNewGame(e: Event) {
+  // The options stay open until the new game is on (a failed request keeps
+  // them, as chosen); then, if they were submitted from the keyboard, focus
+  // goes back to 設定 instead of dropping to the page once they fold away.
+  async function handleNewGame(e: Event) {
     e.preventDefault();
-    setOptionsOpen(false);
-    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    const fromForm = !!formRef.current?.contains(document.activeElement);
+    const started = await startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    const toggle = toggleRef.current;
+    if (!started || !toggle || toggle.offsetParent === null) return;
+    const active = document.activeElement;
+    if (fromForm || active === document.body || formRef.current?.contains(active)) toggle.focus();
   }
 
   // After a call the analysis is empty; the chart keeps the rows from before.
@@ -205,43 +221,6 @@ export function GameApp() {
                 }
               />
             </div>
-            <form
-              id="new-game-options"
-              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
-              onSubmit={handleNewGame}
-            >
-              <label>
-                対局
-                <select value={optionsInput.length} onChange={setOption('length')}>
-                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-                </select>
-              </label>
-              <label>
-                起家
-                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-                  <option value="random">{DEALER_NAMES.random}</option>
-                  <option value="you">{DEALER_NAMES.you}</option>
-                </select>
-              </label>
-              <label>
-                CPU
-                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-                  <option value="weak">{CPU_NAMES.weak}</option>
-                  <option value="normal">{CPU_NAMES.normal}</option>
-                </select>
-              </label>
-              <label>
-                シード
-                <input
-                  type="number"
-                  value={seedInput}
-                  placeholder="ランダム"
-                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              <button type="submit" disabled={busy}>新規対局</button>
-            </form>
             {state && table && (
               <div class="header-status">
                 <dl class="game-status">
@@ -279,6 +258,7 @@ export function GameApp() {
                   uraDora={table.ura_dora}
                 />
                 <button
+                  ref={toggleRef}
                   type="button"
                   class="options-toggle"
                   aria-expanded={optionsOpen}
@@ -289,6 +269,54 @@ export function GameApp() {
                 </button>
               </div>
             )}
+            {/* After the status, so that on a phone Tab goes from 設定 into
+                the options it opens; a desktop shows them on the first row
+                (style.css). */}
+            <form
+              id="new-game-options"
+              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
+              ref={formRef}
+              onSubmit={handleNewGame}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && state && optionsOpen) {
+                  e.preventDefault();
+                  setOptionsOpen(false);
+                  toggleRef.current?.focus();
+                }
+              }}
+            >
+              <label>
+                対局
+                <select value={optionsInput.length} onChange={setOption('length')}>
+                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+                </select>
+              </label>
+              <label>
+                起家
+                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+                  <option value="random">{DEALER_NAMES.random}</option>
+                  <option value="you">{DEALER_NAMES.you}</option>
+                </select>
+              </label>
+              <label>
+                CPU
+                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+                  <option value="weak">{CPU_NAMES.weak}</option>
+                  <option value="normal">{CPU_NAMES.normal}</option>
+                </select>
+              </label>
+              <label>
+                シード
+                <input
+                  type="number"
+                  value={seedInput}
+                  placeholder="ランダム"
+                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <button type="submit" disabled={busy}>新規対局</button>
+            </form>
           </header>
           {error && (
             <div class="error-banner" role="alert">
