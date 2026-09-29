@@ -37,8 +37,9 @@ export function useSerialRequest<T>(
 
   const inFlight = useRef(false);
 
-  async function request(fn: () => Promise<T>) {
-    if (inFlight.current) return;
+  // Resolves to whether fn's own state was shown (not dropped, and not failed).
+  async function request(fn: () => Promise<T>): Promise<boolean> {
+    if (inFlight.current) return false;
     inFlight.current = true;
     setBusy(true);
     setError(null);
@@ -47,6 +48,7 @@ export function useSerialRequest<T>(
       const next = await fn();
       last.current = next;
       onSuccess(next);
+      return true;
     } catch (err) {
       if (refetch && movedOn && last.current !== null && err instanceof api.ApiError && err.status === 409) {
         try {
@@ -64,6 +66,7 @@ export function useSerialRequest<T>(
       } else {
         setError(errorMessage(err));
       }
+      return false;
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -113,7 +116,7 @@ export function gameMovedOn(prev: GameState, next: GameState): boolean {
 
 export interface UrlResumeOptions<T> {
   idKey: string; // the query key holding the server-side id
-  request: (fn: () => Promise<T>) => Promise<void>;
+  request: (fn: () => Promise<T>) => Promise<unknown>;
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
   sync: Record<string, string | null> | null; // params to write back; null deletes the key
@@ -198,10 +201,7 @@ export function useYakuTop(hasState: boolean) {
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
-    // The panels above the yaku table change the app's height when they
-    // change, and so does a new window width. The hand's own height (a CPU
-    // game's table grows as the rivers fill) may not change the app's.
-    const ro = new ResizeObserver(() => {
+    const update = () => {
       const yaku = app.querySelector('.area-yaku');
       if (!yaku) return;
       const top = `${yaku.getBoundingClientRect().top + window.scrollY}px`;
@@ -209,14 +209,41 @@ export function useYakuTop(hasState: boolean) {
       if (app.style.getPropertyValue('--yaku-top') !== top) app.style.setProperty('--yaku-top', top);
       const hand = app.querySelector<HTMLElement>('.area-hand');
       if (!hand) return;
-      const bottom = parseFloat(getComputedStyle(app).getPropertyValue('--yaku-bottom')) || 0;
-      const fits = String(hand.offsetHeight + YAKU_MIN_HEIGHT + bottom <= window.innerHeight);
+      // The pinned hand starts under the top inset, and the panel ends
+      // above the bottom padding (or dock bar) and the bottom inset.
+      const style = getComputedStyle(app);
+      const px = (name: string) => parseFloat(style.getPropertyValue(name)) || 0;
+      const room = window.innerHeight - px('--safe-top') - px('--safe-bottom') - px('--yaku-bottom');
+      const fits = String(hand.offsetHeight + YAKU_MIN_HEIGHT <= room);
       if (app.dataset.handFits !== fits) app.dataset.handFits = fits;
-    });
+    };
+    // The panels above the yaku table change the app's height when they
+    // change, and so does a new window width. The hand's own height (a CPU
+    // game's table grows as the rivers fill) may not change the app's, nor
+    // does a new window height (a phone's URL bar coming and going). Any of
+    // them updates once, on the next frame: writing from a ResizeObserver
+    // callback would resize what it observes within the same frame.
+    let frame = 0;
+    const schedule = () => {
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          update();
+        });
+      }
+    };
+    const ro = new ResizeObserver(schedule);
     ro.observe(app);
     const hand = app.querySelector('.area-hand');
     if (hand) ro.observe(hand);
-    return () => ro.disconnect();
+    window.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('resize', schedule);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', schedule);
+      window.visualViewport?.removeEventListener('resize', schedule);
+      cancelAnimationFrame(frame);
+    };
   }, [hasState]);
   return appRef;
 }

@@ -105,6 +105,15 @@ test('game mode: the header shows the version, and the help links to the glossar
   await expect(glossary.getByRole('searchbox', { name: '用語を検索' })).toBeFocused();
 });
 
+// A phone game has no glossary: the help points to practice mode's instead.
+test('game mode on a phone: the help points to the glossary in practice mode', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?mode=game&seed=1');
+  const dialog = await openHelp(page);
+  await expect(dialog.getByRole('button', { name: '用語表', exact: true })).toHaveCount(0);
+  await expect(dialog.locator('.help-lead')).toContainText('麻雀の用語は練習モードの用語表で調べられます。');
+});
+
 test('the help fits a phone screen and scrolls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?seed=1&turns=18');

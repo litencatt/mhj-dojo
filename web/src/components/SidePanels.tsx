@@ -13,6 +13,7 @@ export interface SidePanelsProps {
   remaining: Remaining;
   previewTile: string | null;
   mode: 'practice' | 'game';
+  glossary?: boolean; // false leaves the glossary out (a CPU game on a phone)
   isMin: (k: PanelKey) => boolean;
   onMinimize: (k: PanelKey) => void; // keeps its identity across renders (useMinimized)
   advice?: ComponentChildren; // the advice panel (practice), above the glossary
@@ -27,6 +28,7 @@ export function SidePanels({
   remaining,
   previewTile,
   mode,
+  glossary = true,
   isMin,
   onMinimize,
   advice,
@@ -35,10 +37,11 @@ export function SidePanels({
   const preview = previewTile ? byDiscard[previewTile] : undefined;
   const previewRows = useMemo(() => preview && withNames(preview, analysis), [preview, analysis]);
   const adviceShown = !!advice && !isMin('advice');
+  const glossHidden = !glossary || isMin('gloss');
   const minimizeYaku = useCallback(() => onMinimize('yaku'), [onMinimize]);
   const minimizeGloss = useCallback(() => onMinimize('gloss'), [onMinimize]);
   return (
-    <div class="area-side" hidden={isMin('yaku') && isMin('gloss') && !adviceShown}>
+    <div class="area-side" hidden={isMin('yaku') && glossHidden && !adviceShown}>
       <div class="area-yaku" hidden={isMin('yaku')}>
         <YakuTable
           rows={previewRows ?? analysis}
@@ -51,15 +54,17 @@ export function SidePanels({
           onMinimize={minimizeYaku}
         />
       </div>
-      <div class="area-notes" hidden={isMin('gloss') && !adviceShown}>
+      <div class="area-notes" hidden={glossHidden && !adviceShown}>
         {advice && (
           <div class="area-advice" hidden={!adviceShown}>
             {advice}
           </div>
         )}
-        <div class="area-gloss" hidden={isMin('gloss')}>
-          <Glossary mode={mode} minimized={isMin('gloss')} onMinimize={minimizeGloss} />
-        </div>
+        {glossary && (
+          <div class="area-gloss" hidden={isMin('gloss')}>
+            <Glossary mode={mode} minimized={isMin('gloss')} onMinimize={minimizeGloss} />
+          </div>
+        )}
       </div>
     </div>
   );
