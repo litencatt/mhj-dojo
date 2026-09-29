@@ -1383,6 +1383,10 @@ section {
 .table-deposit {
   color: var(--muted);
 }
+/* 捨て牌 ▴/▾, folding the other seats' rivers away: phones only. */
+.rivers-toggle {
+  display: none;
+}
 /* The round's moves, scrolled to the newest (GameTable): six and a half
    rows of 24px tiles, the half row a hint that more are above. */
 .event-log {
@@ -1965,23 +1969,29 @@ section {
     width: min(280px, calc(100vw - 16px));
   }
 
-  /* Practice: the yaku panel fills the screen under the header and the hand,
-     down to the bottom padding or dock bar, and scrolls on its own, so the
-     page does not scroll. With more panels open, or on a screen too short
-     for a 200px panel, the page does scroll, and the hand then sticks to the
-     top (not a win, which is too tall to pin).
-     App.tsx sets --yaku-top, where the panel starts on the page. */
-  .app-practice {
+  /* The yaku panel fills the screen under the header and the hand (in a CPU
+     game, the table and the hand), down to the bottom padding or dock bar,
+     and scrolls on its own, so the page does not scroll. With more panels
+     open, or on a screen too short for a 200px panel, the page does scroll,
+     and the hand (with the table) then sticks to the top, once the header
+     has gone by - unless it would cover the panel (on a short screen), or
+     it holds a win or a round's result, which is too tall to pin.
+     useYakuTop (hooks.ts) sets --yaku-top, where the panel starts on the
+     page, and data-hand-fits. */
+  .app-practice,
+  .app-game {
     --yaku-bottom: 32px;
   }
-  .app-practice .area-hand:not(:has(.win-panel)) {
+  .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
+  .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 5;
     background: var(--bg);
     box-shadow: 0 0 0 8px var(--bg);
   }
-  .app-practice .area-yaku {
+  .app-practice .area-yaku,
+  .app-game .area-yaku {
     display: flex;
     flex-direction: column;
     height: max(
@@ -1989,7 +1999,8 @@ section {
       calc(100dvh - var(--yaku-top, 50dvh) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
     );
   }
-  .app-practice .yaku-table-panel {
+  .app-practice .yaku-table-panel,
+  .app-game .yaku-table-panel {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -2035,9 +2046,10 @@ section {
     z-index: 2;
     background: var(--panel-bg);
   }
-  /* In practice the panel is its own scroller: stick to its top edge, over
-     its 10px padding, so no row shows above the header. */
-  .app-practice .yaku-table thead {
+  /* The panel is its own scroller: stick to its top edge, over its 10px
+     padding, so no row shows above the header. */
+  .app-practice .yaku-table thead,
+  .app-game .yaku-table thead {
     top: -10px;
   }
   .yaku-table th,
@@ -2278,6 +2290,38 @@ section {
   .table-center {
     min-width: 0;
   }
+  /* The other seats' rivers can fold away (捨て牌 ▾), leaving each its head,
+     melds and, at a round's end, its revealed hand; your own river stays. */
+  .table-round {
+    display: flex;
+    align-items: center;
+  }
+  .rivers-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    /* Reaches up into the center's padding, not down over the log. */
+    margin: -6px 0 0 10px;
+    padding: 2px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel-bg);
+    color: var(--fg);
+    font-size: 0.8rem;
+    font-weight: normal;
+    cursor: pointer;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-river {
+    display: none;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-head {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-hand,
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .melds {
+    margin-top: 4px;
+    margin-bottom: 0;
+  }
   .event-log li {
     position: relative; /* holds the read-out-only 打 (below) */
     display: grid;
@@ -2414,7 +2458,8 @@ section {
     padding-right: max(8px, env(safe-area-inset-right));
     padding-bottom: calc(60px + env(safe-area-inset-bottom));
   }
-  .app-practice.has-dock {
+  .app-practice.has-dock,
+  .app-game.has-dock {
     --yaku-bottom: 60px;
   }
   /* The site's update notice sits above the dock bar. */

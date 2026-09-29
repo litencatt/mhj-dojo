@@ -20,6 +20,7 @@ import {
   useSingleTab,
   useStableCallback,
   useUrlResume,
+  useYakuTop,
 } from './hooks';
 import { claim } from './singleTab';
 
@@ -154,24 +155,8 @@ export function App() {
   const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
 
   // On a phone the yaku panel scrolls on its own in the height left under the
-  // header and the hand (style.css): tell the CSS where the panel starts.
-  const appRef = useRef<HTMLDivElement>(null);
-  const hasState = !!state;
-  useEffect(() => {
-    const app = appRef.current;
-    if (!app) return;
-    // The panels above the yaku table change the app's height when they
-    // change, and so does a new window width.
-    const ro = new ResizeObserver(() => {
-      const yaku = app.querySelector('.area-yaku');
-      if (!yaku) return;
-      const top = `${yaku.getBoundingClientRect().top + window.scrollY}px`;
-      // A write, even of the same value, may restyle the whole app.
-      if (app.style.getPropertyValue('--yaku-top') !== top) app.style.setProperty('--yaku-top', top);
-    });
-    ro.observe(app);
-    return () => ro.disconnect();
-  }, [hasState]);
+  // header and the hand (style.css).
+  const appRef = useYakuTop(!!state);
 
   return (
     <div ref={appRef} class={appClass}>
