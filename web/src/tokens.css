@@ -1,0 +1,47 @@
+/* The colours, light and dark: the app (style.css) and the 更新情報 page (info.css) share them. */
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --fg: #1a1d23;
+  --muted: #6b7280;
+  --panel-bg: #ffffff;
+  --border: #d8dbe0;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --success-bg: #dcfce7;
+  --success: #15803d;
+  --success-border: #16a34a;
+  --tile-bg: #fffdf5;
+  --tile-border: #c9c2a8;
+  --tile-back: #3f7d5c;
+  --row-best-bg: #fef3c7;
+  --row-tenpai-bg: #fde4e4; /* a yaku (or combo) already at 聴牌 or 和了 */
+  --chart-grid: #e5e7eb;
+  --group-taatsu: #b45309;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --fg: #e6e8eb;
+    --muted: #9aa0aa;
+    --panel-bg: #1d2026;
+    --border: #2e323b;
+    --accent: #60a5fa;
+    --accent-fg: #0b1220;
+    --danger: #f87171;
+    --danger-bg: #3a1414;
+    --success-bg: #123420;
+    --success: #4ade80;
+    --success-border: #4ade80;
+    --tile-bg: #f4efe0;
+    --tile-border: #8a8264;
+    --tile-back: #2f6b4c;
+    --row-best-bg: #3a3110;
+    --row-tenpai-bg: #3d1a1d;
+    --chart-grid: #2c313a;
+    --group-taatsu: #fbbf24;
+  }
+}

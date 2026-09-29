@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "test": "node --test scripts/changelog.test.mjs",
     "e2e": "playwright test",
     "build:site": "tsc --noEmit && vite build --mode site",
     "dev:site": "vite --mode site",

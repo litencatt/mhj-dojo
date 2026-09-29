@@ -105,6 +105,16 @@ made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
 The static site's engine answers it too (with the WebAssembly binary's own stamp). The UI shows
 it in the header.
 
+### `GET /api/changelog`
+The repository's `CHANGELOG.md` (which tagpr updates on every release), as the binary embedded it:
+
+```json
+{"markdown": "# Changelog\n\n## [v2026.0929.1](https://github.com/…) - 2026-09-29\n…"}
+```
+
+The local build's 更新情報 page (`/info/`, `web/info`) renders it. Only the server has it: the
+static site's page is rendered from `CHANGELOG.md` at build time instead.
+
 ## `State`
 
 ```jsonc

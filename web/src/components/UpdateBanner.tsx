@@ -15,7 +15,10 @@ export function UpdateBanner() {
         <div class="update-banner">
           {state === 'newer' ? (
             <>
-              <span>新しいバージョンがあります</span>
+              {/* What's new: the 更新情報 page (web/info), which the deploy has updated too. */}
+              <a class="update-banner-info" href="info/" title="更新情報を開く">
+                新しいバージョンがあります
+              </a>
               <button type="button" class="update-banner-reload" onClick={reload}>
                 再読み込み
               </button>
