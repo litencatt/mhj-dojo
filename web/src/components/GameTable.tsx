@@ -52,14 +52,16 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
   const logRef = useRef<HTMLOListElement>(null);
   const rivers = useRiversShown();
   // The newest move stays in sight: the log scrolls to its end as moves land
-  // (its bottom, or on a phone, where it runs sideways, its right end).
+  // (its bottom, or on a phone, where it runs sideways, its right end), and
+  // when it comes back on an upright phone, where the rivers stand in for it
+  // while they are shown (style.css).
   useLayoutEffect(() => {
     const el = logRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
       el.scrollLeft = el.scrollWidth;
     }
-  }, [log.length]);
+  }, [log.length, rivers.shown]);
   // A phone turned on its side keeps the newest in sight too.
   useEffect(() => {
     const el = logRef.current;

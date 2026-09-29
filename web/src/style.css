@@ -2369,6 +2369,50 @@ section {
     padding: 0 1px;
   }
 }
+/* A phone upright: the CPU seats one under another at the full width, 対面,
+   上家, 下家, then the round's row and your seat; a seat with no discards
+   yet ends at its head. The rivers show every discard, so the log of moves
+   only stands in for them while they are folded away (捨て牌 ▾). On its
+   side the phone keeps the grid above, and the log. */
+@media (width <= 760px) and (height > 500px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "center"
+      "bottom";
+    gap: 3px;
+  }
+  /* A revealed hand and the melds share a row, the head and the river each
+     a row of their own. */
+  .seat-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 8px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .seat-box > .seat-head,
+  .seat-box > .seat-river {
+    flex-basis: 100%;
+  }
+  .seat-river:empty {
+    display: none;
+  }
+  .seat-box > :has(+ .seat-river:empty) {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="shown"] .event-log {
+    display: none;
+  }
+  /* The round's row alone: 捨て牌 reaches down into the padding too. */
+  .game-table[data-rivers="shown"] .table-center {
+    padding-bottom: 0;
+  }
+}
 
 /* A short screen (a phone on its side): the right-edge tabs take their short
    names (チャート, 履歴) and less padding, so they fit the height; the column
