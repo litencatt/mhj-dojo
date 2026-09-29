@@ -109,8 +109,8 @@ async function playToResult(page: Page, maxSteps = 150) {
  * to the newest at the right end, and inside the page's width. */
 async function expectPhoneLog(page: Page) {
   const log = page.getByRole('list', { name: 'この局の動き' });
+  await expect.poll(async () => (await log.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(48);
   const box = (await log.boundingBox())!;
-  expect(box.height).toBeLessThanOrEqual(48);
   const tops = await log.locator('li').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
   expect(tops.length).toBeGreaterThan(1);
   expect(new Set(tops).size).toBe(1);
@@ -272,9 +272,9 @@ for (const [width, height] of [[390, 844], [360, 800]]) {
     const yaku = yakuScroller(page);
     await expect(hand).toBeInViewport({ ratio: 1 });
     await expect(page.locator('.app')).toHaveAttribute('data-hand-fits', 'true');
+    await expect.poll(async () => (await yaku.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(199);
+    await expect.poll(() => yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
     const panel = (await yaku.boundingBox())!;
-    expect(panel.height).toBeGreaterThanOrEqual(199);
-    expect(await yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
     // A wheel over the panel scrolls the panel, not the page.
     await page.mouse.move(panel.x + panel.width / 2, panel.y + 40);
@@ -356,7 +356,7 @@ test('a 320x640 phone pins the hand only while it leaves the yaku panel room', a
     await waitForPlayback(page);
     await expect(app).toHaveAttribute('data-hand-fits', fits);
     await expect(page.locator('.area-hand')).toHaveCSS('position', fits === 'true' ? 'sticky' : 'static');
-    expect(await yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    await expect.poll(() => yaku.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await expect(yaku).toBeInViewport({ ratio: 1 });
     const area = (await page.locator('.area-hand').boundingBox())!;
@@ -638,6 +638,92 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     await expect(form).toBeHidden();
   });
 }
+
+// 設定 comes right before its options in the focus order: Tab goes from it
+// into them. Escape folds them away, and so does a new game once it is on,
+// focus going back to 設定 either way; a new game that fails keeps them
+// open, as chosen.
+test('a phone\'s 設定: Tab into the options, Escape and a new game fold them back', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  const toggle = page.getByRole('button', { name: /^設定/ });
+  const form = page.locator('.new-game-form');
+  const length = form.getByRole('combobox').first();
+
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(form).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(length).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(form).toBeHidden();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toBeFocused();
+
+  // A failed request keeps the options, as chosen.
+  await page.keyboard.press('Enter');
+  await length.selectOption('hanchan');
+  await page.route('**/api/games', (route) =>
+    route.request().method() === 'POST' ? route.fulfill({ status: 500, body: 'boom' }) : route.continue(),
+  );
+  await form.getByRole('button', { name: '新規対局' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.error-banner')).toBeVisible();
+  await expect(form).toBeVisible();
+  await expect(length).toHaveValue('hanchan');
+
+  // A new game folds them away, focus back on 設定.
+  await page.unroute('**/api/games');
+  await form.getByRole('button', { name: '新規対局' }).focus();
+  await Promise.all([
+    page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/api/games')),
+    page.keyboard.press('Enter'),
+  ]);
+  await expect(form).toBeHidden();
+  await expect(toggle).toBeFocused();
+  await expect(page.locator('.game-status')).toContainText('半荘戦');
+});
+
+// A desktop (and a phone on its side) shows the options with the title,
+// above the status, though they come after it in the page.
+for (const [width, height] of [[1280, 900], [844, 390]]) {
+  test(`a ${width}x${height} screen keeps the new-game options above the status`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    await expect(page.locator('.new-game-form')).toBeVisible();
+    const form = (await page.locator('.new-game-form').boundingBox())!;
+    const status = (await page.locator('.header-status').boundingBox())!;
+    const title = (await page.locator('.app-header h1').boundingBox())!;
+    expect(form.y).toBeGreaterThanOrEqual(title.y);
+    expect(form.y + form.height).toBeLessThanOrEqual(status.y);
+  });
+}
+
+// The log keeps the newest move in sight only while it is there: a player
+// reading earlier moves isn't taken to the end by the next ones.
+test('the log of moves stays where a player scrolled it', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  const log = page.getByRole('list', { name: 'この局の動き' });
+  const gap = () => log.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+  for (let i = 0; i < 4; i++) await playOneStep(page);
+  await waitForPlayback(page);
+  expect(await log.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect.poll(gap).toBeLessThanOrEqual(1);
+  const count = await log.locator('li').count();
+  await log.evaluate((el) => (el.scrollTop = 0));
+  await playOneStep(page);
+  await waitForPlayback(page);
+  await expect(log.locator('li')).not.toHaveCount(count);
+  expect(await log.evaluate((el) => el.scrollTop)).toBe(0);
+  // Back at the end, it follows again.
+  await log.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await playOneStep(page);
+  await waitForPlayback(page);
+  await expect.poll(gap).toBeLessThanOrEqual(1);
+});
 
 // At a round's end, on a phone upright or on its side, every CPU seat's
 // revealed hand, melds and river fit the seat: the rivers wrap at the seat's
