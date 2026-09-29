@@ -311,6 +311,8 @@ test('game options from the URL survive a reload', async ({ page }) => {
   const status = page.locator('.game-status');
   const expectOptions = async () => {
     await expect(status).toContainText('東1局');
+    // A seed the player chose is known from the start, so it shows.
+    await expect(status.locator('div').filter({ hasText: 'シード' }).locator('dd')).toHaveText(String(SEED));
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
     await expect(page.getByLabel('起家')).toHaveValue('you');
@@ -330,7 +332,9 @@ test('a random-seed game keeps its seed hidden and still resumes', async ({ page
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await expect(page).not.toHaveURL(/[?&]seed=/);
-  await expect(page.locator('.game-status')).toContainText('終局後に表示');
+  // A hidden seed isn't shown at all until the game ends.
+  await expect(page.locator('.game-status').getByRole('term').filter({ hasText: /^シード$/ })).toHaveCount(0);
+  await expect(page.locator('.game-status')).toContainText('東風戦');
   const before = await tableState(page);
   await page.reload();
   await waitForPlayback(page);
