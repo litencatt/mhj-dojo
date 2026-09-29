@@ -757,13 +757,33 @@ section {
 }
 
 /* ---- Yaku table ---- */
-/* Filter bar: search, shanten limit and sort on the first row, category
-   chips, count and reset on the second. It sits outside the scrolling table. */
+/* 絞り込み folds the filter options away; its row, with the count and the
+   reset, stays above the table. */
+.yaku-filter-toggle {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.yaku-filter-toggle:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+/* Filter bar: the toggle, (when open) the category chips, and the count
+   and reset on the first row, then (when open) search, shanten limit and
+   sort. It sits outside the scrolling table. */
 .yaku-filter {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 8px;
+}
+.yaku-filter-chips {
+  display: contents;
 }
 .yaku-filter-row {
   display: flex;
@@ -805,8 +825,8 @@ section {
   background: var(--accent);
   color: var(--accent-fg);
 }
-/* The count and the reset stay together, at the right end of the chips' row
-   or wrapped under them. */
+/* The count and the reset stay together, at the right end of the first row
+   or wrapped under it. */
 .yaku-filter-status {
   display: flex;
   align-items: center;
@@ -1938,7 +1958,8 @@ section {
     font-size: 1.1rem;
   }
   .filter-chip,
-  .legend-item {
+  .legend-item,
+  .yaku-filter-toggle {
     min-height: 32px;
   }
   .filter-chip {

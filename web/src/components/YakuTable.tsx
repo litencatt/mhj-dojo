@@ -12,7 +12,9 @@ import {
   applyYakuFilter,
   isDefaultFilter,
   loadFilter,
+  loadFilterOpen,
   saveFilter,
+  saveFilterOpen,
   type Category,
   type SortOrder,
   type YakuFilter,
@@ -130,6 +132,17 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
   const active = phone ? { ...filter, query: '' } : filter;
   // 条件をクリア on a phone keeps that hidden search text too.
   const clearFilter = () => setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
+  // The filter bar folds away behind 絞り込み, leaving the count (and
+  // 条件をクリア) above the table. It starts folded on a phone, upright or on
+  // its side, where the table scrolls in a short panel, and open on a wider
+  // screen; once toggled, the player's choice holds on every screen size.
+  const compact = useMediaQuery('(width <= 760px), (height <= 500px)');
+  const [savedOpen, setSavedOpen] = useState(loadFilterOpen);
+  const filterOpen = savedOpen ?? !compact;
+  const toggleFilter = () => {
+    setSavedOpen(!filterOpen);
+    saveFilterOpen(!filterOpen);
+  };
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -223,6 +236,40 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
       {!phone && <ComboTable combos={combos} base={baseCombos} remaining={remaining} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
+          <button
+            type="button"
+            class="yaku-filter-toggle"
+            aria-expanded={filterOpen}
+            aria-controls="yaku-filter-chips yaku-filter-options"
+            onClick={toggleFilter}
+          >
+            絞り込み {filterOpen ? '▴' : '▾'}
+          </button>
+          <span id="yaku-filter-chips" class="yaku-filter-chips" hidden={!filterOpen}>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
+                aria-pressed={filter.categories.includes(c.key)}
+                onClick={() => toggleCategory(c.key)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </span>
+          <span class="yaku-filter-status">
+            <span class="yaku-filter-count">
+              {visibleCount} / {total}役を表示中
+            </span>
+            {!isDefaultFilter(active) && (
+              <button type="button" class="filter-clear" onClick={clearFilter}>
+                条件をクリア
+              </button>
+            )}
+          </span>
+        </div>
+        <div id="yaku-filter-options" class="yaku-filter-row" hidden={!filterOpen}>
           {!phone && (
             <input
               type="search"
@@ -262,29 +309,6 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
               <option value="ukeire">有効牌が多い順</option>
             </select>
           </label>
-        </div>
-        <div class="yaku-filter-row">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
-              aria-pressed={filter.categories.includes(c.key)}
-              onClick={() => toggleCategory(c.key)}
-            >
-              {c.label}
-            </button>
-          ))}
-          <span class="yaku-filter-status">
-            <span class="yaku-filter-count">
-              {visibleCount} / {total}役を表示中
-            </span>
-            {!isDefaultFilter(active) && (
-              <button type="button" class="filter-clear" onClick={clearFilter}>
-                条件をクリア
-              </button>
-            )}
-          </span>
         </div>
       </div>
       {tip && YAKU_CONDITIONS[tip.key] && (
