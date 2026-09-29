@@ -1,5 +1,11 @@
 # Changelog
 
+## [v2026.0929.2](https://github.com/litencatt/mhj-dojo/compare/v2026.0929.1...v2026.0929.2) - 2026-09-29
+
+### 新機能
+- 説明文と OG 画像を CPU 対戦も含む内容に by @litencatt in https://github.com/litencatt/mhj-dojo/pull/145
+- 更新情報ページ（/info）を CHANGELOG から自動で作る by @litencatt in https://github.com/litencatt/mhj-dojo/pull/149
+
 ## [v2026.0929.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0929.0...v2026.0929.1) - 2026-09-29
 
 ### 新機能
