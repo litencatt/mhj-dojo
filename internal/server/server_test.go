@@ -25,8 +25,9 @@ type client struct {
 
 func newClient(t *testing.T, store *session.Store) *client {
 	static := fstest.MapFS{
-		"index.html":    {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
-		"assets/app.js": {Data: []byte("console.log(1)")},
+		"index.html":      {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
+		"assets/app.js":   {Data: []byte("console.log(1)")},
+		"info/index.html": {Data: []byte("<!doctype html><title>更新情報</title>")},
 	}
 	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))
 	t.Cleanup(srv.Close)
@@ -444,6 +445,9 @@ func TestStaticAndSPAFallback(t *testing.T) {
 		"/":              "<!doctype html>",
 		"/some/spa/path": "<!doctype html>",
 		"/assets/app.js": "console.log",
+		"/info/":         "<!doctype html><title>更新情報",
+		"/info":          "<!doctype html><title>更新情報",     // redirected to /info/
+		"/assets/":       "<!doctype html><title>mhj-dojo", // a directory without a page
 	} {
 		code, b, _ := c.do("GET", path, "")
 		if code != http.StatusOK || !strings.HasPrefix(string(b), want) {
@@ -452,6 +456,15 @@ func TestStaticAndSPAFallback(t *testing.T) {
 	}
 	if code, _, _ := c.do("POST", "/", "x"); code != http.StatusMethodNotAllowed {
 		t.Errorf("POST /: %d", code)
+	}
+}
+
+func TestChangelog(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	code, b, _ := c.do("GET", "/api/changelog", "")
+	var got struct{ Markdown string }
+	if code != http.StatusOK || json.Unmarshal(b, &got) != nil || !strings.HasPrefix(got.Markdown, "# Changelog\n") {
+		t.Fatalf("GET /api/changelog: %d %.80q", code, b)
 	}
 }
 
