@@ -143,6 +143,21 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
     setSavedOpen(!filterOpen);
     saveFilterOpen(!filterOpen);
   };
+  // On a phone (no 複合役 in between) 絞り込み sits in the heading, and the
+  // chips, the count and 条件をクリア share one row: the count is shortened
+  // while the bar is open, 条件をクリア is an icon, and the screen reader
+  // still reads both in full.
+  const filterToggle = (
+    <button
+      type="button"
+      class="yaku-filter-toggle"
+      aria-expanded={filterOpen}
+      aria-controls="yaku-filter-chips yaku-filter-options"
+      onClick={toggleFilter}
+    >
+      絞り込み {filterOpen ? '▴' : '▾'}
+    </button>
+  );
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -230,21 +245,13 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
 
   return (
     <section class="yaku-table-panel" aria-label="役別向聴テーブル">
-      <PanelHeading title="役別向聴" onMinimize={onMinimize}>
+      <PanelHeading title="役別向聴" onMinimize={onMinimize} actions={phone && filterToggle}>
         {previewTile && <span class="preview-note"> — {tileName(previewTile)} を打牌した場合のプレビュー</span>}
       </PanelHeading>
       {!phone && <ComboTable combos={combos} base={baseCombos} remaining={remaining} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
-          <button
-            type="button"
-            class="yaku-filter-toggle"
-            aria-expanded={filterOpen}
-            aria-controls="yaku-filter-chips yaku-filter-options"
-            onClick={toggleFilter}
-          >
-            絞り込み {filterOpen ? '▴' : '▾'}
-          </button>
+          {!phone && filterToggle}
           <span id="yaku-filter-chips" class="yaku-filter-chips" hidden={!filterOpen}>
             {CATEGORIES.map((c) => (
               <button
@@ -259,14 +266,36 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
             ))}
           </span>
           <span class="yaku-filter-status">
-            <span class="yaku-filter-count">
-              {visibleCount} / {total}役を表示中
-            </span>
-            {!isDefaultFilter(active) && (
-              <button type="button" class="filter-clear" onClick={clearFilter}>
-                条件をクリア
-              </button>
+            {phone && filterOpen ? (
+              <span class="yaku-filter-count">
+                <span aria-hidden="true">
+                  {visibleCount}/{total}
+                </span>
+                <span class="visually-hidden">
+                  {visibleCount} / {total}役を表示中
+                </span>
+              </span>
+            ) : (
+              <span class="yaku-filter-count">
+                {visibleCount} / {total}役を表示中
+              </span>
             )}
+            {!isDefaultFilter(active) &&
+              (phone ? (
+                <button
+                  type="button"
+                  class="filter-clear filter-clear-icon"
+                  onClick={clearFilter}
+                  aria-label="条件をクリア"
+                  title="条件をクリア"
+                >
+                  ✕
+                </button>
+              ) : (
+                <button type="button" class="filter-clear" onClick={clearFilter}>
+                  条件をクリア
+                </button>
+              ))}
           </span>
         </div>
         <div id="yaku-filter-options" class="yaku-filter-row" hidden={!filterOpen}>

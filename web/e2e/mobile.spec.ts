@@ -399,10 +399,12 @@ test.describe('the yaku filter bar on a phone', () => {
     await expect(yaku.getByRole('combobox')).toHaveCount(2);
     // Opened, the table starts lower.
     expect((await box(firstRow)).y).toBeGreaterThan(folded + 20);
-    const before = await count.innerText();
+    // Open, the count is shortened on screen but read in full.
+    await expect(count.locator('[aria-hidden="true"]')).toHaveText(/^(\d+)\/\1$/);
+    await expect(count.locator('.visually-hidden')).toHaveText(/^(\d+) \/ \1役を表示中$/);
     await yaku.getByRole('button', { name: '1翻' }).click();
     await expect(yaku.getByRole('button', { name: '1翻' })).toHaveAttribute('aria-pressed', 'false');
-    await expect(count).not.toHaveText(before);
+    await expect(count.locator('.visually-hidden')).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
     await expect(yaku.getByRole('button', { name: '条件をクリア' })).toBeVisible();
 
     await page.reload();
@@ -411,7 +413,8 @@ test.describe('the yaku filter bar on a phone', () => {
     // Folding keeps the filter.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(count).not.toHaveText(before);
+    await expect(count).toHaveText(/^\d+ \/ \d+役を表示中$/);
+    await expect(count).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
     await page.reload();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(yaku.getByRole('combobox')).toHaveCount(0);
@@ -453,3 +456,56 @@ test.describe('the yaku filter bar on a phone', () => {
     });
   }
 });
+
+// 条件をクリア must not make the open filter bar taller: on a phone the
+// chips, the (shortened) count and the ✕ share one row, under 絞り込み in the
+// heading, and the 向聴/並べ替え row is the only other one.
+for (const width of [320, 360, 390]) {
+  for (const mode of ['practice', 'game']) {
+    test(`${width}px, ${mode}: 条件をクリア keeps the open filter bar's height`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.addInitScript(() => {
+        if (sessionStorage.getItem('e2e-filter')) return;
+        localStorage.setItem('mhj-dojo.yakuFilterOpen', '1');
+        localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'tree', 'advice', 'gloss']));
+        localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: '', maxShanten: 6, categories: ['1', '2', '3', 'yakuman'], sort: 'ukeire' }));
+        sessionStorage.setItem('e2e-filter', '1');
+      });
+      await page.goto(mode === 'game' ? '/?mode=game&seed=1&length=tonpuu' : '/?seed=1&turns=18');
+      const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+      await expect(yaku.locator('.yaku-table tbody tr').first()).toBeVisible();
+      const bar = yaku.locator('.yaku-filter');
+      const clear = yaku.getByRole('button', { name: '条件をクリア' });
+      await expect(clear).toBeVisible();
+
+      // Two rows: the chips with the count and the ✕, then the selects.
+      const middle = async (l: Locator) => {
+        const b = await box(l);
+        return b.y + b.height / 2;
+      };
+      const chipsRow = await middle(yaku.getByRole('button', { name: '役満' }));
+      expect(Math.abs((await middle(yaku.getByRole('button', { name: '1翻' }))) - chipsRow)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await middle(yaku.locator('.yaku-filter-count'))) - chipsRow)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await middle(clear)) - chipsRow)).toBeLessThanOrEqual(1);
+      // The chips' row is one chip tall, and the bar holds just the two rows.
+      const barBox = await box(bar);
+      const chipRow = await box(bar.locator('.yaku-filter-row').first());
+      expect(chipRow.height).toBeLessThanOrEqual((await box(yaku.getByRole('button', { name: '役満' }))).height + 1);
+      const options = await box(bar.locator('#yaku-filter-options'));
+      expect(barBox.height).toBeLessThanOrEqual(chipRow.height + 6 + options.height + 1);
+      // Nothing sticks out of the bar or the page.
+      const right = await bar.evaluate((el) => Math.max(...[...el.querySelectorAll('*')].map((e) => e.getBoundingClientRect().right)));
+      expect(right).toBeLessThanOrEqual(barBox.x + barBox.width + 0.5);
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+      // The ✕ is easy to tap.
+      const c = await box(clear);
+      expect(c.width).toBeGreaterThanOrEqual(32);
+      expect(c.height).toBeGreaterThanOrEqual(32);
+
+      await clear.click();
+      await expect(clear).toHaveCount(0);
+      await expect(yaku.getByRole('combobox').nth(1)).toHaveValue('default');
+      expect(Math.abs((await box(bar)).height - barBox.height)).toBeLessThanOrEqual(1);
+    });
+  }
+}

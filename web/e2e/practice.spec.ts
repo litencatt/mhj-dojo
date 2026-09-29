@@ -542,9 +542,13 @@ test('the yaku filter bar starts open on a desktop and folds away', async ({ pag
   await expect(yaku.getByRole('searchbox', { name: '役名で検索' })).toBeVisible();
   await expect(yaku.getByRole('combobox')).toHaveCount(2);
   await expect(yaku.getByRole('button', { name: '役満' })).toBeVisible();
+  const height = (await yaku.locator('.yaku-filter').boundingBox())!.height;
 
   await yaku.getByRole('searchbox', { name: '役名で検索' }).fill('ピンフ');
   await expect(yaku.locator('.yaku-filter-count')).toHaveText(/^1 \/ \d+役を表示中$/);
+  // 条件をクリア joins the count's row: the bar is no taller.
+  await expect(yaku.getByRole('button', { name: '条件をクリア' })).toBeVisible();
+  expect(Math.abs((await yaku.locator('.yaku-filter').boundingBox())!.height - height)).toBeLessThanOrEqual(1);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(yaku.getByRole('searchbox')).toHaveCount(0);

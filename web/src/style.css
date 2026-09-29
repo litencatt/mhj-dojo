@@ -758,7 +758,7 @@ section {
 
 /* ---- Yaku table ---- */
 /* 絞り込み folds the filter options away; its row, with the count and the
-   reset, stays above the table. */
+   reset, stays above the table. On a phone it sits in the heading instead. */
 .yaku-filter-toggle {
   flex: none;
   padding: 2px 8px;
@@ -772,6 +772,9 @@ section {
 .yaku-filter-toggle:hover {
   color: var(--fg);
   border-color: var(--muted);
+}
+.panel-heading .yaku-filter-toggle {
+  margin: 0 0 8px auto;
 }
 /* Filter bar: the toggle, (when open) the category chips, and the count
    and reset on the first row, then (when open) search, shanten limit and
@@ -1963,7 +1966,21 @@ section {
     min-height: 32px;
   }
   .filter-chip {
-    padding: 4px 10px;
+    padding: 4px 8px;
+  }
+  /* The chips, the short count and the ✕ share one row at 320px; the row
+     keeps its height with or without the ✕, folded or not. */
+  .yaku-filter-row {
+    gap: 6px;
+  }
+  .yaku-filter-status {
+    min-height: 32px;
+  }
+  .filter-clear-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0.9rem;
   }
   /* Filter bar: no name search (YakuTable.tsx), the two selects share the
      first row. */
