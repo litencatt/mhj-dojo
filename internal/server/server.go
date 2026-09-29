@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 
+	mhjdojo "github.com/litencatt/mhj-dojo"
 	"github.com/litencatt/mhj-dojo/internal/apicall"
 	"github.com/litencatt/mhj-dojo/internal/match"
 	"github.com/litencatt/mhj-dojo/internal/session"
@@ -55,6 +56,9 @@ func NewWithFS(store *session.Store, games *match.Store, static fs.FS) http.Hand
 	}))
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, apicall.Version())
+	})
+	mux.HandleFunc("GET /api/changelog", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"markdown": mhjdojo.Changelog})
 	})
 	mux.HandleFunc("POST /api/games", a.createGame)
 	mux.HandleFunc("GET /api/games/{id}", a.withGame(func(m *match.Match, _ *http.Request) (match.State, error) {
@@ -191,6 +195,8 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // spa serves static files and falls back to index.html for unknown paths.
+// A directory with its own index.html (info/, the 更新情報 page) is a page
+// too: the file server serves /info/ and redirects /info there.
 func spa(static fs.FS) http.Handler {
 	files := http.FileServerFS(static)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +209,7 @@ func spa(static fs.FS) http.Handler {
 		if name == "" {
 			name = "index.html"
 		}
-		if st, err := fs.Stat(static, name); err == nil && !st.IsDir() {
+		if st, err := fs.Stat(static, name); err == nil && (!st.IsDir() || isFile(static, path.Join(name, "index.html"))) {
 			files.ServeHTTP(w, r)
 			return
 		}
@@ -215,4 +221,9 @@ func spa(static fs.FS) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
+}
+
+func isFile(fsys fs.FS, name string) bool {
+	st, err := fs.Stat(fsys, name)
+	return err == nil && !st.IsDir()
 }

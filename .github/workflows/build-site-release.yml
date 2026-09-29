@@ -98,7 +98,7 @@ jobs:
 
       - name: Verify the site build
         run: |
-          for f in index.html version.json mhj-dojo.wasm wasm_exec.js worker.js THIRD_PARTY_LICENSES.txt; do
+          for f in index.html info/index.html version.json mhj-dojo.wasm wasm_exec.js worker.js THIRD_PARTY_LICENSES.txt; do
             [ -f "web/dist-site/$f" ] || { echo "::error::web/dist-site/$f is missing"; exit 1; }
           done
 

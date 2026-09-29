@@ -10,7 +10,7 @@ function localTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** The build in the header: a released site's version (e.g. "v2026.0927.0"), otherwise the commit and its date in the viewer's time zone (e.g. "abc1234 · 2026-09-26"); details in its title. */
+/** The build in the header: a released site's version (e.g. "v2026.0927.0"), otherwise the commit and its date in the viewer's time zone (e.g. "abc1234 · 2026-09-26"); details in its title. A link to the 更新情報 page. */
 export function VersionTag() {
   const v = useVersion();
   if (!v) return null;
@@ -27,10 +27,11 @@ export function VersionTag() {
     SITE_BUILD && `公開版のビルド: ${SITE_BUILD.version}（${localTime(SITE_BUILD.built)}、${SITE_BUILD.id}）`,
     BUNDLE && `画面: ${BUNDLE}`,
   ].filter(Boolean);
+  // It opens the 更新情報 page (web/info).
   return (
-    <span class="version-tag" title={details.join('\n')}>
+    <a class="version-tag" href="info/" title={['更新情報を開く', ...details].join('\n')}>
       {release ?? version}
       {!release && date && ` · ${date}`}
-    </span>
+    </a>
   );
 }

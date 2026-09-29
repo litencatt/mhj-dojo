@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>更新情報 - mhj-dojo 麻雀道場</title>
+    <meta name="description" content="mhj-dojo 麻雀道場のリリースごとの新機能・修正・改善" />
+    <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)" />
+    <!-- The app's files, one level up (served at info/). -->
+    <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="mhj-dojo 麻雀道場" />
+    <meta property="og:title" content="更新情報 - mhj-dojo 麻雀道場" />
+    <meta property="og:description" content="mhj-dojo 麻雀道場のリリースごとの新機能・修正・改善" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="更新情報 - mhj-dojo 麻雀道場" />
+    <meta name="twitter:description" content="mhj-dojo 麻雀道場のリリースごとの新機能・修正・改善" />
+  </head>
+  <body>
+    <div class="info">
+      <header class="info-header">
+        <h1>更新情報 <span class="info-subtitle">mhj-dojo 麻雀道場</span></h1>
+        <nav class="info-nav" aria-label="アプリへ戻る">
+          <a href="../">練習</a>
+          <a href="../?mode=game">CPU対戦</a>
+        </nav>
+      </header>
+      <p class="info-lead">
+        リリースごとの変更です（新しい順）。開発のための変更（CI・依存関係・テスト）は省いています。番号はその変更の GitHub のプルリクエストです。
+      </p>
+      <!-- The site build renders CHANGELOG.md here (vite.config.ts); the local
+           server's page fills it in the browser (src/info.ts). -->
+      <main id="changelog" class="changelog"><!--changelog--></main>
+    </div>
+    <script type="module" src="/src/info.ts"></script>
+  </body>
+</html>

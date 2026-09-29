@@ -1,0 +1,107 @@
+/* The 更新情報 page (web/info/index.html), in the app's colours (tokens.css). */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--accent);
+}
+
+.info {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.info-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.info-header h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+.info-subtitle {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: normal;
+}
+.info-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+}
+.info-nav a {
+  display: inline-block;
+  padding: 6px 0;
+}
+.info-lead {
+  margin: 8px 0 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.release {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.release h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+.release-version {
+  font-variant-numeric: tabular-nums;
+}
+.release time {
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.release h3 {
+  margin: 10px 0 2px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.release ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.release li {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.release code {
+  font-size: 0.9em;
+}
+.release-pr {
+  margin-left: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.release-internal {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
