@@ -22,6 +22,7 @@ export interface HandProps {
   // where they stand in for your seat at the table.
   status?: ComponentChildren;
   river?: ComponentChildren;
+  acting?: boolean; // game mode: your turn, marked as your seat's box marks it
   highlight?: string | null; // tiles to mark (exact string), e.g. a hovered advice candidate
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
@@ -78,7 +79,7 @@ type Pick = number | 'drawn';
  * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
-  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, highlight, onDiscard, onPreview } = props;
+  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, onDiscard, onPreview } = props;
   const mark = (t: string) => (highlight && t === highlight ? 'tile-advice' : undefined);
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
   const [showGroups, setShowGroups] = useHandGroupsToggle();
@@ -202,7 +203,7 @@ export function Hand(props: HandProps) {
 
   let pos = 0;
   return (
-    <section class="hand-panel" aria-label="手牌">
+    <section class={acting ? 'hand-panel hand-acting' : 'hand-panel'} aria-label="手牌">
       <div class="hand-heading">
         <h2>手牌</h2>
         {status && <div class="hand-status">{status}</div>}

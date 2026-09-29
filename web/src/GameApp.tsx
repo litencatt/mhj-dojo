@@ -37,8 +37,10 @@ const NO_TILES: TileT[] = [];
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
 // On a phone, upright or on its side (style.css), the game leaves the chart
-// and the glossary to practice mode, giving their room to the yaku table.
-const PHONE = '(width <= 760px), (height <= 500px)';
+// and the glossary to practice mode, giving their room to the yaku table. A
+// short window is a phone on its side only with a touch screen: a desktop
+// window made short keeps them.
+const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -146,7 +148,8 @@ export function GameApp() {
 
   // The options stay open until the new game is on (a failed request keeps
   // them, as chosen); then, if they were submitted from the keyboard, focus
-  // goes back to 設定 instead of dropping to the page once they fold away.
+  // goes back to 設定 instead of dropping to the page once they fold away,
+  // unless the player has moved it elsewhere meanwhile.
   async function handleNewGame(e: Event) {
     e.preventDefault();
     const fromForm = !!formRef.current?.contains(document.activeElement);
@@ -154,7 +157,7 @@ export function GameApp() {
     const toggle = toggleRef.current;
     if (!started || !toggle || toggle.offsetParent === null) return;
     const active = document.activeElement;
-    if (fromForm || active === document.body || formRef.current?.contains(active)) toggle.focus();
+    if (fromForm && (active === document.body || formRef.current?.contains(active))) toggle.focus();
   }
 
   // After a call the analysis is empty; the chart keeps the rows from before.
@@ -361,6 +364,7 @@ export function GameApp() {
                     className="hand-river"
                   />
                 }
+                acting={!playback.playing && table.actor === table.you}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />

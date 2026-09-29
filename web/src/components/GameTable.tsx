@@ -65,14 +65,15 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
     atEnd.current =
       el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
   };
-  const logLength = useRef(log.length);
+  // A new round's log starts over at its end.
+  const round = `${state.round_wind}${state.round_number}-${state.honba}`;
+  const shownRound = useRef(round);
   useLayoutEffect(() => {
     const el = logRef.current;
-    // A shorter log is a new round's: it starts over at its end.
-    const newRound = log.length < logLength.current;
-    logLength.current = log.length;
+    const newRound = round !== shownRound.current;
+    shownRound.current = round;
     if (el && (atEnd.current || newRound)) snap(el);
-  }, [log.length]);
+  }, [log.length, round]);
   // A phone turned on its side keeps the newest in sight too, and so does
   // the log coming back on an upright phone, where the rivers stand in for
   // it while they are shown (style.css): hidden, it lost its place.

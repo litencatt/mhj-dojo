@@ -295,39 +295,106 @@ for (const [width, height] of [[390, 844], [360, 800]]) {
   });
 }
 
-// A CPU game on a phone, upright or on its side, leaves the chart and the
-// glossary to practice mode: no dock bar, even with a saved layout that has
-// them open, and upright the yaku panel reaches down to the page's bottom
-// padding (32px) instead of the dock bar's (60px). Widened to a desktop the
-// saved layout is back, and narrowed again they are gone again.
-test('a phone game has no chart, glossary or dock; the yaku panel takes the room', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('mhj-dojo.minimized.v2', '[]'));
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
-  const chart = page.getByRole('region', { name: '時系列チャート' });
-  const glossary = page.getByRole('region', { name: '用語表' });
-  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  const expectPhone = async () => {
-    await expect(chart).toHaveCount(0);
-    await expect(glossary).toHaveCount(0);
+// A CPU game on a phone (a touch screen), upright or on its side, leaves the
+// chart and the glossary to practice mode: no dock bar, even with a saved
+// layout that has them open, and upright the yaku panel reaches down to the
+// page's bottom padding (32px) instead of the dock bar's (60px). Widened to
+// a desktop the saved layout is back, and narrowed again they are gone again.
+test.describe('a phone game', () => {
+  test.use({ hasTouch: true });
+
+  test('has no chart, glossary or dock; the yaku panel takes the room', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('mhj-dojo.minimized.v2', '[]'));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    const chart = page.getByRole('region', { name: '時系列チャート' });
+    const glossary = page.getByRole('region', { name: '用語表' });
+    const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+    const expectPhone = async () => {
+      await expect(chart).toHaveCount(0);
+      await expect(glossary).toHaveCount(0);
+      await expect(dock).toHaveCount(0);
+      await expect(page.locator('.app')).not.toHaveClass(/has-dock/);
+    };
+    await expectPhone();
+    await expect
+      .poll(async () => {
+        const yaku = (await page.locator('.area-yaku').boundingBox())!;
+        return Math.round(844 - (yaku.y + yaku.height));
+      })
+      .toBe(32);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight))
+      .toBe(0);
+
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expectPhone();
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(chart).toBeVisible();
+    await expect(glossary).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectPhone();
+  });
+
+  // The yaku panel can still be minimized: then (only then) the dock bar
+  // holds its tab, which brings it back.
+  test('docks a minimized yaku panel, and restores it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+    const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+    await expect(dock).toHaveCount(0);
+    await page.locator('.area-yaku').getByRole('button', { name: /最小化/ }).click();
+    await expect(yaku).toBeHidden();
+    await expect(dock.getByRole('button')).toHaveText([/役別向聴/]);
+    await expect(page.locator('.app')).toHaveClass(/has-dock/);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+    await dock.getByRole('button', { name: '役別向聴' }).click();
+    await expect(yaku).toBeVisible();
     await expect(dock).toHaveCount(0);
     await expect(page.locator('.app')).not.toHaveClass(/has-dock/);
-  };
-  await expectPhone();
-  const yaku = (await page.locator('.area-yaku').boundingBox())!;
-  expect(Math.abs(844 - (yaku.y + yaku.height) - 32)).toBeLessThanOrEqual(1);
-  expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBe(0);
+  });
 
-  await page.setViewportSize({ width: 844, height: 390 });
-  await expectPhone();
+  // A 667x375 phone on its side (under 760px wide) folds the new-game
+  // options behind 設定 too: 設定 comes right before them in the focus
+  // order, they open under the status, and nothing overflows.
+  test('on its side at 667x375 folds the options behind 設定', async ({ page }) => {
+    await page.setViewportSize({ width: 667, height: 375 });
+    await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+    await waitForPlayback(page);
+    const toggle = page.getByRole('button', { name: /^設定/ });
+    const form = page.locator('.new-game-form');
+    await expect(toggle).toBeVisible();
+    await expect(form).toBeHidden();
+    await expect(page.getByRole('region', { name: '時系列チャート' })).toHaveCount(0);
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(form).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(form.getByRole('combobox').first()).toBeFocused();
+    const status = (await page.locator('.header-status').boundingBox())!;
+    const f = (await form.boundingBox())!;
+    expect(f.y).toBeGreaterThanOrEqual(status.y + status.height - 1);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+    await page.keyboard.press('Escape');
+    await expect(form).toBeHidden();
+    await expect(toggle).toBeFocused();
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  });
+});
 
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await expect(chart).toBeVisible();
-  await expect(glossary).toBeVisible();
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expectPhone();
+// A desktop window made short (no touch screen) is no phone on its side:
+// the chart and the glossary stay, in the dock.
+test('a short desktop window keeps the chart and the glossary', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 450 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  await expect(dock.getByRole('button')).toHaveText([/チャート/, /用語表/]);
 });
 
 // With the chart and the glossary minimized (the default), a desktop game
@@ -399,6 +466,8 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
     }
   };
   await expectShown(true);
+  // Only a choice is saved, not the default.
+  expect(await page.evaluate(() => localStorage.getItem('mhj-dojo.rivers.v1'))).toBeNull();
   expect((await toggle.getAttribute('aria-controls'))!.split(' ').sort()).toEqual(['river-left', 'river-right', 'river-top']);
   expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
   const log = page.getByRole('list', { name: 'この局の動き' });
@@ -455,6 +524,22 @@ test('an upright phone stacks the CPU seats at the full width', async ({ page })
   for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height);
   expect(rows[3].y + rows[3].height).toBeLessThanOrEqual(table.y + table.height);
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  // Your turn marks the hand panel, as your seat's box was marked.
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+  await expect(hand).toHaveClass(/hand-acting/);
+  const accent = await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.style.color = 'var(--accent)';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect(hand).toHaveCSS('border-color', accent);
+  // Not while the CPU moves play back.
+  await clickAndWait(page, hand.locator('.hand-drawn button'));
+  await expect(hand).not.toHaveClass(/hand-acting/);
 });
 
 // On an upright phone your seat leaves the table for the hand panel: its

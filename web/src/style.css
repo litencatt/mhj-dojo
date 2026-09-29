@@ -2475,6 +2475,11 @@ section {
   .game-table .seat-bottom {
     display: none;
   }
+  /* Your turn: the hand panel marked as your seat's box was. */
+  .hand-panel.hand-acting {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
   /* One line between 手牌 and 面子表示, clipped rather than wrapped. */
   .hand-panel .hand-status {
     display: flex;

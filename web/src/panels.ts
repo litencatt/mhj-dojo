@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { tileName } from './tiles';
 
 // Panels that can be minimized into the dock (the right edge; a bottom bar on a phone).
@@ -84,14 +84,20 @@ function loadRiversShown(): boolean {
  */
 export function useRiversShown() {
   const [shown, setShown] = useState(loadRiversShown);
+  // Saved once the player has chosen: the default is never written.
+  const chosen = useRef(false);
   useEffect(() => {
+    if (!chosen.current) return;
     try {
       localStorage.setItem(RIVERS_KEY, shown ? 'shown' : 'hidden');
     } catch {
       // Storage unavailable: the choice just won't persist.
     }
   }, [shown]);
-  const toggle = useCallback(() => setShown((prev) => !prev), []);
+  const toggle = useCallback(() => {
+    chosen.current = true;
+    setShown((prev) => !prev);
+  }, []);
   return { shown, toggle };
 }
 

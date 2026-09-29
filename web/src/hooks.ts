@@ -220,17 +220,29 @@ export function useYakuTop(hasState: boolean) {
     // The panels above the yaku table change the app's height when they
     // change, and so does a new window width. The hand's own height (a CPU
     // game's table grows as the rivers fill) may not change the app's, nor
-    // does a new window height (a phone's URL bar coming and going).
-    const ro = new ResizeObserver(update);
+    // does a new window height (a phone's URL bar coming and going). Any of
+    // them updates once, on the next frame: writing from a ResizeObserver
+    // callback would resize what it observes within the same frame.
+    let frame = 0;
+    const schedule = () => {
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          update();
+        });
+      }
+    };
+    const ro = new ResizeObserver(schedule);
     ro.observe(app);
     const hand = app.querySelector('.area-hand');
     if (hand) ro.observe(hand);
-    window.addEventListener('resize', update);
-    window.visualViewport?.addEventListener('resize', update);
+    window.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('resize', schedule);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', update);
-      window.visualViewport?.removeEventListener('resize', update);
+      window.removeEventListener('resize', schedule);
+      window.visualViewport?.removeEventListener('resize', schedule);
+      cancelAnimationFrame(frame);
     };
   }, [hasState]);
   return appRef;
