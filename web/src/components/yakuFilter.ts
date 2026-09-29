@@ -151,3 +151,24 @@ export function saveFilter(f: YakuFilter): void {
     // Storage unavailable: the filter just won't persist.
   }
 }
+
+const OPEN_KEY = 'mhj-dojo.yakuFilterOpen';
+
+/** Whether the filter bar was last left open ('1') or closed ('0'); null
+ * until the player first toggles it, and whenever storage fails. */
+export function loadFilterOpen(): boolean | null {
+  try {
+    const v = localStorage.getItem(OPEN_KEY);
+    return v === '1' ? true : v === '0' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveFilterOpen(open: boolean): void {
+  try {
+    localStorage.setItem(OPEN_KEY, open ? '1' : '0');
+  } catch {
+    // Storage unavailable: the choice just won't persist.
+  }
+}

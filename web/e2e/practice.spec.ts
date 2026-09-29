@@ -531,3 +531,34 @@ test('preview: the rows after a discard, with names, han and remaining counts', 
     expect(r.total).toBe(p.ukeire_total);
   }
 });
+
+// On a wider screen the yaku filter bar starts open; 絞り込み folds it away
+// but for the count (mobile.spec.ts has the phone's side).
+test('the yaku filter bar starts open on a desktop and folds away', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+  const toggle = yaku.getByRole('button', { name: '絞り込み', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(yaku.getByRole('searchbox', { name: '役名で検索' })).toBeVisible();
+  await expect(yaku.getByRole('combobox')).toHaveCount(2);
+  await expect(yaku.getByRole('button', { name: '役満' })).toBeVisible();
+  const height = (await yaku.locator('.yaku-filter').boundingBox())!.height;
+
+  await yaku.getByRole('searchbox', { name: '役名で検索' }).fill('ピンフ');
+  await expect(yaku.locator('.yaku-filter-count')).toHaveText(/^1 \/ \d+役を表示中$/);
+  // 条件をクリア joins the count's row: the bar is no taller.
+  await expect(yaku.getByRole('button', { name: '条件をクリア' })).toBeVisible();
+  expect(Math.abs((await yaku.locator('.yaku-filter').boundingBox())!.height - height)).toBeLessThanOrEqual(1);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(yaku.getByRole('searchbox')).toHaveCount(0);
+  await expect(yaku.getByRole('button', { name: '役満' })).toHaveCount(0);
+  // Folding keeps the search: one row, and the count and 条件をクリア say so.
+  await expect(yaku.locator('.yaku-filter-count')).toHaveText(/^1 \/ \d+役を表示中$/);
+  await expect(yaku.getByRole('button', { name: '条件をクリア' })).toBeVisible();
+  // 条件をクリア from the keyboard goes away and leaves focus on 絞り込み.
+  await yaku.getByRole('button', { name: '条件をクリア' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+});
