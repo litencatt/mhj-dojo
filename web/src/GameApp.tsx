@@ -24,6 +24,7 @@ import {
   useSerialRequest,
   useSingleTab,
   useUrlResume,
+  useYakuTop,
 } from './hooks';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
@@ -171,10 +172,13 @@ export function GameApp() {
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
   // The tree and advice may be minimized from practice mode, but game mode has neither.
   const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app has-dock' : 'app';
+  const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
+  // On a phone the yaku panel scrolls on its own in the height left under the
+  // header, the table and the hand (style.css), as in practice.
+  const appRef = useYakuTop(!!state);
 
   return (
-    <div class={appClass}>
+    <div ref={appRef} class={appClass}>
       <div class="area-main">
         <div class="area-header">
           <header class="app-header">
@@ -231,10 +235,13 @@ export function GameApp() {
             {state && table && (
               <div class="header-status">
                 <dl class="game-status">
-                  <div>
-                    <dt>シード</dt>
-                    <dd>{state.seed ?? '終局後に表示'}</dd>
-                  </div>
+                  {/* A random seed is hidden until the game ends: nothing to show before then. */}
+                  {state.seed !== null && (
+                    <div>
+                      <dt>シード</dt>
+                      <dd>{state.seed}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt class="status-dt-obvious">対局</dt>
                     <dd>{LENGTH_NAMES[state.length]}</dd>
