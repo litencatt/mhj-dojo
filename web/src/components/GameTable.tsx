@@ -141,10 +141,7 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
     <div class={classes.join(' ')} aria-label={seatLabel(seat.seat, state.you)}>
       <div class="seat-head">
         <span class="seat-name">{seatLabel(seat.seat, state.you)}</span>
-        <span class={seat.seat === state.dealer ? 'seat-wind seat-dealer' : 'seat-wind'}>{WIND_NAMES[seat.wind]}</span>
-        <span class="seat-points">{seat.points.toLocaleString()}</span>
-        <span class="seat-rank" title="現在の順位">{state.standings[seat.seat].rank}位</span>
-        {seat.riichi && <span class="seat-riichi">リーチ</span>}
+        <SeatStatus seat={seat} state={state} />
         {!you && !seat.hand && (
           // Face down: a row of backs under the head, or on a phone one
           // back with the count on it, in the head itself (style.css), so
@@ -166,19 +163,50 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />
-      <div id={riverId} class="seat-river" aria-label="捨て牌">
-        {seat.river.map((r, i) => (
-          <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
-            <Tile
-              tile={r.tile}
-              size="xs"
-              dimmed={r.called}
-              label={riverLabel(r)}
-              className={landed && highlight?.kind === 'river' && highlight.index === i ? 'tile-landed' : undefined}
-            />
-          </span>
-        ))}
-      </div>
+      <River seat={seat} highlight={highlight} id={riverId} />
+    </div>
+  );
+}
+
+/** A seat's wind (red for the dealer), points, rank and riichi badge: in
+ * its seat's head, and for you on an upright phone in the hand panel's
+ * heading instead (GameApp). */
+export function SeatStatus({ seat, state }: { seat: Seat; state: GameState }) {
+  return (
+    <>
+      <span class={seat.seat === state.dealer ? 'seat-wind seat-dealer' : 'seat-wind'}>{WIND_NAMES[seat.wind]}</span>
+      <span class="seat-points">{seat.points.toLocaleString()}</span>
+      <span class="seat-rank" title="現在の順位">{state.standings[seat.seat].rank}位</span>
+      {seat.riichi && <span class="seat-riichi">リーチ</span>}
+    </>
+  );
+}
+
+interface RiverProps {
+  seat: Seat;
+  highlight?: PlaybackHighlight | null;
+  id?: string;
+  label?: string;
+  className?: string;
+}
+
+/** A seat's discards: the riichi tile sideways, a called one dimmed, and
+ * the one the playback just landed marked. */
+export function River({ seat, highlight, id, label = '捨て牌', className }: RiverProps) {
+  const landed = highlight?.seat === seat.seat && highlight.kind === 'river';
+  return (
+    <div id={id} class={className ? `seat-river ${className}` : 'seat-river'} aria-label={label}>
+      {seat.river.map((r, i) => (
+        <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
+          <Tile
+            tile={r.tile}
+            size="xs"
+            dimmed={r.called}
+            label={riverLabel(r)}
+            className={landed && highlight?.index === i ? 'tile-landed' : undefined}
+          />
+        </span>
+      ))}
     </div>
   );
 }

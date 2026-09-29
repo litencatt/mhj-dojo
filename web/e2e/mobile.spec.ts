@@ -308,6 +308,11 @@ for (const [label, viewport] of [
         await expect(page.getByRole('region', { name })).toBeHidden();
       }
       const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+      if (label === '390px') {
+        // A phone game has neither (practice keeps them): no dock at all.
+        await expect(dock).toHaveCount(0);
+        return;
+      }
       await expect(dock.getByRole('button')).toHaveCount(2);
       await expect(dock.getByRole('button', { name: '時系列チャート' })).toBeVisible();
       await expect(dock.getByRole('button', { name: '用語表' })).toBeVisible();

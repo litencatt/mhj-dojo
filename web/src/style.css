@@ -690,6 +690,12 @@ section {
 .hand-heading h2 {
   margin: 0;
 }
+/* Your wind, points, rank and river in the hand panel (CPU game): on an
+   upright phone only, where they replace your seat at the table (below). */
+.hand-panel .hand-status,
+.hand-panel .hand-river {
+  display: none;
+}
 /* 面子表示: each block under a labelled bracket; blocks wrap as units, and
    tiles sit closer inside a block than between blocks. With 2px inside and
    6px between, up to 7 blocks take no more width than the 4px gaps of the
@@ -1854,12 +1860,13 @@ section {
      gaps and above and below it. */
   .hand-panel {
     --hand-fixed: 40px;
+    --hand-tile: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
   }
   .hand-panel:has(.hand-tiles-grouped) {
     --hand-fixed: 54px;
   }
   .hand-panel .tile-md {
-    width: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
+    width: var(--hand-tile);
     padding: 1.5px;
     border-radius: 4px;
   }
@@ -1886,10 +1893,30 @@ section {
     position: absolute;
     inset: -8px -1px;
   }
-  /* Called melds (CPU game) get a row of their own under the hand. */
+  /* Called melds (CPU game) get a row of their own under the hand, the
+     hand and the melds both from the left edge, in the hand's tile size so
+     that four fit on the row (the called tile sideways, as at 26px). */
+  .hand-row:has(> .melds) {
+    justify-content: flex-start;
+  }
   .hand-row > .melds {
     flex-basis: 100%;
-    justify-content: center;
+    justify-content: flex-start;
+  }
+  .hand-row > .melds .tile-sm {
+    width: var(--hand-tile);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  .hand-row > .melds .meld-called .tile-sm {
+    transform: translateY(calc(var(--hand-tile) / 6)) rotate(90deg);
+    margin: 0 calc(var(--hand-tile) / 6);
+  }
+  .hand-row > .melds .meld-called.meld-added .tile-sm {
+    transform: rotate(90deg);
+    margin: calc(var(--hand-tile) / -6) calc(var(--hand-tile) / 6);
   }
   /* Discards a little smaller than the hand's tiles, which shrink with the
      screen, instead of a fixed 26px that dwarfs them on a phone. */
@@ -2370,10 +2397,12 @@ section {
   }
 }
 /* A phone upright: the CPU seats one under another at the full width, 対面,
-   上家, 下家, then the round's row and your seat; a seat with no discards
-   yet ends at its head. The rivers show every discard, so the log of moves
-   only stands in for them while they are folded away (捨て牌 ▾). On its
-   side the phone keeps the grid above, and the log. */
+   上家, 下家, then the round's row; a seat with no discards yet ends at its
+   head. Your seat moves into the hand panel: its wind, points, rank and
+   riichi beside the heading, its river under the hand. The rivers show
+   every discard, so the log of moves only stands in for them while they are
+   folded away (捨て牌 ▾). On its side the phone keeps the grid above, your
+   seat and the log. */
 @media (width <= 760px) and (height > 500px) {
   .game-table {
     grid-template-columns: minmax(0, 1fr);
@@ -2381,9 +2410,36 @@ section {
       "top"
       "left"
       "right"
-      "center"
-      "bottom";
+      "center";
     gap: 3px;
+  }
+  .game-table .seat-bottom {
+    display: none;
+  }
+  /* One line between 手牌 and 面子表示, clipped rather than wrapped. */
+  .hand-panel .hand-status {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .hand-heading > h2,
+  .hand-heading > button {
+    flex: none;
+  }
+  .hand-panel .hand-river:not(:empty) {
+    display: flex;
+    margin-top: 8px;
+  }
+  .hand-river .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
   }
   /* A revealed hand and the melds share a row, the head and the river each
      a row of their own. */

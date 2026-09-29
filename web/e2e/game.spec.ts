@@ -10,6 +10,8 @@ import type { GameResult, GameState } from '../src/api';
 // for how to re-derive it if game logic changes.
 const SEED = 12;
 
+const WIND: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
+
 /** Waits for the action POST triggered by clicking `locator` to complete,
  * so the next step never races a still-in-flight request (the UI serializes
  * requests and disables buttons while busy). This also tolerates any future
@@ -293,6 +295,53 @@ for (const [width, height] of [[390, 844], [360, 800]]) {
   });
 }
 
+// A CPU game on a phone, upright or on its side, leaves the chart and the
+// glossary to practice mode: no dock bar, even with a saved layout that has
+// them open, and upright the yaku panel reaches down to the page's bottom
+// padding (32px) instead of the dock bar's (60px). Widened to a desktop the
+// saved layout is back, and narrowed again they are gone again.
+test('a phone game has no chart, glossary or dock; the yaku panel takes the room', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('mhj-dojo.minimized.v2', '[]'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  const chart = page.getByRole('region', { name: '時系列チャート' });
+  const glossary = page.getByRole('region', { name: '用語表' });
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  const expectPhone = async () => {
+    await expect(chart).toHaveCount(0);
+    await expect(glossary).toHaveCount(0);
+    await expect(dock).toHaveCount(0);
+    await expect(page.locator('.app')).not.toHaveClass(/has-dock/);
+  };
+  await expectPhone();
+  const yaku = (await page.locator('.area-yaku').boundingBox())!;
+  expect(Math.abs(844 - (yaku.y + yaku.height) - 32)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBe(0);
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expectPhone();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(chart).toBeVisible();
+  await expect(glossary).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPhone();
+});
+
+// With the chart and the glossary minimized (the default), a desktop game
+// keeps both in the dock.
+test('a desktop game keeps the chart and the glossary in the dock', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+  await dock.getByRole('button', { name: '用語表' }).click();
+  await expect(page.getByRole('region', { name: '用語表' })).toBeVisible();
+});
+
 // A screen too short for the table, the hand and the panel together doesn't
 // pin them, which would cover the panel: early in the round (short rivers)
 // they fit and are pinned, later the page scrolls instead. Either way the
@@ -317,13 +366,17 @@ test('a 320x640 phone pins the hand only while it leaves the yaku panel room', a
     await page.evaluate(() => window.scrollTo(0, 0));
   };
   await check('true');
-  // A few turns fill the rivers: the table outgrows the room.
-  for (let i = 0; i < 8; i++) await playOneStep(page);
+  // A few turns fill the rivers: the table and the hand outgrow the room.
+  for (let i = 0; i < 20; i++) {
+    await playOneStep(page);
+    await waitForPlayback(page);
+    if ((await app.getAttribute('data-hand-fits')) === 'false') break;
+  }
   await check('false');
 });
 
-// On a phone 捨て牌 ▴/▾ folds the other seats' rivers away (your own
-// stays), leaving each seat its head, and the yaku panel the room; the log
+// On a phone 捨て牌 ▴/▾ folds the other seats' rivers away (your own, in
+// the hand panel, stays), leaving each seat its head, and the yaku panel the room; the log
 // of moves stands in for them meanwhile. The choice survives a reload.
 test('a phone folds the other seats\' rivers away with 捨て牌, and remembers it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -339,7 +392,7 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
       if (shown) await expect(page.locator(r)).toBeVisible();
       else await expect(page.locator(r)).toBeHidden();
     }
-    await expect(page.locator('.seat-bottom .seat-river')).toBeVisible();
+    await expect(handPanel(page).locator('[aria-label="自分の捨て牌"]')).toBeVisible();
     for (const seat of ['.seat-top', '.seat-left', '.seat-right']) {
       await expect(page.locator(`${seat} .seat-points`)).toBeVisible();
       await expect(page.locator(`${seat} .seat-hand-count`)).toBeVisible();
@@ -375,29 +428,105 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
 });
 
 // An upright phone stacks the CPU seats at the table's full width, 対面,
-// 上家 then 下家, over the round's row and your seat; a seat with nothing
-// under its head (your seat before your first discard) ends at its head.
+// 上家 then 下家, over the round's row; your seat is in the hand panel (see
+// below). A seat with nothing under its head (before its first discard)
+// ends at its head.
 test('an upright phone stacks the CPU seats at the full width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
-  await expect(page.locator('.seat-bottom .seat-river')).toBeHidden();
-  const seat = await box('.seat-bottom');
-  const head = await box('.seat-bottom .seat-head');
+  await expect(page.locator('.seat-bottom')).toBeHidden();
+  // Seed 12 deals you the first turn: no CPU has discarded yet.
+  await expect(page.locator('#river-top')).toBeHidden();
+  const seat = await box('.seat-top');
+  const head = await box('.seat-top .seat-head');
   expect(seat.y + seat.height - (head.y + head.height)).toBeLessThanOrEqual(5);
 
   for (let i = 0; i < 4; i++) await playOneStep(page);
   await waitForPlayback(page);
   const table = await box('.game-table');
-  const rows = await Promise.all(['.seat-top', '.seat-left', '.seat-right', '.table-center', '.seat-bottom'].map(box));
+  const rows = await Promise.all(['.seat-top', '.seat-left', '.seat-right', '.table-center'].map(box));
   expect(rows[0].width).toBeGreaterThan(table.width - 16);
   for (const r of rows) {
     expect(Math.abs(r.x - rows[0].x)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.width - rows[0].width)).toBeLessThanOrEqual(1);
   }
   for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height);
+  expect(rows[3].y + rows[3].height).toBeLessThanOrEqual(table.y + table.height);
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+});
+
+// On an upright phone your seat leaves the table for the hand panel: its
+// wind (red for the dealer), points, rank and riichi on one line beside
+// 手牌, 面子表示 still in view, and its river (the riichi tile sideways)
+// under the hand. Called melds sit on a row of their own from the hand's
+// left edge, in the hand's tile size, so four fit on one row. The response
+// is patched with a riichi and four melds, whatever the seed deals.
+test('an upright phone shows your seat in the hand panel', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
+  for (let i = 0; i < 4; i++) await playOneStep(page);
+  await waitForPlayback(page);
+  let st: GameState | null = null;
+  await page.route('**/api/games/*', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    const s = (await response.json()) as GameState;
+    const me = s.seats[s.you];
+    me.riichi = true;
+    me.river[1].riichi = true;
+    me.melds = [
+      { type: 'pon', tiles: ['5z', '5z', '5z'], from: (s.you + 1) % 4, added: false },
+      { type: 'chii', tiles: ['2s', '3s', '1s'], from: (s.you + 3) % 4, added: false },
+      { type: 'kan', tiles: ['7p', '7p', '7p', '7p'], from: (s.you + 2) % 4, added: true },
+      { type: 'ankan', tiles: ['9m', '9m', '9m', '9m'], from: -1, added: false },
+    ];
+    me.hand = me.hand!.slice(12);
+    st = s;
+    await route.fulfill({ response, json: s });
+  });
+  await page.reload();
+  await waitForPlayback(page);
+  const state = st!;
+  const me = state.seats[state.you];
+  const hand = handPanel(page);
+  await expect(page.locator('.seat-bottom')).toBeHidden();
+  const river = hand.locator('[aria-label="自分の捨て牌"]');
+  await expect(river.locator('.tile')).toHaveCount(me.river.length);
+  await expect(river.locator('.river-riichi')).toHaveCount(1);
+  const status = hand.locator('.hand-status');
+  await expect(status.locator('.seat-wind')).toHaveText(WIND[me.wind]);
+  expect(await status.locator('.seat-wind').evaluate((e) => e.classList.contains('seat-dealer'))).toBe(
+    state.dealer === state.you,
+  );
+  await expect(status.locator('.seat-points')).toHaveText(me.points.toLocaleString());
+  await expect(status.locator('.seat-rank')).toHaveText(`${state.standings[state.you].rank}位`);
+  await expect(status.locator('.seat-riichi')).toHaveText('リーチ');
+
+  for (const [width, height] of [[390, 844], [360, 800], [320, 640]]) {
+    await page.setViewportSize({ width, height });
+    const heading = (await hand.locator('.hand-heading').boundingBox())!;
+    const s = (await status.boundingBox())!;
+    const toggle = (await hand.getByRole('button', { name: '面子表示' }).boundingBox())!;
+    expect(s.height, `${width}px`).toBeLessThanOrEqual(24);
+    expect(s.x + s.width).toBeLessThanOrEqual(toggle.x);
+    expect(toggle.x + toggle.width).toBeLessThanOrEqual(heading.x + heading.width + 0.5);
+    expect(await status.evaluate((e) => e.scrollWidth <= e.clientWidth), `${width}px: the status is not clipped`).toBe(true);
+    // The melds: one row, from the hand's left edge, in its tile size.
+    const melds = hand.locator('.hand-row > .melds');
+    const bottoms = await melds
+      .locator('.meld')
+      .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().bottom)));
+    expect(bottoms).toHaveLength(4);
+    expect(new Set(bottoms).size, `${width}px: four melds on one row`).toBe(1);
+    const first = (await hand.locator('.hand-tiles').boundingBox())!;
+    expect(Math.abs((await melds.boundingBox())!.x - first.x)).toBeLessThanOrEqual(1);
+    const handTile = (await hand.locator('.hand-tiles .tile').first().boundingBox())!;
+    const meldTile = (await melds.locator('.meld > .tile').first().boundingBox())!;
+    expect(Math.abs(meldTile.width - handTile.width)).toBeLessThanOrEqual(0.5);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  }
 });
 
 // On an upright phone the rivers show every discard, so the log of moves is
@@ -428,10 +557,10 @@ test('an upright phone shows the log of moves only with the rivers folded away',
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
 });
 
-// A phone on its side and a desktop keep 上家 and 下家 side by side, and the
-// log of moves, with the rivers shown.
+// A phone on its side and a desktop keep 上家 and 下家 side by side, your
+// seat at the table, and the log of moves with the rivers shown.
 for (const [width, height] of [[844, 390], [1280, 900]]) {
-  test(`a ${width}x${height} screen keeps 上家 and 下家 side by side, and the log`, async ({ page }) => {
+  test(`a ${width}x${height} screen keeps 上家 and 下家 side by side, your seat and the log`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto(`/?mode=game&seed=${SEED}&length=tonpuu`);
     for (let i = 0; i < 2; i++) await playOneStep(page);
@@ -443,6 +572,11 @@ for (const [width, height] of [[844, 390], [1280, 900]]) {
     expect(left.x + left.width).toBeLessThanOrEqual(right.x);
     await expect(page.locator('#river-left')).toBeVisible();
     await expect(page.getByRole('list', { name: 'この局の動き' })).toBeVisible();
+    // Your seat stays at the table, not in the hand panel.
+    await expect(page.locator('.seat-bottom .seat-points')).toBeVisible();
+    await expect(page.locator('.seat-bottom .seat-river')).toBeVisible();
+    await expect(page.locator('.hand-status')).toBeHidden();
+    await expect(page.locator('.hand-river')).toBeHidden();
     expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
   });
 }

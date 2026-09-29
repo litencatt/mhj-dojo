@@ -7,7 +7,7 @@ import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, WIND_NAMES, seatLabel } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
@@ -18,6 +18,7 @@ import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from 
 import {
   gameMovedOn,
   useLastAnalysis,
+  useMediaQuery,
   usePlayback,
   useRoundLog,
   useRowNames,
@@ -35,6 +36,10 @@ const NO_TILES: TileT[] = [];
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
+// On a phone, upright or on its side (style.css), the game leaves the chart
+// and the glossary to practice mode, giving their room to the yaku table.
+const PHONE = '(width <= 760px), (height <= 500px)';
+const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
@@ -63,6 +68,7 @@ export function GameApp() {
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
   const [optionsOpen, setOptionsOpen] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
+  const phone = useMediaQuery(PHONE);
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   const { busy, error, notice, request } = useSerialRequest<GameState>(
@@ -171,7 +177,7 @@ export function GameApp() {
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
   // The tree and advice may be minimized from practice mode, but game mode has neither.
-  const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
+  const docked = (phone ? PHONE_GAME_PANELS : GAME_PANELS).filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
   // On a phone the yaku panel scrolls on its own in the height left under the
   // header, the table and the hand (style.css), as in practice.
@@ -189,10 +195,14 @@ export function GameApp() {
             <div class="header-meta">
               <VersionTag />
               <Help
-                onShowGlossary={() => {
-                  restore('gloss');
-                  focusGlossary();
-                }}
+                onShowGlossary={
+                  phone
+                    ? undefined
+                    : () => {
+                        restore('gloss');
+                        focusGlossary();
+                      }
+                }
               />
             </div>
             <form
@@ -314,6 +324,15 @@ export function GameApp() {
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
                 onlyDrawn={me.riichi}
                 melds={<Melds melds={me.melds} owner={state.you} size="sm" />}
+                status={<SeatStatus seat={table.seats[table.you]} state={table} />}
+                river={
+                  <River
+                    seat={table.seats[table.you]}
+                    highlight={playback.highlight}
+                    label="自分の捨て牌"
+                    className="hand-river"
+                  />
+                }
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
@@ -352,16 +371,18 @@ export function GameApp() {
                   } />
               )}
             </div>
-            <div class="area-chart" hidden={isMin('chart')}>
-              <ShantenChart
-                sessionId={state.game_id}
-                history={state.history}
-                currentAnalysis={chartAnalysis}
-                rowNames={rowNames}
-                minimized={isMin('chart')}
-                onMinimize={minimizeChart}
-              />
-            </div>
+            {!phone && (
+              <div class="area-chart" hidden={isMin('chart')}>
+                <ShantenChart
+                  sessionId={state.game_id}
+                  history={state.history}
+                  currentAnalysis={chartAnalysis}
+                  rowNames={rowNames}
+                  minimized={isMin('chart')}
+                  onMinimize={minimizeChart}
+                />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -374,6 +395,7 @@ export function GameApp() {
           remaining={state.remaining}
           previewTile={previewTile}
           mode="game"
+          glossary={!phone}
           isMin={isMin}
           onMinimize={minimize}
         />
