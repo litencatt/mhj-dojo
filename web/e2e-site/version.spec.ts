@@ -48,7 +48,8 @@ test('the header shows the version and the help opens', async ({ page }) => {
   if (served.release) {
     expect(served.release).toMatch(/^v\d{4}\.\d{4}\.\d+$/);
     await expect(tag).toHaveText(served.release);
-    await expect(tag).toHaveAttribute('title', new RegExp(`^リリース: ${served.release.replaceAll('.', '\\.')}\\n`));
+    // The title opens with the link's purpose, then the release (VersionTag).
+    await expect(tag).toHaveAttribute('title', new RegExp(`^更新情報を開く\\nリリース: ${served.release.replaceAll('.', '\\.')}\\n`));
   } else {
     await expect(tag).toHaveText(/^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/);
   }
