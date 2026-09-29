@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ComboRow, Remaining, Tile as TileCode, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
@@ -130,8 +130,13 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
   // saved one is kept for a wider screen).
   const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
   const active = phone ? { ...filter, query: '' } : filter;
-  // 条件をクリア on a phone keeps that hidden search text too.
-  const clearFilter = () => setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
+  // 条件をクリア on a phone keeps that hidden search text too. Its button
+  // then goes away, so focus moves to 絞り込み rather than to the page.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const clearFilter = () => {
+    setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
+    toggleRef.current?.focus();
+  };
   // The filter bar folds away behind 絞り込み, leaving the count (and
   // 条件をクリア) above the table. It starts folded on a phone, upright or on
   // its side, where the table scrolls in a short panel, and open on a wider
@@ -147,17 +152,26 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
   // chips, the count and 条件をクリア share one row: the count is shortened
   // while the bar is open, 条件をクリア is an icon, and the screen reader
   // still reads both in full.
+  const filterId = useId();
   const filterToggle = (
     <button
       type="button"
       class="yaku-filter-toggle"
+      ref={toggleRef}
       aria-expanded={filterOpen}
-      aria-controls="yaku-filter-chips yaku-filter-options"
+      aria-controls={`${filterId}-chips ${filterId}-options`}
       onClick={toggleFilter}
     >
-      絞り込み {filterOpen ? '▴' : '▾'}
+      絞り込み <span aria-hidden="true">{filterOpen ? '▴' : '▾'}</span>
     </button>
   );
+  // Crossing 760px remounts 絞り込み in its other place: keep its focus. The
+  // old one is still in the page while this renders.
+  const toggleHadFocus = useRef(false);
+  toggleHadFocus.current = toggleRef.current !== null && document.activeElement === toggleRef.current;
+  useLayoutEffect(() => {
+    if (toggleHadFocus.current) toggleRef.current?.focus();
+  }, [phone]);
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -252,7 +266,7 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
           {!phone && filterToggle}
-          <span id="yaku-filter-chips" class="yaku-filter-chips" hidden={!filterOpen}>
+          <span id={`${filterId}-chips`} class="yaku-filter-chips" hidden={!filterOpen}>
             {CATEGORIES.map((c) => (
               <button
                 key={c.key}
@@ -298,7 +312,7 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
               ))}
           </span>
         </div>
-        <div id="yaku-filter-options" class="yaku-filter-row" hidden={!filterOpen}>
+        <div id={`${filterId}-options`} class="yaku-filter-row" hidden={!filterOpen}>
           {!phone && (
             <input
               type="search"

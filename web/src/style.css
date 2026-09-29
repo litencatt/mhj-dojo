@@ -788,6 +788,10 @@ section {
 .yaku-filter-chips {
   display: contents;
 }
+/* Folded parts stay folded whatever their display. */
+.yaku-filter [hidden] {
+  display: none;
+}
 .yaku-filter-row {
   display: flex;
   flex-wrap: wrap;
