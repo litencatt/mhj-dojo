@@ -109,6 +109,8 @@ Differences from the local version:
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 
+The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, and the first release is only named, with a link to its GitHub release (`web/src/changelog.ts`). The local server serves the same page at `/info/`, from the `CHANGELOG.md` embedded in its binary.
+
 #### Deploying
 
 The build and the deploy are split into two workflows, so the release artifact isn't tied to any one host. Releases go through [tagpr](https://github.com/Songmu/tagpr) (`.tagpr`, `.github/workflows/tagpr.yml`):
