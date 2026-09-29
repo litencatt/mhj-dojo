@@ -124,6 +124,7 @@ test('a newer build: banner, reload past the cache, and no loop if the old page 
   await expect(banner).toBeVisible();
   const reload = banner.getByRole('button', { name: '再読み込み' });
   await expect(reload).toBeVisible();
+  await expect(banner.getByRole('link', { name: '変更点' })).toHaveAttribute('href', 'info/');
 
   // Checking stops once a newer build is found.
   const checks = seen.length;

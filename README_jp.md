@@ -111,7 +111,7 @@ make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo
 
 Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開しています。
 
-`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せません（`web/src/changelog.ts`）。ローカル版のサーバーも、バイナリに埋め込んだ `CHANGELOG.md` から同じページを `/info/` で出します。
+`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せず、最初のリリースは「最初の公開」と GitHub のリリースへのリンクだけにします（`web/src/changelog.ts`）。ローカル版のサーバーも、バイナリに埋め込んだ `CHANGELOG.md` から同じページを `/info/` で出します。
 
 #### デプロイ
 

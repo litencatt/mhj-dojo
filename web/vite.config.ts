@@ -162,6 +162,7 @@ export default defineConfig(({ command, mode }) => {
         outDir: 'dist-site',
         emptyOutDir: true,
         rolldownOptions: { input: PAGES },
+        modulePreload: { polyfill: false },
       },
     };
   }
@@ -177,6 +178,9 @@ export default defineConfig(({ command, mode }) => {
       outDir: '../internal/server/static',
       emptyOutDir: true,
       rolldownOptions: { input: PAGES },
+      // The two pages would otherwise share it as a chunk of its own; the
+      // browsers the build targets all have modulepreload.
+      modulePreload: { polyfill: false },
     },
     server: {
       proxy: {

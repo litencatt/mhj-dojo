@@ -1,23 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { forUsersOnly, parseChangelog } from '../src/changelog';
 
 // The 更新情報 page (info/), which the site build renders from CHANGELOG.md:
 // the releases newest first, without the authors or the repository's own
 // changes, with links back to the app.
 
-const CHANGELOG = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
-const NEWEST = /^## \[(v[^\]]+)\]/m.exec(CHANGELOG)![1];
-// The newest pull request shown: the first item outside the hidden
-// categories and the E2E-only changes.
-const SHOWN = (() => {
-  let hidden = false;
-  for (const line of CHANGELOG.split('\n')) {
-    if (line.startsWith('### ')) hidden = ['CI・リポジトリ', '依存関係'].includes(line.slice(4));
-    const m = /^- (.+) by @\S+ in \S+\/pull\/(\d+)$/.exec(line);
-    if (m && !hidden && !m[1].includes('E2E')) return { title: m[1], number: m[2] };
-  }
-  throw new Error('no item in CHANGELOG.md');
-})();
+const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8')));
+const NEWEST = RELEASES[0].version;
+// The newest pull request shown.
+const SHOWN = RELEASES.flatMap((r) => r.sections.flatMap((s) => s.items))[0];
+const FIRST = RELEASES.at(-1)!.version;
 
 test('info/ lists the releases, newest first, for users', async ({ page }) => {
   const res = await page.goto('./info/');
@@ -31,7 +24,7 @@ test('info/ lists the releases, newest first, for users', async ({ page }) => {
   await expect(main.locator('.release').first().locator('.release-version')).toHaveText(NEWEST);
   const item = main.getByRole('listitem').filter({ hasText: SHOWN.title });
   await expect(item).toHaveCount(1);
-  await expect(item.getByRole('link', { name: `#${SHOWN.number}` })).toHaveAttribute('href', `https://github.com/litencatt/mhj-dojo/pull/${SHOWN.number}`);
+  await expect(item.getByRole('link', { name: `#${SHOWN.pr!.number}` })).toHaveAttribute('href', `https://github.com/litencatt/mhj-dojo/pull/${SHOWN.pr!.number}`);
   expect(await main.textContent()).not.toContain('by @');
 
   // The repository's own changes are left out, and a release with nothing
@@ -41,6 +34,13 @@ test('info/ lists the releases, newest first, for users', async ({ page }) => {
   await expect(main).not.toContainText('Bump vite');
   await expect(main).not.toContainText('E2E');
   await expect(page.locator('#v2026\\.0927\\.1')).toContainText('内部の改善のみ');
+
+  // The first release is only named, not its whole history.
+  const first = main.locator('.release').last();
+  await expect(first.locator('.release-version')).toHaveText(FIRST);
+  await expect(first).toContainText('最初の公開');
+  await expect(first.getByRole('link', { name: 'GitHub のリリース' })).toHaveAttribute('href', `https://github.com/litencatt/mhj-dojo/releases/tag/${FIRST}`);
+  await expect(main).not.toContainText('Add CI workflow');
 });
 
 test('info/ links back to practice and the CPU game', async ({ page }) => {
@@ -74,4 +74,20 @@ test('info/ fits a phone: no sideways scroll at 390px', async ({ page }) => {
   await page.goto('./info/');
   await expect(page.locator('.release').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});
+
+test('the new-version banner links to info/ and stays one line on a phone', async ({ page }) => {
+  await page.route('**/version.json*', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: 'fffffff', id: 'ffffffffffffffff', built: '2099-01-01T00:00:00.000Z' }) }),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./?seed=1&turns=18');
+  const banner = page.locator('.update-banner');
+  await expect(banner).toContainText('新しいバージョンがあります');
+  const b = (await banner.boundingBox())!;
+  expect(b.x).toBeGreaterThanOrEqual(0);
+  expect(b.x + b.width).toBeLessThanOrEqual(390);
+  expect(b.height).toBeLessThan(56);
+  await banner.getByRole('link', { name: '変更点' }).click();
+  await expect(page).toHaveURL(/\/info\/$/);
 });

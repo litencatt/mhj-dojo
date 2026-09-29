@@ -32,35 +32,41 @@ export interface Release {
 }
 
 const RELEASE = /^## \[(v[^\]]+)\]\([^)]*\) - (\d{4}-\d{2}-\d{2})\s*$/;
-const ITEM = /^- (.+?) by @(\S+) in (https:\/\/\S+\/pull\/(\d+))\s*$/;
+const ITEM = /^- (.+?) by @(\S+) in (\S+)\s*$/;
+// This repository's pull requests: any other URL gets no link.
+const PR_URL = /^https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/(\d+)$/;
 
-/** The releases in CHANGELOG.md, in its order (newest first). */
+/** The releases in CHANGELOG.md, in its order (newest first). Any other
+ * ## section (such as New Contributors) is left out up to the next release,
+ * and so are the lines that are not a release note's item. */
 export function parseChangelog(md: string): Release[] {
   const releases: Release[] = [];
+  let release: Release | null = null;
   for (const line of md.split(/\r?\n/)) {
     const r = RELEASE.exec(line);
     if (r) {
-      releases.push({ version: r[1], date: r[2], sections: [] });
+      release = { version: r[1], date: r[2], sections: [] };
+      releases.push(release);
       continue;
     }
-    const release = releases.at(-1);
+    if (line.startsWith('## ')) {
+      release = null;
+      continue;
+    }
     if (!release) continue;
     if (line.startsWith('### ')) {
       release.sections.push({ category: line.slice(4).trim(), items: [] });
       continue;
     }
-    if (!line.startsWith('- ')) continue;
+    const m = ITEM.exec(line);
+    if (!m) continue;
     let section = release.sections.at(-1);
     if (!section) {
       section = { category: null, items: [] };
       release.sections.push(section);
     }
-    const m = ITEM.exec(line);
-    section.items.push(
-      m
-        ? { title: m[1], author: m[2], pr: { number: Number(m[4]), url: m[3] } }
-        : { title: line.slice(2).trim(), author: null, pr: null },
-    );
+    const pr = PR_URL.exec(m[3]);
+    section.items.push({ title: m[1], author: m[2], pr: pr ? { number: Number(pr[1]), url: m[3] } : null });
   }
   return releases;
 }
@@ -77,13 +83,18 @@ function forUsers(category: string | null, item: ChangelogItem): boolean {
 
 /** The releases with only the items for the app's users. A release left
  * with none stays (with no sections): the header shows its version, so the
- * page lists it too. */
+ * page lists it too. The oldest release, the first one published, is only
+ * named (renderChangelog): its notes, from before the notes had categories,
+ * are the whole project's history. */
 export function forUsersOnly(releases: Release[]): Release[] {
-  return releases.map((r) => ({
+  return releases.map((r, i) => ({
     ...r,
-    sections: r.sections
-      .map((s) => ({ ...s, items: s.items.filter((it) => forUsers(s.category, it)) }))
-      .filter((s) => s.items.length > 0),
+    sections:
+      i === releases.length - 1
+        ? []
+        : r.sections
+            .map((s) => ({ ...s, items: s.items.filter((it) => forUsers(s.category, it)) }))
+            .filter((s) => s.items.length > 0),
   }));
 }
 
@@ -95,12 +106,18 @@ function inline(title: string): string {
   return escape(title).replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-/** The releases as HTML (one <section> each, with the version as its id). */
+const RELEASE_URL = 'https://github.com/litencatt/mhj-dojo/releases/tag/';
+
+/** The releases as HTML (one <section> each, with the version as its id);
+ * the last, the oldest, as the first release. */
 export function renderChangelog(releases: Release[]): string {
+  if (releases.length === 0) return '<p class="release-internal">まだリリースはありません。</p>';
   return releases
-    .map((r) => {
+    .map((r, i) => {
       const body =
-        r.sections.length === 0
+        i === releases.length - 1
+          ? `<p class="release-internal">最初の公開 <a class="release-pr" href="${RELEASE_URL}${encodeURIComponent(r.version)}" target="_blank" rel="noopener">GitHub のリリース</a></p>`
+          : r.sections.length === 0
           ? '<p class="release-internal">内部の改善のみ</p>'
           : r.sections
               .map((s) => {

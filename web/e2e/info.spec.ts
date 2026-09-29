@@ -32,3 +32,15 @@ test('the help opens /info/ and it links back to the app', async ({ page }) => {
   await expect(page).toHaveURL(/\/\?mode=game$/);
   await expect(page.locator('.app-header h1')).toContainText('CPU対戦');
 });
+
+test('練習 goes back to the practice session the page came from', async ({ page }) => {
+  await page.goto('/?seed=1&turns=18');
+  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await expect(page).toHaveURL(/session=/);
+  const practice = page.url();
+  await page.locator('.app-header .version-tag').click();
+  await expect(page).toHaveURL(/\/info\/$/);
+  await expect(page.locator('.release').first()).toBeVisible();
+  await page.getByRole('navigation').getByRole('link', { name: '練習' }).click();
+  await expect(page).toHaveURL(practice);
+});

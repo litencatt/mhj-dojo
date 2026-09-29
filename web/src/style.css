@@ -1342,7 +1342,8 @@ section {
   font-size: 0.9rem;
 }
 .update-banner-info {
-  color: inherit;
+  color: var(--accent);
+  white-space: nowrap;
 }
 .update-banner-reload {
   padding: 4px 12px;
@@ -2198,16 +2199,22 @@ section {
     font-size: 1.1rem;
   }
 
-  /* The site's update notice: fitted to the screen. */
+  /* The site's update notice: fitted to the screen, on one line at 390px. */
   .update-banner {
     bottom: calc(12px + env(safe-area-inset-bottom));
     width: max-content;
     max-width: calc(100vw - 16px);
+    gap: 8px;
+    padding: 6px 6px 6px 12px;
     font-size: 0.85rem;
   }
   .update-banner-reload,
   .update-banner-close {
     min-height: 36px;
+  }
+  .update-banner-reload {
+    padding: 4px 10px;
+    white-space: nowrap;
   }
 }
 
