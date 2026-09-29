@@ -52,22 +52,38 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
   const logRef = useRef<HTMLOListElement>(null);
   const rivers = useRiversShown();
   // The newest move stays in sight: the log scrolls to its end as moves land
-  // (its bottom, or on a phone, where it runs sideways, its right end), and
-  // when it comes back on an upright phone, where the rivers stand in for it
-  // while they are shown (style.css).
+  // (its bottom, or on a phone, where it runs sideways, its right end), but
+  // only while it is there, so a player reading earlier moves stays put.
+  const atEnd = useRef(true);
+  const snap = (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight;
+    el.scrollLeft = el.scrollWidth;
+    atEnd.current = true;
+  };
+  const onLogScroll = (e: Event) => {
+    const el = e.currentTarget as HTMLElement;
+    atEnd.current =
+      el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+  };
+  const logLength = useRef(log.length);
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-      el.scrollLeft = el.scrollWidth;
-    }
-  }, [log.length, rivers.shown]);
-  // A phone turned on its side keeps the newest in sight too.
+    // A shorter log is a new round's: it starts over at its end.
+    const newRound = log.length < logLength.current;
+    logLength.current = log.length;
+    if (el && (atEnd.current || newRound)) snap(el);
+  }, [log.length]);
+  // A phone turned on its side keeps the newest in sight too, and so does
+  // the log coming back on an upright phone, where the rivers stand in for
+  // it while they are shown (style.css): hidden, it lost its place.
   useEffect(() => {
     const el = logRef.current;
     if (!el || typeof ResizeObserver !== 'function') return;
+    let width = el.clientWidth;
     const ro = new ResizeObserver(() => {
-      el.scrollLeft = el.scrollWidth;
+      const was = width;
+      width = el.clientWidth;
+      if (width > 0 && (was === 0 || atEnd.current)) snap(el);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -98,7 +114,7 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
         </div>
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
         {/* Focusable so a keyboard can scroll it too. */}
-        <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0}>
+        <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0} onScroll={onLogScroll}>
           {log.map((e, i) => (
             <li key={i}>
               <span class="event-seat">{seatLabel(e.seat, state.you)}</span>
