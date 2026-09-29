@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { WASM } from '../api';
 
 export interface HelpProps {
-  onShowGlossary: () => void; // bring the 用語表 panel back from the dock and show it
+  // Brings the 用語表 panel back from the dock and shows it; without it (a CPU
+  // game on a phone, which has no glossary) the help points to practice mode.
+  onShowGlossary?: () => void;
 }
 
 // How the UI names tiles (tiles.ts tileName); the codes (5p, 0m, 7z) stay internal.
@@ -44,7 +46,7 @@ export function Help({ onShowGlossary }: HelpProps) {
     // before the glossary takes the focus.
     ref.current?.close();
     setOpen(false);
-    onShowGlossary();
+    onShowGlossary?.();
   };
 
   return (
@@ -84,11 +86,18 @@ export function Help({ onShowGlossary }: HelpProps) {
               </button>
             </div>
             <p class="help-lead">
-              麻雀の用語は
-              <button type="button" class="help-link" onClick={showGlossary}>
-                用語表
-              </button>
-              で調べられます。このアプリの画面の項目は、下の「画面の用語」にあります。
+              {onShowGlossary ? (
+                <>
+                  麻雀の用語は
+                  <button type="button" class="help-link" onClick={showGlossary}>
+                    用語表
+                  </button>
+                  で調べられます。
+                </>
+              ) : (
+                '麻雀の用語は練習モードの用語表で調べられます。'
+              )}
+              このアプリの画面の項目は、下の「画面の用語」にあります。
             </p>
 
             <section aria-labelledby="help-about">
@@ -191,7 +200,7 @@ export function Help({ onShowGlossary }: HelpProps) {
             <section aria-labelledby="help-game">
               <h3 id="help-game">CPU対戦</h3>
               <p>
-                ヘッダーの「CPU対戦へ」から、CPU3人と東風戦・半荘戦を、鳴き・リーチ・点数計算ありで打てます。役別向聴の表と用語表も使えます。
+                ヘッダーの「CPU対戦へ」から、CPU3人と東風戦・半荘戦を、鳴き・リーチ・点数計算ありで打てます。役別向聴の表と用語表も使えます（スマートフォンでは役別向聴の表を広く取るため、時系列チャートと用語表は練習モードだけです）。
               </p>
             </section>
 

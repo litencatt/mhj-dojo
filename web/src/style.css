@@ -201,9 +201,27 @@ h2 {
   font-size: 0.75rem;
   color: var(--muted);
 }
+/* The safe-area insets as lengths useYakuTop (hooks.ts) can read. */
+@property --safe-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --safe-bottom {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
 /* The CPU game's 「設定」, folding the new-game options away: phones only. */
 .options-toggle {
   display: none;
+}
+/* The CPU game's options come after the status in the page (for a phone's
+   focus order, GameApp) but show on the first row. */
+@media (width > 760px) {
+  .app-game .app-header > .header-status {
+    order: 1;
+  }
 }
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
@@ -689,6 +707,12 @@ section {
 }
 .hand-heading h2 {
   margin: 0;
+}
+/* Your wind, points, rank and river in the hand panel (CPU game): on an
+   upright phone only, where they replace your seat at the table (below). */
+.hand-panel .hand-status,
+.hand-panel .hand-river {
+  display: none;
 }
 /* 面子表示: each block under a labelled bracket; blocks wrap as units, and
    tiles sit closer inside a block than between blocks. With 2px inside and
@@ -1850,9 +1874,6 @@ section {
   }
   /* CPU game: the new-game options fold away under the status once a game
      is on, 「設定」 at the end of the dora row opening them there. */
-  .new-game-options {
-    order: 1;
-  }
   .new-game-options-closed {
     display: none;
   }
@@ -1881,12 +1902,13 @@ section {
      gaps and above and below it. */
   .hand-panel {
     --hand-fixed: 40px;
+    --hand-tile: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
   }
   .hand-panel:has(.hand-tiles-grouped) {
     --hand-fixed: 54px;
   }
   .hand-panel .tile-md {
-    width: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
+    width: var(--hand-tile);
     padding: 1.5px;
     border-radius: 4px;
   }
@@ -1913,10 +1935,30 @@ section {
     position: absolute;
     inset: -8px -1px;
   }
-  /* Called melds (CPU game) get a row of their own under the hand. */
+  /* Called melds (CPU game) get a row of their own under the hand, the
+     hand and the melds both from the left edge, in the hand's tile size so
+     that four fit on the row (the called tile sideways, as at 26px). */
+  .hand-row:has(> .melds) {
+    justify-content: flex-start;
+  }
   .hand-row > .melds {
     flex-basis: 100%;
-    justify-content: center;
+    justify-content: flex-start;
+  }
+  .hand-row > .melds .tile-sm {
+    width: var(--hand-tile);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  .hand-row > .melds .meld-called .tile-sm {
+    transform: translateY(calc(var(--hand-tile) / 6)) rotate(90deg);
+    margin: 0 calc(var(--hand-tile) / 6);
+  }
+  .hand-row > .melds .meld-called.meld-added .tile-sm {
+    transform: rotate(90deg);
+    margin: calc(var(--hand-tile) / -6) calc(var(--hand-tile) / 6);
   }
   /* Discards a little smaller than the hand's tiles, which shrink with the
      screen, instead of a fixed 26px that dwarfs them on a phone. */
@@ -2023,6 +2065,8 @@ section {
   .app-practice,
   .app-game {
     --yaku-bottom: 32px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
   .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
@@ -2409,6 +2453,84 @@ section {
   }
   .seat-wind {
     padding: 0 1px;
+  }
+}
+/* A phone upright: the CPU seats one under another at the full width, 対面,
+   上家, 下家, then the round's row; a seat with no discards yet ends at its
+   head. Your seat moves into the hand panel: its wind, points, rank and
+   riichi beside the heading, its river under the hand. The rivers show
+   every discard, so the log of moves only stands in for them while they are
+   folded away (捨て牌 ▾). On its side the phone keeps the grid above, your
+   seat and the log. */
+@media (width <= 760px) and (height > 500px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "center";
+    gap: 3px;
+  }
+  .game-table .seat-bottom {
+    display: none;
+  }
+  /* Your turn: the hand panel marked as your seat's box was. */
+  .hand-panel.hand-acting {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  /* One line between 手牌 and 面子表示, clipped rather than wrapped. */
+  .hand-panel .hand-status {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .hand-heading > h2,
+  .hand-heading > button {
+    flex: none;
+  }
+  .hand-panel .hand-river:not(:empty) {
+    display: flex;
+    margin-top: 8px;
+  }
+  .hand-river .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
+  /* A revealed hand and the melds share a row, the head and the river each
+     a row of their own. */
+  .seat-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 8px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .seat-box > .seat-head,
+  .seat-box > .seat-river {
+    flex-basis: 100%;
+  }
+  .seat-river:empty {
+    display: none;
+  }
+  .seat-box > :has(+ .seat-river:empty) {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="shown"] .event-log {
+    display: none;
+  }
+  /* The round's row alone: 捨て牌 reaches down into the padding too. */
+  .game-table[data-rivers="shown"] .table-center {
+    padding-bottom: 0;
   }
 }
 

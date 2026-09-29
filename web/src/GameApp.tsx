@@ -7,7 +7,7 @@ import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, WIND_NAMES, seatLabel } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
@@ -18,6 +18,7 @@ import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from 
 import {
   gameMovedOn,
   useLastAnalysis,
+  useMediaQuery,
   usePlayback,
   useRoundLog,
   useRowNames,
@@ -35,6 +36,12 @@ const NO_TILES: TileT[] = [];
 
 // Game mode has no branch tree: the round only moves forward.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
+// On a phone, upright or on its side (style.css), the game leaves the chart
+// and the glossary to practice mode, giving their room to the yaku table. A
+// short window is a phone on its side only with a touch screen: a desktop
+// window made short keeps them.
+const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
+const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
@@ -62,7 +69,13 @@ export function GameApp() {
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  // The game shown: a new one (from the form, the final panel or the URL)
+  // folds the options away.
+  const shownGame = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
+  const phone = useMediaQuery(PHONE);
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   const { busy, error, notice, request } = useSerialRequest<GameState>(
@@ -70,6 +83,10 @@ export function GameApp() {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
         setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
+      }
+      if (shownGame.current !== next.game_id) {
+        shownGame.current = next.game_id;
+        setOptionsOpen(false);
       }
       setState(next);
       setPreviewTile(null);
@@ -129,10 +146,18 @@ export function GameApp() {
     void request(() => api.gameAction(state.game_id, type, tile, tiles));
   }
 
-  function handleNewGame(e: Event) {
+  // The options stay open until the new game is on (a failed request keeps
+  // them, as chosen); then, if they were submitted from the keyboard, focus
+  // goes back to 設定 instead of dropping to the page once they fold away,
+  // unless the player has moved it elsewhere meanwhile.
+  async function handleNewGame(e: Event) {
     e.preventDefault();
-    setOptionsOpen(false);
-    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    const fromForm = !!formRef.current?.contains(document.activeElement);
+    const started = await startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    const toggle = toggleRef.current;
+    if (!started || !toggle || toggle.offsetParent === null) return;
+    const active = document.activeElement;
+    if (fromForm && (active === document.body || formRef.current?.contains(active))) toggle.focus();
   }
 
   // After a call the analysis is empty; the chart keeps the rows from before.
@@ -171,7 +196,7 @@ export function GameApp() {
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
   // The tree and advice may be minimized from practice mode, but game mode has neither.
-  const docked = GAME_PANELS.filter((p) => minimized.includes(p.key));
+  const docked = (phone ? PHONE_GAME_PANELS : GAME_PANELS).filter((p) => minimized.includes(p.key));
   const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
   // On a phone the yaku panel scrolls on its own in the height left under the
   // header, the table and the hand (style.css), as in practice.
@@ -189,49 +214,16 @@ export function GameApp() {
             <div class="header-meta">
               <VersionTag />
               <Help
-                onShowGlossary={() => {
-                  restore('gloss');
-                  focusGlossary();
-                }}
+                onShowGlossary={
+                  phone
+                    ? undefined
+                    : () => {
+                        restore('gloss');
+                        focusGlossary();
+                      }
+                }
               />
             </div>
-            <form
-              id="new-game-options"
-              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
-              onSubmit={handleNewGame}
-            >
-              <label>
-                対局
-                <select value={optionsInput.length} onChange={setOption('length')}>
-                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-                </select>
-              </label>
-              <label>
-                起家
-                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-                  <option value="random">{DEALER_NAMES.random}</option>
-                  <option value="you">{DEALER_NAMES.you}</option>
-                </select>
-              </label>
-              <label>
-                CPU
-                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-                  <option value="weak">{CPU_NAMES.weak}</option>
-                  <option value="normal">{CPU_NAMES.normal}</option>
-                </select>
-              </label>
-              <label>
-                シード
-                <input
-                  type="number"
-                  value={seedInput}
-                  placeholder="ランダム"
-                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              <button type="submit" disabled={busy}>新規対局</button>
-            </form>
             {state && table && (
               <div class="header-status">
                 <dl class="game-status">
@@ -269,6 +261,7 @@ export function GameApp() {
                   uraDora={table.ura_dora}
                 />
                 <button
+                  ref={toggleRef}
                   type="button"
                   class="options-toggle"
                   aria-expanded={optionsOpen}
@@ -279,6 +272,54 @@ export function GameApp() {
                 </button>
               </div>
             )}
+            {/* After the status, so that on a phone Tab goes from 設定 into
+                the options it opens; a desktop shows them on the first row
+                (style.css). */}
+            <form
+              id="new-game-options"
+              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
+              ref={formRef}
+              onSubmit={handleNewGame}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && state && optionsOpen) {
+                  e.preventDefault();
+                  setOptionsOpen(false);
+                  toggleRef.current?.focus();
+                }
+              }}
+            >
+              <label>
+                対局
+                <select value={optionsInput.length} onChange={setOption('length')}>
+                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+                </select>
+              </label>
+              <label>
+                起家
+                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+                  <option value="random">{DEALER_NAMES.random}</option>
+                  <option value="you">{DEALER_NAMES.you}</option>
+                </select>
+              </label>
+              <label>
+                CPU
+                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+                  <option value="weak">{CPU_NAMES.weak}</option>
+                  <option value="normal">{CPU_NAMES.normal}</option>
+                </select>
+              </label>
+              <label>
+                シード
+                <input
+                  type="number"
+                  value={seedInput}
+                  placeholder="ランダム"
+                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <button type="submit" disabled={busy}>新規対局</button>
+            </form>
           </header>
           {error && (
             <div class="error-banner" role="alert">
@@ -314,6 +355,16 @@ export function GameApp() {
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
                 onlyDrawn={me.riichi}
                 melds={<Melds melds={me.melds} owner={state.you} size="sm" />}
+                status={<SeatStatus seat={table.seats[table.you]} state={table} />}
+                river={
+                  <River
+                    seat={table.seats[table.you]}
+                    highlight={playback.highlight}
+                    label="自分の捨て牌"
+                    className="hand-river"
+                  />
+                }
+                acting={!playback.playing && table.actor === table.you}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
               />
@@ -352,16 +403,18 @@ export function GameApp() {
                   } />
               )}
             </div>
-            <div class="area-chart" hidden={isMin('chart')}>
-              <ShantenChart
-                sessionId={state.game_id}
-                history={state.history}
-                currentAnalysis={chartAnalysis}
-                rowNames={rowNames}
-                minimized={isMin('chart')}
-                onMinimize={minimizeChart}
-              />
-            </div>
+            {!phone && (
+              <div class="area-chart" hidden={isMin('chart')}>
+                <ShantenChart
+                  sessionId={state.game_id}
+                  history={state.history}
+                  currentAnalysis={chartAnalysis}
+                  rowNames={rowNames}
+                  minimized={isMin('chart')}
+                  onMinimize={minimizeChart}
+                />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -374,6 +427,7 @@ export function GameApp() {
           remaining={state.remaining}
           previewTile={previewTile}
           mode="game"
+          glossary={!phone}
           isMin={isMin}
           onMinimize={minimize}
         />
