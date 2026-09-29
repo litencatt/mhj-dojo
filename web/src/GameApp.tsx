@@ -231,10 +231,13 @@ export function GameApp() {
             {state && table && (
               <div class="header-status">
                 <dl class="game-status">
-                  <div>
-                    <dt>シード</dt>
-                    <dd>{state.seed ?? '終局後に表示'}</dd>
-                  </div>
+                  {/* A random seed is hidden until the game ends: nothing to show before then. */}
+                  {state.seed !== null && (
+                    <div>
+                      <dt>シード</dt>
+                      <dd>{state.seed}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt class="status-dt-obvious">対局</dt>
                     <dd>{LENGTH_NAMES[state.length]}</dd>
