@@ -111,7 +111,7 @@ test('a CPU game runs in the browser and a reload resumes it', async ({ page }) 
     logged = await log.count();
   }
   await expect(page.locator('.seat-bottom .seat-river .tile')).not.toHaveCount(0);
-  expect(logged).toBeGreaterThanOrEqual(await page.locator('.seat-river .tile').count());
+  expect(logged).toBeGreaterThanOrEqual(await page.locator('.game-table .seat-river .tile').count());
 
   const id = gameId(page);
   expect(id).toBeTruthy();

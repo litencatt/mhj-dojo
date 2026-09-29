@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ComboRow, Remaining, Tile as TileCode, YakuRow } from '../api';
 import { Tile, mouseOnly } from './Tile';
 import { PanelHeading } from './PanelHeading';
@@ -12,7 +12,9 @@ import {
   applyYakuFilter,
   isDefaultFilter,
   loadFilter,
+  loadFilterOpen,
   saveFilter,
+  saveFilterOpen,
   type Category,
   type SortOrder,
   type YakuFilter,
@@ -128,8 +130,48 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
   // saved one is kept for a wider screen).
   const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
   const active = phone ? { ...filter, query: '' } : filter;
-  // 条件をクリア on a phone keeps that hidden search text too.
-  const clearFilter = () => setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
+  // 条件をクリア on a phone keeps that hidden search text too. Its button
+  // then goes away, so focus moves to 絞り込み rather than to the page.
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const clearFilter = () => {
+    setFilter(phone ? { ...DEFAULT_FILTER, query: filter.query } : DEFAULT_FILTER);
+    toggleRef.current?.focus();
+  };
+  // The filter bar folds away behind 絞り込み, leaving the count (and
+  // 条件をクリア) above the table. It starts folded on a phone, upright or on
+  // its side, where the table scrolls in a short panel, and open on a wider
+  // screen; once toggled, the player's choice holds on every screen size.
+  const compact = useMediaQuery('(width <= 760px), (height <= 500px)');
+  const [savedOpen, setSavedOpen] = useState(loadFilterOpen);
+  const filterOpen = savedOpen ?? !compact;
+  const toggleFilter = () => {
+    setSavedOpen(!filterOpen);
+    saveFilterOpen(!filterOpen);
+  };
+  // On a phone (no 複合役 in between) 絞り込み sits in the heading, and the
+  // chips, the count and 条件をクリア share one row: the count is shortened
+  // while the bar is open, 条件をクリア is an icon, and the screen reader
+  // still reads both in full.
+  const filterId = useId();
+  const filterToggle = (
+    <button
+      type="button"
+      class="yaku-filter-toggle"
+      ref={toggleRef}
+      aria-expanded={filterOpen}
+      aria-controls={`${filterId}-chips ${filterId}-options`}
+      onClick={toggleFilter}
+    >
+      絞り込み <span aria-hidden="true">{filterOpen ? '▴' : '▾'}</span>
+    </button>
+  );
+  // Crossing 760px remounts 絞り込み in its other place: keep its focus. The
+  // old one is still in the page while this renders.
+  const toggleHadFocus = useRef(false);
+  toggleHadFocus.current = toggleRef.current !== null && document.activeElement === toggleRef.current;
+  useLayoutEffect(() => {
+    if (toggleHadFocus.current) toggleRef.current?.focus();
+  }, [phone]);
 
   // Tooltip with the hovered/focused yaku's conditions. It is fixed to the
   // viewport so the scrolling table panel cannot clip it. It opens below the
@@ -217,12 +259,60 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
 
   return (
     <section class="yaku-table-panel" aria-label="役別向聴テーブル">
-      <PanelHeading title="役別向聴" onMinimize={onMinimize}>
+      <PanelHeading title="役別向聴" onMinimize={onMinimize} actions={phone && filterToggle}>
         {previewTile && <span class="preview-note"> — {tileName(previewTile)} を打牌した場合のプレビュー</span>}
       </PanelHeading>
       {!phone && <ComboTable combos={combos} base={baseCombos} remaining={remaining} />}
       <div class="yaku-filter" role="group" aria-label="役の絞り込み">
         <div class="yaku-filter-row">
+          {!phone && filterToggle}
+          <span id={`${filterId}-chips`} class="yaku-filter-chips" hidden={!filterOpen}>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
+                aria-pressed={filter.categories.includes(c.key)}
+                onClick={() => toggleCategory(c.key)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </span>
+          <span class="yaku-filter-status">
+            {phone && filterOpen ? (
+              <span class="yaku-filter-count">
+                <span aria-hidden="true">
+                  {visibleCount}/{total}
+                </span>
+                <span class="visually-hidden">
+                  {visibleCount} / {total}役を表示中
+                </span>
+              </span>
+            ) : (
+              <span class="yaku-filter-count">
+                {visibleCount} / {total}役を表示中
+              </span>
+            )}
+            {!isDefaultFilter(active) &&
+              (phone ? (
+                <button
+                  type="button"
+                  class="filter-clear filter-clear-icon"
+                  onClick={clearFilter}
+                  aria-label="条件をクリア"
+                  title="条件をクリア"
+                >
+                  ✕
+                </button>
+              ) : (
+                <button type="button" class="filter-clear" onClick={clearFilter}>
+                  条件をクリア
+                </button>
+              ))}
+          </span>
+        </div>
+        <div id={`${filterId}-options`} class="yaku-filter-row" hidden={!filterOpen}>
           {!phone && (
             <input
               type="search"
@@ -262,29 +352,6 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
               <option value="ukeire">有効牌が多い順</option>
             </select>
           </label>
-        </div>
-        <div class="yaku-filter-row">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              class={`filter-chip ${filter.categories.includes(c.key) ? 'filter-chip-on' : ''}`}
-              aria-pressed={filter.categories.includes(c.key)}
-              onClick={() => toggleCategory(c.key)}
-            >
-              {c.label}
-            </button>
-          ))}
-          <span class="yaku-filter-status">
-            <span class="yaku-filter-count">
-              {visibleCount} / {total}役を表示中
-            </span>
-            {!isDefaultFilter(active) && (
-              <button type="button" class="filter-clear" onClick={clearFilter}>
-                条件をクリア
-              </button>
-            )}
-          </span>
         </div>
       </div>
       {tip && YAKU_CONDITIONS[tip.key] && (

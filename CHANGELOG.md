@@ -1,5 +1,11 @@
 # Changelog
 
+## [v2026.0929.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0929.0...v2026.0929.1) - 2026-09-29
+
+### 新機能
+- 役別向聴: 絞り込みをトグルでたたむ・条件をクリアで高さが変わらないように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/141
+- CPU 対戦（スマホ縦）: 席を横長に並べ、自分の情報を手牌の欄に、チャート・用語表をなくして役別向聴を広く by @litencatt in https://github.com/litencatt/mhj-dojo/pull/143
+
 ## [v2026.0929.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0928.1...v2026.0929.0) - 2026-09-29
 
 ### 新機能

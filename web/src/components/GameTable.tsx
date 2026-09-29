@@ -52,20 +52,39 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
   const logRef = useRef<HTMLOListElement>(null);
   const rivers = useRiversShown();
   // The newest move stays in sight: the log scrolls to its end as moves land
-  // (its bottom, or on a phone, where it runs sideways, its right end).
+  // (its bottom, or on a phone, where it runs sideways, its right end), but
+  // only while it is there, so a player reading earlier moves stays put.
+  const atEnd = useRef(true);
+  const snap = (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight;
+    el.scrollLeft = el.scrollWidth;
+    atEnd.current = true;
+  };
+  const onLogScroll = (e: Event) => {
+    const el = e.currentTarget as HTMLElement;
+    atEnd.current =
+      el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+  };
+  // A new round's log starts over at its end.
+  const round = `${state.round_wind}${state.round_number}-${state.honba}`;
+  const shownRound = useRef(round);
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-      el.scrollLeft = el.scrollWidth;
-    }
-  }, [log.length]);
-  // A phone turned on its side keeps the newest in sight too.
+    const newRound = round !== shownRound.current;
+    shownRound.current = round;
+    if (el && (atEnd.current || newRound)) snap(el);
+  }, [log.length, round]);
+  // A phone turned on its side keeps the newest in sight too, and so does
+  // the log coming back on an upright phone, where the rivers stand in for
+  // it while they are shown (style.css): hidden, it lost its place.
   useEffect(() => {
     const el = logRef.current;
     if (!el || typeof ResizeObserver !== 'function') return;
+    let width = el.clientWidth;
     const ro = new ResizeObserver(() => {
-      el.scrollLeft = el.scrollWidth;
+      const was = width;
+      width = el.clientWidth;
+      if (width > 0 && (was === 0 || atEnd.current)) snap(el);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -96,7 +115,7 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
         </div>
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
         {/* Focusable so a keyboard can scroll it too. */}
-        <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0}>
+        <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0} onScroll={onLogScroll}>
           {log.map((e, i) => (
             <li key={i}>
               <span class="event-seat">{seatLabel(e.seat, state.you)}</span>
@@ -139,10 +158,7 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
     <div class={classes.join(' ')} aria-label={seatLabel(seat.seat, state.you)}>
       <div class="seat-head">
         <span class="seat-name">{seatLabel(seat.seat, state.you)}</span>
-        <span class={seat.seat === state.dealer ? 'seat-wind seat-dealer' : 'seat-wind'}>{WIND_NAMES[seat.wind]}</span>
-        <span class="seat-points">{seat.points.toLocaleString()}</span>
-        <span class="seat-rank" title="現在の順位">{state.standings[seat.seat].rank}位</span>
-        {seat.riichi && <span class="seat-riichi">リーチ</span>}
+        <SeatStatus seat={seat} state={state} />
         {!you && !seat.hand && (
           // Face down: a row of backs under the head, or on a phone one
           // back with the count on it, in the head itself (style.css), so
@@ -164,19 +180,50 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />
-      <div id={riverId} class="seat-river" aria-label="捨て牌">
-        {seat.river.map((r, i) => (
-          <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
-            <Tile
-              tile={r.tile}
-              size="xs"
-              dimmed={r.called}
-              label={riverLabel(r)}
-              className={landed && highlight?.kind === 'river' && highlight.index === i ? 'tile-landed' : undefined}
-            />
-          </span>
-        ))}
-      </div>
+      <River seat={seat} highlight={highlight} id={riverId} />
+    </div>
+  );
+}
+
+/** A seat's wind (red for the dealer), points, rank and riichi badge: in
+ * its seat's head, and for you on an upright phone in the hand panel's
+ * heading instead (GameApp). */
+export function SeatStatus({ seat, state }: { seat: Seat; state: GameState }) {
+  return (
+    <>
+      <span class={seat.seat === state.dealer ? 'seat-wind seat-dealer' : 'seat-wind'}>{WIND_NAMES[seat.wind]}</span>
+      <span class="seat-points">{seat.points.toLocaleString()}</span>
+      <span class="seat-rank" title="現在の順位">{state.standings[seat.seat].rank}位</span>
+      {seat.riichi && <span class="seat-riichi">リーチ</span>}
+    </>
+  );
+}
+
+interface RiverProps {
+  seat: Seat;
+  highlight?: PlaybackHighlight | null;
+  id?: string;
+  label?: string;
+  className?: string;
+}
+
+/** A seat's discards: the riichi tile sideways, a called one dimmed, and
+ * the one the playback just landed marked. */
+export function River({ seat, highlight, id, label = '捨て牌', className }: RiverProps) {
+  const landed = highlight?.seat === seat.seat && highlight.kind === 'river';
+  return (
+    <div id={id} class={className ? `seat-river ${className}` : 'seat-river'} aria-label={label}>
+      {seat.river.map((r, i) => (
+        <span key={i} class={r.riichi ? 'river-tile river-riichi' : 'river-tile'}>
+          <Tile
+            tile={r.tile}
+            size="xs"
+            dimmed={r.called}
+            label={riverLabel(r)}
+            className={landed && highlight?.index === i ? 'tile-landed' : undefined}
+          />
+        </span>
+      ))}
     </div>
   );
 }

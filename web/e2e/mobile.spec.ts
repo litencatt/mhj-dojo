@@ -256,7 +256,9 @@ test('a phone hides the name search, and 条件をクリア keeps its saved text
   // The hidden search is ignored on the phone: the yaku are listed.
   await expect(yaku.locator('.yaku-table tbody tr').nth(1)).toBeVisible();
 
+  // The filter bar starts folded on a phone; 条件をクリア stays out.
   await yaku.getByRole('button', { name: '条件をクリア' }).click();
+  await yaku.getByRole('button', { name: '絞り込み', exact: true }).click();
   await expect(yaku.getByRole('combobox').nth(1)).toHaveValue('default');
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mhj-dojo.yakuFilter') ?? '{}'));
   expect(saved.query).toBe('zzz');
@@ -308,6 +310,11 @@ for (const [label, viewport] of [
         await expect(page.getByRole('region', { name })).toBeHidden();
       }
       const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+      if (label === '390px') {
+        // A phone game has neither (practice keeps them): no dock at all.
+        await expect(dock).toHaveCount(0);
+        return;
+      }
       await expect(dock.getByRole('button')).toHaveCount(2);
       await expect(dock.getByRole('button', { name: '時系列チャート' })).toBeVisible();
       await expect(dock.getByRole('button', { name: '用語表' })).toBeVisible();
@@ -365,3 +372,186 @@ for (const [label, viewport] of [
     await lineUp();
   });
 }
+
+// The filter bar folds away behind 絞り込み: folded on a phone, upright or on
+// its side, open on a wider screen (practice.spec.ts), and the player's
+// choice is kept. Folded, the count (and 条件をクリア) stays above the table.
+test.describe('the yaku filter bar on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('starts folded, opens to filter, and keeps the choice over a reload', async ({ page }) => {
+    await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
+    const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+    const toggle = yaku.getByRole('button', { name: '絞り込み', exact: true });
+    const count = yaku.locator('.yaku-filter-count');
+    const firstRow = yaku.locator('.yaku-table tbody tr').first();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(yaku.getByRole('combobox')).toHaveCount(0);
+    await expect(yaku.getByRole('button', { name: '役満' })).toHaveCount(0);
+    await expect(count).toBeVisible();
+    await expect(count).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
+    const folded = (await box(firstRow)).y;
+
+    // The table scrolls in its own panel; its header still sticks to the top.
+    const panel = page.locator('.yaku-table-panel');
+    await panel.evaluate((p) => (p.scrollTop = 400));
+    expect(Math.abs((await box(yaku.locator('.yaku-table thead'))).y - (await box(panel)).y)).toBeLessThanOrEqual(1);
+    await panel.evaluate((p) => (p.scrollTop = 0));
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(yaku.getByRole('combobox')).toHaveCount(2);
+    // Opened, the table starts lower.
+    expect((await box(firstRow)).y).toBeGreaterThan(folded + 20);
+    // Open, the count is shortened on screen but read in full.
+    await expect(count.locator('[aria-hidden="true"]')).toHaveText(/^(\d+)\/\1$/);
+    await expect(count.locator('.visually-hidden')).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await yaku.getByRole('button', { name: '1翻' }).click();
+    await expect(yaku.getByRole('button', { name: '1翻' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(count.locator('.visually-hidden')).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(yaku.getByRole('button', { name: '条件をクリア' })).toBeVisible();
+
+    await page.reload();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(yaku.getByRole('button', { name: '1翻' })).toHaveAttribute('aria-pressed', 'false');
+    // Folding keeps the filter.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(count).toHaveText(/^\d+ \/ \d+役を表示中$/);
+    await expect(count).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await page.reload();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(yaku.getByRole('combobox')).toHaveCount(0);
+  });
+
+  test('folded, 条件をクリア shows while a condition is set and clears it', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('e2e-filter')) {
+        localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: '', maxShanten: null, categories: ['1'], sort: 'default' }));
+        sessionStorage.setItem('e2e-filter', '1');
+      }
+    });
+    await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
+    const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+    await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    const count = yaku.locator('.yaku-filter-count');
+    await expect(count).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
+    const rows = await yaku.locator('.yaku-table tbody tr').count();
+
+    await yaku.getByRole('button', { name: '条件をクリア' }).click();
+    await expect(count).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
+    expect(await yaku.locator('.yaku-table tbody tr').count()).toBeGreaterThan(rows);
+    await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  for (const [mode, viewport] of [
+    ['a CPU game', { width: 390, height: 844 }],
+    ['a CPU game on its side', { width: 844, height: 390 }],
+  ] as const) {
+    test(`${mode} starts folded too`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/?mode=game&seed=1&length=tonpuu');
+      const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+      await expect(yaku.locator('.yaku-table tbody tr').first()).toBeAttached();
+      await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');
+      await expect(yaku.getByRole('combobox')).toHaveCount(0);
+      await expect(yaku.locator('.yaku-filter-count')).toBeAttached();
+    });
+  }
+});
+
+// 条件をクリア must not make the open filter bar taller: on a phone the
+// chips, the (shortened) count and the ✕ share one row, under 絞り込み in the
+// heading, and the 向聴/並べ替え row is the only other one.
+for (const width of [320, 360, 390]) {
+  for (const mode of ['practice', 'game']) {
+    test(`${width}px, ${mode}: 条件をクリア keeps the open filter bar's height`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.addInitScript(() => {
+        if (sessionStorage.getItem('e2e-filter')) return;
+        localStorage.setItem('mhj-dojo.yakuFilterOpen', '1');
+        localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'tree', 'advice', 'gloss']));
+        localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: '', maxShanten: 6, categories: ['1', '2', '3', 'yakuman'], sort: 'ukeire' }));
+        sessionStorage.setItem('e2e-filter', '1');
+      });
+      await page.goto(mode === 'game' ? '/?mode=game&seed=1&length=tonpuu' : '/?seed=1&turns=18');
+      const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+      await expect(yaku.locator('.yaku-table tbody tr').first()).toBeVisible();
+      const bar = yaku.locator('.yaku-filter');
+      const clear = yaku.getByRole('button', { name: '条件をクリア' });
+      await expect(clear).toBeVisible();
+
+      // Two rows: the chips with the count and the ✕, then the selects.
+      const middle = async (l: Locator) => {
+        const b = await box(l);
+        return b.y + b.height / 2;
+      };
+      const chipsRow = await middle(yaku.getByRole('button', { name: '役満' }));
+      expect(Math.abs((await middle(yaku.getByRole('button', { name: '1翻' }))) - chipsRow)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await middle(yaku.locator('.yaku-filter-count'))) - chipsRow)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await middle(clear)) - chipsRow)).toBeLessThanOrEqual(1);
+      // The chips' row is one chip tall, and the bar holds just the two rows.
+      const barBox = await box(bar);
+      const chipRow = await box(bar.locator('.yaku-filter-row').first());
+      expect(chipRow.height).toBeLessThanOrEqual((await box(yaku.getByRole('button', { name: '役満' }))).height + 1);
+      const options = await box(bar.locator('.yaku-filter-row').nth(1));
+      expect(barBox.height).toBeLessThanOrEqual(chipRow.height + 6 + options.height + 1);
+      // Nothing sticks out of the bar or the page.
+      const right = await bar.evaluate((el) => Math.max(...[...el.querySelectorAll('*')].map((e) => e.getBoundingClientRect().right)));
+      expect(right).toBeLessThanOrEqual(barBox.x + barBox.width + 0.5);
+      expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+      // The ✕ is easy to tap.
+      const c = await box(clear);
+      expect(c.width).toBeGreaterThanOrEqual(32);
+      expect(c.height).toBeGreaterThanOrEqual(32);
+
+      // From the keyboard: the ✕ goes away and focus moves to 絞り込み.
+      await clear.focus();
+      await page.keyboard.press('Enter');
+      await expect(clear).toHaveCount(0);
+      await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toBeFocused();
+      await expect(yaku.getByRole('combobox').nth(1)).toHaveValue('default');
+      expect(Math.abs((await box(bar)).height - barBox.height)).toBeLessThanOrEqual(1);
+    });
+  }
+}
+
+// 絞り込み moves between the heading (a phone) and the filter bar: crossing
+// 760px keeps its focus.
+test('絞り込み keeps focus when the width crosses 760px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
+  const toggle = page.getByRole('region', { name: '役別向聴テーブル' }).getByRole('button', { name: '絞り込み', exact: true });
+  await toggle.focus();
+  await expect(page.locator('.panel-heading .yaku-filter-toggle')).toBeFocused();
+  await page.setViewportSize({ width: 900, height: 844 });
+  await expect(page.locator('.yaku-filter .yaku-filter-toggle')).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.panel-heading .yaku-filter-toggle')).toBeFocused();
+});
+
+// A tap's preview note makes the heading's title long: at 320px the title
+// wraps, and 絞り込み and – stay in the heading row, inside the panel.
+test.describe('320px touch', () => {
+  test.use({ viewport: { width: 320, height: 800 }, hasTouch: true });
+
+  test('the preview note leaves 絞り込み and – in the heading', async ({ page }) => {
+    await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
+    const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
+    await page.getByRole('region', { name: '手牌' }).locator('.hand-tiles button.tile').first().tap();
+    await expect(yaku.locator('.preview-note')).toBeVisible();
+    expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+    const heading = await box(yaku.locator('.panel-heading'));
+    for (const b of [yaku.getByRole('button', { name: '絞り込み', exact: true }), yaku.getByRole('button', { name: '役別向聴を最小化' })]) {
+      await expect(b).toBeVisible();
+      const r = await box(b);
+      expect(r.y).toBeGreaterThanOrEqual(heading.y);
+      expect(r.y + r.height).toBeLessThanOrEqual(heading.y + heading.height);
+      expect(r.x + r.width).toBeLessThanOrEqual(heading.x + heading.width + 0.5);
+    }
+    const title = await box(yaku.locator('.panel-heading h2'));
+    expect(title.x + title.width).toBeLessThanOrEqual((await box(yaku.getByRole('button', { name: '絞り込み', exact: true }))).x);
+  });
+});
