@@ -77,10 +77,10 @@ doesn't need them:
 - `advice=0` – `advice` and `discard_review` are `null`, and the advice is not computed (about
   2 ms, a sixth of a discard's time along the advice's best line). A discard made with it leaves
   the new node's review to be computed the next time the node is shown with the advice, so asking
-  for the same state again without `advice=0` (say, once the client's advice panel opens) fills
+  for the same state again without `advice=0` (say, once the page's advice panel opens) fills
   in both. `advice=1` is the default.
 - `tree_from=<n>` – `tree` holds only the nodes with `node_id >= n`. Nodes are numbered in the
-  order they are made and never change once made, so a client that holds the first `n` nodes
+  order they are made and never change once made, so a page that holds the first `n` nodes
   (its tree's length) asks for the rest only and appends them; `node_count` tells it how many
   the whole tree has, a check that the two add up. `0` (the default) sends the whole tree; past
   the end, `tree` is `[]`.
@@ -438,6 +438,10 @@ These clarify points the contract above leaves open; none changes the JSON shape
   one before that can happen),
   `422` a session's tree is already at its node cap (see below) — not a state conflict: the
   current node itself is fine to act on.
+  The page's side of the worker (`web/src/wasm.ts`) adds two of its own, which never reach the
+  engine: `409` when a save another tab wrote can't be rebuilt here (that tab may run a newer
+  engine; the page asks for a reload), and `423` when another tab has taken the session or game
+  over.
 - **`seed`** defaults to a random value in `[0, 2^32)`. **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.

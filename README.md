@@ -1,6 +1,6 @@
 # mhj-dojo
 
-A web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it serves the app on your machine and opens it in your browser; the engine runs in the browser (WebAssembly), the same build as the public site. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
+A web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it opens the app in your browser. It is the same build as the public site, its engine running in the browser (WebAssembly). Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
 
 [日本語版 README](README_jp.md)
 
@@ -67,13 +67,13 @@ The built frontend isn't committed, so a plain `go build` or `go install github.
 | `--port` | `8765` | Port to listen on (`0` = random free port) |
 | `--host` | `127.0.0.1` | Host to bind |
 | `--open` | `true` | Open the browser on start |
-| `--seed` | random | Open practice on this wall seed (the page `/?seed=N`); CPU games and later games are not affected |
+| `--seed` | random | Open practice on this wall seed (0 to 2^53-1; the page `/?seed=N`); CPU games and later practice sessions are not affected |
 
 The server only answers requests whose `Host` header names localhost or a loopback address, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
 
 ### Saves
 
-Practice sessions and CPU games are saved in the browser's localStorage: the 10 most recently used sessions and the 5 most recently used games. A reload, or restarting `mhj-dojo`, continues from the save; if a save can't be used, the same wall is dealt again from the seed in the URL. localStorage is per origin (host and port), so another `--port`, or `localhost` instead of `127.0.0.1`, shows other saves. A random seed stays hidden until the game ends, and only one tab plays a session or game at a time.
+Practice sessions and CPU games are saved in the browser's localStorage: the 10 most recently used sessions and the 5 most recently used games. A reload, or restarting `mhj-dojo`, continues from the save; if a save can't be used, a seed in the URL deals the same wall again. localStorage is per origin (host and port), so another `--port`, or `localhost` instead of `127.0.0.1`, shows other saves.
 
 ## Development
 
@@ -84,7 +84,7 @@ make embed        # make site (npm ci first if needed), copied to internal/serve
 make run          # make embed, then go run ./cmd/mhj-dojo
 ```
 
-`mhj-dojo` serves the same build as the static site (below), its engine running in the browser. After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
+After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
 Every engine operation goes through `internal/apicall` (`apicall.Route`, which the WebAssembly engine answers with), and its behaviour is tested there. Add new operations there; the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
 
@@ -110,7 +110,7 @@ The app is a static site: the Go engine (`cmd/mhj-dojo-wasm`) is compiled to Web
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`, and run the E2E tests (`web/e2e/`) with `make embed && cd web && npm run e2e`: they run on `mhj-dojo`, which serves a copy of this build.
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`.
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 

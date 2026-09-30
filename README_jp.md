@@ -1,6 +1,6 @@
 # mhj-dojo
 
-日本式リーチ麻雀を練習するためのWebアプリです。CLI `mhj-dojo` を起動すると手元のマシンでアプリを配信し、ブラウザで開きます。エンジンはブラウザの中で動き（WebAssembly）、公開サイトと同じビルドです。一人打ちで役別向聴を見ながら練習することも、鳴きとリーチのある東風戦・半荘戦をCPU3人と打つこともできます。
+日本式リーチ麻雀を練習するためのWebアプリです。CLI `mhj-dojo` を起動すると、ブラウザでアプリが開きます。公開サイトと同じビルドで、エンジンはブラウザ内（WebAssembly）で動きます。一人打ちで役別向聴を見ながら練習することも、鳴きとリーチのある東風戦・半荘戦をCPU3人と打つこともできます。
 
 [English README](README.md)
 
@@ -69,13 +69,13 @@ make build        # 静的サイトをビルド（make embed）してから、�
 | `--port` | `8765` | 待ち受けポート（`0` で空きポートをランダムに使用） |
 | `--host` | `127.0.0.1` | バインドするホスト |
 | `--open` | `true` | 起動時にブラウザを開く |
-| `--seed` | ランダム | 一人打ち練習をこのシードの山で開く（`/?seed=N` のページ）。CPU対戦やその後の対局には影響しません |
+| `--seed` | ランダム | 一人打ち練習をこのシード（0〜2^53-1）の山で開く（`/?seed=N` のページ）。新しく始める練習やCPU対戦には影響しません |
 
 `Host` ヘッダーが localhost かループバックアドレスを指すリクエストにしか応答しません。ブラウザ上のページが DNS リバインディングで到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
 
 ### 保存
 
-練習セッションとCPU対戦は、ブラウザの localStorage に保存します（最近使った 10 セッションと 5 対局まで）。再読み込みしても `mhj-dojo` を再起動しても、保存から続きを遊べます。保存が使えないときは、URL のシードから同じ山で配り直します。localStorage はオリジン（ホストとポート）ごとなので、`--port` を変えたり `127.0.0.1` の代わりに `localhost` で開いたりすると、別の保存が表示されます。ランダムなシードは終局まで表示せず、同じセッションや対局を進められるのは一度に1つのタブだけです。
+練習とCPU対戦はブラウザの localStorage に保存します（最近の10セッションと5対局まで）。再読み込みや `mhj-dojo` の再起動のあとも続きから遊べます。保存が使えないときは、URL にシードがあれば同じ山で配り直します。localStorage はオリジン（ホストとポート）ごとなので、`--port` を変えたり `localhost` で開いたりすると保存は別になります。
 
 ## 開発
 
@@ -86,7 +86,7 @@ make embed        # make site（必要なら先に npm ci）の結果を interna
 make run          # make embed のあと go run ./cmd/mhj-dojo
 ```
 
-`mhj-dojo` は静的サイト（後述）と同じビルドを配信し、エンジンはブラウザの中で動きます。`web/` やエンジンを変えたら `make embed` で作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make embed` でコピーした画面がそのまま埋め込まれます。
+`web/` やエンジンを変えたら `make embed` で作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make embed` でコピーした画面がそのまま埋め込まれます。
 
 エンジンへの操作はすべて `internal/apicall` を通します（WebAssembly 版のエンジンは `apicall.Route` で応答します）。その振る舞いのテストも `internal/apicall` にあります。新しい操作はここに追加し、画面からはブラウザの中のエンジン（`web/src/wasm.ts`）を通してだけ呼びます。
 
@@ -106,13 +106,13 @@ make embed && cd web && npm run e2e
 
 ### 静的サイト（WebAssembly）
 
-このアプリは静的サイトです。Go のエンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にしてブラウザで動かします。画面が固まらないよう Web Worker の中で動かします。画面からエンジンへのリクエストの形式は [docs/api.md](docs/api.md) のとおりです。`mhj-dojo` はこのビルドを配信します（`make embed`）。どの静的ホスティングでも配信できます。
+このアプリは静的サイトです。Go のエンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にし、画面が固まらないよう Web Worker で動かします。リクエストの形式は [docs/api.md](docs/api.md) のとおりです。`mhj-dojo`（`make embed`）でも、どの静的ホスティングでも配信できます。
 
 ```sh
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview`、E2E テスト（`web/e2e/`）は `make embed && cd web && npm run e2e` で、このビルドのコピーを配信する `mhj-dojo` に対して実行します。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview` です。
 
 Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開しています。
 
