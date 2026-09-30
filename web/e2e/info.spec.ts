@@ -14,7 +14,8 @@ for (const path of ['/info/', '/info']) {
     await expect(page).toHaveTitle('更新情報 - mhj-dojo 麻雀道場');
     const first = page.getByRole('main').locator('.release').first();
     await expect(first.locator('.release-version')).toHaveText(NEWEST);
-    await expect(first.getByRole('listitem').first()).toBeVisible();
+    // The newest release may have only internal changes; some release lists one.
+    await expect(page.getByRole('main').getByRole('listitem').first()).toBeVisible();
     await expect(page.getByRole('main').getByRole('link')).toHaveCount(0);
     await expect(page.locator('body')).not.toContainText('GitHub');
     expect(await page.getByRole('main').textContent()).not.toContain('by @');
