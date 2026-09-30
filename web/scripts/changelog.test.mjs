@@ -81,7 +81,7 @@ test('leaves out other ## sections up to the next release, and lines that are no
   );
 });
 
-test("links only this repository's pull requests", () => {
+test("reads only this repository's pull requests", () => {
   const items = parseChangelog(SAMPLE)[2].sections[0].items;
   assert.deepEqual(items[0].pr, { number: 5, url: 'https://github.com/litencatt/mhj-dojo/pull/5' });
   assert.equal(items[1].pr, null);
@@ -103,18 +103,20 @@ test('keeps only the items for users; a release left empty stays, with no sectio
   assert.deepEqual(releases[3].sections, []);
 });
 
-test('renders HTML without the author, escaped, with PR links', () => {
+test('renders HTML without the author or any link to GitHub, escaped', () => {
   const html = changelogHtml(SAMPLE);
   assert.ok(!html.includes('by @'));
   assert.ok(!html.includes('CI・リポジトリ'));
   assert.ok(!html.includes('依存関係'));
   assert.ok(!html.includes('E2E'));
   assert.match(html, /<h2 id="v2026\.0929\.1-title"><span class="release-version">v2026\.0929\.1<\/span> <time datetime="2026-09-29">/);
-  assert.match(html, /<a class="release-pr" href="https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/141" [^>]*>#141<\/a>/);
+  assert.match(html, /<li>役別向聴: 絞り込みをトグルでたたむ<\/li>/);
+  assert.ok(!html.includes('<a '));
+  assert.ok(!html.includes('github.com'));
   assert.match(html, /内部の改善のみ/);
   assert.match(html, /a blank &lt;tile&gt; in <code>TileFace<\/code>/);
   assert.ok(html.indexOf('v2026.0929.1') < html.indexOf('v2026.0928.0'));
-  assert.match(html, /<section class="release" id="v2026\.0927\.0"[^]*最初の公開 <a class="release-pr" href="https:\/\/github\.com\/litencatt\/mhj-dojo\/releases\/tag\/v2026\.0927\.0"/);
+  assert.match(html, /<section class="release" id="v2026\.0927\.0"[^]*<p class="release-internal">最初の公開<\/p>/);
   assert.ok(!html.includes('Add CI workflow'));
   assert.ok(!html.includes('New Contributors'));
   assert.ok(!html.includes('first contribution'));

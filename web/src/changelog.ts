@@ -33,7 +33,7 @@ export interface Release {
 
 const RELEASE = /^## \[(v[^\]]+)\]\([^)]*\) - (\d{4}-\d{2}-\d{2})\s*$/;
 const ITEM = /^- (.+?) by @(\S+) in (\S+)\s*$/;
-// This repository's pull requests: any other URL gets no link.
+// This repository's pull requests: any other URL is no pull request of the app.
 const PR_URL = /^https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/(\d+)$/;
 
 /** The releases in CHANGELOG.md, in its order (newest first). Any other
@@ -106,27 +106,21 @@ function inline(title: string): string {
   return escape(title).replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-const RELEASE_URL = 'https://github.com/litencatt/mhj-dojo/releases/tag/';
-
 /** The releases as HTML (one <section> each, with the version as its id);
- * the last, the oldest, as the first release. */
+ * the last, the oldest, as the first release. The page is for the app's
+ * users, so it doesn't link to GitHub. */
 export function renderChangelog(releases: Release[]): string {
   if (releases.length === 0) return '<p class="release-internal">まだリリースはありません。</p>';
   return releases
     .map((r, i) => {
       const body =
         i === releases.length - 1
-          ? `<p class="release-internal">最初の公開 <a class="release-pr" href="${RELEASE_URL}${encodeURIComponent(r.version)}" target="_blank" rel="noopener">GitHub のリリース</a></p>`
+          ? '<p class="release-internal">最初の公開</p>'
           : r.sections.length === 0
           ? '<p class="release-internal">内部の改善のみ</p>'
           : r.sections
               .map((s) => {
-                const items = s.items
-                  .map((it) => {
-                    const pr = it.pr ? ` <a class="release-pr" href="${escape(it.pr.url)}" target="_blank" rel="noopener">#${it.pr.number}</a>` : '';
-                    return `<li>${inline(it.title)}${pr}</li>`;
-                  })
-                  .join('');
+                const items = s.items.map((it) => `<li>${inline(it.title)}</li>`).join('');
                 const heading = s.category === null ? '' : `<h3>${escape(s.category)}</h3>`;
                 return `${heading}<ul>${items}</ul>`;
               })
