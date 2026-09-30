@@ -1,9 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { discardsSent, engineCalls, waitForPlayback } from '../helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
 // along the bottom that never covers the page, the yaku tables fitting the
-// width, and a tap selecting a tile before a second tap discards it.
+// width, and a tap selecting a tile before a second tap discards it. On
+// both builds; the CPU game's phone layout is in game.spec.ts.
 
 const MINIMIZED_KEY = 'mhj-dojo.minimized.v2';
 const ALL_PANELS = ['chart', 'tree', 'yaku', 'advice', 'gloss'];
@@ -54,7 +56,7 @@ async function openPractice(page: Page, minimized: string[]) {
     },
     [MINIMIZED_KEY, JSON.stringify(minimized)],
   );
-  await page.goto('/?seed=1&turns=18');
+  await page.goto('./?seed=1&turns=18');
   await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-drawn button')).toBeVisible();
 }
 
@@ -139,20 +141,19 @@ test.describe('touch', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
   test('a tap selects and previews a tile, a second tap discards it', async ({ page }) => {
+    const calls = await engineCalls(page);
     await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
     const hand = page.getByRole('region', { name: '手牌' });
     const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
     let discards = 0;
-    page.on('request', (req) => {
-      if (req.method() === 'POST' && req.url().includes('/discard')) discards++;
-    });
+    const countDiscards = async () => (discards += await discardsSent(calls));
 
     const tile = hand.locator('.hand-tiles button.tile').first();
     const name = await tile.getAttribute('aria-label');
     await tile.tap();
     await expect(tile).toHaveClass(/tile-picked/);
     await expect(yaku.locator('.preview-note')).toContainText(`${name} を打牌した場合のプレビュー`);
-    expect(discards).toBe(0);
+    expect(await countDiscards()).toBe(0);
 
     // Another tile moves the selection; the first stays in the hand.
     const other = hand.locator('.hand-drawn button');
@@ -161,14 +162,12 @@ test.describe('touch', () => {
     await expect(other).toHaveClass(/tile-picked/);
     await expect(tile).not.toHaveClass(/tile-picked/);
     await expect(yaku.locator('.preview-note')).toContainText(`${otherName} を打牌した場合のプレビュー`);
-    expect(discards).toBe(0);
+    expect(await countDiscards()).toBe(0);
 
     // The second tap on it discards it.
-    await Promise.all([
-      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/discard')),
-      other.tap(),
-    ]);
+    await other.tap();
     await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
+    expect(await countDiscards()).toBe(1);
     await expect(hand.locator(`.discard-river [aria-label="${otherName}"]`)).toBeVisible();
     await expect(hand.locator('.tile-picked')).toHaveCount(0);
   });
@@ -188,6 +187,7 @@ test.describe('touch', () => {
   });
 
   test('after a tap selected a tile, the keyboard still discards on the first Enter', async ({ page }) => {
+    const calls = await engineCalls(page);
     await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
     const hand = page.getByRole('region', { name: '手牌' });
     const drawn = hand.locator('.hand-drawn button');
@@ -197,47 +197,11 @@ test.describe('touch', () => {
     const tile = hand.locator('.hand-tiles button.tile').first();
     const tileName = await tile.getAttribute('aria-label');
     await tile.focus();
-    await Promise.all([
-      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/discard')),
-      page.keyboard.press('Enter'),
-    ]);
+    await page.keyboard.press('Enter');
     await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
     await expect(hand.locator(`.discard-river [aria-label="${tileName}"]`)).toBeVisible();
+    expect(await discardsSent(calls)).toBe(1);
     expect(name).toBeTruthy();
-  });
-
-  // A pick made before リーチ is toggled must not declare riichi with one tap.
-  // The server rarely offers riichi early, so its responses are patched to
-  // offer it on the tile the test selects (no riichi is ever sent).
-  test('toggling riichi drops a tap selection', async ({ page }) => {
-    await page.route('**/api/games**', async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      if (body?.legal && body.phase === 'discard' && body.actor === body.you && body.legal.discards.length > 0) {
-        const me = body.seats[body.you];
-        body.legal.riichi = [me.drawn ?? body.legal.discards[0]];
-      }
-      await route.fulfill({ response: res, json: body });
-    });
-    await page.goto('/?mode=game&seed=12&first_dealer=you');
-    await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
-    const hand = page.getByRole('region', { name: '手牌' });
-    const drawn = hand.locator('.hand-drawn button');
-    await expect(drawn).toBeVisible();
-    let actions = 0;
-    page.on('request', (req) => {
-      if (req.method() === 'POST' && req.url().includes('/action')) actions++;
-    });
-
-    await drawn.tap();
-    await expect(drawn).toHaveClass(/tile-picked/);
-    await page.locator('.action-bar').getByRole('button', { name: 'リーチ' }).tap();
-    await expect(page.locator('.action-bar').getByRole('button', { name: 'リーチ' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(hand.locator('.tile-picked')).toHaveCount(0);
-    // One tap only selects the riichi tile again: nothing is sent.
-    await drawn.tap();
-    await expect(drawn).toHaveClass(/tile-picked/);
-    expect(actions).toBe(0);
   });
 });
 
@@ -267,15 +231,14 @@ test('a phone hides the name search, and 条件をクリア keeps its saved text
 
 test('a mouse click at phone width discards at once', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const calls = await engineCalls(page);
   await openPractice(page, ALL_PANELS);
   const hand = page.getByRole('region', { name: '手牌' });
   const drawn = hand.locator('.hand-drawn button');
   const name = await drawn.getAttribute('aria-label');
-  await Promise.all([
-    page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/discard')),
-    drawn.click(),
-  ]);
+  await drawn.click();
   await expect(hand.locator(`.discard-river [aria-label="${name}"]`)).toBeVisible();
+  expect(await discardsSent(calls)).toBe(1);
   await expect(hand.locator('.tile-picked')).toHaveCount(0);
 });
 
@@ -289,7 +252,7 @@ for (const [label, viewport] of [
     test.use({ viewport });
 
     test('practice: only the header, the hand and 役別向聴 are open', async ({ page }) => {
-      await page.goto('/?seed=1&turns=18');
+      await page.goto('./?seed=1&turns=18');
       await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
       await expect(page.locator('.app-header')).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
@@ -302,7 +265,7 @@ for (const [label, viewport] of [
     });
 
     test('CPU game: only the header, the table, the hand and 役別向聴 are open', async ({ page }) => {
-      await page.goto('/?mode=game&seed=12');
+      await page.goto('./?mode=game&seed=12');
       await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
       await expect(page.getByRole('region', { name: '卓' })).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
@@ -356,7 +319,7 @@ for (const [label, viewport] of [
 ] as const) {
   test(`the drawn tile lines up with the grouped hand (${label})`, async ({ page }) => {
     await page.setViewportSize(viewport);
-    await page.goto('/?seed=1&turns=18');
+    await page.goto('./?seed=1&turns=18');
     const hand = page.getByRole('region', { name: '手牌' });
     const drawn = hand.locator('.hand-drawn button.tile');
     await expect(drawn).toBeVisible();
@@ -452,7 +415,7 @@ test.describe('the yaku filter bar on a phone', () => {
   ] as const) {
     test(`${mode} starts folded too`, async ({ page }) => {
       await page.setViewportSize(viewport);
-      await page.goto('/?mode=game&seed=1&length=tonpuu');
+      await page.goto('./?mode=game&seed=1&length=tonpuu');
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
       await expect(yaku.locator('.yaku-table tbody tr').first()).toBeAttached();
       await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');
@@ -476,7 +439,7 @@ for (const width of [320, 360, 390]) {
         localStorage.setItem('mhj-dojo.yakuFilter', JSON.stringify({ query: '', maxShanten: 6, categories: ['1', '2', '3', 'yakuman'], sort: 'ukeire' }));
         sessionStorage.setItem('e2e-filter', '1');
       });
-      await page.goto(mode === 'game' ? '/?mode=game&seed=1&length=tonpuu' : '/?seed=1&turns=18');
+      await page.goto(mode === 'game' ? './?mode=game&seed=1&length=tonpuu' : './?seed=1&turns=18');
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
       await expect(yaku.locator('.yaku-table tbody tr').first()).toBeVisible();
       const bar = yaku.locator('.yaku-filter');
@@ -488,6 +451,15 @@ for (const width of [320, 360, 390]) {
         const b = await box(l);
         return b.y + b.height / 2;
       };
+      const offRow = async () => {
+        const row = await middle(yaku.getByRole('button', { name: '役満' }));
+        const others = [yaku.getByRole('button', { name: '1翻' }), yaku.locator('.yaku-filter-count'), clear];
+        return Math.max(...(await Promise.all(others.map(async (l) => Math.abs((await middle(l)) - row)))));
+      };
+      // Measured once the page has settled: in a game the CPU turns before
+      // yours play back first, the count changing as they land.
+      if (mode === 'game') await waitForPlayback(page);
+      await expect.poll(offRow).toBeLessThanOrEqual(1);
       const chipsRow = await middle(yaku.getByRole('button', { name: '役満' }));
       expect(Math.abs((await middle(yaku.getByRole('button', { name: '1翻' }))) - chipsRow)).toBeLessThanOrEqual(1);
       expect(Math.abs((await middle(yaku.locator('.yaku-filter-count'))) - chipsRow)).toBeLessThanOrEqual(1);

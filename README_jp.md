@@ -51,14 +51,16 @@
 ## 必要環境
 
 - Go 1.27 以上
-- Node.js 24 以上（フロントエンドを再ビルドする場合のみ。ビルド済みの成果物はコミットしてあります）
+- Node.js 24 以上（バイナリに埋め込む画面（フロントエンド）のビルドに使います）
 
 ## クイックスタート
 
 ```sh
-make build        # bin/mhj-dojo をビルド（フロントエンドを埋め込み済み）
+make build        # 画面をビルド（make web）してから、それを埋め込んだ bin/mhj-dojo をビルド
 ./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
+
+ビルド済みの画面はコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。API は動きますが、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
 
 ### オプション
 
@@ -76,9 +78,13 @@ make build        # bin/mhj-dojo をビルド（フロントエンドを埋め�
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj-dojo
+make web          # npm run build（必要なら先に npm ci）→ internal/server/static/dist（コミットしません）
+make run          # make web のあと go run ./cmd/mhj-dojo
 ```
+
+`web/` を変えたら `make web` で画面を作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make web` で作った画面がそのまま埋め込まれます。
+
+エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面側に `api.WASM` の分岐を増やさないでください。
 
 ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。`/api` を `127.0.0.1:8765` に中継するので、`mhj-dojo` も起動しておいてください。
 
@@ -86,7 +92,7 @@ make run          # go run ./cmd/mhj-dojo
 cd web && npm run dev
 ```
 
-ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習と、CPU対戦（鳴き・局の結果・次局・390px幅のモバイル表示）をカバーします。ビルド済みのフロントエンドに対して専用の `mhj-dojo` サーバを自前で起動するので、他にサーバを立てておく必要はありません。
+ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習、CPU対戦（鳴き・局の結果・次局・スマホでの表示）、ヘルプと更新情報ページをカバーします。テストは `web/e2e/` にあり、`shared/` はローカル版と静的サイト（後述）の両方で、`server/` と `site/` はそれぞれの版でだけ実行します（HTTP API や、ブラウザへの保存・計算エンジンの Web Worker など）。`npm run e2e` は `shared/` と `server/` を、ビルド済みのフロントエンドに対して専用の `mhj-dojo` サーバを自前で起動して実行するので、他にサーバを立てておく必要はありません。
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # 初回のみ
@@ -101,7 +107,7 @@ cd web && npm run build && npm run e2e
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テストは `cd web && npm run e2e:site` です。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です。両方の版をビルドしてあれば、`npm run e2e:all` で両方の版のテストをまとめて実行できます。
 
 ローカル版との違い:
 
@@ -117,7 +123,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 
 ビルドとデプロイは 2 つのワークフローに分かれていて、リリースの成果物は特定のホストに縛られません。リリースには [tagpr](https://github.com/Songmu/tagpr) を使います（`.tagpr`、`.github/workflows/tagpr.yml`）。
 
-1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` をカテゴリ別（新機能・修正・パフォーマンス・ドキュメント・CI・リポジトリ・依存関係・その他）に更新します。カテゴリは、各 PR の head ブランチ名の接頭辞から **Label pull requests**（`.github/workflows/labeler.yml`）が付けるラベル（`feat/` → enhancement、`fix/` → bug、`perf/` → performance、`docs/` → documentation、`ci/`/`chore/` → ci/chore、`dependabot/` → dependencies）で決まります。
+1. `main` に push されるたびに、tagpr がリリース用 PR を最新に保ちます。この PR は、GitHub のリリースノート自動生成（`.github/release.yml`）で `CHANGELOG.md` をカテゴリ別（新機能・修正・パフォーマンス・ドキュメント・CI・リポジトリ・依存関係・その他）に更新します。カテゴリは、各 PR の head ブランチ名の接頭辞から **Label pull requests**（`.github/workflows/labeler.yml`）が付けるラベル（`feat/` → enhancement、`fix/` → bug、`perf/` → performance、`docs/` → documentation、`ci/` → ci、`chore/`/`build/`/`test/` → chore、`dependabot/` → dependencies）で決まります。
 2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.0927.0`、次は `v2026.0927.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Build site release**（`.github/workflows/build-site-release.yml`）を実行します。Build site release は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行し、`web/dist-site` を `mhj-dojo-site-<tag>.tar.gz`（と `.sha256`）にまとめて、そのタグの GitHub Release に添付します。
 3. Build site release は続けて **Deploy to Lolipop**（`.github/workflows/deploy-lolipop.yml`）をそのタグで呼び出します。この成果物をダウンロード・検証し、`lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、そのブランチの `web/dist-site` を成果物の内容に完全に置き換えて（Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）、`lolipop-deploy-now` 向けの PR を作ります。公開サイトはこの `lolipop-deploy-now` ブランチから公開されます。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。
 4. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
@@ -132,7 +138,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
-サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省いてビルド間で内容が変わらないままにします（CI が `internal/server/static` の最新性を確認します）。
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省きます。
 
 ### ディレクトリ構成
 
