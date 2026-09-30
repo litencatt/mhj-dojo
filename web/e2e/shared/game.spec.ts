@@ -4,18 +4,17 @@ import {
   clickAndWait,
   expectStopped,
   handPanel,
-  onSite,
   pageOverflowX,
   playOneStep,
   playToResult,
   playUntilPonOffered,
-  slowOnSite,
+  slowEngine,
   stoppedDialog,
   tableState,
   waitForPlayback,
 } from '../helpers';
 
-// The CPU game (?mode=game), on both builds: the table, the hand and the
+// The CPU game (?mode=game): the table, the hand and the
 // header at every screen size, and one tab at a time.
 
 /** Plays generic steps (like TestHumanPon) until a pon is offered, then
@@ -52,7 +51,7 @@ async function expectPhoneLog(page: Page) {
 test('a CPU game: pon offer, round result, next round, and a mobile viewport', async ({ page }) => {
   // It plays a whole round: about 17s locally, but over 30s on a busy CI runner.
   test.setTimeout(60_000);
-  slowOnSite();
+  slowEngine();
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
 
   const hand = handPanel(page);
@@ -339,7 +338,7 @@ test('a desktop game keeps the chart and the glossary in the dock', async ({ pag
 // panel scrolls on its own and, at the page's end, is in full view.
 test('a 320x640 phone pins the hand only while it leaves the yaku panel room', async ({ page }) => {
   test.setTimeout(60_000);
-  slowOnSite();
+  slowEngine();
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   const app = page.locator('.app');
@@ -625,7 +624,7 @@ test('the log of moves stays where a player scrolled it', async ({ page }) => {
 test('a phone fits the revealed hands and the rivers in their seats', async ({ page }) => {
   // It plays a whole round.
   test.setTimeout(60_000);
-  slowOnSite();
+  slowEngine();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await playToResult(page);
@@ -721,7 +720,7 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
   expect(page.url(), 'the reload resumes the same game').toBe(url);
 });
 
-/** The game's save on the site (localStorage), for the game in the page's URL. */
+/** The game's save (localStorage), for the game in the page's URL. */
 function savedGame(page: Page) {
   return page.evaluate((id) => {
     const s = JSON.parse(localStorage.getItem('mhj-dojo.site.games') ?? 'null') as { games: Record<string, { save: string }> } | null;
@@ -730,7 +729,7 @@ function savedGame(page: Page) {
 }
 
 test('a second tab on the same game stops the first, until taken back', async ({ page, context }) => {
-  slowOnSite();
+  slowEngine();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await expect(handPanel(page)).toBeVisible();
@@ -747,7 +746,7 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await expectStopped(page);
   await expect(stoppedDialog(other)).toHaveCount(0);
 
-  // B plays on, and on the site saves.
+  // B plays on, and saves.
   await playOneStep(other);
   await playOneStep(other);
   await waitForPlayback(other);
@@ -760,8 +759,8 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await waitForPlayback(page);
   await expect.poll(() => tableState(page)).toEqual(b);
   await expectStopped(other);
-  if (onSite()) await expect.poll(() => savedGame(page)).toBe(save);
+  await expect.poll(() => savedGame(page)).toBe(save);
   await playOneStep(page);
-  if (onSite()) await expect.poll(() => savedGame(page)).not.toBe(save);
+  await expect.poll(() => savedGame(page)).not.toBe(save);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

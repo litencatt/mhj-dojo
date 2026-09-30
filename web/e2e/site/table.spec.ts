@@ -167,7 +167,7 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   let patched: GameState | null = null;
   let riichiAt = -1;
   onEngineReply(page, (call, reply) => {
-    if (!isGameAction(call) || patched !== null) return;
+    if (!isGameAction(call) || reply.status !== 200 || patched !== null) return;
     const state = reply.data as GameState;
     // The first CPU discard becomes an accepted riichi, and the last move
     // turns a kan dora over.
@@ -383,11 +383,11 @@ function endRound(st: GameState, result: Partial<GameResult>, deltas: number[], 
 async function checkRoundEnd(page: Page, end: RoundEnd) {
   await page.clock.install();
   let patched: GameState | null = null;
-  // The events of the real answer, checked after the click: an expect()
-  // failing in the hook would leave the page waiting, and the test timing out.
+  // The events of the real answer, checked after the click, in the test
+  // itself (a hook's error only shows once something waits on the engine).
   let real: string[] = [];
   onEngineReply(page, (call, reply) => {
-    if (!isGameAction(call) || patched !== null) return;
+    if (!isGameAction(call) || reply.status !== 200 || patched !== null) return;
     const st = reply.data as GameState;
     real = st.events.map((e) => e.type);
     patched = st;

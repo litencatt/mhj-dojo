@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { GameEvent, GameState, SessionState, YakuRow } from './api';
+import type { GameEvent, GameState, YakuRow } from './api';
 import { errorMessage } from './panels';
 import { claim, isStopped, onChange } from './singleTab';
 import {
@@ -13,27 +13,14 @@ import {
 } from './playback';
 
 /**
- * Runs one API request at a time. Every action acts on the server's current
- * state, so requests must never overlap: a second one could be redirected by
- * the first, and responses could land out of order. Overlapping calls are dropped.
- *
- * A 409 can mean the same session or game moved on elsewhere (another tab, or
- * a CPU turn that finished mid-request) - but the server also returns 409 for
- * plain "not allowed right now" errors (e.g. tsumo with an incomplete hand),
- * which have nothing to do with another tab. When `refetch` and `movedOn` are
- * both given, a 409 re-fetches the current state and, only if `movedOn` says
- * it actually differs from what's on screen, shows it with a notice instead
- * of the error; otherwise the server's own error message is shown as usual.
+ * Runs one engine request at a time. Every action acts on the engine's
+ * current state, so requests must never overlap: a second one could be
+ * redirected by the first, and responses could land out of order.
+ * Overlapping calls are dropped.
  */
-export function useSerialRequest<T>(
-  onSuccess: (next: T) => void,
-  refetch?: () => Promise<T>,
-  movedOn?: (prev: T, next: T) => boolean,
-) {
+export function useSerialRequest<T>(onSuccess: (next: T) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const last = useRef<T | null>(null);
 
   const inFlight = useRef(false);
 
@@ -43,29 +30,11 @@ export function useSerialRequest<T>(
     inFlight.current = true;
     setBusy(true);
     setError(null);
-    setNotice(null);
     try {
-      const next = await fn();
-      last.current = next;
-      onSuccess(next);
+      onSuccess(await fn());
       return true;
     } catch (err) {
-      if (refetch && movedOn && last.current !== null && err instanceof api.ApiError && err.status === 409) {
-        try {
-          const fresh = await refetch();
-          if (movedOn(last.current, fresh)) {
-            last.current = fresh;
-            onSuccess(fresh);
-            setNotice('別の画面で進んだため最新の状態に更新しました');
-          } else {
-            setError(errorMessage(err));
-          }
-        } catch (refetchErr) {
-          setError(errorMessage(refetchErr));
-        }
-      } else {
-        setError(errorMessage(err));
-      }
+      setError(errorMessage(err));
       return false;
     } finally {
       inFlight.current = false;
@@ -73,7 +42,7 @@ export function useSerialRequest<T>(
     }
   }
 
-  return { busy, error, notice, request };
+  return { busy, error, request };
 }
 
 /**
@@ -92,30 +61,8 @@ export function useSingleTab(key: string | null): boolean {
   return stopped;
 }
 
-/**
- * `useSerialRequest`'s `movedOn` for practice sessions: true only if the
- * re-fetched state is actually a different node than what was on screen, so
- * a plain "not allowed right now" 409 (e.g. tsumo with an incomplete hand)
- * still shows the server's own error instead of a spurious notice.
- */
-export function sessionMovedOn(prev: SessionState, next: SessionState): boolean {
-  return prev.node_id !== next.node_id || prev.turn !== next.turn || prev.status !== next.status;
-}
-
-/** `useSerialRequest`'s `movedOn` for games; see sessionMovedOn. */
-export function gameMovedOn(prev: GameState, next: GameState): boolean {
-  return (
-    prev.phase !== next.phase ||
-    prev.actor !== next.actor ||
-    prev.events.length !== next.events.length ||
-    prev.round_number !== next.round_number ||
-    prev.honba !== next.honba ||
-    prev.wall_remaining !== next.wall_remaining
-  );
-}
-
 export interface UrlResumeOptions<T> {
-  idKey: string; // the query key holding the server-side id
+  idKey: string; // the query key holding the session's or game's id
   request: (fn: () => Promise<T>) => Promise<unknown>;
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
@@ -123,10 +70,10 @@ export interface UrlResumeOptions<T> {
 }
 
 /**
- * Keeps the id in the URL so a reload resumes the same session or game. They
- * live only in server memory, so after a server restart (404) the same wall is
- * dealt again from the params instead. Returns resume, which does it again
- * (for a tab taking the session or game back from another tab).
+ * Keeps the id in the URL so a reload resumes the same session or game. When
+ * the engine has no save for it (404), the same wall is dealt again from the
+ * params instead. Returns resume, which does it again (for a tab taking the
+ * session or game back from another tab).
  */
 export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
   function resume() {

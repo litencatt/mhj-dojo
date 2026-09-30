@@ -23,14 +23,12 @@ export default defineConfig({
   },
   projects: [
     {
-      // The build the tests run on (e2e/helpers.ts): the site's, here as in
-      // playwright.config.ts.
       name: 'site',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: {
-    command: `npx vite preview --mode site --host 127.0.0.1 --port ${PORT} --strictPort`,
+    command: `npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

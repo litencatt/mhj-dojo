@@ -20,7 +20,7 @@ Static site (practice and CPU games, no install): https://mhj-dojo.lolipop-now.a
 - **Rewindable history tree** — jump back to any turn and try a different discard. New branches are added and old ones are kept, so you can compare lines of play on the same wall.
 - **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives). Yakuman count 13 han each (26 for the double yakuman 四暗刻単騎, 国士無双十三面待ち, 純正九蓮宝燈 and 大四喜) and stack; dora are shown but not added.
 - **Glossary** — a searchable list of the terms used on the page (shanten, ukeire, waits, rules, app features), shown beside the yaku table on wide screens.
-- **Help and version** — the header's **?** opens a short guide to the screen; next to it, the commit the app was built from (`GET /api/version`).
+- **Help and version** — the header's **?** opens a short guide to the screen; next to it, the build's commit and date, or its release (e.g. `v2026.0927.0`).
 - **Minimizable panels** — the time-series chart, history tree and glossary can be minimized into tabs on the right edge of the screen and restored with a click; the layout is remembered.
 - **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
 
@@ -82,11 +82,12 @@ make run          # make embed, then go run ./cmd/mhj-dojo
 
 `mhj-dojo` serves the same build as the static site (below), its engine running in the browser. After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
-Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
+Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
 
-Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj-dojo` running):
+Frontend dev server with hot reload (the engine runs in the page, so build it into `web/site-public/` first):
 
 ```sh
+make wasm
 cd web && npm run dev
 ```
 
@@ -105,17 +106,17 @@ The app can also be built as a static site that needs no server: the Go engine (
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site` (the same tests as `npm run e2e`, on `vite preview` instead of `mhj-dojo`; `npm run e2e:all` runs both).
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site` (the same tests as `npm run e2e`, on `vite preview` instead of `mhj-dojo`; `npm run e2e:all` runs both).
 
-Differences from the local version:
+In the browser, on the site as in `mhj-dojo`:
 
-- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser too, CPU turns included.
-- Only one tab plays a session or game at a time, as in the local version; there is no other browser to move it on, so there is no "moved on elsewhere" handling.
+- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser, CPU turns included.
+- Only one tab plays a session or game at a time.
 - Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL. CPU games are saved the same way (the 5 most recently used games); a random seed stays hidden until the game ends.
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 
-The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). The local server serves the same page at `/info/`, from the `CHANGELOG.md` embedded in its binary.
+The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). `mhj-dojo` serves the same built page at `/info/`.
 
 #### Deploying
 
@@ -136,7 +137,7 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
-The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. `mhj-dojo` embeds this same build (`make embed`), tags included; the default `npm run build` has no public URL to share, so it omits them.
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. `mhj-dojo` embeds this same build (`make embed`), tags included.
 
 ### Layout
 

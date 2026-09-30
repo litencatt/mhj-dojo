@@ -101,7 +101,7 @@ test('history tree: only new nodes are sent, the tree stays whole across goto, b
   await expect(hand.locator('.hand-drawn button')).toBeEnabled();
   const trees: number[] = [];
   onEngineReply(page, (call, reply) => {
-    if (call.fn === 'request' && call.path!.startsWith('/api/sessions/')) trees.push((reply.data as { tree: unknown[] }).tree.length);
+    if (call.fn === 'request' && reply.status === 200 && call.path!.startsWith('/api/sessions/')) trees.push((reply.data as { tree: unknown[] }).tree.length);
   });
 
   await discardDrawn(page);

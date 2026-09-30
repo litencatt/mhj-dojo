@@ -4,8 +4,8 @@ import { discardsSent, engineCalls, waitForPlayback } from '../helpers';
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
 // along the bottom that never covers the page, the yaku tables fitting the
-// width, and a tap selecting a tile before a second tap discards it. On
-// both builds; the CPU game's phone layout is in game.spec.ts.
+// width, and a tap selecting a tile before a second tap discards it. The CPU
+// game's phone layout is in game.spec.ts.
 
 const MINIMIZED_KEY = 'mhj-dojo.minimized.v2';
 const ALL_PANELS = ['chart', 'tree', 'yaku', 'advice', 'gloss'];

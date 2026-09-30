@@ -20,7 +20,7 @@
 - **巻き戻し可能な履歴ツリー**：任意の巡目に戻って、別の牌を切れます。新しい枝が増え、元の枝も残ります。同じ山で打ち筋を比べられます。
 - **和了表示**：ツモ和了すると、成立役・翻数・ドラ（赤5を含む）を表示します。役満は1つにつき13翻（四暗刻単騎・国士無双十三面待ち・純正九蓮宝燈・大四喜はダブル役満で26翻）で複合し、ドラは表示のみで加算しません。
 - **用語表**：画面で使う用語（向聴・有効牌・待ちの形・ルール・アプリの機能）の説明一覧。検索できます。幅の広い画面では役別向聴の右に表示します。
-- **ヘルプとバージョン**：ヘッダーの **?** で画面の使い方を表示します。その横に、ビルド元のコミットを表示します（`GET /api/version`）。
+- **ヘルプとバージョン**：ヘッダーの **?** で画面の使い方を表示します。その横に、ビルド元のコミットと日付、またはリリース名（`v2026.0927.0` など）を表示します。
 - **パネルの最小化**：時系列チャート・履歴ツリー・用語表は、画面右端のタブに最小化でき、クリックで元に戻せます。状態は再読み込み後も残ります。
 - **URLからの再開**：ページのURLにセッションとシードが入るので、再読み込みしても続きから再開できます。サーバを再起動した後は、同じシードから同じ山で配り直します。
 
@@ -84,11 +84,12 @@ make run          # make embed のあと go run ./cmd/mhj-dojo
 
 `mhj-dojo` は静的サイト（後述）と同じビルドを配信し、エンジンはブラウザの中で動きます。`web/` やエンジンを変えたら `make embed` で作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make embed` でコピーした画面がそのまま埋め込まれます。
 
-エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面側に `api.WASM` の分岐を増やさないでください。
+エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面からはブラウザの中のエンジン（`web/src/wasm.ts`）を通してだけ呼びます。
 
-ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。`/api` を `127.0.0.1:8765` に中継するので、`mhj-dojo` も起動しておいてください。
+ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。エンジンはページの中で動くので、先に `make wasm` で `web/site-public/` に作っておいてください。
 
 ```sh
+make wasm
 cd web && npm run dev
 ```
 
@@ -107,17 +108,17 @@ make embed && cd web && npm run e2e
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です（`npm run e2e` と同じテストを、`mhj-dojo` ではなく `vite preview` に対して実行します。`npm run e2e:all` で両方を実行できます）。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です（`npm run e2e` と同じテストを、`mhj-dojo` ではなく `vite preview` に対して実行します。`npm run e2e:all` で両方を実行できます）。
 
-ローカル版との違い:
+ブラウザの中での動き（公開サイトでも `mhj-dojo` でも同じ）:
 
 - CPU対戦（**CPU対戦へ**、`?mode=game`）も、CPUの手番を含めてブラウザの中で動きます。
-- ローカル版と同じく、同じセッションや対局を進められるのは一度に1つのタブだけです。ほかのブラウザから進むことはないので、「別の画面で進んだ」ときの処理はありません。
+- 同じセッションや対局を進められるのは一度に1つのタブだけです。
 - セッションごとの操作をブラウザ（localStorage、最近使った 10 セッションまで）に保存し、再読み込みのときに同じ URL のまま作り直します。作り直せないときは、URL のシードから同じ山で配り直します。CPU対戦も同じように保存します（最近使った 5 対局まで）。ランダムなシードは終局まで表示しません。
 
 Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開しています。
 
-`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せず、最初のリリースは「最初の公開」とだけ書きます。GitHub の PR やリリースへのリンクは付けません（`web/src/changelog.ts`）。ローカル版のサーバーも、バイナリに埋め込んだ `CHANGELOG.md` から同じページを `/info/` で出します。
+`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せず、最初のリリースは「最初の公開」とだけ書きます。GitHub の PR やリリースへのリンクは付けません（`web/src/changelog.ts`）。`mhj-dojo` も、ビルドした同じページを `/info/` で出します。
 
 #### デプロイ
 
@@ -138,7 +139,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
-サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。`mhj-dojo` はこのビルドをそのまま埋め込みます（`make embed`、タグも含む）。既定の `npm run build` は公開URLを持たないため、これらのタグを省きます。
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。`mhj-dojo` はこのビルドをそのまま埋め込みます（`make embed`、タグも含む）。
 
 ### ディレクトリ構成
 
