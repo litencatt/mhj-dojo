@@ -1,7 +1,6 @@
-// The static site's transport (issue #67): instead of calling the mhj-dojo
-// server, API requests go to the engine compiled to WebAssembly, running in
-// a Web Worker (site-public/worker.js). Only built into the site (`npm run
-// build:site`); see api.ts.
+// The engine's transport (issues #67, #147): api.ts's requests go to the
+// engine compiled to WebAssembly, running in a Web Worker
+// (site-public/worker.js), on the public site and in the local mhj-dojo.
 //
 // The engine keeps practice sessions and CPU games in the worker's memory,
 // which a reload loses (and it evicts all but a few), so each one is also
@@ -56,8 +55,8 @@ function start(): Promise<Worker> {
     const url = new URL('worker.js', document.baseURI);
     // A hash of the worker, wasm_exec.js and mhj-dojo.wasm (vite.config.ts), so a
     // deploy never mixes cached and new copies of them.
-    const version = import.meta.env.VITE_MHJDOJO_ENGINE as string | undefined;
-    if (version) url.searchParams.set('v', version);
+    const version = import.meta.env.VITE_MHJDOJO_ENGINE as string;
+    url.searchParams.set('v', version);
     const w = new Worker(url);
     const fail = (message: string) => {
       w.terminate();
@@ -440,14 +439,14 @@ async function restore(kind: Kind, publicId: string, query: string, stopped: () 
 let queue: Promise<unknown> = Promise.resolve();
 
 /**
- * Answers an API request (method, path and JSON body as for the server) from
- * the engine. A request for a saved session or game that the engine doesn't
+ * Answers a request (method, path and JSON body, docs/api.md) from the
+ * engine. A request for a saved session or game that the engine doesn't
  * hold (the page was reloaded, the engine restarted, it evicted it, or
  * another tab took it over and gave it back) first rebuilds it from
- * localStorage; if its save is unusable the request gets the engine's 404 and
- * the page deals afresh from the URL's seed, as the local version does after
- * a server restart. One another tab has taken over (singleTab.ts) gets a 423,
- * and neither the engine nor the save sees it.
+ * localStorage; if there is no save for it, or its save is unusable, the
+ * request gets the engine's 404 and the page deals afresh from the URL's
+ * seed. One another tab has taken over (singleTab.ts) gets a 423, and
+ * neither the engine nor the save sees it.
  */
 export function wasmRequest(method: string, path: string, body?: string): Promise<WasmResponse> {
   // Whether another tab has taken the session or game over since the

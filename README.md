@@ -1,10 +1,10 @@
 # mhj-dojo
 
-A local web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it starts a local web server and opens the practice UI in your browser. Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
+A web app for practicing Japanese riichi mahjong. Run the `mhj-dojo` CLI and it opens the app in your browser. It is the same build as the public site, its engine running in the browser (WebAssembly). Practice alone with per-yaku shanten and a rewindable history, or play a full game (東風戦 / 半荘戦) with calls and riichi against three CPU players.
 
 [日本語版 README](README_jp.md)
 
-Static site (practice and CPU games, no install): https://mhj-dojo.lolipop-now.app/
+The same app, no install: https://mhj-dojo.lolipop-now.app/
 
 ## Practice mode
 
@@ -20,9 +20,9 @@ Static site (practice and CPU games, no install): https://mhj-dojo.lolipop-now.a
 - **Rewindable history tree** — jump back to any turn and try a different discard. New branches are added and old ones are kept, so you can compare lines of play on the same wall.
 - **Win panel** — on tsumo, shows the yaku, han, and dora (including red fives). Yakuman count 13 han each (26 for the double yakuman 四暗刻単騎, 国士無双十三面待ち, 純正九蓮宝燈 and 大四喜) and stack; dora are shown but not added.
 - **Glossary** — a searchable list of the terms used on the page (shanten, ukeire, waits, rules, app features), shown beside the yaku table on wide screens.
-- **Help and version** — the header's **?** opens a short guide to the screen; next to it, the commit the app was built from (`GET /api/version`).
+- **Help and version** — the header's **?** opens a short guide to the screen; next to it, the build's commit and date, or its release (e.g. `v2026.0927.0`).
 - **Minimizable panels** — the time-series chart, history tree and glossary can be minimized into tabs on the right edge of the screen and restored with a click; the layout is remembered.
-- **Resume from the URL** — the page URL carries the session and seed, so a reload resumes the game. If the server was restarted, the same wall is dealt again from the seed.
+- **Resume from the URL** — the page URL carries the session and seed, and the moves are saved in the browser (see [Saves](#saves)), so a reload resumes the game.
 
 Default rules: red fives ×3, open tanyao allowed, atozuke allowed. Round and seat wind are fixed to East in solo practice.
 
@@ -33,14 +33,14 @@ Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to
 - **Table** — every seat's river (a riichi tile lies sideways, a called tile shows in the taker's meld), melds, points, wind and dealer mark; CPU hands stay face down until the round ends. Choose **対局: 東風戦** or **半荘戦**, and **起家: ランダム** (seed mod 4) or **自分** to deal first yourself.
 - **Your moves** — discard, **リーチ** (pick a discard that keeps tenpai; later draws are discarded for you unless you can win), **ツモ**, **ロン** / **見逃す**, and calls: **ポン** / **チー** / **カン** when offered, or a concealed/added kan on your own turn.
 - **Calls** — pon and open kan on any seat's discard, chii from the seat to your left; the last discard of the round cannot be called, and a seat in riichi can only ron or make a concealed kan that keeps its waits. Kuikae (喰い替え) blocks discarding the called kind (or the far tile after an end-of-sequence chii) right after a pon or chii; an added kan can be robbed (槍槓 chankan); each kan draws a replacement tile (嶺上開花 rinshan if it wins) and adds a kan dora indicator (at once for a concealed kan; for an open or added kan when the declarer discards, so a ron on that discard counts it but the rinshan win does not). Open hands lose the closed-only yaku and a han on the kuisagari yaku.
-- **CPU move playback** — after each of your moves the server plays every CPU turn at once; the table replays them one discard/call at a time, with a **スキップ** button to jump straight to your next choice.
+- **CPU move playback** — after each of your moves the engine plays every CPU turn at once; the table replays them one discard/call at a time, with a **スキップ** button to jump straight to your next choice.
 - **Rules** — riichi, double riichi, ippatsu, ura dora, haitei / houtei, furiten (own discards, same go-around, after riichi), head bump (no double ron), a noten penalty at the exhaustive draw, and the abortive draws 九種九牌, 四風連打, 四家立直 and 四開槓.
 - **Scoring** — fu and han, mangan to counted yakuman, with double and stacked yakuman (a double yakuman counts 26 han; several together add up); dealer / non-dealer payments, honba (300 on a ron, 100 each on a tsumo) and riichi sticks — carried on the table until someone wins — shown with the point changes when the round ends.
 - **Game flow** — the dealer keeps the deal (連荘) after winning, after a tenpai draw, or after an abortive draw, otherwise it passes on; honba goes up by one when the dealer keeps the deal or after any draw, and resets to 0 when a non-dealer wins. The game ends after its last round (unless the last dealer keeps the deal) or as soon as anyone drops below 0 points (tobi); final standings rank by points, with uma (+20 / +10 / −10 / −20) and oka (+20 to first place).
 - **Per-yaku shanten for open hands** — melds count as fixed groups, so shanten only counts your concealed tiles; a meld that can't satisfy a yaku's shape makes that row impossible. Any meld drops chiitoitsu, kokushi, chuuren, pinfu and ryanpeikou; a chii, pon or open kan additionally opens the hand, dropping iipeikou and suuankou too (a concealed kan alone keeps the hand closed).
 - **CPU players** — **CPU: 普通** takes every win, riichis when tenpai, calls when it keeps a yaku, kans when it doesn't set the hand back, discards for tile efficiency, and folds against a riichi two or more steps from tenpai. **CPU: 弱い** also wins and riichis but never calls, kans or folds, and often picks a less efficient discard — both are reproducible from the seed.
 - **Practice tools stay on** — the per-yaku shanten table (its wind rows follow your seat and the round), the discard preview, the time-series chart and the glossary. There is no rewinding in a game.
-- **Seed** — a seed you choose makes the whole game (CPU moves included) repeatable; a random seed is revealed when the game ends. Only one tab of a browser plays a game or practice session at a time: opening it in another tab stops the first one, which can take it back with 「このタブで続ける」. If another browser (or a CPU turn finishing mid-request) has already moved the game on, your next action re-fetches the current state instead of failing.
+- **Seed** — a seed you choose makes the whole game (CPU moves included) repeatable; a random seed is revealed when the game ends. Only one tab of a browser plays a game or practice session at a time: opening it in another tab stops the first one, which can take it back with 「このタブで続ける」.
 
 ### How yaku shanten is defined
 
@@ -54,11 +54,11 @@ For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H t
 ## Quick start
 
 ```sh
-make build        # builds the frontend (make web), then bin/mhj-dojo with it embedded
+make build        # builds the static site (make embed), then bin/mhj-dojo with it embedded
 ./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
 
-The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: the API works, but the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
+The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: there is nothing to play, and the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
 
 ### Flags
 
@@ -67,55 +67,54 @@ The built frontend isn't committed, so a plain `go build` or `go install github.
 | `--port` | `8765` | Port to listen on (`0` = random free port) |
 | `--host` | `127.0.0.1` | Host to bind |
 | `--open` | `true` | Open the browser on start |
-| `--seed` | random | Default wall seed for new games |
+| `--seed` | random | Open practice on this wall seed (0 to 2^53-1; the page `/?seed=N`); CPU games and later practice sessions are not affected |
 
-The server only accepts requests whose `Host` header names localhost. That stops web pages in your browser from reaching it through DNS rebinding, but it is not authentication: with `--host 0.0.0.0` any machine on the network can use the API by sending a loopback `Host` header, and the server prints a warning when bound to a non-loopback address. Keep the default host unless you trust the network.
+The server only answers requests whose `Host` header names localhost or a loopback address, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
+
+### Saves
+
+Practice sessions and CPU games are saved in the browser's localStorage: the 10 most recently used sessions and the 5 most recently used games. A reload, or restarting `mhj-dojo`, continues from the save; if a save can't be used, a seed in the URL deals the same wall again. localStorage is per origin (host and port), so another `--port`, or `localhost` instead of `127.0.0.1`, shows other saves.
 
 ## Development
 
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm run build (npm ci first if needed) → internal/server/static/dist (not committed)
-make run          # make web, then go run ./cmd/mhj-dojo
+make embed        # make site (npm ci first if needed), copied to internal/server/static/dist (not committed)
+make run          # make embed, then go run ./cmd/mhj-dojo
 ```
 
-After changing `web/`, rebuild the frontend with `make web` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make web` last built.
+After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
-Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
+Every engine operation goes through `internal/apicall` (`apicall.Route`, which the WebAssembly engine answers with), and its behaviour is tested there. Add new operations there; the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
 
-Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj-dojo` running):
+Frontend dev server with hot reload (the engine runs in the page, so build it into `web/site-public/` first):
 
 ```sh
+make wasm
 cd web && npm run dev
 ```
 
-Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`: `shared/` runs on both the local version and the static site (below), `server/` and `site/` only on their own build (the HTTP API; the saves in the browser and the engine's worker). `npm run e2e` runs `shared/` and `server/` on their own `mhj-dojo` server against the built frontend, so no other server needs to be running:
+Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`, and `npm run e2e` runs them on their own `mhj-dojo` server serving the embedded site build (below), so no other server needs to be running:
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # once
-cd web && npm run build && npm run e2e
+make embed && cd web && npm run e2e
 ```
 
 ### Static site (WebAssembly)
 
-The app can also be built as a static site that needs no server: the Go engine (`cmd/mhj-dojo-wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. It answers the same requests as the HTTP API (docs/api.md), so the UI code is shared.
+The app is a static site: the Go engine (`cmd/mhj-dojo-wasm`) is compiled to WebAssembly and runs in the browser, in a Web Worker so the analysis doesn't freeze the page. The page sends it requests in the format of [docs/api.md](docs/api.md). `mhj-dojo` serves this build (`make embed`); any static host can too.
 
 ```sh
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site`; with both builds in place, `npm run e2e:all` runs both builds' tests.
-
-Differences from the local version:
-
-- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser too, CPU turns included.
-- Only one tab plays a session or game at a time, as in the local version; there is no other browser to move it on, so there is no "moved on elsewhere" handling.
-- Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL. CPU games are saved the same way (the 5 most recently used games); a random seed stays hidden until the game ends.
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`.
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 
-The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). The local server serves the same page at `/info/`, from the `CHANGELOG.md` embedded in its binary.
+The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). `mhj-dojo` serves the same built page at `/info/`.
 
 #### Deploying
 
@@ -136,7 +135,7 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
-The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags.
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. `mhj-dojo` embeds this same build (`make embed`), tags included.
 
 ### Layout
 
@@ -149,17 +148,17 @@ internal/memo/       bounded memo table for the shanten engines
 internal/shanten/    normal / chiitoitsu / kokushi shanten and ukeire
 internal/yakushanten/ per-yaku shanten
 internal/yaku/       win decomposition, yaku and dora
-internal/apiview/    JSON views shared by the practice and game APIs
+internal/apiview/    JSON views shared by practice and games
 internal/session/    solo game session and history tree
 internal/score/      points from han and fu
 internal/game/       four-player round engine (riichi, furiten, settlement)
 internal/cpu/        CPU player
-internal/match/      games against CPU players for the API
-internal/store/      in-memory store for sessions and games
-internal/apicall/    request handling shared by the HTTP API and the WebAssembly build
-internal/server/     HTTP API and embedded frontend
+internal/match/      games against CPU players
+internal/store/      the engine's in-memory store for sessions and games
+internal/apicall/    the engine's entry for every request (apicall.Route)
+internal/server/     static file serving of the embedded site build
 web/                 Vite + Preact + TypeScript frontend
-docs/api.md          HTTP API and definitions
+docs/api.md          the engine's request format and definitions
 ```
 
 Tile notation: `1m`–`9m`, `1p`–`9p`, `1s`–`9s`, `1z`–`7z` (East, South, West, North, White, Green, Red). A red five is written `0m` / `0p` / `0s`.

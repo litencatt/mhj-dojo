@@ -1,22 +1,13 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/litencatt/mhj-dojo/internal/apiview"
-	"github.com/litencatt/mhj-dojo/internal/match"
-	"github.com/litencatt/mhj-dojo/internal/session"
-	"github.com/litencatt/mhj-dojo/internal/tile"
-	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 type client struct {
@@ -24,13 +15,20 @@ type client struct {
 	srv *httptest.Server
 }
 
-func newClient(t *testing.T, store *session.Store) *client {
+func newClient(t *testing.T) *client {
 	static := fstest.MapFS{
-		"index.html":      {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
-		"assets/app.js":   {Data: []byte("console.log(1)")},
-		"info/index.html": {Data: []byte("<!doctype html><title>更新情報</title>")},
+		"index.html":               {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
+		"assets/app-C2ZR0Mrc.js":   {Data: []byte("console.log(1)")},
+		"assets/logo.svg":          {Data: []byte("<svg")},
+		"assets/foo-bar-bazqux.js": {Data: []byte("console.log(2)")},
+		"info/index.html":          {Data: []byte("<!doctype html><title>更新情報</title>")},
+		"mhj-dojo.wasm":            {Data: []byte("\x00asm\x01\x00\x00\x00")},
+		"worker.js":                {Data: []byte("importScripts('wasm_exec.js')")},
+		"wasm_exec.js":             {Data: []byte("globalThis.Go = class {}")},
+		"version.json":             {Data: []byte(`{"version":"dev"}`)},
+		"manifest.webmanifest":     {Data: []byte(`{"name":"mhj-dojo"}`)},
 	}
-	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))
+	srv := httptest.NewServer(NewWithFS(static))
 	t.Cleanup(srv.Close)
 	return &client{t: t, srv: srv}
 }
@@ -42,9 +40,6 @@ func (c *client) do(method, path, body string) (int, []byte, http.Header) {
 		r = strings.NewReader(body)
 	}
 	req, _ := http.NewRequest(method, c.srv.URL+path, r)
-	if method == http.MethodPost {
-		req.Header.Set("Content-Type", "application/json")
-	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		c.t.Fatal(err)
@@ -54,405 +49,38 @@ func (c *client) do(method, path, body string) (int, []byte, http.Header) {
 	return res.StatusCode, b, res.Header
 }
 
-func (c *client) state(method, path, body string) session.State {
-	c.t.Helper()
-	code, b, h := c.do(method, path, body)
-	if code != http.StatusOK {
-		c.t.Fatalf("%s %s: %d %s", method, path, code, b)
-	}
-	if ct := h.Get("Content-Type"); ct != "application/json" {
-		c.t.Fatalf("content-type %q", ct)
-	}
-	var st session.State
-	if err := json.Unmarshal(b, &st); err != nil {
-		c.t.Fatal(err)
-	}
-	return st
-}
-
-func (c *client) wantError(method, path, body string, status int) {
-	c.t.Helper()
-	code, b, _ := c.do(method, path, body)
-	if code != status {
-		c.t.Fatalf("%s %s: status %d, want %d (%s)", method, path, code, status, b)
-	}
-	var e map[string]string
-	if err := json.Unmarshal(b, &e); err != nil || e["error"] == "" {
-		c.t.Fatalf("%s %s: error body %q", method, path, b)
-	}
-}
-
-// TestVersionContract checks GET /api/version against docs/api.md. A test
-// binary carries no VCS stamp, so it reports "dev".
-func TestVersionContract(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	code, b, h := c.do("GET", "/api/version", "")
-	if code != http.StatusOK || h.Get("Content-Type") != "application/json" {
-		t.Fatalf("status %d, content-type %q: %s", code, h.Get("Content-Type"), b)
-	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
-		t.Fatal(err)
-	}
-	for _, k := range []string{"version", "revision", "time", "modified"} {
-		if _, ok := raw[k]; !ok {
-			t.Errorf("missing key %q", k)
-		}
-	}
-	if string(raw["version"]) != `"dev"` {
-		t.Errorf("version %s, want \"dev\" in a test binary", raw["version"])
-	}
-	c.wantError("POST", "/api/version", "{}", http.StatusNotFound)
-}
-
-// TestStateContract checks the raw JSON shape against docs/api.md.
-func TestStateContract(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	_, b, _ := c.do("POST", "/api/sessions", `{"seed": 42}`)
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
-		t.Fatal(err)
-	}
-	for _, k := range []string{
-		"session_id", "seed", "max_turns", "round_wind", "seat_wind", "node_id", "turn", "status",
-		"hand", "hand_groups", "drawn", "discards", "dora_indicators", "dora", "ura_dora_indicators", "ura_dora", "wall_remaining", "can_tsumo",
-		"analysis", "by_discard", "combos", "combos_by_discard", "history", "tree", "win", "advice", "discard_review",
-	} {
-		if _, ok := raw[k]; !ok {
-			t.Errorf("missing key %q", k)
-		}
-	}
-	if string(raw["win"]) != "null" || string(raw["discards"]) != "[]" || !bytes.HasPrefix(raw["by_discard"], []byte("{")) {
-		t.Errorf("win=%s discards=%s", raw["win"], raw["discards"])
-	}
-	var rows []map[string]json.RawMessage
-	if err := json.Unmarshal(raw["analysis"], &rows); err != nil {
-		t.Fatal(err)
-	}
-	if len(rows) != 30 {
-		t.Fatalf("%d rows", len(rows))
-	}
-	for _, k := range []string{"key", "name", "yakuman", "han", "shanten", "approx", "ukeire", "ukeire_total"} {
-		if _, ok := rows[0][k]; !ok {
-			t.Errorf("row missing %q", k)
-		}
-	}
-	if string(rows[0]["han"]) != "0" || string(rows[1]["han"]) != "1" || string(rows[21]["han"]) != "13" {
-		t.Errorf("han: normal=%s tanyao=%s kokushi=%s", rows[0]["han"], rows[1]["han"], rows[21]["han"])
-	}
-	if string(rows[0]["yakuman"]) != "false" || string(rows[21]["key"]) != `"kokushi"` || string(rows[21]["yakuman"]) != "true" {
-		t.Errorf("yakuman flags: %s %s %s", rows[0]["yakuman"], rows[21]["key"], rows[21]["yakuman"])
-	}
-	var combos []map[string]json.RawMessage
-	if err := json.Unmarshal(raw["combos"], &combos); err != nil {
-		t.Fatal(err)
-	}
-	if len(combos) == 0 || len(combos) > 5 {
-		t.Fatalf("%d combos", len(combos))
-	}
-	for _, k := range []string{"keys", "name", "han", "shanten", "approx", "ukeire", "ukeire_total"} {
-		if _, ok := combos[0][k]; !ok {
-			t.Errorf("combo missing %q", k)
-		}
-	}
-	var combosBy map[string][]map[string]json.RawMessage
-	if err := json.Unmarshal(raw["combos_by_discard"], &combosBy); err != nil || len(combosBy) == 0 {
-		t.Errorf("combos_by_discard = %s (%v)", raw["combos_by_discard"], err)
-	}
-	var hist []map[string]json.RawMessage
-	if err := json.Unmarshal(raw["history"], &hist); err != nil {
-		t.Fatal(err)
-	}
-	if string(hist[0]["draw"]) != "null" || string(hist[0]["discard"]) != "null" {
-		t.Errorf("root history entry: %v", hist[0])
-	}
-	var tree []map[string]json.RawMessage
-	if err := json.Unmarshal(raw["tree"], &tree); err != nil {
-		t.Fatal(err)
-	}
-	if string(tree[0]["parent_id"]) != "null" {
-		t.Errorf("root parent_id = %s", tree[0]["parent_id"])
-	}
-	checkAdviceContract(t, raw)
-}
-
-// checkAdviceContract checks the keys of a playing root state's advice
-// (docs/api.md "Advice") and that it has no discard_review.
-func checkAdviceContract(t *testing.T, raw map[string]json.RawMessage) {
-	t.Helper()
-	if string(raw["discard_review"]) != "null" {
-		t.Errorf("root discard_review = %s", raw["discard_review"])
-	}
-	var adv map[string]json.RawMessage
-	if err := json.Unmarshal(raw["advice"], &adv); err != nil {
-		t.Fatal(err)
-	}
-	for _, k := range []string{"candidates", "junme", "phase", "guideline", "draws_left", "tenpai_chance", "win_chance", "shape", "near_yaku", "notes"} {
-		if _, ok := adv[k]; !ok {
-			t.Errorf("advice missing %q", k)
-		}
-	}
-	var cands []map[string]json.RawMessage
-	if err := json.Unmarshal(adv["candidates"], &cands); err != nil {
-		t.Fatal(err)
-	}
-	if len(cands) != 3 {
-		t.Fatalf("%d candidates", len(cands))
-	}
-	for _, k := range []string{"tile", "shanten", "ukeire_kinds", "ukeire", "wait", "yaku"} {
-		if _, ok := cands[0][k]; !ok {
-			t.Errorf("candidate missing %q", k)
-		}
-	}
-}
-
-func TestDiscardReviewContract(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	root := c.state("POST", "/api/sessions", `{"seed": 42, "max_turns": 1}`)
-	_, b, _ := c.do("POST", "/api/sessions/"+root.SessionID+"/discard", `{"tile": "`+root.Advice.Candidates[0].Tile+`"}`)
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
-		t.Fatal(err)
-	}
-	// Exhausted: no advice, but the review of the last discard.
-	if string(raw["advice"]) != "null" {
-		t.Errorf("advice = %s", raw["advice"])
-	}
-	var r map[string]json.RawMessage
-	if err := json.Unmarshal(raw["discard_review"], &r); err != nil {
-		t.Fatal(err)
-	}
-	for _, k := range []string{"tile", "best", "rank", "is_best", "shanten", "best_shanten", "ukeire", "best_ukeire", "text"} {
-		if _, ok := r[k]; !ok {
-			t.Errorf("discard_review missing %q", k)
-		}
-	}
-	if string(r["is_best"]) != "true" || string(r["rank"]) != "1" {
-		t.Errorf("review of the recommended discard: %s", raw["discard_review"])
-	}
-}
-
-func TestCreateDiscardGotoBranch(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	root := c.state("POST", "/api/sessions", `{"seed": 42, "max_turns": 3}`)
-	if root.Seed != 42 || root.MaxTurns != 3 || root.Drawn == nil {
-		t.Fatalf("create: %+v", root)
-	}
-	base := "/api/sessions/" + root.SessionID
-
-	got := c.state("GET", base, "")
-	if got.NodeID != 0 || got.Hand[0] != root.Hand[0] {
-		t.Fatal("GET should return the current node")
-	}
-
-	drawn := *root.Drawn
-	n1 := c.state("POST", base+"/discard", `{"tile":"`+drawn+`"}`)
-	if n1.NodeID != 1 || n1.Turn != 1 || n1.Discards[0] != drawn || len(n1.History) != 2 {
-		t.Fatalf("discard: %+v", n1)
-	}
-
-	back := c.state("POST", base+"/goto", `{"node_id": 0}`)
-	if back.NodeID != 0 || len(back.Tree) != 2 {
-		t.Fatalf("goto: %+v", back)
-	}
-	other := root.Hand[0]
-	if other == drawn {
-		other = root.Hand[12]
-	}
-	n2 := c.state("POST", base+"/discard", `{"tile":"`+other+`"}`)
-	if n2.NodeID != 2 || len(n2.Tree) != 3 {
-		t.Fatalf("branch: node %d, %d tree nodes", n2.NodeID, len(n2.Tree))
-	}
-	for _, n := range n2.Tree[1:] {
-		if n.ParentID == nil || *n.ParentID != 0 {
-			t.Fatalf("both branches should hang off the root: %+v", n)
-		}
-	}
-	// The original branch is still reachable.
-	if s := c.state("POST", base+"/goto", `{"node_id": 1}`); s.NodeID != 1 || s.Discards[0] != drawn {
-		t.Fatal("branch 1 lost")
-	}
-
-	// Play to the turn limit.
-	s := n2
-	c.state("POST", base+"/goto", `{"node_id": 2}`)
-	for s.Status == session.StatusPlaying {
-		s = c.state("POST", base+"/discard", `{"tile":"`+*s.Drawn+`"}`)
-	}
-	if s.Status != session.StatusExhausted || s.Turn != 3 || s.Drawn != nil || len(s.ByDiscard) != 0 {
-		t.Fatalf("exhausted: %+v", s)
-	}
-	c.wantError("POST", base+"/discard", `{"tile":"`+s.Hand[0]+`"}`, http.StatusConflict)
-	c.wantError("POST", base+"/tsumo", "", http.StatusConflict)
-}
-
-// TestSessionNodeIDGuard covers the optional node_id on discard/tsumo
-// (issue #53): it lets a stale tab that acted from an earlier node detect
-// that another tab already moved the session on, instead of silently
-// discarding against whatever node happens to be current.
-func TestSessionNodeIDGuard(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	root := c.state("POST", "/api/sessions", `{"seed": 1}`)
-	base := "/api/sessions/" + root.SessionID
-	drawn := *root.Drawn
-
-	// match: node_id names the current node, so the discard applies.
-	n1 := c.state("POST", base+"/discard", `{"tile":"`+drawn+`","node_id":`+strconv.Itoa(root.NodeID)+`}`)
-	if n1.NodeID != 1 {
-		t.Fatalf("match: node %d, want 1", n1.NodeID)
-	}
-
-	// mismatch: node_id still names the now-stale root node, as if another
-	// tab (this test's own first request) had already moved the session on.
-	// The server rejects it (409) and makes no change.
-	c.wantError("POST", base+"/discard", `{"tile":"`+*n1.Drawn+`","node_id":`+strconv.Itoa(root.NodeID)+`}`, http.StatusConflict)
-	unchanged := c.state("GET", base, "")
-	if unchanged.NodeID != n1.NodeID || len(unchanged.Tree) != len(n1.Tree) {
-		t.Fatalf("mismatch discard changed state: before %+v after %+v", n1, unchanged)
-	}
-
-	// absent: no node_id keeps today's behaviour (applies regardless).
-	n2 := c.state("POST", base+"/discard", `{"tile":"`+*n1.Drawn+`"}`)
-	if n2.NodeID != 2 {
-		t.Fatalf("absent: node %d, want 2", n2.NodeID)
-	}
-}
-
-// TestTsumoNodeIDGuard is TestSessionNodeIDGuard for tsumo.
-func TestTsumoNodeIDGuard(t *testing.T) {
-	store := session.NewStore()
-	w, err := wall.WithFront(1, tile.MustParseHand("123m456p789s1122z1z"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err := store.CreateWithWall(w, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := newClient(t, store)
-	base := "/api/sessions/" + s.ID()
-	root := c.state("GET", base, "")
-	if !root.CanTsumo {
-		t.Fatalf("expected can_tsumo: %+v", root)
-	}
-
-	// mismatch: node_id names a node other than the current one.
-	c.wantError("POST", base+"/tsumo", `{"node_id":`+strconv.Itoa(root.NodeID+1)+`}`, http.StatusConflict)
-	unchanged := c.state("GET", base, "")
-	if unchanged.NodeID != root.NodeID || unchanged.Status != session.StatusPlaying {
-		t.Fatalf("mismatch tsumo changed state: before %+v after %+v", root, unchanged)
-	}
-
-	// match: node_id equals the current node, so the tsumo applies.
-	win := c.state("POST", base+"/tsumo", `{"node_id":`+strconv.Itoa(root.NodeID)+`}`)
-	if win.Status != session.StatusTsumo || win.Win == nil {
-		t.Fatalf("match: %+v", win)
-	}
-}
-
-// checkHandGroups fails unless groups index hand exactly once each, with
-// known block types.
-func checkHandGroups(t *testing.T, hand []string, groups []apiview.HandGroup) {
-	t.Helper()
-	seen := make([]bool, len(hand))
-	for _, g := range groups {
-		switch g.Type {
-		case "seq", "trip", "pair", "ryanmen", "kanchan", "penchan", "toitsu", "float":
-		default:
-			t.Fatalf("hand %v: group type %q", hand, g.Type)
-		}
-		if len(g.Tiles) == 0 {
-			t.Fatalf("hand %v: empty %s group", hand, g.Type)
-		}
-		for _, i := range g.Tiles {
-			if i < 0 || i >= len(hand) || seen[i] {
-				t.Fatalf("hand %v: groups %+v: index %d out of range or repeated", hand, groups, i)
-			}
-			seen[i] = true
-		}
-	}
-	for i, ok := range seen {
-		if !ok {
-			t.Fatalf("hand %v: groups %+v miss index %d", hand, groups, i)
-		}
-	}
-}
-
-func TestSessionHandGroups(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	s := c.state("POST", "/api/sessions", `{"seed": 7}`)
-	base := "/api/sessions/" + s.SessionID
-	for s.Status == session.StatusPlaying {
-		checkHandGroups(t, s.Hand, s.HandGroups)
-		s = c.state("POST", base+"/discard", `{"tile":"`+*s.Drawn+`"}`)
-	}
-	checkHandGroups(t, s.Hand, s.HandGroups)
-}
-
-func TestTsumoFlow(t *testing.T) {
-	store := session.NewStore()
-	w, err := wall.WithFront(1, tile.MustParseHand("123m456p789s1122z1z"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err := store.CreateWithWall(w, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := newClient(t, store)
-	base := "/api/sessions/" + s.ID()
-	st := c.state("GET", base, "")
-	if !st.CanTsumo {
-		t.Fatalf("can_tsumo false with drawn %v", *st.Drawn)
-	}
-	win := c.state("POST", base+"/tsumo", "")
-	if win.Status != session.StatusTsumo || win.Win == nil {
-		t.Fatalf("tsumo: %+v", win)
-	}
-	var keys []string
-	for _, y := range win.Win.Yaku {
-		keys = append(keys, y.Key)
-	}
-	if strings.Join(keys, ",") != "tsumo,ton" || win.Win.HanTotal < 3 {
-		t.Fatalf("yaku %v han %d", keys, win.Win.HanTotal)
-	}
-	// Back to the root, tsumogiri, and tsumo is refused.
-	c.state("POST", base+"/goto", `{"node_id": 0}`)
-	c.state("POST", base+"/discard", `{"tile":"1z"}`)
-	c.wantError("POST", base+"/tsumo", "", http.StatusConflict)
-}
-
-func TestErrors(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	st := c.state("POST", "/api/sessions", "")
-	base := "/api/sessions/" + st.SessionID
-	c.wantError("GET", "/api/sessions/nope", "", http.StatusNotFound)
-	c.wantError("POST", "/api/sessions/nope/discard", `{"tile":"1m"}`, http.StatusNotFound)
-	c.wantError("POST", "/api/sessions", `{"max_turns": 500}`, http.StatusBadRequest)
-	c.wantError("POST", "/api/sessions", `{"seed": "x"}`, http.StatusBadRequest)
-	c.wantError("POST", base+"/discard", `{"tile":"9z"}`, http.StatusBadRequest)
-	c.wantError("POST", base+"/discard", `{}`, http.StatusBadRequest)
-	c.wantError("POST", base+"/discard", ``, http.StatusBadRequest)
-	c.wantError("POST", base+"/discard", `not json`, http.StatusBadRequest)
-	c.wantError("POST", base+"/goto", `{"node_id": 42}`, http.StatusNotFound)
-	c.wantError("POST", base+"/goto", `{}`, http.StatusBadRequest)
-	c.wantError("GET", "/api/unknown", "", http.StatusNotFound)
-	c.wantError("DELETE", base, "", http.StatusNotFound)
-}
-
 func TestStaticAndSPAFallback(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	for path, want := range map[string]string{
-		"/":              "<!doctype html>",
-		"/some/spa/path": "<!doctype html>",
-		"/assets/app.js": "console.log",
-		"/info/":         "<!doctype html><title>更新情報",
-		"/info":          "<!doctype html><title>更新情報",     // redirected to /info/
-		"/assets/":       "<!doctype html><title>mhj-dojo", // a directory without a page
+	c := newClient(t)
+	const (
+		html      = "text/html; charset=utf-8"
+		js        = "text/javascript; charset=utf-8"
+		noCache   = "no-cache"
+		immutable = "public, max-age=31536000, immutable"
+	)
+	for path, want := range map[string]struct{ body, contentType, cache string }{
+		"/":                         {"<!doctype html>", html, noCache},
+		"/practice":                 {"<!doctype html><title>mhj-dojo", html, noCache}, // an unknown page
+		"/assets/app-C2ZR0Mrc.js":   {"console.log", js, immutable},
+		"/assets/logo.svg":          {"<svg", "image/svg+xml", noCache}, // not named by its hash
+		"/assets/foo-bar-bazqux.js": {"console.log(2)", js, noCache},    // dashes, but no 8-character hash
+		"/info/":                    {"<!doctype html><title>更新情報", html, noCache},
+		"/info":                     {"<!doctype html><title>更新情報", html, noCache}, // redirected to /info/
+		"/mhj-dojo.wasm?v=abc":      {"\x00asm", "application/wasm", noCache},
+		"/worker.js?v=abc":          {"importScripts", js, noCache},
+		"/wasm_exec.js?v=abc":       {"globalThis.Go", js, noCache},
+		"/version.json?t=1":         {`{"version"`, "application/json", noCache},
+		"/manifest.webmanifest":     {`{"name"`, "application/manifest+json", noCache},
 	} {
-		code, b, _ := c.do("GET", path, "")
-		if code != http.StatusOK || !strings.HasPrefix(string(b), want) {
-			t.Errorf("GET %s: %d %q", path, code, b)
+		code, b, h := c.do("GET", path, "")
+		if code != http.StatusOK || !strings.HasPrefix(string(b), want.body) || h.Get("Content-Type") != want.contentType || h.Get("Cache-Control") != want.cache || h.Get("ETag") == "" {
+			t.Errorf("GET %s: %d %q %q %q %q, want %q %q", path, code, b, h.Get("Content-Type"), h.Get("Cache-Control"), h.Get("ETag"), want.contentType, want.cache)
+		}
+	}
+	// index.html served at a deeper path would load its relative assets from
+	// the wrong place.
+	for _, path := range []string{"/assets/missing-C2ZR0Mrc.js", "/assets/", "/some/spa/path", "/info/missing", "/api"} {
+		if code, b, _ := c.do("GET", path, ""); code != http.StatusNotFound {
+			t.Errorf("GET %s: %d %q, want 404", path, code, b)
 		}
 	}
 	if code, _, _ := c.do("POST", "/", "x"); code != http.StatusMethodNotAllowed {
@@ -460,20 +88,66 @@ func TestStaticAndSPAFallback(t *testing.T) {
 	}
 }
 
-func TestChangelog(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	code, b, _ := c.do("GET", "/api/changelog", "")
-	var got struct{ Markdown string }
-	if code != http.StatusOK || json.Unmarshal(b, &got) != nil || !strings.HasPrefix(got.Markdown, "# Changelog\n") {
-		t.Fatalf("GET /api/changelog: %d %.80q", code, b)
+// A reload revalidates the engine and the pages by their ETags instead of
+// fetching them again.
+func TestStaticETag(t *testing.T) {
+	c := newClient(t)
+	send := func(method, path string, header ...string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(method, c.srv.URL+path, nil)
+		for i := 0; i < len(header); i += 2 {
+			req.Header.Set(header[i], header[i+1])
+		}
+		// Redirects are looked at, not followed.
+		res, err := http.DefaultTransport.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		return res
+	}
+	for _, path := range []string{"/mhj-dojo.wasm?v=abc", "/worker.js?v=abc", "/", "/info/", "/practice"} {
+		code, _, h := c.do("GET", path, "")
+		etag := h.Get("ETag")
+		if code != http.StatusOK || etag == "" {
+			t.Fatalf("GET %s: %d, ETag %q", path, code, etag)
+		}
+		if res := send("GET", path, "If-None-Match", etag); res.StatusCode != http.StatusNotModified {
+			t.Errorf("GET %s with If-None-Match %s: %d, want 304", path, etag, res.StatusCode)
+		}
+		if res := send("HEAD", path); res.StatusCode != http.StatusOK || res.Header.Get("ETag") != etag {
+			t.Errorf("HEAD %s: %d, ETag %q, want 200 and %s", path, res.StatusCode, res.Header.Get("ETag"), etag)
+		}
+		if res := send("GET", path, "If-None-Match", `"other"`); res.StatusCode != http.StatusOK {
+			t.Errorf("GET %s with another ETag: %d, want 200", path, res.StatusCode)
+		}
+	}
+	// A reload resuming a download gets the rest, while the ETag holds.
+	_, whole, h := c.do("GET", "/mhj-dojo.wasm", "")
+	res := send("GET", "/mhj-dojo.wasm", "Range", "bytes=4-", "If-Range", h.Get("ETag"))
+	if res.StatusCode != http.StatusPartialContent || res.ContentLength != int64(len(whole)-4) {
+		t.Errorf("Range: %d, %d bytes of %d", res.StatusCode, res.ContentLength, len(whole))
+	}
+	// Redirects carry no ETag: it would stand for the page they lead to.
+	for path, to := range map[string]string{"/info": "info/", "/index.html": "./", "/info/index.html": "./", "/version.json/": "../version.json"} {
+		res := send("GET", path)
+		if res.StatusCode != http.StatusMovedPermanently || res.Header.Get("Location") != to || res.Header.Get("ETag") != "" {
+			t.Errorf("GET %s: %d to %q, ETag %q; want a redirect to %q without one", path, res.StatusCode, res.Header.Get("Location"), res.Header.Get("ETag"), to)
+		}
+	}
+	_, _, wasm := c.do("GET", "/mhj-dojo.wasm", "")
+	_, _, worker := c.do("GET", "/worker.js", "")
+	if wasm.Get("ETag") == worker.Get("ETag") {
+		t.Errorf("mhj-dojo.wasm and worker.js share the ETag %s", wasm.Get("ETag"))
 	}
 }
 
-// TestEmbeddedFrontend checks what this binary serves: the built frontend
-// after make web (as in CI's E2E job, which drives it in the browser), the
-// not-built page otherwise (as in the Go test jobs and `go install`).
+// TestEmbeddedFrontend checks what this binary serves: the static site's
+// build after make embed (as in CI's site job, which drives it in the
+// browser), the not-built page otherwise (as in the Go test jobs and
+// `go install`).
 func TestEmbeddedFrontend(t *testing.T) {
-	srv := httptest.NewServer(New(session.NewStore(), match.NewStore()))
+	srv := httptest.NewServer(New())
 	defer srv.Close()
 	res, err := http.Get(srv.URL + "/")
 	if err != nil {
@@ -487,6 +161,15 @@ func TestEmbeddedFrontend(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK || !strings.Contains(string(b), want) {
 		t.Fatalf("embedded index (built %v): %d %q", FrontendBuilt(), res.StatusCode, b)
+	}
+	if !FrontendBuilt() {
+		return
+	}
+	// The static site's build (make embed), its engine included.
+	for _, name := range []string{"mhj-dojo.wasm", "wasm_exec.js", "worker.js", "version.json", "info/index.html"} {
+		if !isFile(staticFS, "static/dist/"+name) {
+			t.Errorf("static/dist/%s is missing: not the site build?", name)
+		}
 	}
 }
 
@@ -508,54 +191,66 @@ func TestFrontend(t *testing.T) {
 	}
 }
 
-func TestGuards(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	send := func(method, host, contentType, body string) int {
-		req, _ := http.NewRequest(method, c.srv.URL+"/api/sessions", strings.NewReader(body))
-		if host != "" {
-			req.Host = host
+// The API is gone (issue #147): a plain 404, never the page.
+func TestNoAPI(t *testing.T) {
+	c := newClient(t)
+	for _, r := range []struct{ method, path string }{
+		{"GET", "/api"}, {"GET", "/api/version"}, {"GET", "/api/changelog"}, {"POST", "/api/sessions"}, {"POST", "/api/games/x/action"},
+	} {
+		code, b, h := c.do(r.method, r.path, "{}")
+		if code != http.StatusNotFound || strings.Contains(string(b), "<title>") || !strings.HasPrefix(h.Get("Content-Type"), "text/plain") {
+			t.Errorf("%s %s: %d %q %q", r.method, r.path, code, h.Get("Content-Type"), b)
 		}
-		if contentType != "" {
-			req.Header.Set("Content-Type", contentType)
+	}
+}
+
+// Only a loopback Host is served: another site's page can't reach the app
+// through DNS rebinding.
+func TestGuards(t *testing.T) {
+	c := newClient(t)
+	for _, tc := range []struct {
+		host, path string
+		want       int
+	}{
+		{"", "/", http.StatusOK},
+		{"localhost:8765", "/", http.StatusOK},
+		{"LOCALHOST", "/", http.StatusOK},
+		{"[::1]:8765", "/", http.StatusOK},
+		{"127.0.0.1", "/", http.StatusOK},
+		{"127.0.0.2:8765", "/", http.StatusOK},
+		{"evil.example:8765", "/", http.StatusForbidden},
+		{"evil.example", "/", http.StatusForbidden},
+		{"192.168.1.10:8765", "/", http.StatusForbidden},
+		{"localhost.evil.example", "/", http.StatusForbidden},
+		// The Host check comes first, whatever the path.
+		{"evil.example", "/api/x", http.StatusForbidden},
+		{"evil.example", "/assets/app-C2ZR0Mrc.js", http.StatusForbidden},
+		{"", "/api/x", http.StatusNotFound},
+	} {
+		req, _ := http.NewRequest("GET", c.srv.URL+tc.path, nil)
+		if tc.host != "" {
+			req.Host = tc.host
 		}
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
 		_ = res.Body.Close()
-		return res.StatusCode
-	}
-	for _, tc := range []struct {
-		method, host, ct string
-		want             int
-	}{
-		{"POST", "", "application/json", http.StatusOK},
-		{"POST", "", "application/json; charset=utf-8", http.StatusOK},
-		{"POST", "localhost:8765", "application/json", http.StatusOK},
-		{"POST", "[::1]:8765", "application/json", http.StatusOK},
-		{"POST", "127.0.0.1", "application/json", http.StatusOK},
-		{"POST", "", "", http.StatusUnsupportedMediaType},
-		{"POST", "", "text/plain", http.StatusUnsupportedMediaType},
-		{"POST", "", "application/x-www-form-urlencoded", http.StatusUnsupportedMediaType},
-		{"POST", "evil.example:8765", "application/json", http.StatusForbidden},
-		{"GET", "evil.example", "", http.StatusForbidden},
-		{"POST", "192.168.1.10:8765", "application/json", http.StatusForbidden},
-	} {
-		if got := send(tc.method, tc.host, tc.ct, "{}"); got != tc.want {
-			t.Errorf("%s host=%q ct=%q: %d, want %d", tc.method, tc.host, tc.ct, got, tc.want)
+		if res.StatusCode != tc.want {
+			t.Errorf("host=%q %s: %d, want %d", tc.host, tc.path, res.StatusCode, tc.want)
 		}
 	}
 }
 
 func TestSecurityHeaders(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t)
 	check := func(what string, h http.Header) {
 		t.Helper()
 		if h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Content-Security-Policy") != "frame-ancestors 'none'" || h.Get("X-Frame-Options") != "DENY" {
 			t.Errorf("%s: headers %v", what, h)
 		}
 	}
-	for _, path := range []string{"/", "/api/sessions/nope"} {
+	for _, path := range []string{"/", "/info/", "/assets/app-C2ZR0Mrc.js", "/api/sessions/nope", "/some/spa/path"} {
 		_, _, h := c.do("GET", path, "")
 		check(path, h)
 	}
@@ -571,15 +266,4 @@ func TestSecurityHeaders(t *testing.T) {
 		t.Fatalf("spoofed host: %d", res.StatusCode)
 	}
 	check("403", res.Header)
-	req, _ = http.NewRequest("POST", c.srv.URL+"/api/sessions", strings.NewReader("{}"))
-	req.Header.Set("Content-Type", "text/plain")
-	res, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = res.Body.Close()
-	if res.StatusCode != http.StatusUnsupportedMediaType {
-		t.Fatalf("form post: %d", res.StatusCode)
-	}
-	check("415", res.Header)
 }

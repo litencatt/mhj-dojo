@@ -1,17 +1,17 @@
 // Replays the CPU moves in a game response one by one instead of snapping
 // straight to the final GameState (issue #29).
 //
-// The server only sends the final state plus the flat list of events that
+// The engine only sends the final state plus the flat list of events that
 // produced it (docs/api.md "events"); there is no intermediate state per
-// event. Recomputing the whole table client-side (discard legality, calls,
-// scoring, ...) would duplicate the server's rules and drift from them.
+// event. Recomputing the whole table in the page (discard legality, calls,
+// scoring, ...) would duplicate the engine's rules and drift from them.
 // Instead this file "reveals" the already-correct final seats progressively:
 // it walks `events` backwards from the final seats, undoing each event's
 // effect (pop a river tile, pop a meld, un-mark a called tile, ...) down to
 // a `base` with nothing from this batch applied, while recording the
 // inverse of each undo as a forward "op". Replaying those ops in order over
 // `base` reproduces every intermediate frame, always ending exactly on the
-// server's final seats.
+// engine's final seats.
 //
 // The table's numbers (points, riichi sticks, wall, dora, the other seats'
 // hand sizes) follow the same steps: see playbackState.

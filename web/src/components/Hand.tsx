@@ -7,7 +7,7 @@ import { tileName } from '../tiles';
 
 export interface HandProps {
   hand: string[];
-  // The server's split of `hand` (docs/api.md "HandGroup"); enables the 面子表示 toggle.
+  // The engine's split of `hand` (docs/api.md "HandGroup"); enables the 面子表示 toggle.
   groups?: HandGroup[];
   drawn: string | null;
   discards: string[];
@@ -72,7 +72,7 @@ type Pick = number | 'drawn';
 
 /**
  * 13-tile hand + drawn tile (set apart) + discard river. Click discards; hover/focus previews.
- * With 面子表示 on, the hand is regrouped into the server's blocks, each under a labelled bracket.
+ * With 面子表示 on, the hand is regrouped into the engine's blocks, each under a labelled bracket.
  *
  * Touch has no hover, so a tap only selects a tile (raised, and previewed like
  * a hovered one) and a second tap on the same tile discards it. The mouse and

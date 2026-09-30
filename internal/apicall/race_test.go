@@ -1,6 +1,6 @@
 //go:build race
 
-package server
+package apicall
 
 // raceEnabled reports whether the race detector is on; it slows the game
 // engine 5-10x, which makes timing assertions meaningless.

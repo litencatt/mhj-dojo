@@ -1,18 +1,15 @@
-// Package apicall is the transport-independent part of the JSON API
+// Package apicall is the engine's entry for the page's requests
 // (docs/api.md): decoding request bodies, running the practice and game
-// operations and mapping errors to HTTP statuses. The HTTP server
-// (internal/server) and the WebAssembly build (cmd/mhj-dojo-wasm) share it,
-// so both answer the same request with the same JSON.
+// operations and mapping errors to HTTP status codes. The WebAssembly build
+// (cmd/mhj-dojo-wasm) answers every request through Route.
 package apicall
 
 import (
 	"encoding/json"
 	"errors"
 	"io"
-	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/match"
@@ -61,9 +58,7 @@ func Status(err error) int {
 	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
 		return statusBadRequest
 	case errors.Is(err, session.ErrTreeFull):
-		// Not a state conflict (the current node is fine); a client that
-		// re-fetches on 409 to recover from another tab's progress must
-		// not treat this the same way, since re-fetching changes nothing.
+		// Not a state conflict: the current node is fine to act on.
 		return statusUnprocessableEntity
 	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
 		return statusConflict
@@ -109,7 +104,7 @@ func SessionView(query string) (session.View, error) {
 	return v, nil
 }
 
-// CreateSession is POST /api/sessions.
+// CreateSession is Route's POST /api/sessions.
 func CreateSession(store *session.Store, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		Seed     *int64 `json:"seed"`
@@ -125,7 +120,7 @@ func CreateSession(store *session.Store, v session.View, body io.Reader) (sessio
 	return s.State(v), nil
 }
 
-// Discard is POST /api/sessions/{id}/discard.
+// Discard is Route's POST /api/sessions/{id}/discard.
 func Discard(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		Tile   *string `json:"tile"`
@@ -140,7 +135,7 @@ func Discard(s *session.Session, v session.View, body io.Reader) (session.State,
 	return s.Discard(*req.Tile, req.NodeID, v)
 }
 
-// Tsumo is POST /api/sessions/{id}/tsumo.
+// Tsumo is Route's POST /api/sessions/{id}/tsumo.
 func Tsumo(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		NodeID *int `json:"node_id"`
@@ -151,7 +146,7 @@ func Tsumo(s *session.Session, v session.View, body io.Reader) (session.State, e
 	return s.Tsumo(req.NodeID, v)
 }
 
-// Goto is POST /api/sessions/{id}/goto.
+// Goto is Route's POST /api/sessions/{id}/goto.
 func Goto(s *session.Session, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
 		NodeID *int `json:"node_id"`
@@ -165,7 +160,7 @@ func Goto(s *session.Session, v session.View, body io.Reader) (session.State, er
 	return s.Goto(*req.NodeID, v)
 }
 
-// CreateGame is POST /api/games.
+// CreateGame is Route's POST /api/games.
 func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
 	var req struct {
 		Seed        *int64 `json:"seed"`
@@ -183,8 +178,8 @@ func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
 	return m.State(), nil
 }
 
-// GameAction is POST /api/games/{id}/action: one of the human's moves, or
-// "next".
+// GameAction is Route's POST /api/games/{id}/action: one of the human's
+// moves, or "next".
 func GameAction(m *match.Match, body io.Reader) (match.State, error) {
 	var req struct {
 		Type  game.ActionType `json:"type"`
@@ -212,60 +207,20 @@ func GameAction(m *match.Match, body io.Reader) (match.State, error) {
 	return m.Act(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles})
 }
 
-// VersionInfo is the body of GET /api/version: the commit the answering
-// binary (the server, or the WebAssembly engine) was built from, as the go
-// command stamped it (debug.ReadBuildInfo). A build without that stamp, such
-// as `go run`, `go test` or a build outside a git checkout, reports "dev".
-type VersionInfo struct {
-	Version  string `json:"version"`  // the commit's first 7 hex digits, or "dev"
-	Revision string `json:"revision"` // the full commit hash; "" when unknown
-	Time     string `json:"time"`     // the commit time (RFC 3339, UTC); "" when unknown
-	Modified bool   `json:"modified"` // built with uncommitted changes
-}
-
-// Version is GET /api/version.
-var Version = sync.OnceValue(func() VersionInfo { return versionOf(debug.ReadBuildInfo()) })
-
-func versionOf(bi *debug.BuildInfo, ok bool) VersionInfo {
-	v := VersionInfo{Version: "dev"}
-	if !ok {
-		return v
-	}
-	for _, s := range bi.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			v.Revision = s.Value
-		case "vcs.time":
-			v.Time = s.Value
-		case "vcs.modified":
-			v.Modified = s.Value == "true"
-		}
-	}
-	if len(v.Revision) >= 7 {
-		v.Version = v.Revision[:7]
-	}
-	return v
-}
-
-// Route runs one request given as its HTTP method and API path, with any
-// query (such as "POST", "/api/sessions/{id}/discard?advice=0"), for a
-// transport without an HTTP
-// router (the WebAssembly build). It returns the status and the response
-// value the HTTP server would send: a session.State, a match.State, a
-// VersionInfo or an ErrorBody. Any other path is a 404 as for an unknown
-// endpoint.
+// Route runs one request given as its method and path, with any query (such
+// as "POST", "/api/sessions/{id}/discard?advice=0"): the engine's entry for
+// every operation, which the WebAssembly build calls. It returns the status
+// (an HTTP status code) and the response value: a session.State, a
+// match.State or an ErrorBody. Any other path is a 404.
 func Route(store *session.Store, games *match.Store, method, path string, body io.Reader) (int, any) {
 	path, query, _ := strings.Cut(path, "?")
-	if method == methodGet && path == "/api/version" {
-		return statusOK, Version()
-	}
 	return result(route(store, games, method, path, query, body))
 }
 
 // Restore rebuilds a session from its moves in one call (session.Replay)
-// and returns the status and response value of its final state. It is not
-// an HTTP endpoint: the WebAssembly build uses it to bring a session back
-// after a page reload. The body is {"seed", "max_turns", "moves",
+// and returns the status and response value of its final state. It is not a
+// request (Route does not answer it): the WebAssembly build uses it to bring
+// a session back after a page reload. The body is {"seed", "max_turns", "moves",
 // "current"}, moves as [{"parent": 0, "tile": "5m"}, {"parent": 3}] (no
 // tile: tsumo); query holds view options as for a request (SessionView).
 func Restore(store *session.Store, query string, body io.Reader) (int, any) {
@@ -298,8 +253,8 @@ func Restore(store *session.Store, query string, body io.Reader) (int, any) {
 
 // RestoreGame rebuilds a game under a new id from its match.Save (the JSON
 // body) and returns the status and response value of its state. Like
-// Restore it is not an HTTP endpoint: the WebAssembly build uses it to bring
-// a game back after a page reload.
+// Restore it is not a request (Route does not answer it): the WebAssembly
+// build uses it to bring a game back after a page reload.
 func RestoreGame(games *match.Store, body io.Reader) (int, any) {
 	var req match.Save
 	if err := Decode(body, &req, true); err != nil {
@@ -320,7 +275,7 @@ func result(v any, err error) (int, any) {
 }
 
 func route(store *session.Store, games *match.Store, method, path, query string, body io.Reader) (any, error) {
-	// The server's message for a path no endpoint matches.
+	// The message for a path no request matches.
 	noEndpoint := errors.Join(session.ErrNotFound, errors.New("no such endpoint: "+method+" "+path))
 	if rest, ok := strings.CutPrefix(path, "/api/sessions"); ok {
 		var f func(*session.Session, session.View, io.Reader) (session.State, error)

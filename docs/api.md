@@ -1,16 +1,18 @@
-# mhj-dojo HTTP API
+# mhj-dojo engine requests
 
-All endpoints return JSON (`Content-Type: application/json`). Errors: HTTP 4xx/5xx with `{"error": "message"}`.
+The page talks to its engine, the Go code built as WebAssembly (`cmd/mhj-dojo-wasm`), in a Web
+Worker (`web/site-public/worker.js`, driven by `web/src/wasm.ts`). A request is an HTTP-style
+method, path and JSON body — practice (`/api/sessions…`) or game (`/api/games…`), below — which
+the worker's `mhjDojoRequest(method, path, body)` hands to `apicall.Route` (`internal/apicall`). It
+returns `{status, body, save}`: an HTTP status code and a JSON body, the error ones
+`{"error": "message"}` with a 4xx/5xx status ("Errors" under the implementation notes), and a game's save (see "Game saves").
+There is no HTTP server behind it: `mhj-dojo` only serves the page's files. The worker also defines
+two calls that are not requests: `mhjDojoRestore(body, query)`, which rebuilds a session from its
+moves in one call after a page reload (`body` is `{"seed", "max_turns", "moves", "current"}`;
+`query`, which may be left out, holds view options as a request's query does, see "View options"),
+and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves").
 
-The static site (README, "Static site") has no server: the engine built as WebAssembly
-(`cmd/mhj-dojo-wasm`) defines `mhjDojoRequest(method, path, body)` in its Web Worker, which takes a
-request below — practice (`/api/sessions…`), game (`/api/games…`) or `GET /api/version` — as its
-method, path and JSON body and returns `{status, body, save}` with the status and JSON body the
-server would send (both use `internal/apicall`). It also defines two functions that are not HTTP
-endpoints: `mhjDojoRestore(body, query)`, which rebuilds a session from its moves in one call after a page
-reload (`body` is `{"seed", "max_turns", "moves", "current"}`; `query`, which may be left out, holds
-view options as a request's URL query does, see "View options"), and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves
-(WebAssembly)").
+The TypeScript types for these shapes are in `web/src/api.ts`.
 
 ## Tile notation
 
@@ -41,7 +43,7 @@ Node status:
 - `tsumo` – the player declared tsumo at this node (terminal)
 - `exhausted` – `turn == max_turns` reached (terminal; no more draws)
 
-## Endpoints
+## Requests
 
 ### `POST /api/sessions`
 Body (all optional): `{"seed": 42, "max_turns": 18}`
@@ -52,10 +54,10 @@ Returns the `State` at the current node.
 
 ### `POST /api/sessions/{id}/discard`
 Body: `{"tile": "5m", "node_id": 3}` – `tile` is the exact tile string from hand or `drawn`
-(red matters: `0m` vs `5m`). `node_id` is optional: the node the client acted from (its
+(red matters: `0m` vs `5m`). `node_id` is optional: the node the page acted from (its
 current `state.node_id`); if it doesn't match the session's current node, the request is
-rejected with `409` and nothing changes (another browser has moved the session on first – see
-Errors below). Omitting it keeps the old behaviour of acting on whatever node is current.
+rejected with `409` and nothing changes (see Errors below). Omitting it acts on whatever node is
+current.
 Creates the child node, or moves to it if the same discard already exists. Returns the `State`.
 
 ### `POST /api/sessions/{id}/tsumo`
@@ -63,23 +65,22 @@ Body (optional): `{"node_id": 3}`, as `discard` above. Allowed only when `can_ts
 Creates a terminal `tsumo` child node. Returns the `State`.
 
 ### `POST /api/sessions/{id}/goto`
-Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id` here already
-names the destination explicitly, so there's no separate "acted from" node to guard: unlike
-discard/tsumo, another browser moving the session on first can't make this ambiguous (the target
-node still exists; the tree only grows), so `goto` takes no staleness guard.
+Body: `{"node_id": 3}` – moves the current node. Returns the `State`. `node_id` names the
+destination itself (it still exists: the tree only grows), so `goto` takes no staleness guard.
 
 ### View options
 
-Every practice endpoint above (`POST /api/sessions` included) takes two optional URL query
-parameters that leave parts of the returned `State` out, for a client that doesn't need them:
+Every practice request above (`POST /api/sessions` included) takes two optional query
+parameters, in its path after `?`, that leave parts of the returned `State` out, for a page that
+doesn't need them:
 
 - `advice=0` – `advice` and `discard_review` are `null`, and the advice is not computed (about
   2 ms, a sixth of a discard's time along the advice's best line). A discard made with it leaves
   the new node's review to be computed the next time the node is shown with the advice, so asking
-  for the same state again without `advice=0` (say, once the client's advice panel opens) fills
+  for the same state again without `advice=0` (say, once the page's advice panel opens) fills
   in both. `advice=1` is the default.
 - `tree_from=<n>` – `tree` holds only the nodes with `node_id >= n`. Nodes are numbered in the
-  order they are made and never change once made, so a client that holds the first `n` nodes
+  order they are made and never change once made, so a page that holds the first `n` nodes
   (its tree's length) asks for the rest only and appends them; `node_count` tells it how many
   the whole tree has, a check that the two add up. `0` (the default) sends the whole tree; past
   the end, `tree` is `[]`.
@@ -87,33 +88,8 @@ parameters that leave parts of the returned `State` out, for a client that doesn
 Any other value is a `400` (`tree_from` is read as a decimal integer, a leading `+` allowed);
 unknown parameters are ignored, and of a parameter given twice the last value counts. The UI sends `advice=0` while the
 advice panel is minimized (opening it asks for the state shown again, with the advice), and
-`tree_from` on every request but those that load a session afresh (a new one, the first of a page,
-the re-fetch after a `409`), which take the whole tree.
-
-### `GET /api/version`
-The commit the answering binary was built from, as the go command stamps it into a build
-made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
-
-```json
-{"version": "b083fb0", "revision": "b083fb0498b732b077e4b85af931ede37292438f", "time": "2026-09-26T13:16:27Z", "modified": false}
-```
-
-`version` is the first 7 hex digits of `revision`, or `"dev"` for a build without the stamp
-(`go run`, `go test`, a build outside a git checkout), where `revision` and `time` are `""`.
-`time` is the commit time (RFC 3339, UTC), `modified` whether the build had uncommitted changes
-(as `git status` reports them, so untracked files that are not ignored count too).
-The static site's engine answers it too (with the WebAssembly binary's own stamp). The UI shows
-it in the header.
-
-### `GET /api/changelog`
-The repository's `CHANGELOG.md` (which tagpr updates on every release), as the binary embedded it:
-
-```json
-{"markdown": "# Changelog\n\n## [v2026.0929.1](https://github.com/…) - 2026-09-29\n…"}
-```
-
-The local build's 更新情報 page (`/info/`, `web/info`) renders it. Only the server has it: the
-static site's page is rendered from `CHANGELOG.md` at build time instead.
+`tree_from` on every request but those that load a session afresh (a new one, the first of a page),
+which take the whole tree.
 
 ## `State`
 
@@ -381,7 +357,7 @@ Ranking (`yakushanten.Combos`):
    value tiles (dragons, winds) it uses, with the same han and shanten.
 4. Keep the first five.
 
-The server evaluates the combinations best-first by a lower bound (the largest
+The engine evaluates the combinations best-first by a lower bound (the largest
 shanten among each combination's own rows) and stops once no remaining one can
 enter the top five; within a combination's target family it also stops at the
 first member that reaches the distance that bound implies (for pinfu the
@@ -451,19 +427,22 @@ Pinfu: all four melds are sequences, the pair is not a yakuhai (白發中, 東),
 At shanten 0 the ryanmen condition is checked exactly (tenpai only if some winning tile completes a
 pinfu shape with a ryanmen wait); at shanten ≥ 1 the value ignores the wait condition and `approx` is true.
 
-## Implementation notes (backend, binding)
+## Implementation notes (engine)
 
 These clarify points the contract above leaves open; none changes the JSON shape.
 
-- **Errors**: `400` invalid body/tile/`max_turns`, `403` non-loopback Host, `404` unknown
-  session/node/endpoint, `415` POST without a JSON content type, `409` action not
+- **Errors**: `400` invalid body/tile/`max_turns`/view option, `404` unknown
+  session/node/request path, `409` action not
   allowed at the current node (discard/tsumo at a terminal node, tsumo with an incomplete hand,
-  or a `node_id` that no longer matches the current node because another browser moved the
-  session on first; of two tabs in one browser the page stops the older one before that),
-  `422` a session's tree is already at its node cap (see below) — not a state conflict, since
-  the current node itself is fine to act on, so unlike a `409` re-fetching the session changes
-  nothing.
-- **`seed`** defaults to a random value in `[0, 2^32)` (or the server's `--seed` flag). **`max_turns`**
+  or a `node_id` that no longer matches the current node; of two tabs the page stops the older
+  one before that can happen),
+  `422` a session's tree is already at its node cap (see below) — not a state conflict: the
+  current node itself is fine to act on.
+  The page's side of the worker (`web/src/wasm.ts`) adds two of its own, which never reach the
+  engine: `409` when a save another tab wrote can't be rebuilt here (that tab may run a newer
+  engine; the page asks for a reload), and `423` when another tab has taken the session or game
+  over.
+- **`seed`** defaults to a random value in `[0, 2^32)`. **`max_turns`**
   must be `1..109`; `0`/omitted means 18.
 - **`by_discard`** and **`combos_by_discard`** are always present: `{}` unless `status == "playing"`. **`win`** is `null` unless `status == "tsumo"`.
   **`advice`** is `null` unless `status == "playing"`; **`discard_review`** is `null` at the root and at tsumo nodes
@@ -529,11 +508,6 @@ These clarify points the contract above leaves open; none changes the JSON shape
   yakuman are listed (no 門前清自摸和 or other yaku). A closed tsumo with four triplets is always
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
-- **Request guards** (all endpoints): the `Host` header must be a loopback name — `localhost`,
-  `127.0.0.1` or another loopback IP, `[::1]`, any port — otherwise `403` (a DNS-rebinding guard
-  against browsers; a network client can spoof the header, so `--host 0.0.0.0` does expose the API).
-  Every `POST` must send `Content-Type: application/json` (parameters such as `charset` allowed),
-  otherwise `415`. Responses carry `X-Content-Type-Options: nosniff` and forbid framing.
 
 ## Games against CPU players
 
@@ -542,12 +516,12 @@ are seat 0, three CPU players take seats 1–3, and every player starts with
 25000 points. The first dealer (起家) is `seed mod 4`, so your seat wind
 depends on the seed, unless you ask to be the first dealer
 (`"first_dealer": "you"`); the walls are the same either way. There is no
-rewinding. After each of your moves the server plays the CPU seats until you
+rewinding. After each of your moves the engine plays the CPU seats until you
 have a choice again or the round ends; after a round ends you send `next`.
 
 Round rules: riichi (closed, costs a 1000-point stick and needs at least 1000
 points, at least 4 draws left, tenpai after the discard; after riichi only the
-drawn tile can be discarded, and the server discards it for you unless you can
+drawn tile can be discarded, and the engine discards it for you unless you can
 tsumo), double riichi, ippatsu, ura dora, haitei, houtei, furiten (own
 discards, same go-around, and after riichi), head bump (no double ron),
 3000-point noten penalty at the exhaustive draw, and the abortive draws 九種九牌
@@ -643,8 +617,7 @@ Body (optional): `{"seed": 42, "length": "hanchan", "first_dealer": "you",
 `first_dealer` is `"random"` (the default: `seed mod 4`) or `"you"`; `cpu` is
 `"normal"` (the default) or `"weak"`. Any other value is a `400`. Returns a
 `GameState`. Every round's wall is
-derived one-way from the seed. Without a seed (and without the server's
-`--seed` flag) a random seed in `[0, 2^53)` is used and `seed` stays `null`
+derived one-way from the seed. Without a seed a random seed in `[0, 2^53)` is used and `seed` stays `null`
 until the game ends, because the seed rebuilds every wall.
 
 ### `GET /api/games/{id}`
@@ -669,7 +642,7 @@ Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
 Errors: `400` malformed body, unknown type or a tile you do not hold, `404`
 unknown game, `409` a move that is not legal now.
 
-### Game saves (WebAssembly)
+### Game saves
 
 The WebAssembly engine keeps games in the tab's memory only, so the page keeps
 a save of each game to rebuild it after a reload or an eviction (see Memory).
@@ -679,7 +652,7 @@ the human's moves on the same seed and options.
 - `mhjDojoRequest(method, path, body)` returns `{status, body, save}`. `save`
   is a JSON string (below) when `body` is a `GameState` (`POST /api/games`,
   `GET /api/games/{id}` and `POST /api/games/{id}/action` with status `200`),
-  and `""` for any other response (practice, version, errors). Take each new
+  and `""` for any other response (practice, errors). Take each new
   save as the game's latest.
 - `mhjDojoRestoreGame(save)` takes such a save string and returns
   `{status, body, save}` like a request: `200` with the rebuilt game's
@@ -816,30 +789,28 @@ East, otherwise the round wind row then your seat wind row (1 han each).
 
 ## Memory
 
-The server keeps two in-memory stores, each evicting its least recently used
+The engine keeps two in-memory stores, each evicting its least recently used
 entry once full (`internal/store`; a `Get` marks an entry most recently used,
-so one a client keeps polling or acting on stays in): up to
-`session.MaxSessions` = 256 practice sessions and up to `match.MaxGames` = 256
-CPU games. Each session or game owns a
+so one the page keeps acting on stays in). Each session or game owns a
 `yakushanten.Analyzer`, and a game's three CPU seats additionally share one
 `cpu.Player`; each keeps a shanten memo bounded as described under "Memo
 bounds" below (at most ~9 MiB per analyzer and ~1 MiB per CPU player).
 
-The wasm build (`cmd/mhj-dojo-wasm`) passes a much smaller max — 4, via
-`session.NewStoreWithMax` — instead of `session.MaxSessions`: it runs in a
-browser tab's memory rather than a server's, and Go's wasm runtime never
-returns freed heap pages to the OS, so a session's cost (its branch tree plus
-its own analyzer memo, up to ~8 MiB) only ever grows the
+The WebAssembly build (`cmd/mhj-dojo-wasm`) keeps at most 4 sessions
+(`session.NewStoreWithMax`; `session.MaxSessions` = 256 is `session.NewStore`'s
+default, for the tests): it runs in a browser tab's memory, and Go's wasm
+runtime never returns freed heap pages to the OS, so a session's cost (its
+branch tree plus its own analyzer memo, up to ~8 MiB) only ever grows the
 tab's memory until the store evicts it. A session evicted this way, or lost
 to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
-works; `web/e2e/site/practice.spec.ts` checks the eviction and rebuild
+works; `web/e2e/practice-saves.spec.ts` checks the eviction and rebuild
 together.
 
-Games get the same treatment with a max of 2 (`match.NewStoreWithMax`): a
+Games get the same treatment with a max of 2 (`match.NewStoreWithMax`;
+`match.MaxGames` = 256 is the default): a
 game holds its analyzer memo and its CPU players' memo, and an evicted or
-reloaded game is rebuilt from its save (`mhjDojoRestoreGame`, "Game saves
-(WebAssembly)").
+reloaded game is rebuilt from its save (`mhjDojoRestoreGame`, "Game saves").
 
 Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and
 `internal/session/memory_test.go`'s `BenchmarkSessionMemory` (not run by
@@ -1002,13 +973,11 @@ game moves ~11.7 → ~12.2 ms.
 `BenchmarkAnalyzeAllDiscards` (one fresh analyzer per call) is unchanged
 at ~22.5 ms, so the generational lookup itself costs nothing measurable.
 
-Worst case, native server: a session ≈ 9 MiB (analyzer) + ~0.8 MiB (a
+Worst case: a session ≈ 9 MiB (analyzer) + ~0.8 MiB (a
 2000-node tree, its per-row shanten included) ≈ 9.8 MiB, a game ≈ 9 + 1
-(CPU) + ~0.5 (game state) ≈ 10.5 MiB, so 256 sessions + 256 games ≈ 2.5 +
-2.6 ≈ 5.1 GiB, down from ~18 GiB under the old caps (~30 MiB per session,
-~42 MiB per game). The
-WebAssembly build (4 sessions, 2 games) is bounded at ~60 MiB, down from
-~200 MiB (plus a turnover's brief extra generation, see above). A lower
-`shanten.MemoGen` trades latency for memory along the table above (12,000
-per generation would be ~5 MiB per analyzer and ~3 GiB in total, at +47%
-table misses in ordinary practice).
+(CPU) + ~0.5 (game state) ≈ 10.5 MiB (~30 MiB per session and ~42 MiB per
+game under the old caps), so the WebAssembly build (4 sessions, 2 games) is
+bounded at ~60 MiB, down from ~200 MiB (plus a turnover's brief extra
+generation, see above). A lower `shanten.MemoGen` trades latency for memory
+along the table above (12,000 per generation would be ~5 MiB per analyzer,
+at +47% table misses in ordinary practice).

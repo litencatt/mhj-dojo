@@ -14,7 +14,6 @@ import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
-  sessionMovedOn,
   useRowNames,
   useSerialRequest,
   useSingleTab,
@@ -54,17 +53,12 @@ export function App() {
     return next;
   }
 
-  const { busy, error, notice, request } = useSerialRequest<SessionState>(
+  const { busy, error, request } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
       setHighlightTile(null);
     },
-    // On the static site no other tab plays this session meanwhile (see
-    // useSingleTab): a 409 is never another tab's doing. On the server it
-    // may be another browser's.
-    state && !api.WASM ? () => load((v) => api.getSession(state.session_id, v), null) : undefined,
-    sessionMovedOn,
   );
   const stopped = useSingleTab(state ? api.sessionKey(state.session_id) : null);
 
@@ -97,8 +91,8 @@ export function App() {
     return request(() => load((v) => api.createSession({ seed, max_turns: maxTurns ?? 18 }, v), null));
   }
 
-  // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
-  // replays the same wall from the seed after a server restart.
+  // The URL carries ?session=&seed=&turns= so a reload resumes the session,
+  // or replays the same wall from the seed when it has no save (404).
   const resume = useUrlResume({
     idKey: 'session',
     request,
@@ -229,15 +223,10 @@ export function App() {
               {error}
             </div>
           )}
-          {notice && (
-            <div class="notice-banner" role="status">
-              {notice}
-            </div>
-          )}
 
           {!state && !error && (
             <p class="muted">
-              {api.WASM ? '計算エンジンを読み込んでいます…' : '対局を準備しています…'}
+              計算エンジンを読み込んでいます…
             </p>
           )}
         </div>

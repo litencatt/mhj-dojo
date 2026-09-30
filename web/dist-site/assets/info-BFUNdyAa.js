@@ -1,0 +1,1 @@
+var e=document.referrer?new URL(document.referrer):null,t=e=>e.searchParams.get(`mode`)===`game`;for(let n of document.querySelectorAll(`.info-nav a`))n.addEventListener(`click`,r=>{let i=new URL(n.href);!e||e.origin!==i.origin||e.pathname!==i.pathname||t(e)!==t(i)||history.length<2||(r.preventDefault(),history.back())});

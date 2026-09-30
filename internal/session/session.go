@@ -17,15 +17,15 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
-// Errors returned by sessions; the server maps them to HTTP statuses.
+// Errors returned by sessions; apicall maps them to HTTP status codes.
 var (
 	ErrNotFound = errors.New("not found")
 	ErrInvalid  = errors.New("invalid request")
 	ErrConflict = errors.New("not allowed in the current state")
 	// ErrTreeFull is returned instead of ErrConflict when a session's tree
 	// is already at MaxNodes: the current node itself is fine to act on, so
-	// this isn't a state conflict the client could resolve by re-fetching
-	// (the server maps it to 422, not 409; docs/api.md).
+	// this isn't a state conflict (apicall maps it to 422, not 409;
+	// docs/api.md).
 	ErrTreeFull = errors.New("tree full")
 )
 
@@ -55,8 +55,6 @@ var winds = yaku.EastEast
 // Store holds sessions in memory.
 type Store struct {
 	sessions *store.Store[*Session]
-	// DefaultSeed, when set, is used for sessions created without a seed.
-	DefaultSeed *int64
 }
 
 // NewStore returns an empty store that keeps at most MaxSessions sessions.
@@ -65,15 +63,15 @@ func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
 // NewStoreWithMax returns an empty store that keeps at most max sessions,
 // evicting the least recently used one beyond that. The wasm build
 // (cmd/mhj-dojo-wasm) uses a much smaller max than MaxSessions: it runs in a
-// browser tab's memory rather than a server's, so it can't afford to hold
+// browser tab's memory, so it can't afford to hold
 // hundreds of sessions' trees and analyzer memos (see docs/api.md "Memory").
 func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
-// Create starts a session. A nil seed picks the default or a random seed;
+// Create starts a session. A nil seed picks a random seed;
 // maxTurns 0 means DefaultMaxTurns.
 func (st *Store) Create(seed *int64, maxTurns int) (*Session, error) {
 	// Practice seeds are always shown, so a small range is fine.
-	return st.CreateWithWall(wall.New(wall.PickSeed(seed, st.DefaultSeed, 1<<32)), maxTurns)
+	return st.CreateWithWall(wall.New(wall.PickSeed(seed, 1<<32)), maxTurns)
 }
 
 // CreateWithWall starts a session on a given wall (used by tests).

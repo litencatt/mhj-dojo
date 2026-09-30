@@ -4,10 +4,10 @@
 // src/wasm.ts starts it and talks to it:
 //
 //   worker → page  {type: 'ready', initMs} | {type: 'failed', error} (at start, or later if the engine exits)
-//   page → worker  {id, fn: 'request', args: [method, path, body]}   an HTTP API request (docs/api.md)
+//   page → worker  {id, fn: 'request', args: [method, path, body]}   an engine request (docs/api.md)
 //                  {id, fn: 'restore', args: [body, query]}          rebuild a session from its moves
 //                  {id, fn: 'restoreGame', args: [save]}             rebuild a CPU game from its save
-//   worker → page  {id, status, body, save?}   the status and JSON body the server would send, and
+//   worker → page  {id, status, body, save?}   the request's status and JSON body, and
 //                                              for a CPU game's success its save (JSON) to keep
 //
 // wasm_exec.js (Go's JS glue) and mhj-dojo.wasm sit next to this file; `make

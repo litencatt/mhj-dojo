@@ -11,11 +11,12 @@ import {
   stoppedDialog,
   tableState,
   waitForPlayback,
-} from '../helpers';
+} from './helpers';
 
-// The static site's CPU game (?mode=game): the engine runs the game, CPU
-// turns included, as WebAssembly in the browser, and saves each game to
-// localStorage so a reload (or the engine evicting it) rebuilds it.
+// The CPU game's saves (?mode=game): the engine runs the game, CPU turns
+// included, as WebAssembly in the browser, and saves each game to
+// localStorage so a reload (or the engine evicting it) rebuilds it
+// (game.spec.ts has the table and the layout).
 
 // Every CPU move lands at once instead of being replayed step by step, so
 // once the engine has answered (clickAndWait) the table shows the answer.
@@ -225,7 +226,7 @@ test('a random-seed game keeps its seed hidden and still resumes', async ({ page
 
 // The engine (cmd/mhj-dojo-wasm) keeps only a couple of games in memory; the
 // rest are evicted and rebuilt from their save on their next request, as in
-// practice.spec.ts's eviction tests. Games created straight through the
+// practice-saves.spec.ts's eviction tests. Games created straight through the
 // worker's mhjDojoRequest are unknown to the page, so it still sends its next
 // action to the engine, which no longer has the game.
 const GAME_CAP = 2; // cmd/mhj-dojo-wasm/main.go's game cap; keep in sync
