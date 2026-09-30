@@ -76,9 +76,11 @@ The server only accepts requests whose `Host` header names localhost. That stops
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static/dist (not committed)
+make web          # npm run build (npm ci first if needed) → internal/server/static/dist (not committed)
 make run          # make web, then go run ./cmd/mhj-dojo
 ```
+
+After changing `web/`, rebuild the frontend with `make web` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make web` last built.
 
 Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
 

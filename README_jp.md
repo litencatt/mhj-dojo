@@ -51,16 +51,16 @@
 ## 必要環境
 
 - Go 1.27 以上
-- Node.js 24 以上（バイナリに埋め込むフロントエンドのビルドに使います）
+- Node.js 24 以上（バイナリに埋め込む画面（フロントエンド）のビルドに使います）
 
 ## クイックスタート
 
 ```sh
-make build        # フロントエンドをビルド（make web）してから、それを埋め込んだ bin/mhj-dojo をビルド
+make build        # 画面をビルド（make web）してから、それを埋め込んだ bin/mhj-dojo をビルド
 ./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
 
-ビルド済みのフロントエンドはコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。API は動きますが、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
+ビルド済みの画面はコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。API は動きますが、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
 
 ### オプション
 
@@ -78,9 +78,11 @@ make build        # フロントエンドをビルド（make web）してから�
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static/dist（コミットしません）
+make web          # npm run build（必要なら先に npm ci）→ internal/server/static/dist（コミットしません）
 make run          # make web のあと go run ./cmd/mhj-dojo
 ```
+
+`web/` を変えたら `make web` で画面を作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make web` で作った画面がそのまま埋め込まれます。
 
 エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面側に `api.WASM` の分岐を増やさないでください。
 
