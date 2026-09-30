@@ -36,7 +36,7 @@ export default defineConfig({
     cwd: path.resolve(__dirname, '..'),
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
   },

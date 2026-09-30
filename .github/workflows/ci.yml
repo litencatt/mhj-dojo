@@ -154,7 +154,7 @@ jobs:
   # The static site (issue #67): the engine built as WebAssembly and the site
   # built on it, which mhj-dojo embeds and serves (issue #147), then the E2E
   # tests in the browser against mhj-dojo. Build site release runs the same
-  # tests on the release build as vite preview serves it.
+  # tests on the release build, on mhj-dojo too.
   site:
     name: Static site (WASM) build + E2E
     runs-on: ubuntu-latest
