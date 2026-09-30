@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// The static site's version: the header shows it, the help opens, and a
+// The build's version: the header shows it, the help opens, and a
 // banner offers a reload once version.json names another build.
 
 // release: the tag the Release site workflow built it for (MHJDOJO_RELEASE), else null.
@@ -67,6 +67,33 @@ test('the header shows the version and the help opens', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
+
+/** An ISO 8601 time as a clock in timeZone shows it: "2026-09-27 07:57". */
+function localTime(iso: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date(iso));
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
+// The build time is UTC; the header shows the viewer's local date and its
+// title the local time. Two zones 25 hours apart always see different dates.
+for (const timeZone of ['Pacific/Kiritimati', 'Pacific/Pago_Pago']) {
+  test.describe(`in ${timeZone}`, () => {
+    test.use({ timezoneId: timeZone });
+    test('the version date is the local one', async ({ page }) => {
+      const served = await servedBuild(page);
+      const local = localTime(served.built, timeZone);
+      expect(local.slice(0, 10)).not.toBe(localTime(served.built, timeZone === 'Pacific/Kiritimati' ? 'Pacific/Pago_Pago' : 'Pacific/Kiritimati').slice(0, 10));
+      await page.goto('./?seed=1&turns=18');
+      await loaded(page);
+      const tag = page.locator('.app-header .version-tag');
+      await expect(tag).toHaveAttribute('title', new RegExp(`\\nビルド: ${served.version}（${local}、${served.id}）`));
+      // A release shows its tag instead of the date.
+      if (!served.release) await expect(tag).toHaveText(`${served.version} · ${local.slice(0, 10)}`);
+    });
+  });
+}
 
 test('no banner for the running build, even redeployed at another time', async ({ page }) => {
   const served = await servedBuild(page);
