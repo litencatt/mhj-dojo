@@ -7,7 +7,6 @@
 ### CI・リポジトリ
 - ラベル: build/・test/ ブランチを chore に by @litencatt in https://github.com/litencatt/mhj-dojo/pull/158
 - E2E を1組にまとめる（#147 の 3） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/160
-### その他
 - ビルド済みの画面をリポジトリに入れない（#147 の 1・2） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/156
 
 ## [v2026.0930.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.0...v2026.0930.1) - 2026-09-30
