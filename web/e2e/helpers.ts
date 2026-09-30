@@ -1,10 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// What the specs share. The specs in e2e/shared run on both builds, each
-// config's one project named after its build: the local server
-// (playwright.config.ts) and the static site, its engine running as
-// WebAssembly in a Web Worker (playwright.site.config.ts). A shared test that
-// needs to know which one it is on asks onSite(); keep such branches few.
+// What the specs share. The specs in e2e/shared ran on both builds, each
+// config's one project named after its build: the local server's and the
+// static site's, its engine running as WebAssembly in a Web Worker. Since
+// mhj-dojo serves the site's build too (issue #147), both configs run the
+// site ('site': playwright.config.ts on mhj-dojo, playwright.site.config.ts on
+// vite preview), until the server's branches here are removed. A shared test
+// that needs to know which one it is on asks onSite(); keep such branches few.
 
 export function onSite() {
   return test.info().project.name === 'site';
