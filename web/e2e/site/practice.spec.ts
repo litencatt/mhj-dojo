@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, expectStopped, labels, stoppedDialog } from '../helpers';
+import { discardDrawn, engineCalls, expectStopped, labels, stoppedDialog } from '../helpers';
 
 // The static site (issue #67): practice mode with the engine running as
 // WebAssembly in a Web Worker, no mhj-dojo server behind it
@@ -564,25 +564,14 @@ function savedMoveList(page: Page) {
 }
 
 /**
- * Counts the GETs the page sends its engine. With the advice panel
- * minimized the page itself sends one only to load a session, so any other
- * is wasm.ts asking for the whole tree because the moves it saves from did
- * not add up (see saveSession).
+ * Takes the GETs the page has sent its engine since the last call. With the
+ * advice panel minimized the page itself sends one only to load a session,
+ * so any other is wasm.ts asking for the whole tree because the moves it
+ * saves from did not add up (see saveSession).
  */
 async function spyEngineGets(page: Page) {
-  await page.addInitScript(() => {
-    const w = window as unknown as { engineGets: string[] };
-    w.engineGets = [];
-    const post = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (this: Worker, m: { fn?: string; args?: string[] }) {
-      if (m?.fn === 'request' && m.args?.[0] === 'GET') w.engineGets.push(m.args[1]);
-      return post.call(this, m as never);
-    } as typeof Worker.prototype.postMessage;
-  });
-  return async () => {
-    const gets = await page.evaluate(() => (window as unknown as { engineGets: string[] }).engineGets.splice(0));
-    return gets;
-  };
+  const calls = await engineCalls(page);
+  return async () => (await calls()).filter((c) => c.startsWith('GET ')).map((c) => c.slice('GET '.length));
 }
 
 // Responses carry only the tree nodes the page lacks (?tree_from=), so the
