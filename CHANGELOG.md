@@ -1,5 +1,16 @@
 # Changelog
 
+## [v2026.0930.3](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.2...v2026.0930.3) - 2026-09-30
+
+### ドキュメント
+- ドキュメント: 画面もエンジンもブラウザの中の1つのビルドに（#147 の 4・その5） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/167
+### CI・リポジトリ
+- mhj-dojo が公開サイトと同じビルドを配る（#147 の 4・その1） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/162
+- E2E を1組・1つの設定に（#147 の 4・その4） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/166
+### その他
+- 画面から HTTP の経路を消す（#147 の 4・その2） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/163
+- サーバの API を削除（#147 の 4・その3） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/165
+
 ## [v2026.0930.2](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.1...v2026.0930.2) - 2026-09-30
 
 ### 修正
