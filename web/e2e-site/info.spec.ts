@@ -24,7 +24,9 @@ test('info/ lists the releases, newest first, for users', async ({ page }) => {
   await expect(main.locator('.release').first().locator('.release-version')).toHaveText(NEWEST);
   const item = main.getByRole('listitem').filter({ hasText: SHOWN.title });
   await expect(item).toHaveCount(1);
-  await expect(item.getByRole('link', { name: `#${SHOWN.pr!.number}` })).toHaveAttribute('href', `https://github.com/litencatt/mhj-dojo/pull/${SHOWN.pr!.number}`);
+  // The page is for the app's users: nothing links to GitHub.
+  await expect(main.getByRole('link')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('GitHub');
   expect(await main.textContent()).not.toContain('by @');
 
   // The repository's own changes are left out, and a release with nothing
@@ -39,7 +41,6 @@ test('info/ lists the releases, newest first, for users', async ({ page }) => {
   const first = main.locator('.release').last();
   await expect(first.locator('.release-version')).toHaveText(FIRST);
   await expect(first).toContainText('最初の公開');
-  await expect(first.getByRole('link', { name: 'GitHub のリリース' })).toHaveAttribute('href', `https://github.com/litencatt/mhj-dojo/releases/tag/${FIRST}`);
   await expect(main).not.toContainText('Add CI workflow');
 });
 
