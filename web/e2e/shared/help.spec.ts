@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { versionPattern } from '../helpers';
 
-// The header's version and the help dialog, in both modes, on both builds.
+// The header's version and the help dialog, in both modes.
 
 async function openHelp(page: Page) {
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
@@ -86,7 +86,7 @@ test('a click on the backdrop closes the help, a drag that ends there does not',
 test('game mode: the header shows the version, and the help links to the glossary', async ({ page }) => {
   await page.goto('./?mode=game&seed=1');
   await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
-  // The game is dealt (on the site the engine takes a moment to load) before the help opens.
+  // The game is dealt (the engine takes a moment to load) before the help opens.
   await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
   // The glossary starts in the dock.
   const glossary = page.getByRole('region', { name: '用語表' });

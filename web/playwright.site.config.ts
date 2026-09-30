@@ -23,8 +23,6 @@ export default defineConfig({
   },
   projects: [
     {
-      // The build the tests run on (e2e/helpers.ts): the site's, here as in
-      // playwright.config.ts.
       name: 'site',
       use: { ...devices['Desktop Chrome'] },
     },

@@ -1,38 +1,22 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// What the specs share. The specs in e2e/shared ran on both builds, each
-// config's one project named after its build: the local server's and the
-// static site's, its engine running as WebAssembly in a Web Worker. Since
-// mhj-dojo serves the site's build too (issue #147), both configs run the
-// site ('site': playwright.config.ts on mhj-dojo, playwright.site.config.ts on
-// vite preview), until the server's branches here are removed. A shared test
-// that needs to know which one it is on asks onSite(); keep such branches few.
+// What the specs share. The site's build runs its engine as WebAssembly in
+// a Web Worker; the specs run on it as mhj-dojo serves it
+// (playwright.config.ts) and as vite preview does
+// (playwright.site.config.ts).
 
-export function onSite() {
-  return test.info().project.name === 'site';
-}
-
-/** A test that plays a whole round on the site's engine (WASM, some three times slower) gets three times its timeout there. */
-export function slowOnSite() {
-  test.slow(onSite(), 'the engine runs as WebAssembly');
+/** A test that plays a whole round on the engine (WASM, some three times slower than native Go) gets three times its timeout. */
+export function slowEngine() {
+  test.slow(true, 'the engine runs as WebAssembly');
 }
 
 /**
- * Records what the page asks its engine from now on: on the server its API
- * requests ("POST /api/sessions/…/discard?…"), on the site the calls posted
- * to the engine's worker ("POST /api/sessions/…/discard?…", or the call's
- * name, such as "restore"). Call it before the page loads. The function it
+ * Records what the page asks its engine from now on: the calls posted to
+ * the engine's worker ("POST /api/sessions/…/discard?…", or the call's name,
+ * such as "restore"). Call it before the page loads. The function it
  * returns takes the calls recorded since its last call.
  */
 export async function engineCalls(page: Page): Promise<() => Promise<string[]>> {
-  if (!onSite()) {
-    const seen: string[] = [];
-    page.on('request', (req) => {
-      const url = new URL(req.url());
-      if (url.pathname.startsWith('/api/')) seen.push(`${req.method()} ${url.pathname}${url.search}`);
-    });
-    return async () => seen.splice(0);
-  }
   await page.addInitScript(() => {
     const w = window as unknown as { engineCalls: string[] };
     w.engineCalls = [];
@@ -50,9 +34,9 @@ export async function discardsSent(calls: () => Promise<string[]>) {
   return (await calls()).filter((c) => /^POST \S+\/discard(\?|$)/.test(c)).length;
 }
 
-/** The header's version: a commit and its date, or on a released site its tag. */
+/** The header's version: a commit and its build's date, or on a release its tag. */
 export function versionPattern() {
-  return onSite() ? /^(v\d{4}\.\d{4}\.\d+|(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?)$/ : /^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/;
+  return /^(v\d{4}\.\d{4}\.\d+|(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?)$/;
 }
 
 export function handPanel(page: Page) {
@@ -282,18 +266,11 @@ export function gameSnapshot(page: Page) {
 }
 
 /** Clicks and waits until the engine has answered, so the next step never
- * races a request still in flight: on the server the action's response, on
- * the site (no HTTP) the table, the hand or the result panel changing (the
- * site saves the game before it shows the answer). The CPU moves may still
- * be playing back: callers that need them over wait for that. */
+ * races a request still in flight: until the table, the hand or the result
+ * panel changes (the site saves the game before it shows the answer). The
+ * CPU moves may still be playing back: callers that need them over wait for
+ * that. */
 export async function clickAndWait(page: Page, locator: Locator) {
-  if (!onSite()) {
-    await Promise.all([
-      page.waitForResponse((res) => res.request().method() === 'POST' && res.url().includes('/action')),
-      locator.click(),
-    ]);
-    return;
-  }
   const before = await gameSnapshot(page);
   await locator.click();
   await expect.poll(() => gameSnapshot(page), { timeout: 30_000 }).not.toBe(before);

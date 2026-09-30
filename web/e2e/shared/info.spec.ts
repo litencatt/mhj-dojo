@@ -2,10 +2,8 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { forUsersOnly, parseChangelog } from '../../src/changelog';
 
-// The 更新情報 page (info/) on both builds: the ways there from the app and
-// back. Its content is tested in each build's own info.spec.ts: the local
-// build's page fetches CHANGELOG.md from the server, the site's has it
-// rendered in at build time.
+// The 更新情報 page (info/): the ways there from the app and back. Its
+// content, rendered in at build time, is tested in e2e/site/info.spec.ts.
 
 const NEWEST = forUsersOnly(parseChangelog(readFileSync(new URL('../../../CHANGELOG.md', import.meta.url), 'utf8')))[0].version;
 
