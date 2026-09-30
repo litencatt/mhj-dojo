@@ -95,11 +95,6 @@ a {
 .release code {
   font-size: 0.9em;
 }
-.release-pr {
-  margin-left: 4px;
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
 .release-internal {
   margin: 4px 0 0;
   color: var(--muted);
