@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { GameResult, GameState } from '../src/api';
+import type { GameResult, GameState } from '../../src/api';
 
 // A seed where a "tsumogiri" strategy (discard the tile you just drew; with
 // no drawn tile, right after a call, discard the last hand tile), skipping

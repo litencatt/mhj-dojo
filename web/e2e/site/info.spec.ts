@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { forUsersOnly, parseChangelog } from '../src/changelog';
+import { forUsersOnly, parseChangelog } from '../../src/changelog';
 
 // The 更新情報 page (info/), which the site build renders from CHANGELOG.md:
 // the releases newest first, without the authors or the repository's own
 // changes, with links back to the app.
 
-const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8')));
+const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../../CHANGELOG.md', import.meta.url), 'utf8')));
 const NEWEST = RELEASES[0].version;
 // The newest pull request shown.
 const SHOWN = RELEASES.flatMap((r) => r.sections.flatMap((s) => s.items))[0];

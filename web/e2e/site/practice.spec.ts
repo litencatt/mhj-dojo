@@ -1,33 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
+import { discardDrawn, expectStopped, labels, stoppedDialog } from '../helpers';
 
 // The static site (issue #67): practice mode with the engine running as
-// WebAssembly in a Web Worker, no mhj-dojo server behind it.
-
-// The tiles' names in a hand or river, in order.
-function labels(page: Page, selector: string) {
-  return page
-    .getByRole('region', { name: '手牌' })
-    .locator(`${selector} .tile`)
-    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-}
+// WebAssembly in a Web Worker, no mhj-dojo server behind it
+// (e2e/shared has the practice tests for both builds).
 
 /** Opens the 履歴ツリー panel, which starts in the dock, on every load of the page. */
 async function openTree(page: Page) {
   await page.addInitScript(() =>
     localStorage.setItem('mhj-dojo.minimized.v2', JSON.stringify(['chart', 'advice', 'gloss'])),
   );
-}
-
-async function discardDrawn(page: Page) {
-  const hand = page.getByRole('region', { name: '手牌' });
-  const river = hand.locator('.discard-river .tile');
-  const before = await river.count();
-  const drawn = hand.locator('.hand-drawn button');
-  await expect(drawn).toBeEnabled();
-  const tile = await drawn.getAttribute('aria-label');
-  await drawn.click();
-  await expect(river).toHaveCount(before + 1);
-  return tile;
 }
 
 test('practice runs in the browser: load, discard, no server requests', async ({ page }) => {
@@ -135,18 +117,6 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
   for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
 
-// One tab at a time plays a session (src/singleTab.ts): the newest tab to
-// open it wins, and the one before stops until taken back.
-function stoppedDialog(page: Page) {
-  return page.getByRole('alertdialog', { name: 'このタブは別のタブで開かれたため停止しました' });
-}
-
-/** The dialog covers the page: shown modal, so everything else is inert. */
-async function expectStopped(page: Page) {
-  await expect(stoppedDialog(page)).toBeVisible();
-  expect(await stoppedDialog(page).evaluate((d) => d.matches(':modal'))).toBe(true);
-}
-
 function savedMoves(page: Page) {
   return page.evaluate((id) => {
     const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
@@ -155,42 +125,6 @@ function savedMoves(page: Page) {
     return s?.sessions[id!]?.moves.length;
   }, new URL(page.url()).searchParams.get('session'));
 }
-
-test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
-  await page.goto('./?seed=21&turns=18');
-  await discardDrawn(page);
-  await expect(page).toHaveURL(/[?&]session=/);
-  const other = await context.newPage();
-  await other.goto(page.url());
-  const handA = page.getByRole('region', { name: '手牌' });
-  const handB = other.getByRole('region', { name: '手牌' });
-  await expect(handB.locator('.discard-river .tile')).toHaveCount(1);
-
-  // A stops: the dialog covers it.
-  await expectStopped(page);
-  await expect(stoppedDialog(other)).toHaveCount(0);
-
-  // B plays on and saves.
-  await discardDrawn(other);
-  await discardDrawn(other);
-  expect(await savedMoves(other)).toBe(3);
-
-  // A takes it back, from where B left it; now B stops.
-  await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
-  await expect(stoppedDialog(page)).toHaveCount(0);
-  await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
-  expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
-  expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
-  await expectStopped(other);
-  await discardDrawn(page);
-  expect(await savedMoves(page)).toBe(4);
-  await expect(page.locator('.error-banner')).toHaveCount(0);
-
-  // 閉じる: a tab the page did not open stays open, with a hint.
-  await stoppedDialog(other).getByRole('button', { name: '閉じる' }).click();
-  await expect(stoppedDialog(other)).toContainText('このタブはそのまま閉じてかまいません');
-  expect(other.isClosed()).toBe(false);
-});
 
 test('an answer that comes after the tab stopped is neither shown nor saved', async ({ page, context }) => {
   await page.goto('./?seed=24&turns=18');
@@ -235,22 +169,6 @@ test('an answer that comes after the tab stopped is neither shown nor saved', as
   await expect(handA.locator('.discard-river .tile')).toHaveCount(2);
   expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
   await expect(page.locator('.error-banner')).toHaveCount(0);
-});
-
-test('a new session lets go of the one before', async ({ page, context }) => {
-  await page.goto('./?seed=25&turns=18');
-  await expect(page).toHaveURL(/[?&]session=/);
-  const first = page.url();
-  await page.locator('.new-game-form input[type="number"]').first().fill('26');
-  await page.getByRole('button', { name: '新規対局' }).click();
-  await expect(page).not.toHaveURL(first);
-  await expect(page).toHaveURL(/[?&]seed=26(&|$)/);
-
-  const other = await context.newPage();
-  await other.goto(first);
-  await discardDrawn(other);
-  await discardDrawn(page);
-  for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
 
 // Makes page drop the singleTab messages that arrive while deaf (setDeaf),
@@ -632,31 +550,6 @@ test('an evicted session declares tsumo after rebuilding, no reload', async ({ p
   expect(page.url()).toBe(url);
   await expect(tree.locator('.tree-node-btn')).toHaveCount(TSUMO_LINE.length + 2);
   await expect(page.locator('.error-banner')).toHaveCount(0);
-});
-
-// On a phone (390px wide): no sideways page scroll, the hand on one row, the
-// minimized panels in a bar along the bottom, and the yaku table in the width.
-test('a 390px-wide phone: one-row hand, bottom dock, nothing wider than the screen', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('./?seed=1&turns=18');
-  const hand = page.getByRole('region', { name: '手牌' });
-  await expect(hand.locator('.hand-drawn button')).toBeVisible();
-  const tops = await hand
-    .locator('.hand-row button.tile')
-    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
-  expect(tops).toHaveLength(14);
-  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(10);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
-  // The advice starts minimized: its tab is in the bottom bar.
-  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  const bar = await dock.boundingBox();
-  expect(bar!.y + bar!.height).toBeCloseTo(844, 0);
-  expect(bar!.width).toBeCloseTo(390, 0);
-  const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
-  await expect(yaku).toBeVisible();
-  const panel = await yaku.boundingBox();
-  const table = await yaku.locator('.yaku-table').boundingBox();
-  expect(table!.x + table!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
 });
 
 /** The page's saved moves (localStorage), for the session in its URL. */

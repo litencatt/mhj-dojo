@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { forUsersOnly, parseChangelog } from '../src/changelog';
+import { forUsersOnly, parseChangelog } from '../../src/changelog';
 
 // The 更新情報 page in the local build: the server serves it at /info/ (and
 // /info), and the page renders the server's CHANGELOG.md (GET /api/changelog).
 
-const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8')));
+const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../../CHANGELOG.md', import.meta.url), 'utf8')));
 const NEWEST = RELEASES[0].version;
 // A release with only the repository's own changes lists no items.
 const NEWEST_HAS_ITEMS = RELEASES[0].sections.length > 0;
