@@ -45,7 +45,7 @@ import (
 // more as a memo turns over), never released by Go's wasm runtime back to
 // the OS (docs/api.md "Memory"). 4 is enough for the
 // one game actually being played plus room to return to a couple of others
-// by URL without forcing a rebuild; web/e2e/site/practice.spec.ts asserts
+// by URL without forcing a rebuild; web/e2e/practice-saves.spec.ts asserts
 // eviction past this cap and its rebuild-from-save, so keep the two in sync.
 const maxSessions = 4
 
