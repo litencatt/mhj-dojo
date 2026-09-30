@@ -44,7 +44,7 @@ function readTried(): string | null {
  * every cache at startup, every 10 minutes and whenever the tab becomes
  * visible again (not while it is hidden, and at most once a minute), names
  * another commit or id than the running build. Checking stops once it does.
- * Network errors are ignored.
+ * Network errors are ignored, and the dev server (no version.json) never checks.
  */
 export function useNewVersion(): { state: UpdateState; reload: () => void } {
   const [deployed, setDeployed] = useState<string | null>(null); // the newer build's id
@@ -60,7 +60,7 @@ export function useNewVersion(): { state: UpdateState; reload: () => void } {
   }, []);
 
   useEffect(() => {
-    if (deployed !== null) return;
+    if (import.meta.env.DEV || deployed !== null) return;
     const running = SITE_BUILD;
     let done = false;
     let last = -Infinity;
