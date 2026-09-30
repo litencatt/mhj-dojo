@@ -760,8 +760,8 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await waitForPlayback(page);
   await expect.poll(() => tableState(page)).toEqual(b);
   await expectStopped(other);
-  if (onSite()) expect(await savedGame(page)).toBe(save);
+  if (onSite()) await expect.poll(() => savedGame(page)).toBe(save);
   await playOneStep(page);
-  if (onSite()) expect(await savedGame(page)).not.toBe(save);
+  if (onSite()) await expect.poll(() => savedGame(page)).not.toBe(save);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

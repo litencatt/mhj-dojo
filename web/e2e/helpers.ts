@@ -107,9 +107,16 @@ export async function waitForPlayback(page: Page) {
   await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
 }
 
+/** Everything a game action changes: the table (rivers, points, wall), the hand and the result panel. */
+export function gameSnapshot(page: Page) {
+  return page.locator('.area-hand').innerText();
+}
+
 /** Clicks and waits until the engine has answered, so the next step never
  * races a request still in flight: on the server the action's response, on
- * the site (no HTTP) the table, the hand or the result panel changing. */
+ * the site (no HTTP) the table, the hand or the result panel changing (the
+ * site saves the game before it shows the answer). The CPU moves may still
+ * be playing back: callers that need them over wait for that. */
 export async function clickAndWait(page: Page, locator: Locator) {
   if (!onSite()) {
     await Promise.all([
@@ -118,10 +125,9 @@ export async function clickAndWait(page: Page, locator: Locator) {
     ]);
     return;
   }
-  const snapshot = () => page.locator('.area-hand').innerText();
-  const before = await snapshot();
+  const before = await gameSnapshot(page);
   await locator.click();
-  await expect.poll(snapshot, { timeout: 30_000 }).not.toBe(before);
+  await expect.poll(() => gameSnapshot(page), { timeout: 30_000 }).not.toBe(before);
 }
 
 /** The control for one generic step: tsumo or ron when offered, otherwise

@@ -75,7 +75,7 @@ test('a second tab on the same session stops the first, until taken back', async
   await discardDrawn(other);
   await discardDrawn(other);
   expect(await calls()).toEqual([]);
-  if (onSite()) expect(await savedMoves(other)).toBe(3);
+  if (onSite()) await expect.poll(() => savedMoves(other)).toBe(3);
 
   // A takes it back, from where B left it (the server's copy is fetched
   // again); now B stops.
@@ -87,7 +87,7 @@ test('a second tab on the same session stops the first, until taken back', async
   expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
   await expectStopped(other);
   await discardDrawn(page);
-  if (onSite()) expect(await savedMoves(page)).toBe(4);
+  if (onSite()) await expect.poll(() => savedMoves(page)).toBe(4);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 
   // 閉じる: a tab the page did not open stays open, with a hint.

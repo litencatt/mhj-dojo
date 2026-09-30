@@ -1,42 +1,27 @@
-import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
-import { SEED, expectStopped, handPanel, nextMove, stoppedDialog, tableState, waitForPlayback } from '../helpers';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import {
+  SEED,
+  clickAndWait,
+  expectStopped,
+  gameSnapshot,
+  handPanel,
+  nextMove,
+  playOneStep,
+  playToResult,
+  stoppedDialog,
+  tableState,
+  waitForPlayback,
+} from '../helpers';
 
 // The static site's CPU game (?mode=game): the engine runs the game, CPU
 // turns included, as WebAssembly in the browser, and saves each game to
 // localStorage so a reload (or the engine evicting it) rebuilds it.
 
-// Every CPU move lands at once instead of being replayed step by step.
+// Every CPU move lands at once instead of being replayed step by step, so
+// once the engine has answered (clickAndWait) the table shows the answer.
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
 });
-
-// Everything an action changes: the table (rivers, points, wall), the hand
-// and the result panel. There are no HTTP requests to wait for here.
-function snapshot(page: Page) {
-  return page.locator('.area-hand').innerText();
-}
-
-/** Clicks and waits until the game has moved on and its (instant) playback has ended. */
-async function clickAndWait(page: Page, locator: Locator) {
-  const before = await snapshot(page);
-  await locator.click();
-  await expect.poll(() => snapshot(page), { timeout: 30_000 }).not.toBe(before);
-  await waitForPlayback(page);
-}
-
-async function playOneStep(page: Page) {
-  await clickAndWait(page, await nextMove(page));
-}
-
-async function playToResult(page: Page, maxSteps = 150) {
-  const result = page.getByRole('region', { name: '結果' });
-  for (let i = 0; i < maxSteps; i++) {
-    await waitForPlayback(page);
-    if (await result.isVisible()) return;
-    await playOneStep(page);
-  }
-  throw new Error(`round did not reach a result panel within ${maxSteps} steps`);
-}
 
 function gameId(page: Page) {
   return new URL(page.url()).searchParams.get('game');
@@ -181,7 +166,7 @@ test('a move answered after the tab stopped is neither shown nor saved', async (
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await expect(page).toHaveURL(/[?&]game=/);
-  const before = await snapshot(page);
+  const before = await gameSnapshot(page);
   // A's engine holds its next move until released.
   const worker = page.workers()[0];
   await worker.evaluate(() => {
@@ -215,7 +200,7 @@ test('a move answered after the tab stopped is neither shown nor saved', async (
   const resume = stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' });
   await expect(resume).toBeEnabled();
   expect(await savedGame(page)).toBe(save);
-  expect(await snapshot(page)).toBe(before);
+  expect(await gameSnapshot(page)).toBe(before);
 
   await resume.click();
   await waitForPlayback(page);
