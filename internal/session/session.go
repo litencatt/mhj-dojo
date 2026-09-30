@@ -55,8 +55,6 @@ var winds = yaku.EastEast
 // Store holds sessions in memory.
 type Store struct {
 	sessions *store.Store[*Session]
-	// DefaultSeed, when set, is used for sessions created without a seed.
-	DefaultSeed *int64
 }
 
 // NewStore returns an empty store that keeps at most MaxSessions sessions.
@@ -69,11 +67,11 @@ func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
 // hundreds of sessions' trees and analyzer memos (see docs/api.md "Memory").
 func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
-// Create starts a session. A nil seed picks the default or a random seed;
+// Create starts a session. A nil seed picks a random seed;
 // maxTurns 0 means DefaultMaxTurns.
 func (st *Store) Create(seed *int64, maxTurns int) (*Session, error) {
 	// Practice seeds are always shown, so a small range is fine.
-	return st.CreateWithWall(wall.New(wall.PickSeed(seed, st.DefaultSeed, 1<<32)), maxTurns)
+	return st.CreateWithWall(wall.New(wall.PickSeed(seed, 1<<32)), maxTurns)
 }
 
 // CreateWithWall starts a session on a given wall (used by tests).
