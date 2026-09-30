@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.0930.1](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.0...v2026.0930.1) - 2026-09-30
+
+### 修正
+- 更新情報の表記を修正 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/153
+
 ## [v2026.0930.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0929.2...v2026.0930.0) - 2026-09-30
 
 ### 新機能
