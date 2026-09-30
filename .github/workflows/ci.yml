@@ -149,7 +149,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      # The build needs the WASM engine: the site job builds it.
 
   # The static site (issue #67): the engine built as WebAssembly and the site
   # built on it, which mhj-dojo embeds and serves (issue #147), then the E2E
