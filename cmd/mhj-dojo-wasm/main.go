@@ -1,29 +1,28 @@
 //go:build js && wasm
 
-// Command mhj-dojo-wasm is the practice mode and the CPU games compiled to
-// WebAssembly for the static site: the browser (a Web Worker,
-// web/site-public/worker.js) runs the sessions and games itself instead of
-// calling the mhj-dojo server.
+// Command mhj-dojo-wasm is the engine, the practice mode and the CPU games,
+// compiled to WebAssembly: the browser (a Web Worker,
+// web/site-public/worker.js) runs the sessions and games itself, on the
+// public site as in mhj-dojo.
 //
 // It defines three global functions:
 //
 //	mhjDojoRequest(method, path, body) -> {status, body, save}
 //
-// answers a request of the HTTP API (docs/api.md), practice or game, given
-// as its method, path and JSON body, with the status and JSON body the
-// server would send (apicall.Route). A game response with a state also
+// answers a request (docs/api.md), practice or game, given as its method,
+// path and JSON body, with its status and JSON body (apicall.Route). A game response with a state also
 // carries save, the game's match.Save as a JSON string ("" otherwise);
 //
 //	mhjDojoRestore(body, query) -> {status, body, save}
 //
 // rebuilds a session from its moves in one call after a page reload
-// (apicall.Restore; not an HTTP endpoint), answering with its state as the
+// (apicall.Restore; not a request), answering with its state as the
 // view options in query (a request's URL query, such as "advice=0"; may be
 // left out) pick it; and
 //
 //	mhjDojoRestoreGame(save) -> {status, body, save}
 //
-// rebuilds a game from a save (apicall.RestoreGame; not an HTTP endpoint).
+// rebuilds a game from a save (apicall.RestoreGame; not a request).
 // Both rebuild under a new id: the page maps its own ids to the engine's.
 package main
 

@@ -1,4 +1,4 @@
-// Package match runs games against CPU players for the HTTP API: a game.Game
+// Package match runs games against CPU players for the engine: a game.Game
 // with seat 0 as the human, the human's per-yaku analysis, and the JSON
 // state of docs/api.md.
 package match
