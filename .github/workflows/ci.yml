@@ -158,6 +158,7 @@ jobs:
   site:
     name: Static site (WASM) build + E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web
@@ -174,9 +175,10 @@ jobs:
       - name: go vet (js/wasm)
         working-directory: .
         run: GOOS=js GOARCH=wasm go vet ./cmd/mhj-dojo-wasm/...
-      - name: Build the WASM engine
+      - run: npm ci
+      - name: Build the site and embed it
         working-directory: .
-        run: make wasm
+        run: make embed
       - name: WASM size
         working-directory: .
         # Budget guards against a size regression, including GOEXPERIMENT=
@@ -190,10 +192,6 @@ jobs:
             echo "::error::mhj-dojo.wasm is $size bytes, over the $budget budget"
             exit 1
           fi
-      - run: npm ci
-      - name: Build the site and embed it
-        working-directory: .
-        run: make embed
       # The Go test jobs run without the site build: check here that the
       # server embeds it.
       - name: go test (embedded frontend)
