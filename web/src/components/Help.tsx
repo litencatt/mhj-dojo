@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { WASM } from '../api';
 
 export interface HelpProps {
   // Brings the 用語表 panel back from the dock and shows it; without it (a CPU
@@ -221,39 +220,26 @@ export function Help({ onShowGlossary }: HelpProps) {
             <section aria-labelledby="help-save">
               <h3 id="help-save">保存</h3>
               <p>
-                {WASM
-                  ? '計算（CPUの打牌も）はすべてブラウザの中で行い、手順はサーバーに送りません。練習は最近の10セッション、CPU対戦は最近の5対局の手順をこのブラウザに保存し、再読み込みや同じ URL を開いたときに復元します。ブラウザのデータを消すと失われます。'
-                  : 'セッションと対局はアプリのサーバーのメモリに保持し、再起動した後は URL のシードから同じ山で配り直します。'}
-                同じブラウザで同じセッションや対局を進められるのは一度に1つのタブだけです。別のタブで同じ URL を開くと前のタブは停止し、「このタブで続ける」を押すと、そのタブが最後に進めた状態から続けられます（今度はもう一方のタブが停止します）。
+                計算（CPUの打牌も）はすべてブラウザの中で行い、手順はサーバーに送りません。練習は最近の10セッション、CPU対戦は最近の5対局の手順をこのブラウザに保存し、再読み込みや同じ URL を開いたときに復元します。ブラウザのデータを消すと失われます。同じブラウザで同じセッションや対局を進められるのは一度に1つのタブだけです。別のタブで同じ URL を開くと前のタブは停止し、「このタブで続ける」を押すと、そのタブが最後に進めた状態から続けられます（今度はもう一方のタブが停止します）。
               </p>
             </section>
 
             <section aria-labelledby="help-version">
               <h3 id="help-version">バージョン表示</h3>
               <p>
-                {WASM
-                  ? 'ヘッダーの「v2026.0927.0」はリリースした日付と、その日の何回目のリリースか（0 から数えます）です。新しいバージョンが出ると「新しいバージョンがあります」と表示されるので、「再読み込み」で更新できます。'
-                  : 'ヘッダーの「abc1234 · 2026-09-26」は、動いているプログラムの元になったコミットとその日付です。'}
-                押すと<a href="info/">更新情報</a>を開きます。
+                ヘッダーの「v2026.0927.0」はリリースした日付と、その日の何回目のリリースか（0 から数えます）です。リリース以外のビルドでは「abc1234 · 2026-09-26」のように、元になったコミットとビルドした日付を表示します。新しいバージョンが出ると「新しいバージョンがあります」と表示されるので、「再読み込み」で更新できます。押すと<a href="info/">更新情報</a>を開きます。
               </p>
             </section>
 
             <section aria-labelledby="help-license">
               <h3 id="help-license">ライセンス</h3>
               <p>
-                mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。
-                {WASM ? (
-                  <>
-                    計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
-                    これらのライセンス文は
-                    <a href="THIRD_PARTY_LICENSES.txt" target="_blank" rel="noopener">
-                      THIRD_PARTY_LICENSES.txt
-                    </a>
-                    にあります。
-                  </>
-                ) : (
-                  'ライセンス文はリポジトリの LICENSE と web/site-public/THIRD_PARTY_LICENSES.txt にあります。'
-                )}
+                mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
+                これらのライセンス文は
+                <a href="THIRD_PARTY_LICENSES.txt" target="_blank" rel="noopener">
+                  THIRD_PARTY_LICENSES.txt
+                </a>
+                にあります。
               </p>
             </section>
           </div>
