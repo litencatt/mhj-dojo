@@ -58,9 +58,7 @@ func Status(err error) int {
 	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
 		return statusBadRequest
 	case errors.Is(err, session.ErrTreeFull):
-		// Not a state conflict (the current node is fine); a client that
-		// re-fetches on 409 to recover from another tab's progress must
-		// not treat this the same way, since re-fetching changes nothing.
+		// Not a state conflict: the current node is fine to act on.
 		return statusUnprocessableEntity
 	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
 		return statusConflict
@@ -180,8 +178,8 @@ func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
 	return m.State(), nil
 }
 
-// GameAction is Route's POST /api/games/{id}/action: one of the human's moves, or
-// "next".
+// GameAction is Route's POST /api/games/{id}/action: one of the human's
+// moves, or "next".
 func GameAction(m *match.Match, body io.Reader) (match.State, error) {
 	var req struct {
 		Type  game.ActionType `json:"type"`
@@ -220,9 +218,9 @@ func Route(store *session.Store, games *match.Store, method, path string, body i
 }
 
 // Restore rebuilds a session from its moves in one call (session.Replay)
-// and returns the status and response value of its final state. It is not
-// a request of Route's: the WebAssembly build uses it to bring a session back
-// after a page reload. The body is {"seed", "max_turns", "moves",
+// and returns the status and response value of its final state. It is not a
+// request (Route does not answer it): the WebAssembly build uses it to bring
+// a session back after a page reload. The body is {"seed", "max_turns", "moves",
 // "current"}, moves as [{"parent": 0, "tile": "5m"}, {"parent": 3}] (no
 // tile: tsumo); query holds view options as for a request (SessionView).
 func Restore(store *session.Store, query string, body io.Reader) (int, any) {
@@ -255,8 +253,8 @@ func Restore(store *session.Store, query string, body io.Reader) (int, any) {
 
 // RestoreGame rebuilds a game under a new id from its match.Save (the JSON
 // body) and returns the status and response value of its state. Like
-// Restore it is not a request of Route's: the WebAssembly build uses it to bring
-// a game back after a page reload.
+// Restore it is not a request (Route does not answer it): the WebAssembly
+// build uses it to bring a game back after a page reload.
 func RestoreGame(games *match.Store, body io.Reader) (int, any) {
 	var req match.Save
 	if err := Decode(body, &req, true); err != nil {

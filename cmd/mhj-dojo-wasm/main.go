@@ -10,8 +10,9 @@
 //	mhjDojoRequest(method, path, body) -> {status, body, save}
 //
 // answers a request (docs/api.md), practice or game, given as its method,
-// path and JSON body, with its status and JSON body (apicall.Route). A game response with a state also
-// carries save, the game's match.Save as a JSON string ("" otherwise);
+// path and JSON body, with its status and JSON body (apicall.Route). A game
+// response with a state also carries save, the game's match.Save as a JSON
+// string ("" otherwise);
 //
 //	mhjDojoRestore(body, query) -> {status, body, save}
 //
@@ -37,8 +38,8 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
-// maxSessions bounds the engine's in-memory sessions much tighter than the
-// native server's session.MaxSessions (256): this runs in a browser tab's
+// maxSessions bounds the engine's in-memory sessions much tighter than
+// session.MaxSessions (256, NewStore's default): this runs in a browser tab's
 // memory, and each practice session (its branch tree plus its own
 // yakushanten.Analyzer memo) can hold up to ~9.8 MiB (briefly a few MiB
 // more as a memo turns over), never released by Go's wasm runtime back to
@@ -49,7 +50,7 @@ import (
 const maxSessions = 4
 
 // maxGames bounds the engine's in-memory games the same way, much tighter
-// than the native server's match.MaxGames (256): a game holds its analyzer
+// than match.MaxGames (256, NewStore's default): a game holds its analyzer
 // memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and ~10.3
 // MiB at most, briefly a few MiB more as a memo turns over (docs/api.md
 // "Memory"). 2 keeps the game being played plus one more; an evicted game is

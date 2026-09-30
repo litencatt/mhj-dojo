@@ -17,15 +17,15 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
-// Errors returned by sessions; the server maps them to HTTP statuses.
+// Errors returned by sessions; apicall maps them to HTTP status codes.
 var (
 	ErrNotFound = errors.New("not found")
 	ErrInvalid  = errors.New("invalid request")
 	ErrConflict = errors.New("not allowed in the current state")
 	// ErrTreeFull is returned instead of ErrConflict when a session's tree
 	// is already at MaxNodes: the current node itself is fine to act on, so
-	// this isn't a state conflict the client could resolve by re-fetching
-	// (the server maps it to 422, not 409; docs/api.md).
+	// this isn't a state conflict (apicall maps it to 422, not 409;
+	// docs/api.md).
 	ErrTreeFull = errors.New("tree full")
 )
 
@@ -63,7 +63,7 @@ func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
 // NewStoreWithMax returns an empty store that keeps at most max sessions,
 // evicting the least recently used one beyond that. The wasm build
 // (cmd/mhj-dojo-wasm) uses a much smaller max than MaxSessions: it runs in a
-// browser tab's memory rather than a server's, so it can't afford to hold
+// browser tab's memory, so it can't afford to hold
 // hundreds of sessions' trees and analyzer memos (see docs/api.md "Memory").
 func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
