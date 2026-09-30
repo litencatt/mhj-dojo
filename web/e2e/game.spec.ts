@@ -12,7 +12,7 @@ import {
   stoppedDialog,
   tableState,
   waitForPlayback,
-} from '../helpers';
+} from './helpers';
 
 // The CPU game (?mode=game): the table, the hand and the
 // header at every screen size, and one tab at a time.

@@ -12,8 +12,6 @@
     "test": "node --test scripts/changelog.test.mjs",
     "e2e": "playwright test",
     "build:site": "npm run build",
-    "e2e:site": "playwright test -c playwright.site.config.ts",
-    "e2e:all": "npm run e2e && npm run e2e:site",
     "e2e:live": "playwright test -c playwright.live.config.ts",
     "gen-icons": "node scripts/gen-icons.mjs"
   },

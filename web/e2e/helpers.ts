@@ -2,8 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // What the specs share. The site's build runs its engine as WebAssembly in
 // a Web Worker; the specs run on it as mhj-dojo serves it
-// (playwright.config.ts) and as vite preview does
-// (playwright.site.config.ts).
+// (playwright.config.ts).
 
 /** A test that plays a whole round on the engine (WASM, some three times slower than native Go) gets three times its timeout. */
 export function slowEngine() {

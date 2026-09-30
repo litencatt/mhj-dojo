@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { GameResult, GameState } from '../../src/api';
+import type { GameResult, GameState } from '../src/api';
 import {
   SEED,
   engineCalls,
@@ -13,12 +13,12 @@ import {
   playOneStep,
   waitForPlayback,
   watchEngine,
-} from '../helpers';
+} from './helpers';
 
 // The CPU game's table with the engine's answers patched to set it up
 // (a riichi, melds, a round's end), or looked at to check the playback
 // against them: the site's engine is watched (watchEngine) as a server's
-// responses were routed. e2e/shared has the rest of the game.
+// responses were routed. game.spec.ts has the rest of the game.
 
 const WIND: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
 

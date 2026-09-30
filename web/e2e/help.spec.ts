@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { versionPattern } from '../helpers';
+import { versionPattern } from './helpers';
 
 // The header's version and the help dialog, in both modes.
 

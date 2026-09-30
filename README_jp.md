@@ -93,7 +93,7 @@ make wasm
 cd web && npm run dev
 ```
 
-ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習、CPU対戦（鳴き・局の結果・次局・スマホでの表示）、ヘルプと更新情報ページをカバーします。テストは `web/e2e/` にあり、`shared/` と `site/` をサイトビルド（後述）に対して実行します。`site/` はサイトビルドにしかないもの（ブラウザへの保存、計算エンジンの Web Worker、卓を作るためにエンジンの応答を書き換えるテスト）を扱います。`server/` は画面が使わなくなった HTTP API のテストなので実行しません。`npm run e2e` は、埋め込んだサイトビルドを配信する専用の `mhj-dojo` サーバを自前で起動して実行するので、他にサーバを立てておく必要はありません。
+ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習、CPU対戦（鳴き・局の結果・次局・スマホでの表示）、ヘルプと更新情報ページをカバーします。テストは `web/e2e/` にあり、`npm run e2e` は埋め込んだサイトビルド（後述）を配信する専用の `mhj-dojo` サーバを自前で起動して実行するので、他にサーバを立てておく必要はありません。
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # 初回のみ
@@ -108,7 +108,7 @@ make embed && cd web && npm run e2e
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です（`npm run e2e` と同じテストを、`mhj-dojo` ではなく `vite preview` に対して実行します。`npm run e2e:all` で両方を実行できます）。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview`、E2E テスト（`web/e2e/`）は `make embed && cd web && npm run e2e` で、このビルドのコピーを配信する `mhj-dojo` に対して実行します。
 
 ブラウザの中での動き（公開サイトでも `mhj-dojo` でも同じ）:
 

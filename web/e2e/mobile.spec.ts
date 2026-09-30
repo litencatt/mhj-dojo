@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { discardsSent, engineCalls, waitForPlayback } from '../helpers';
+import { discardsSent, engineCalls, waitForPlayback } from './helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
