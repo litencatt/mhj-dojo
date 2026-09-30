@@ -24,7 +24,7 @@ export function VersionTag() {
   const details = [
     release && `リリース: ${release}`,
     `エンジン: ${v.revision || v.version}${v.time ? `（${localTime(v.time)}）` : ''}${v.modified ? '（未コミットの変更を含む）' : ''}`,
-    SITE_BUILD && `公開版のビルド: ${SITE_BUILD.version}（${localTime(SITE_BUILD.built)}、${SITE_BUILD.id}）`,
+    SITE_BUILD && `ビルド: ${SITE_BUILD.version}（${localTime(SITE_BUILD.built)}、${SITE_BUILD.id}）`,
     BUNDLE && `画面: ${BUNDLE}`,
   ].filter(Boolean);
   // It opens the 更新情報 page (web/info).
