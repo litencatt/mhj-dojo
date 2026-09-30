@@ -4,6 +4,7 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -122,12 +123,10 @@ func spa(static fs.FS) http.Handler {
 			return
 		}
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if name == "" {
-			name = "index.html"
-		}
 		w.Header().Set("Cache-Control", "no-cache")
-		st, err := fs.Stat(static, name)
-		if err == nil && st.IsDir() {
+		st, err := fs.Stat(static, cmp.Or(name, "."))
+		dir := err == nil && st.IsDir()
+		if dir {
 			name = path.Join(name, "index.html")
 			st, err = fs.Stat(static, name)
 		}
@@ -135,7 +134,13 @@ func spa(static fs.FS) http.Handler {
 			if hashedAsset.MatchString(name) {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			}
-			w.Header().Set("ETag", etags[name])
+			// The file server redirects /info to /info/, /index.html to ./
+			// and a file's path with a trailing slash to the file: only
+			// the file itself carries its ETag.
+			u := r.URL.Path
+			if !strings.HasSuffix(u, "/index.html") && dir == strings.HasSuffix(u, "/") {
+				w.Header().Set("ETag", etags[name])
+			}
 			files.ServeHTTP(w, r)
 			return
 		}
@@ -150,7 +155,8 @@ func spa(static fs.FS) http.Handler {
 }
 
 // hashedAsset matches the build's files named by their content hash.
-var hashedAsset = regexp.MustCompile(`^assets/[^/]*-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$`)
+// Vite names them name-hash.ext, the hash 8 characters long.
+var hashedAsset = regexp.MustCompile(`^assets/.+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$`)
 
 // etags is each file's ETag in fsys: a hash of its content.
 func etags(fsys fs.FS) map[string]string {
