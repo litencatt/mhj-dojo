@@ -192,14 +192,6 @@ h2 {
   padding: 10px 14px;
 }
 
-.notice-banner {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success-border);
-  border-radius: 8px;
-  padding: 10px 14px;
-}
-
 /* Layout by width:
    - above 1100px the page is exactly one viewport tall and never scrolls.
      The columns are a flex row, each scrolling on its own, so a minimized

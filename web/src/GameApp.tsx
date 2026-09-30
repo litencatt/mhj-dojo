@@ -16,7 +16,6 @@ import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
-  gameMovedOn,
   useLastAnalysis,
   useMediaQuery,
   usePlayback,
@@ -78,7 +77,7 @@ export function GameApp() {
   const phone = useMediaQuery(PHONE);
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
-  const { busy, error, notice, request } = useSerialRequest<GameState>(
+  const { busy, error, request } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
@@ -92,12 +91,6 @@ export function GameApp() {
       setPreviewTile(null);
       setRiichiMode(false);
     },
-    // On the static site the CPU turns run within the request and no other
-    // tab plays this game meanwhile (see useSingleTab): a 409 is never
-    // another tab's (or a finishing CPU turn's) doing. On the server it may
-    // be another browser's.
-    state && !api.WASM ? () => api.getGame(state.game_id) : undefined,
-    gameMovedOn,
   );
   const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
@@ -326,14 +319,9 @@ export function GameApp() {
               {error}
             </div>
           )}
-          {notice && (
-            <div class="notice-banner" role="status">
-              {notice}
-            </div>
-          )}
           {!state && !error && (
             <p class="muted">
-              {api.WASM ? '計算エンジンを読み込んでいます…' : '対局を準備しています…'}
+              計算エンジンを読み込んでいます…
             </p>
           )}
         </div>

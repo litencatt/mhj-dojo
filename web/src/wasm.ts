@@ -1,7 +1,6 @@
-// The static site's transport (issue #67): instead of calling the mhj-dojo
-// server, API requests go to the engine compiled to WebAssembly, running in
-// a Web Worker (site-public/worker.js). Only built into the site (`npm run
-// build:site`); see api.ts.
+// The engine's transport (issues #67, #147): api.ts's requests go to the
+// engine compiled to WebAssembly, running in a Web Worker
+// (site-public/worker.js), on the public site and in the local mhj-dojo.
 //
 // The engine keeps practice sessions and CPU games in the worker's memory,
 // which a reload loses (and it evicts all but a few), so each one is also

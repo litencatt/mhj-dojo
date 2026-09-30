@@ -1,12 +1,9 @@
-// API client + types mirroring docs/api.md.
+// The engine's requests + types mirroring docs/api.md. The engine is compiled
+// to WebAssembly and runs in the browser (wasm.ts), on the public site and in
+// the local mhj-dojo alike (issue #147).
 
 import { lease, live, STOPPED, STOPPED_MESSAGE } from './singleTab';
 import { wasmRequest } from './wasm';
-
-// The static site (`npm run build:site`, issue #67) answers requests from the
-// engine compiled to WebAssembly instead of the mhj-dojo server. Fixed
-// at build time, so the default build leaves the WASM transport out.
-export const WASM = import.meta.env.VITE_MHJDOJO_TARGET === 'wasm';
 
 export type Tile = string; // e.g. "1m", "0m" (red five), "7z"
 
@@ -194,7 +191,7 @@ export const gameKey = (id: string) => `/api/games/${encodeURIComponent(id)}`;
 
 // A tab another one stopped sends nothing for that session or game, and
 // drops the answer to a request it sent before it was stopped.
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: { method: string; body: string }): Promise<T> {
   const key = tabKey(path);
   const l = key ? lease(key) : 0;
   if (key && l === null) throw new ApiError(STOPPED_MESSAGE, STOPPED);
@@ -203,33 +200,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res;
 }
 
-async function send<T>(path: string, init?: RequestInit): Promise<T> {
-  if (WASM) {
-    const res = await wasmRequest(init?.method ?? 'GET', path, init?.body as string | undefined);
-    if (res.status !== 200) {
-      const message = (res.data as ApiErrorBody | null)?.error || `${res.status}`;
-      throw new ApiError(message, res.status);
-    }
-    return res.data as T;
-  }
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const body = (await res.json()) as ApiErrorBody;
-      if (body?.error) message = body.error;
-    } catch {
-      // ignore body parse failure, use status text
-    }
+async function send<T>(path: string, init?: { method: string; body: string }): Promise<T> {
+  const res = await wasmRequest(init?.method ?? 'GET', path, init?.body);
+  if (res.status !== 200) {
+    const message = (res.data as ApiErrorBody | null)?.error || `${res.status}`;
     throw new ApiError(message, res.status);
   }
-  return (await res.json()) as T;
+  return res.data as T;
 }
 
 // The optional parts of a practice state to ask for (docs/api.md "View
@@ -262,8 +239,8 @@ export function getSession(id: string, view = FULL_VIEW): Promise<SessionState> 
 }
 
 // nodeId is the node the page showed when the user acted (state.node_id):
-// the server rejects the request (409) if the session has since moved on
-// from it in another tab (docs/api.md, issue #53).
+// the engine rejects the request (409) if the session is no longer at it
+// (docs/api.md, issue #53).
 export function discard(id: string, tile: Tile, nodeId: number, view = FULL_VIEW): Promise<SessionState> {
   return request<SessionState>(sessionPath(`/api/sessions/${encodeURIComponent(id)}/discard`, view), {
     method: 'POST',
@@ -283,19 +260,6 @@ export function goto(id: string, nodeId: number, view = FULL_VIEW): Promise<Sess
     method: 'POST',
     body: JSON.stringify({ node_id: nodeId }),
   });
-}
-
-// The commit the server (or the site's engine) was built from (docs/api.md
-// "GET /api/version").
-export interface VersionInfo {
-  version: string; // 7 hex digits, or "dev" for a build without the stamp
-  revision: string; // "" when unknown
-  time: string; // the commit time (RFC 3339); "" when unknown
-  modified: boolean;
-}
-
-export function getVersion(): Promise<VersionInfo> {
-  return request<VersionInfo>('/api/version');
 }
 
 // ---- Games against CPU players (docs/api.md "Games") ----
