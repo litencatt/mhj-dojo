@@ -58,7 +58,7 @@ make build        # builds the static site (make embed), then bin/mhj-dojo with 
 ./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
 
-The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: the API works, but the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
+The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: there is nothing to play, and the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
 
 ### Flags
 
@@ -67,9 +67,9 @@ The built frontend isn't committed, so a plain `go build` or `go install github.
 | `--port` | `8765` | Port to listen on (`0` = random free port) |
 | `--host` | `127.0.0.1` | Host to bind |
 | `--open` | `true` | Open the browser on start |
-| `--seed` | random | Default wall seed for new games |
+| `--seed` | random | Open practice on this wall seed (the page `/?seed=N`) |
 
-The server only accepts requests whose `Host` header names localhost. That stops web pages in your browser from reaching it through DNS rebinding, but it is not authentication: with `--host 0.0.0.0` any machine on the network can use the API by sending a loopback `Host` header, and the server prints a warning when bound to a non-loopback address. Keep the default host unless you trust the network.
+The server only answers requests whose `Host` header names localhost, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
 
 ## Development
 
@@ -82,7 +82,7 @@ make run          # make embed, then go run ./cmd/mhj-dojo
 
 `mhj-dojo` serves the same build as the static site (below), its engine running in the browser. After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
-Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
+Every engine operation goes through `internal/apicall` (`apicall.Route`, which the WebAssembly engine answers with), and its behaviour is tested there. Add new operations there, and the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
 
 Frontend dev server with hot reload (the engine runs in the page, so build it into `web/site-public/` first):
 
@@ -158,7 +158,7 @@ internal/cpu/        CPU player
 internal/match/      games against CPU players for the API
 internal/store/      in-memory store for sessions and games
 internal/apicall/    request handling shared by the HTTP API and the WebAssembly build
-internal/server/     HTTP API and embedded frontend
+internal/server/     serves the embedded frontend
 web/                 Vite + Preact + TypeScript frontend
 docs/api.md          HTTP API and definitions
 ```

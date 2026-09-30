@@ -60,7 +60,7 @@ make build        # 静的サイトをビルド（make embed）してから、�
 ./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
 
-ビルド済みの画面はコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。API は動きますが、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
+ビルド済みの画面はコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。何も遊べず、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
 
 ### オプション
 
@@ -69,9 +69,9 @@ make build        # 静的サイトをビルド（make embed）してから、�
 | `--port` | `8765` | 待ち受けポート（`0` で空きポートをランダムに使用） |
 | `--host` | `127.0.0.1` | バインドするホスト |
 | `--open` | `true` | 起動時にブラウザを開く |
-| `--seed` | ランダム | 新規対局で使う山の既定シード |
+| `--seed` | ランダム | 一人打ち練習をこのシードの山で開く（`/?seed=N` のページ） |
 
-`Host` ヘッダーが localhost を指すリクエストしか受け付けません。これはブラウザ上のページが DNS リバインディングで到達するのを防ぐためのもので、認証ではありません。`--host 0.0.0.0` を指定すると、同じネットワークの他の端末からは `Host` ヘッダーを偽って API を使えます（起動時に警告を出します）。信頼できるネットワーク以外では既定のホストのままにしてください。
+`Host` ヘッダーが localhost を指すリクエストにしか応答しません。ブラウザ上のページが DNS リバインディングで到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
 
 ## 開発
 
@@ -84,7 +84,7 @@ make run          # make embed のあと go run ./cmd/mhj-dojo
 
 `mhj-dojo` は静的サイト（後述）と同じビルドを配信し、エンジンはブラウザの中で動きます。`web/` やエンジンを変えたら `make embed` で作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make embed` でコピーした画面がそのまま埋め込まれます。
 
-エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面からはブラウザの中のエンジン（`web/src/wasm.ts`）を通してだけ呼びます。
+エンジンへの操作はすべて `internal/apicall` を通します（WebAssembly 版のエンジンは `apicall.Route` で応答します）。その振る舞いのテストも `internal/apicall` にあります。新しい操作はここに追加し、画面からはブラウザの中のエンジン（`web/src/wasm.ts`）を通してだけ呼びます。
 
 ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。エンジンはページの中で動くので、先に `make wasm` で `web/site-public/` に作っておいてください。
 
@@ -160,7 +160,7 @@ internal/cpu/        CPU の思考
 internal/match/      API 用の CPU 対戦
 internal/store/      セッションと対局のメモリ保持
 internal/apicall/    HTTP API と WebAssembly 版で共有するリクエスト処理
-internal/server/     HTTP API と埋め込みフロントエンド
+internal/server/     埋め込んだフロントエンドの配信
 web/                 Vite + Preact + TypeScript のフロントエンド
 docs/api.md          HTTP API と各種定義
 ```
