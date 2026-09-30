@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { engineCalls, waitForPlayback } from '../helpers';
+import { discardsSent, engineCalls, waitForPlayback } from '../helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
@@ -146,7 +146,7 @@ test.describe('touch', () => {
     const hand = page.getByRole('region', { name: '手牌' });
     const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
     let discards = 0;
-    const countDiscards = async () => (discards += (await calls()).filter((c) => /^POST .*\/discard/.test(c)).length);
+    const countDiscards = async () => (discards += await discardsSent(calls));
 
     const tile = hand.locator('.hand-tiles button.tile').first();
     const name = await tile.getAttribute('aria-label');
@@ -187,6 +187,7 @@ test.describe('touch', () => {
   });
 
   test('after a tap selected a tile, the keyboard still discards on the first Enter', async ({ page }) => {
+    const calls = await engineCalls(page);
     await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
     const hand = page.getByRole('region', { name: '手牌' });
     const drawn = hand.locator('.hand-drawn button');
@@ -199,6 +200,7 @@ test.describe('touch', () => {
     await page.keyboard.press('Enter');
     await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
     await expect(hand.locator(`.discard-river [aria-label="${tileName}"]`)).toBeVisible();
+    expect(await discardsSent(calls)).toBe(1);
     expect(name).toBeTruthy();
   });
 });
@@ -229,12 +231,14 @@ test('a phone hides the name search, and 条件をクリア keeps its saved text
 
 test('a mouse click at phone width discards at once', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const calls = await engineCalls(page);
   await openPractice(page, ALL_PANELS);
   const hand = page.getByRole('region', { name: '手牌' });
   const drawn = hand.locator('.hand-drawn button');
   const name = await drawn.getAttribute('aria-label');
   await drawn.click();
   await expect(hand.locator(`.discard-river [aria-label="${name}"]`)).toBeVisible();
+  expect(await discardsSent(calls)).toBe(1);
   await expect(hand.locator('.tile-picked')).toHaveCount(0);
 });
 

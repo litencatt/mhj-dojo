@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, engineCalls, expectStopped, handPanel, labels, onSite, stoppedDialog } from '../helpers';
+import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, onSite, stoppedDialog } from '../helpers';
 
 // Solo practice mode (the root page), on both builds.
 
 // Load a fixed seed and discard once, checking that both the table (discard
 // river) and the analysis (yaku table) update from the engine's answer.
 test('practice mode loads and a discard updates the table and analysis', async ({ page }) => {
+  const calls = await engineCalls(page);
   await page.goto('./?seed=1&turns=18');
 
   const hand = handPanel(page);
@@ -36,8 +37,10 @@ test('practice mode loads and a discard updates the table and analysis', async (
   expect(drawnTile).toBeTruthy();
   await drawn.click();
 
-  // The table now shows one discard in the river, holding that tile.
+  // The table now shows one discard in the river, holding that tile, from
+  // the one discard sent.
   await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
+  expect(await discardsSent(calls)).toBe(1);
   await expect(hand.locator(`.discard-river [aria-label="${drawnTile}"]`)).toBeVisible();
 
   // The analysis table is repopulated for the new node, and its content

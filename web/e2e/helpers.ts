@@ -43,6 +43,11 @@ export async function engineCalls(page: Page): Promise<() => Promise<string[]>> 
   return () => page.evaluate(() => (window as unknown as { engineCalls: string[] }).engineCalls.splice(0));
 }
 
+/** How many discards (POST …/discard) are among the calls engineCalls recorded since its last call. */
+export async function discardsSent(calls: () => Promise<string[]>) {
+  return (await calls()).filter((c) => /^POST \S+\/discard(\?|$)/.test(c)).length;
+}
+
 /** The header's version: a commit and its date, or on a released site its tag. */
 export function versionPattern() {
   return onSite() ? /^(v\d{4}\.\d{4}\.\d+|(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?)$/ : /^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/;
