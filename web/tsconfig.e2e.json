@@ -1,0 +1,9 @@
+{
+  // The E2E tests (e2e/, e2e-live/) and the Playwright configs, which run
+  // in Node and hand callbacks to the page and its engine's worker.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"]
+  },
+  "include": ["e2e", "e2e-live", "playwright*.config.ts"]
+}

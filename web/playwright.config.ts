@@ -8,9 +8,13 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 // End-to-end tests drive the real server (built assets + Go backend), not
 // the Vite dev server: `npm run build` must run first so the server embeds
-// the current frontend (internal/server/static/dist).
+// the current frontend (internal/server/static/dist). They are e2e/shared,
+// which playwright.site.config.ts runs on the static site too, and
+// e2e/server, which only means something here (the HTTP API, two browsers
+// on one session).
 export default defineConfig({
   testDir: './e2e',
+  testMatch: ['shared/**/*.spec.ts', 'server/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -26,7 +30,8 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      // The build the tests run on (e2e/helpers.ts): 'server' or 'site'.
+      name: 'server',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
