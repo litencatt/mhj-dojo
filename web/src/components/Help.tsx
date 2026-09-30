@@ -227,15 +227,14 @@ export function Help({ onShowGlossary }: HelpProps) {
             <section aria-labelledby="help-version">
               <h3 id="help-version">バージョン表示</h3>
               <p>
-                ヘッダーの「v2026.0927.0」はリリースした日付と、その日の何回目のリリースか（0 から数えます）です。リリース以外のビルドでは「abc1234 · 2026-09-26」のように、元になったコミットとビルドした日付を表示します。新しいバージョンが出ると「新しいバージョンがあります」と表示されるので、「再読み込み」で更新できます。押すと<a href="info/">更新情報</a>を開きます。
+                ヘッダーのバージョン表示を押すと<a href="info/">更新情報</a>を開きます。「v2026.0927.0」はリリースした日付と、その日の何回目のリリースか（0 から数えます）です。新しいバージョンが出ると「新しいバージョンがあります」と表示されるので、「再読み込み」で更新できます。
               </p>
             </section>
 
             <section aria-labelledby="help-license">
               <h3 id="help-license">ライセンス</h3>
               <p>
-                mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
-                これらのライセンス文は
+                mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。これらのライセンス文は
                 <a href="THIRD_PARTY_LICENSES.txt" target="_blank" rel="noopener">
                   THIRD_PARTY_LICENSES.txt
                 </a>
