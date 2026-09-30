@@ -33,7 +33,7 @@ export function SidePanels({
   onMinimize,
   advice,
 }: SidePanelsProps) {
-  // Preview only tiles the server analysed, so the title never outruns the table.
+  // Preview only tiles the engine analysed, so the title never outruns the table.
   const preview = previewTile ? byDiscard[previewTile] : undefined;
   const previewRows = useMemo(() => preview && withNames(preview, analysis), [preview, analysis]);
   const adviceShown = !!advice && !isMin('advice');

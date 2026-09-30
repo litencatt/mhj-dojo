@@ -7,10 +7,9 @@
 //   ### 新機能
 //   - <the pull request's title> by @user in https://github.com/…/pull/141
 //
-// The oldest releases have no ### headings. The site build renders it at
-// build time (vite.config.ts); the local server's page fetches it
-// (GET /api/changelog) and renders it in the browser (info.ts). Only
-// erasable TypeScript here: `npm test` runs its test in plain Node.
+// The oldest releases have no ### headings. The build renders it into the
+// page (vite.config.ts). Only erasable TypeScript here: `npm test` runs its
+// test in plain Node.
 
 export interface ChangelogItem {
   title: string;

@@ -1,4 +1,5 @@
-// Command mhj-dojo starts the local mahjong practice server and opens the browser.
+// Command mhj-dojo serves the mahjong practice app (the static site's build,
+// its engine running in the browser) on this machine and opens the browser.
 package main
 
 import (
@@ -17,33 +18,36 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/litencatt/mhj-dojo/internal/match"
 	"github.com/litencatt/mhj-dojo/internal/server"
-	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
 func main() {
 	port := flag.Int("port", 8765, "port to listen on (0 = random free port)")
 	host := flag.String("host", "127.0.0.1", "host to bind")
 	open := flag.Bool("open", true, "open the browser")
-	seed := flag.Int64("seed", 0, "default wall seed for new sessions (random if unset)")
+	seed := flag.Int64("seed", 0, "open practice on this wall seed (/?seed=N; random if unset)")
 	flag.Parse()
 
-	store := session.NewStore()
-	games := match.NewStore()
+	page := "/"
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "seed" {
-			store.DefaultSeed = seed
-			games.DefaultSeed = seed
+			page = "/?seed=" + strconv.FormatInt(*seed, 10)
 		}
 	})
+	// The page reads the seed as a JavaScript number, exact below 2^53.
+	if *seed < 0 || *seed >= 1<<53 {
+		fmt.Fprintf(os.Stderr, "invalid --seed %d: it must be from 0 to 2^53-1 (%d)\n", *seed, int64(1<<53-1))
+		os.Exit(2)
+	}
 
-	if err := run(*host, *port, *open, store, games); err != nil {
+	if err := run(*host, *port, *open, page); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(host string, port int, open bool, store *session.Store, games *match.Store) error {
+// run serves the app until interrupted, printing (and with open, opening)
+// the URL of page on it.
+func run(host string, port int, open bool, page string) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return err
@@ -52,17 +56,17 @@ func run(host string, port int, open bool, store *session.Store, games *match.St
 	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
 		urlHost = "127.0.0.1"
 	}
-	url := fmt.Sprintf("http://%s/", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
+	url := fmt.Sprintf("http://%s%s", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)), page)
 	fmt.Printf("mhj-dojo listening on %s (Ctrl+C to quit)\n", url)
 	if !server.FrontendBuilt() {
-		fmt.Fprintln(os.Stderr, "warning: this binary was built without the web frontend, so only the API works; rebuild it with `make build`")
+		fmt.Fprintln(os.Stderr, "warning: this binary was built without the web frontend, so there is nothing to play; rebuild it with `make build`")
 	}
 	if addr := ln.Addr().(*net.TCPAddr); !addr.IP.IsLoopback() {
-		fmt.Fprintf(os.Stderr, "warning: bound to %s: the API has no authentication and the Host check only stops browsers, so other machines on the network can use it\n", addr)
+		fmt.Fprintf(os.Stderr, "warning: bound to %s, but it only answers requests for localhost, so browsers on other machines can't open it\n", addr)
 	}
 
 	srv := &http.Server{
-		Handler:           server.New(store, games),
+		Handler:           server.New(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

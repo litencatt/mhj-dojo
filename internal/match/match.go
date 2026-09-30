@@ -1,4 +1,4 @@
-// Package match runs games against CPU players for the HTTP API: a game.Game
+// Package match runs games against CPU players for the engine: a game.Game
 // with seat 0 as the human, the human's per-yaku analysis, and the JSON
 // state of docs/api.md.
 package match
@@ -32,8 +32,6 @@ const (
 // Store holds games in memory.
 type Store struct {
 	games *store.Store[*Match]
-	// DefaultSeed, when set, is used for games created without a seed.
-	DefaultSeed *int64
 }
 
 // NewStore returns an empty store that keeps at most MaxGames games.
@@ -64,8 +62,8 @@ type Options struct {
 	CPU         string // cpu.Normal or cpu.Weak
 }
 
-// Create deals a game with the given options. A nil seed picks the default
-// or a random seed.
+// Create deals a game with the given options. A nil seed picks a random
+// seed.
 func (st *Store) Create(seed *int64, o Options) (*Match, error) {
 	o, rules, err := o.normalize()
 	if err != nil {
@@ -74,8 +72,8 @@ func (st *Store) Create(seed *int64, o Options) (*Match, error) {
 	// A random seed is hidden until the game ends: it rebuilds every wall.
 	// 2^53 keeps it exact in JSON while making a search from the dealt tiles
 	// impractical (2^32 would take minutes).
-	s := wall.PickSeed(seed, st.DefaultSeed, 1<<53)
-	m := newMatch(deal(s, rules, o), o, seed != nil || st.DefaultSeed != nil)
+	s := wall.PickSeed(seed, 1<<53)
+	m := newMatch(deal(s, rules, o), o, seed != nil)
 	m.id = st.games.Add(m)
 	return m, nil
 }

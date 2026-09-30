@@ -55,14 +55,10 @@ func FullSet() [Size]tile.Tile {
 	return ts
 }
 
-// PickSeed returns explicit if set, else def if set, else a random seed in
-// [0, bound).
-func PickSeed(explicit, def *int64, bound int64) int64 {
-	switch {
-	case explicit != nil:
+// PickSeed returns explicit if set, else a random seed in [0, bound).
+func PickSeed(explicit *int64, bound int64) int64 {
+	if explicit != nil {
 		return *explicit
-	case def != nil:
-		return *def
 	}
 	return rand.Int64N(bound)
 }

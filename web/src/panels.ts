@@ -126,7 +126,7 @@ export function focusGlossary() {
   requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.glossary-search')?.focus({ preventScroll }));
 }
 
-// Server error messages (English, meant for API clients) sometimes embed a raw
+// Engine error messages (English, docs/api.md) sometimes embed a raw
 // tile code, e.g. `tile "5p" is not in hand or drawn`. Replace each whole code
 // token with its name for display, quotes and all if quoted ("5p" -> 5筒, bare
 // 5p -> 5筒). \b keeps it from matching inside a longer token (18p, abc5pdef).

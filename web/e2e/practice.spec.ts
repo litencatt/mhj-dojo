@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, onSite, stoppedDialog } from '../helpers';
+import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, stoppedDialog } from './helpers';
 
-// Solo practice mode (the root page), on both builds.
+// Solo practice mode (the root page).
 
 // Load a fixed seed and discard once, checking that both the table (discard
 // river) and the analysis (yaku table) update from the engine's answer.
@@ -74,23 +74,21 @@ test('a second tab on the same session stops the first, until taken back', async
   await expect(stoppedDialog(other)).toHaveCount(0);
   await calls();
 
-  // B plays on, and on the site saves.
+  // B plays on, and saves.
   await discardDrawn(other);
   await discardDrawn(other);
   expect(await calls()).toEqual([]);
-  if (onSite()) await expect.poll(() => savedMoves(other)).toBe(3);
+  await expect.poll(() => savedMoves(other)).toBe(3);
 
-  // A takes it back, from where B left it (the server's copy is fetched
-  // again); now B stops.
+  // A takes it back, from where B left it; now B stops.
   await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
   await expect(stoppedDialog(page)).toHaveCount(0);
   await expect(handA.locator('.discard-river .tile')).toHaveCount(3);
-  if (!onSite()) expect(await calls()).toContainEqual(expect.stringMatching(/^GET \/api\/sessions\/[^/]+$/));
   expect(await labels(page, '.discard-river')).toEqual(await labels(other, '.discard-river'));
   expect(await labels(page, '.hand-tiles')).toEqual(await labels(other, '.hand-tiles'));
   await expectStopped(other);
   await discardDrawn(page);
-  if (onSite()) await expect.poll(() => savedMoves(page)).toBe(4);
+  await expect.poll(() => savedMoves(page)).toBe(4);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 
   // 閉じる: a tab the page did not open stays open, with a hint.

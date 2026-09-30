@@ -1,6 +1,6 @@
 // One tab per practice session or CPU game: the newest tab to open one wins
-// and any other tab showing it stops (sends nothing more for it, and on the
-// static site saves nothing more of it) until the player takes it back.
+// and any other tab showing it stops (asks its engine nothing more for it,
+// and saves nothing more of it) until the player takes it back.
 //
 // A tab holds at most one id (a key: the id's API path, as api.ts builds
 // it). Its claim, {key, tab, at}, goes two ways:
@@ -16,11 +16,11 @@
 //   as it comes back into view and before each request and save, and stops
 //   if the record is newer than its own claim. Silence is not consent.
 //
-// Two browsers don't see each other: there the server's 409 for a move on
-// an out-of-date screen still applies.
+// Two browsers don't share a session or game: each has its own engine and
+// its own saves.
 
 // The status and message of a request refused because another tab has
-// taken over its session or game: 423 Locked, never taken for a 409.
+// taken over its session or game: 423 Locked.
 export const STOPPED = 423;
 export const STOPPED_MESSAGE = 'このタブは別のタブで開かれたため停止しました';
 
