@@ -54,7 +54,7 @@ For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H t
 ## Quick start
 
 ```sh
-make build        # builds the frontend (make web), then bin/mhj-dojo with it embedded
+make build        # builds the static site (make embed), then bin/mhj-dojo with it embedded
 ./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
 
@@ -76,11 +76,11 @@ The server only accepts requests whose `Host` header names localhost. That stops
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm run build (npm ci first if needed) → internal/server/static/dist (not committed)
-make run          # make web, then go run ./cmd/mhj-dojo
+make embed        # make site (npm ci first if needed), copied to internal/server/static/dist (not committed)
+make run          # make embed, then go run ./cmd/mhj-dojo
 ```
 
-After changing `web/`, rebuild the frontend with `make web` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make web` last built.
+`mhj-dojo` serves the same build as the static site (below), its engine running in the browser. After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
 Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
 
@@ -90,11 +90,11 @@ Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep
 cd web && npm run dev
 ```
 
-Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`: `shared/` runs on both the local version and the static site (below), `server/` and `site/` only on their own build (the HTTP API; the saves in the browser and the engine's worker). `npm run e2e` runs `shared/` and `server/` on their own `mhj-dojo` server against the built frontend, so no other server needs to be running:
+Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`: `shared/` runs on both the local version and the static site (below), `server/` and `site/` only on their own build (the HTTP API; the saves in the browser and the engine's worker). `npm run e2e` runs `shared/` and `site/` on their own `mhj-dojo` server serving the embedded site build (`server/` is not run: the page no longer uses the HTTP API), so no other server needs to be running:
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # once
-cd web && npm run build && npm run e2e
+make embed && cd web && npm run e2e
 ```
 
 ### Static site (WebAssembly)
@@ -136,7 +136,7 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
-The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags.
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. `mhj-dojo` embeds this same build (`make embed`), tags included; the default `npm run build` has no public URL to share, so it omits them.
 
 ### Layout
 
