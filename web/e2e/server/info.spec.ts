@@ -4,6 +4,7 @@ import { forUsersOnly, parseChangelog } from '../../src/changelog';
 
 // The 更新情報 page in the local build: the server serves it at /info/ (and
 // /info), and the page renders the server's CHANGELOG.md (GET /api/changelog).
+// e2e/shared/info.spec.ts has the ways there and back, on both builds.
 
 const RELEASES = forUsersOnly(parseChangelog(readFileSync(new URL('../../../CHANGELOG.md', import.meta.url), 'utf8')));
 const NEWEST = RELEASES[0].version;
@@ -27,28 +28,3 @@ for (const path of ['/info/', '/info']) {
     await expect(page.getByRole('main').getByRole('heading', { name: 'CI・リポジトリ' })).toHaveCount(0);
   });
 }
-
-test('the help opens /info/ and it links back to the app', async ({ page }) => {
-  await page.goto('/?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
-  await page.getByRole('dialog', { name: 'ヘルプ' }).getByRole('region', { name: 'バージョン表示' }).getByRole('link', { name: '更新情報' }).click();
-  await expect(page).toHaveURL(/\/info\/$/);
-  await expect(page.locator('.release').first()).toBeVisible();
-
-  await page.getByRole('navigation').getByRole('link', { name: 'CPU対戦' }).click();
-  await expect(page).toHaveURL(/\/\?mode=game$/);
-  await expect(page.locator('.app-header h1')).toContainText('CPU対戦');
-});
-
-test('練習 goes back to the practice session the page came from', async ({ page }) => {
-  await page.goto('/?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect(page).toHaveURL(/session=/);
-  const practice = page.url();
-  await page.locator('.app-header .version-tag').click();
-  await expect(page).toHaveURL(/\/info\/$/);
-  await expect(page.locator('.release').first()).toBeVisible();
-  await page.getByRole('navigation').getByRole('link', { name: '練習' }).click();
-  await expect(page).toHaveURL(practice);
-});
