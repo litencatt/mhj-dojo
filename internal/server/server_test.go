@@ -26,9 +26,14 @@ type client struct {
 
 func newClient(t *testing.T, store *session.Store) *client {
 	static := fstest.MapFS{
-		"index.html":      {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
-		"assets/app.js":   {Data: []byte("console.log(1)")},
-		"info/index.html": {Data: []byte("<!doctype html><title>更新情報</title>")},
+		"index.html":           {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
+		"assets/app.js":        {Data: []byte("console.log(1)")},
+		"info/index.html":      {Data: []byte("<!doctype html><title>更新情報</title>")},
+		"mhj-dojo.wasm":        {Data: []byte("\x00asm\x01\x00\x00\x00")},
+		"worker.js":            {Data: []byte("importScripts('wasm_exec.js')")},
+		"wasm_exec.js":         {Data: []byte("globalThis.Go = class {}")},
+		"version.json":         {Data: []byte(`{"version":"dev"}`)},
+		"manifest.webmanifest": {Data: []byte(`{"name":"mhj-dojo"}`)},
 	}
 	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))
 	t.Cleanup(srv.Close)
@@ -442,17 +447,29 @@ func TestErrors(t *testing.T) {
 
 func TestStaticAndSPAFallback(t *testing.T) {
 	c := newClient(t, session.NewStore())
-	for path, want := range map[string]string{
-		"/":              "<!doctype html>",
-		"/some/spa/path": "<!doctype html>",
-		"/assets/app.js": "console.log",
-		"/info/":         "<!doctype html><title>更新情報",
-		"/info":          "<!doctype html><title>更新情報",     // redirected to /info/
-		"/assets/":       "<!doctype html><title>mhj-dojo", // a directory without a page
+	const (
+		html      = "text/html; charset=utf-8"
+		js        = "text/javascript; charset=utf-8"
+		noCache   = "no-cache"
+		immutable = "public, max-age=31536000, immutable"
+	)
+	for path, want := range map[string]struct{ body, contentType, cache string }{
+		"/":                     {"<!doctype html>", html, noCache},
+		"/some/spa/path":        {"<!doctype html>", html, noCache},
+		"/assets/app.js":        {"console.log", js, immutable},
+		"/assets/missing.js":    {"<!doctype html><title>mhj-dojo", html, noCache},
+		"/info/":                {"<!doctype html><title>更新情報", html, noCache},
+		"/info":                 {"<!doctype html><title>更新情報", html, noCache},     // redirected to /info/
+		"/assets/":              {"<!doctype html><title>mhj-dojo", html, noCache}, // a directory without a page
+		"/mhj-dojo.wasm?v=abc":  {"\x00asm", "application/wasm", noCache},
+		"/worker.js?v=abc":      {"importScripts", js, noCache},
+		"/wasm_exec.js?v=abc":   {"globalThis.Go", js, noCache},
+		"/version.json?t=1":     {`{"version"`, "application/json", noCache},
+		"/manifest.webmanifest": {`{"name"`, "application/manifest+json", noCache},
 	} {
-		code, b, _ := c.do("GET", path, "")
-		if code != http.StatusOK || !strings.HasPrefix(string(b), want) {
-			t.Errorf("GET %s: %d %q", path, code, b)
+		code, b, h := c.do("GET", path, "")
+		if code != http.StatusOK || !strings.HasPrefix(string(b), want.body) || h.Get("Content-Type") != want.contentType || h.Get("Cache-Control") != want.cache {
+			t.Errorf("GET %s: %d %q %q %q, want %q %q", path, code, b, h.Get("Content-Type"), h.Get("Cache-Control"), want.contentType, want.cache)
 		}
 	}
 	if code, _, _ := c.do("POST", "/", "x"); code != http.StatusMethodNotAllowed {
@@ -469,9 +486,10 @@ func TestChangelog(t *testing.T) {
 	}
 }
 
-// TestEmbeddedFrontend checks what this binary serves: the built frontend
-// after make web (as in CI's E2E job, which drives it in the browser), the
-// not-built page otherwise (as in the Go test jobs and `go install`).
+// TestEmbeddedFrontend checks what this binary serves: the static site's
+// build after make embed (as in CI's E2E job, which drives it in the
+// browser), the not-built page otherwise (as in the Go test jobs and
+// `go install`).
 func TestEmbeddedFrontend(t *testing.T) {
 	srv := httptest.NewServer(New(session.NewStore(), match.NewStore()))
 	defer srv.Close()
@@ -487,6 +505,15 @@ func TestEmbeddedFrontend(t *testing.T) {
 	}
 	if res.StatusCode != http.StatusOK || !strings.Contains(string(b), want) {
 		t.Fatalf("embedded index (built %v): %d %q", FrontendBuilt(), res.StatusCode, b)
+	}
+	if !FrontendBuilt() {
+		return
+	}
+	// The static site's build (make embed), its engine included.
+	for _, name := range []string{"mhj-dojo.wasm", "wasm_exec.js", "worker.js", "version.json", "info/index.html"} {
+		if !isFile(staticFS, "static/dist/"+name) {
+			t.Errorf("static/dist/%s is missing: not the site build?", name)
+		}
 	}
 }
 

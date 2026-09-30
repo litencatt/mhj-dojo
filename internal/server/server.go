@@ -18,7 +18,8 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
-// static/dist is the built frontend (make web; not committed), and
+// static/dist is the built frontend, the static site (make embed; not
+// committed), and
 // static/notbuilt the page served in its place by a binary built without
 // it, such as one from `go install`.
 //
@@ -216,6 +217,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // spa serves static files and falls back to index.html for unknown paths.
 // A directory with its own index.html (info/, the 更新情報 page) is a page
 // too: the file server serves /info/ and redirects /info there.
+//
+// The build's assets/ files are named by their content hash, so a browser
+// keeps them for good; anything else (the pages, version.json, the engine,
+// which the page loads as worker.js?v=<hash> and so on) it checks with the
+// server on every load, so it picks up a new binary's build.
 func spa(static fs.FS) http.Handler {
 	files := http.FileServerFS(static)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +234,11 @@ func spa(static fs.FS) http.Handler {
 		if name == "" {
 			name = "index.html"
 		}
+		w.Header().Set("Cache-Control", "no-cache")
 		if st, err := fs.Stat(static, name); err == nil && (!st.IsDir() || isFile(static, path.Join(name, "index.html"))) {
+			if !st.IsDir() && strings.HasPrefix(name, "assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
 			files.ServeHTTP(w, r)
 			return
 		}
