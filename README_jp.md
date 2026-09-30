@@ -51,14 +51,16 @@
 ## 必要環境
 
 - Go 1.27 以上
-- Node.js 24 以上（フロントエンドを再ビルドする場合のみ。ビルド済みの成果物はコミットしてあります）
+- Node.js 24 以上（バイナリに埋め込むフロントエンドのビルドに使います）
 
 ## クイックスタート
 
 ```sh
-make build        # bin/mhj-dojo をビルド（フロントエンドを埋め込み済み）
+make build        # フロントエンドをビルド（make web）してから、それを埋め込んだ bin/mhj-dojo をビルド
 ./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
+
+ビルド済みのフロントエンドはコミットしていないため、`go build` や `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` だけで作ったバイナリには画面が入りません。API は動きますが、画面には `make build` で作り直すよう案内が出るだけです。ビルド済みのバイナリは配布していないので、リポジトリを取得して `make build` を使ってください。
 
 ### オプション
 
@@ -76,9 +78,11 @@ make build        # bin/mhj-dojo をビルド（フロントエンドを埋め�
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj-dojo
+make web          # npm ci && npm run build → internal/server/static/dist（コミットしません）
+make run          # make web のあと go run ./cmd/mhj-dojo
 ```
+
+エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面側に `api.WASM` の分岐を増やさないでください。
 
 ホットリロード付きでフロントエンドを開発する場合は、次のコマンドで開発サーバを起動します。`/api` を `127.0.0.1:8765` に中継するので、`mhj-dojo` も起動しておいてください。
 
@@ -132,7 +136,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
-サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省いてビルド間で内容が変わらないままにします（CI が `internal/server/static` の最新性を確認します）。
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省きます。
 
 ### ディレクトリ構成
 
