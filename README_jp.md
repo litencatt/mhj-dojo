@@ -110,15 +110,15 @@ make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo
 
 出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です（`npm run e2e` と同じテストを、`mhj-dojo` ではなく `vite preview` に対して実行します。`npm run e2e:all` で両方を実行できます）。
 
-ローカル版との違い:
+ブラウザの中での動き（公開サイトでも `mhj-dojo` でも同じ）:
 
 - CPU対戦（**CPU対戦へ**、`?mode=game`）も、CPUの手番を含めてブラウザの中で動きます。
-- ローカル版と同じく、同じセッションや対局を進められるのは一度に1つのタブだけです。ほかのブラウザから進むことはないので、「別の画面で進んだ」ときの処理はありません。
+- 同じセッションや対局を進められるのは一度に1つのタブだけです。
 - セッションごとの操作をブラウザ（localStorage、最近使った 10 セッションまで）に保存し、再読み込みのときに同じ URL のまま作り直します。作り直せないときは、URL のシードから同じ山で配り直します。CPU対戦も同じように保存します（最近使った 5 対局まで）。ランダムなシードは終局まで表示しません。
 
 Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開しています。
 
-`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せず、最初のリリースは「最初の公開」とだけ書きます。GitHub の PR やリリースへのリンクは付けません（`web/src/changelog.ts`）。ローカル版のサーバーも、バイナリに埋め込んだ `CHANGELOG.md` から同じページを `/info/` で出します。
+`info/` の更新情報のページ（https://mhj-dojo.lolipop-now.app/info/）は、ビルドのときに `CHANGELOG.md` から作るので、リリースのビルドにはそのリリースまでが載ります。作者の表記を除き、CI・依存関係・E2E だけの変更は載せず、最初のリリースは「最初の公開」とだけ書きます。GitHub の PR やリリースへのリンクは付けません（`web/src/changelog.ts`）。`mhj-dojo` も、ビルドした同じページを `/info/` で出します。
 
 #### デプロイ
 

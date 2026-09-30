@@ -108,15 +108,15 @@ make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.
 
 The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site` (the same tests as `npm run e2e`, on `vite preview` instead of `mhj-dojo`; `npm run e2e:all` runs both).
 
-Differences from the local version:
+In the browser, on the site as in `mhj-dojo`:
 
-- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser too, CPU turns included.
-- Only one tab plays a session or game at a time, as in the local version; there is no other browser to move it on, so there is no "moved on elsewhere" handling.
+- CPU games (**CPU対戦へ**, `?mode=game`) run entirely in the browser, CPU turns included.
+- Only one tab plays a session or game at a time.
 - Each session's moves are saved in the browser (localStorage, the 10 most recently used sessions) and replayed after a reload, under the same URL; if that fails, the same wall is dealt again from the seed in the URL. CPU games are saved the same way (the 5 most recently used games); a random seed stays hidden until the game ends.
 
 It's published at https://mhj-dojo.lolipop-now.app/ on Lolipop Deploy Now.
 
-The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). The local server serves the same page at `/info/`, from the `CHANGELOG.md` embedded in its binary.
+The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/info/) is rendered from `CHANGELOG.md` at build time, so each release's build lists itself; the notes are shown without their authors, the CI, dependency and E2E-only changes are left out, the first release is only named, and nothing links to GitHub (`web/src/changelog.ts`). `mhj-dojo` serves the same built page at `/info/`.
 
 #### Deploying
 
