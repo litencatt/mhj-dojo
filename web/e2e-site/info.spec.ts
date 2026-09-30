@@ -26,6 +26,7 @@ test('info/ lists the releases, newest first, for users', async ({ page }) => {
   await expect(item).toHaveCount(1);
   // The page is for the app's users: nothing links to GitHub.
   await expect(main.getByRole('link')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('GitHub');
   expect(await main.textContent()).not.toContain('by @');
 
   // The repository's own changes are left out, and a release with nothing

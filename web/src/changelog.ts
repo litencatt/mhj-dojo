@@ -14,7 +14,8 @@
 
 export interface ChangelogItem {
   title: string;
-  /** The pull request's number and URL, if the line names one. */
+  /** The pull request's number and URL, if the line names one. Not shown on
+   * the page; the test checks that every item has one. */
   pr: { number: number; url: string } | null;
   author: string | null;
 }
@@ -33,7 +34,7 @@ export interface Release {
 
 const RELEASE = /^## \[(v[^\]]+)\]\([^)]*\) - (\d{4}-\d{2}-\d{2})\s*$/;
 const ITEM = /^- (.+?) by @(\S+) in (\S+)\s*$/;
-// This repository's pull requests: any other URL is no pull request of the app.
+// Only this repository's pull requests count; any other URL gives `pr: null`.
 const PR_URL = /^https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/(\d+)$/;
 
 /** The releases in CHANGELOG.md, in its order (newest first). Any other

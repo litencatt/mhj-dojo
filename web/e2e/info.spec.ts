@@ -16,6 +16,7 @@ for (const path of ['/info/', '/info']) {
     await expect(first.locator('.release-version')).toHaveText(NEWEST);
     await expect(first.getByRole('listitem').first()).toBeVisible();
     await expect(page.getByRole('main').getByRole('link')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('GitHub');
     expect(await page.getByRole('main').textContent()).not.toContain('by @');
     await expect(page.getByRole('main').getByRole('heading', { name: 'CI・リポジトリ' })).toHaveCount(0);
   });
