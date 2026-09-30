@@ -1,5 +1,5 @@
 //go:build !race
 
-package server
+package apicall
 
 const raceEnabled = false

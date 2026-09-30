@@ -1,4 +1,4 @@
-package server
+package apicall
 
 import (
 	"encoding/json"
@@ -17,9 +17,13 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
+// The CPU game's behaviour through Route (moved here from internal/server's
+// HTTP tests, issue #147): whole games to their end, the options, the
+// errors, what stays hidden, calls and riichi.
+
 func (c *client) game(method, path, body string) (match.State, map[string]any) {
 	c.t.Helper()
-	code, b, _ := c.do(method, path, body)
+	code, b := c.do(method, path, body)
 	if code != http.StatusOK {
 		c.t.Fatalf("%s %s %s: %d %s", method, path, body, code, b)
 	}
@@ -139,7 +143,7 @@ func TestGameOptions(t *testing.T) {
 	}
 }
 
-func TestGameErrors(t *testing.T) {
+func TestGameActionErrors(t *testing.T) {
 	c := newClient(t, session.NewStore())
 	st, _ := c.game("POST", "/api/games", `{"seed":4}`) // dealer 0: you move first
 	path := "/api/games/" + st.GameID + "/action"
@@ -329,18 +333,14 @@ func TestHumanPon(t *testing.T) {
 func TestGameConcurrentRequests(t *testing.T) {
 	c := newClient(t, session.NewStore())
 	st, _ := c.game("POST", "/api/games", `{"seed":7}`)
-	path := c.srv.URL + "/api/games/" + st.GameID
-	post := func(url, body string) (int, match.State, error) {
-		res, err := http.Post(url, "application/json", strings.NewReader(body))
-		if err != nil {
-			return 0, match.State{}, err
+	path := "/api/games/" + st.GameID
+	send := func(method, path, body string) (int, match.State, error) {
+		code, v := Route(c.store, c.games, method, path, strings.NewReader(body))
+		st, _ := v.(match.State)
+		if code == http.StatusOK && st.GameID == "" {
+			return code, st, fmt.Errorf("%s %s: %T", method, path, v)
 		}
-		defer func() { _ = res.Body.Close() }()
-		var st match.State
-		if res.StatusCode == http.StatusOK {
-			err = json.NewDecoder(res.Body).Decode(&st)
-		}
-		return res.StatusCode, st, err
+		return code, st, nil
 	}
 	var wg sync.WaitGroup
 	var moved atomic.Int32
@@ -352,29 +352,22 @@ func TestGameConcurrentRequests(t *testing.T) {
 					if i >= 3 {
 						return
 					}
-					if code, _, err := post(c.srv.URL+"/api/games", `{}`); err != nil || code != http.StatusOK {
+					if code, _, err := send("POST", "/api/games", `{}`); err != nil || code != http.StatusOK {
 						errs <- fmt.Errorf("create: %d %v", code, err)
 						return
 					}
 					continue
 				}
-				res, err := http.Get(path)
-				if err != nil {
-					errs <- err
-					return
-				}
-				var cur match.State
-				err = json.NewDecoder(res.Body).Decode(&cur)
-				_ = res.Body.Close()
-				if err != nil {
-					errs <- err
+				code, cur, err := send("GET", path, "")
+				if err != nil || code != http.StatusOK {
+					errs <- fmt.Errorf("get: %d %v", code, err)
 					return
 				}
 				if cur.Result != nil {
 					return
 				}
 				// Another goroutine may move first, so the move can be stale.
-				code, _, err := post(path+"/action", nextMove(cur))
+				code, _, err = send("POST", path+"/action", nextMove(cur))
 				if err != nil || (code != http.StatusOK && code != http.StatusConflict && code != http.StatusBadRequest) {
 					errs <- fmt.Errorf("action: %d %v", code, err)
 					return
