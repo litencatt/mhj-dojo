@@ -26,14 +26,15 @@ type client struct {
 
 func newClient(t *testing.T, store *session.Store) *client {
 	static := fstest.MapFS{
-		"index.html":           {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
-		"assets/app.js":        {Data: []byte("console.log(1)")},
-		"info/index.html":      {Data: []byte("<!doctype html><title>更新情報</title>")},
-		"mhj-dojo.wasm":        {Data: []byte("\x00asm\x01\x00\x00\x00")},
-		"worker.js":            {Data: []byte("importScripts('wasm_exec.js')")},
-		"wasm_exec.js":         {Data: []byte("globalThis.Go = class {}")},
-		"version.json":         {Data: []byte(`{"version":"dev"}`)},
-		"manifest.webmanifest": {Data: []byte(`{"name":"mhj-dojo"}`)},
+		"index.html":             {Data: []byte("<!doctype html><title>mhj-dojo</title>")},
+		"assets/app-C2ZR0Mrc.js": {Data: []byte("console.log(1)")},
+		"assets/logo.svg":        {Data: []byte("<svg")},
+		"info/index.html":        {Data: []byte("<!doctype html><title>更新情報</title>")},
+		"mhj-dojo.wasm":          {Data: []byte("\x00asm\x01\x00\x00\x00")},
+		"worker.js":              {Data: []byte("importScripts('wasm_exec.js')")},
+		"wasm_exec.js":           {Data: []byte("globalThis.Go = class {}")},
+		"version.json":           {Data: []byte(`{"version":"dev"}`)},
+		"manifest.webmanifest":   {Data: []byte(`{"name":"mhj-dojo"}`)},
 	}
 	srv := httptest.NewServer(NewWithFS(store, match.NewStore(), static))
 	t.Cleanup(srv.Close)
@@ -454,26 +455,60 @@ func TestStaticAndSPAFallback(t *testing.T) {
 		immutable = "public, max-age=31536000, immutable"
 	)
 	for path, want := range map[string]struct{ body, contentType, cache string }{
-		"/":                     {"<!doctype html>", html, noCache},
-		"/some/spa/path":        {"<!doctype html>", html, noCache},
-		"/assets/app.js":        {"console.log", js, immutable},
-		"/assets/missing.js":    {"<!doctype html><title>mhj-dojo", html, noCache},
-		"/info/":                {"<!doctype html><title>更新情報", html, noCache},
-		"/info":                 {"<!doctype html><title>更新情報", html, noCache},     // redirected to /info/
-		"/assets/":              {"<!doctype html><title>mhj-dojo", html, noCache}, // a directory without a page
-		"/mhj-dojo.wasm?v=abc":  {"\x00asm", "application/wasm", noCache},
-		"/worker.js?v=abc":      {"importScripts", js, noCache},
-		"/wasm_exec.js?v=abc":   {"globalThis.Go", js, noCache},
-		"/version.json?t=1":     {`{"version"`, "application/json", noCache},
-		"/manifest.webmanifest": {`{"name"`, "application/manifest+json", noCache},
+		"/":                       {"<!doctype html>", html, noCache},
+		"/practice":               {"<!doctype html><title>mhj-dojo", html, noCache}, // an unknown page
+		"/assets/app-C2ZR0Mrc.js": {"console.log", js, immutable},
+		"/assets/logo.svg":        {"<svg", "image/svg+xml", noCache}, // not named by its hash
+		"/info/":                  {"<!doctype html><title>更新情報", html, noCache},
+		"/info":                   {"<!doctype html><title>更新情報", html, noCache}, // redirected to /info/
+		"/mhj-dojo.wasm?v=abc":    {"\x00asm", "application/wasm", noCache},
+		"/worker.js?v=abc":        {"importScripts", js, noCache},
+		"/wasm_exec.js?v=abc":     {"globalThis.Go", js, noCache},
+		"/version.json?t=1":       {`{"version"`, "application/json", noCache},
+		"/manifest.webmanifest":   {`{"name"`, "application/manifest+json", noCache},
 	} {
 		code, b, h := c.do("GET", path, "")
-		if code != http.StatusOK || !strings.HasPrefix(string(b), want.body) || h.Get("Content-Type") != want.contentType || h.Get("Cache-Control") != want.cache {
-			t.Errorf("GET %s: %d %q %q %q, want %q %q", path, code, b, h.Get("Content-Type"), h.Get("Cache-Control"), want.contentType, want.cache)
+		if code != http.StatusOK || !strings.HasPrefix(string(b), want.body) || h.Get("Content-Type") != want.contentType || h.Get("Cache-Control") != want.cache || h.Get("ETag") == "" {
+			t.Errorf("GET %s: %d %q %q %q %q, want %q %q", path, code, b, h.Get("Content-Type"), h.Get("Cache-Control"), h.Get("ETag"), want.contentType, want.cache)
+		}
+	}
+	// index.html served at a deeper path would load its relative assets from
+	// the wrong place.
+	for _, path := range []string{"/assets/missing-C2ZR0Mrc.js", "/assets/", "/some/spa/path", "/info/missing", "/api"} {
+		if code, b, _ := c.do("GET", path, ""); code != http.StatusNotFound {
+			t.Errorf("GET %s: %d %q, want 404", path, code, b)
 		}
 	}
 	if code, _, _ := c.do("POST", "/", "x"); code != http.StatusMethodNotAllowed {
 		t.Errorf("POST /: %d", code)
+	}
+}
+
+// A reload revalidates the engine and the pages by their ETags instead of
+// fetching them again.
+func TestStaticETag(t *testing.T) {
+	c := newClient(t, session.NewStore())
+	for _, path := range []string{"/mhj-dojo.wasm?v=abc", "/worker.js?v=abc", "/", "/info/", "/practice"} {
+		code, _, h := c.do("GET", path, "")
+		etag := h.Get("ETag")
+		if code != http.StatusOK || etag == "" {
+			t.Fatalf("GET %s: %d, ETag %q", path, code, etag)
+		}
+		req, _ := http.NewRequest("GET", c.srv.URL+path, nil)
+		req.Header.Set("If-None-Match", etag)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusNotModified {
+			t.Errorf("GET %s with If-None-Match %s: %d, want 304", path, etag, res.StatusCode)
+		}
+	}
+	_, _, wasm := c.do("GET", "/mhj-dojo.wasm", "")
+	_, _, worker := c.do("GET", "/worker.js", "")
+	if wasm.Get("ETag") == worker.Get("ETag") {
+		t.Errorf("mhj-dojo.wasm and worker.js share the ETag %s", wasm.Get("ETag"))
 	}
 }
 
