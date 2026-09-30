@@ -7,8 +7,8 @@ const PORT = 8799;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 // End-to-end tests drive the real server (built assets + Go backend), not
-// the Vite dev server: `npm run build` must run first so internal/server/static
-// is up to date (the `e2e` npm script does this).
+// the Vite dev server: `npm run build` must run first so the server embeds
+// the current frontend (internal/server/static/dist).
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,

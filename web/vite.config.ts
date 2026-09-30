@@ -33,9 +33,8 @@ const CHANGELOG = new URL('../CHANGELOG.md', import.meta.url);
 // Renders CHANGELOG.md into the 更新情報 page, for the site: it is static,
 // and the Release site workflow builds the tag, whose tree has the release's
 // CHANGELOG.md (tagpr commits it before tagging). The default build leaves
-// it for the page to fetch from the server (src/info.ts), since a build
-// that changed with every release would leave the committed
-// internal/server/static stale.
+// it for the page to fetch from the server (src/info.ts), which serves the
+// CHANGELOG.md embedded in its binary.
 function siteChangelogPlugin(): Plugin {
   return {
     name: 'mhj-dojo-site-changelog',
@@ -53,8 +52,7 @@ function siteChangelogPlugin(): Plugin {
 // only make sense for the published site (a crawler fetches og:image
 // directly, without page context, so it must be absolute). index.html
 // carries the rest of the OG/Twitter tags itself, since those don't depend
-// on any URL and must stay byte-stable in the embedded build (CI checks
-// internal/server/static is up to date).
+// on any URL and are the same in the embedded build.
 function siteOgTagsPlugin(siteUrl: string): Plugin {
   const image = `${siteUrl}og-image.png`;
   return {
@@ -175,7 +173,7 @@ export default defineConfig(({ command, mode }) => {
       __MHJDOJO_SITE_RELEASE__: 'null',
     },
     build: {
-      outDir: '../internal/server/static',
+      outDir: '../internal/server/static/dist',
       emptyOutDir: true,
       rolldownOptions: { input: PAGES },
       // The two pages would otherwise share it as a chunk of its own; the

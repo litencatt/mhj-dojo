@@ -1,9 +1,11 @@
 .PHONY: web build test run vet wasm site deploy deploy-check
 
+# The frontend into internal/server/static/dist/ (not committed), which the
+# server embeds; a Go build without it serves a page saying to run `make build`.
 web:
 	cd web && npm ci && npm run build
 
-build:
+build: web
 	go build -o bin/mhj-dojo ./cmd/mhj-dojo
 
 test:
@@ -12,7 +14,7 @@ test:
 vet:
 	go vet ./...
 
-run:
+run: web
 	go run ./cmd/mhj-dojo
 
 # The engine (practice and CPU games) as WebAssembly for the static site
