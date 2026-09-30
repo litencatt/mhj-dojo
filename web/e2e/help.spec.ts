@@ -34,7 +34,7 @@ test('practice: the header shows the version and the help opens, closes and link
     'アドバイス',
     'CPU対戦',
     '牌の表記',
-    '公開版の保存',
+    '保存',
     'バージョン表示',
     'ライセンス',
   ]) {

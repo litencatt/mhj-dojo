@@ -104,7 +104,6 @@ export function Help({ onShowGlossary }: HelpProps) {
               <h3 id="help-about">このアプリについて</h3>
               <p>
                 日本式リーチ麻雀の練習アプリです。一人打ちでツモと打牌を繰り返したり、CPU3人と東風戦・半荘戦を打ったりしながら、役ごとにあと何向聴か・どの牌が有効牌かを確認できます。
-                パソコンで動かすローカル版（<code>mhj-dojo</code> コマンド）と、ブラウザだけで動く公開版があります。
                 リリースごとの変更は<a href="info/">更新情報</a>にあります。
               </p>
             </section>
@@ -220,11 +219,12 @@ export function Help({ onShowGlossary }: HelpProps) {
             </section>
 
             <section aria-labelledby="help-save">
-              <h3 id="help-save">公開版の保存</h3>
+              <h3 id="help-save">保存</h3>
               <p>
-                公開版は計算（CPUの打牌も）をすべてブラウザの中で行い、手順はサーバーに送りません。練習は最近の10セッション、CPU対戦は最近の5対局の手順をこのブラウザに保存し、再読み込みや同じ URL を開いたときに復元します。ブラウザのデータを消すと失われます。
-                ローカル版はセッションと対局を <code>mhj-dojo</code> のメモリに持ち、再起動した後は URL のシードから同じ山で配り直します。
-                どちらも、同じブラウザで同じセッションや対局を進められるのは一度に1つのタブだけです。別のタブで同じ URL を開くと前のタブは停止し、「このタブで続ける」を押すと、そのタブが最後に進めた状態から続けられます（今度はもう一方のタブが停止します）。
+                {WASM
+                  ? '計算（CPUの打牌も）はすべてブラウザの中で行い、手順はサーバーに送りません。練習は最近の10セッション、CPU対戦は最近の5対局の手順をこのブラウザに保存し、再読み込みや同じ URL を開いたときに復元します。ブラウザのデータを消すと失われます。'
+                  : 'セッションと対局はサーバーのメモリに持ち、再起動した後は URL のシードから同じ山で配り直します。'}
+                同じセッションや対局を進められるのは一度に1つのタブだけです。別のタブで同じ URL を開くと前のタブは停止し、「このタブで続ける」を押すと、そのタブが最後に進めた状態から続けられます（今度はもう一方のタブが停止します）。
               </p>
             </section>
 
@@ -241,7 +241,7 @@ export function Help({ onShowGlossary }: HelpProps) {
                 mhj-dojo は MIT ライセンスです。画面には Preact（MIT ライセンス）を使っています。
                 {WASM ? (
                   <>
-                    公開版の計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
+                    計算エンジンには Go のランタイムと <code>wasm_exec.js</code>（BSD 3-Clause ライセンス）も含まれます。
                     これらのライセンス文は
                     <a href="THIRD_PARTY_LICENSES.txt" target="_blank" rel="noopener">
                       THIRD_PARTY_LICENSES.txt
