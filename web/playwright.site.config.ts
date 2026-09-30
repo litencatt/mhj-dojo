@@ -6,9 +6,8 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 // End-to-end tests for the static site (issue #67): the engine runs
 // as WebAssembly in the browser, with no mhj-dojo server. `make site` must run
 // first so web/dist-site is up to date; `vite preview` serves it (with
-// .wasm as application/wasm). The tests are e2e/shared, which
-// playwright.config.ts runs on the local server too, and e2e/site, which only
-// means something here (the saves, the engine's worker, version.json).
+// .wasm as application/wasm). The tests are e2e/shared and e2e/site, which
+// playwright.config.ts runs on the same build as mhj-dojo serves it.
 export default defineConfig({
   testDir: './e2e',
   testMatch: ['shared/**/*.spec.ts', 'site/**/*.spec.ts'],
@@ -24,7 +23,8 @@ export default defineConfig({
   },
   projects: [
     {
-      // The build the tests run on (e2e/helpers.ts): 'server' or 'site'.
+      // The build the tests run on (e2e/helpers.ts): the site's, here as in
+      // playwright.config.ts.
       name: 'site',
       use: { ...devices['Desktop Chrome'] },
     },

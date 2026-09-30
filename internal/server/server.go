@@ -3,14 +3,19 @@
 package server
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"mime"
 	"net"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
+	"time"
 
 	mhjdojo "github.com/litencatt/mhj-dojo"
 	"github.com/litencatt/mhj-dojo/internal/apicall"
@@ -18,7 +23,8 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
-// static/dist is the built frontend (make web; not committed), and
+// static/dist is the built frontend, the static site (make embed; not
+// committed), and
 // static/notbuilt the page served in its place by a binary built without
 // it, such as one from `go install`.
 //
@@ -213,11 +219,22 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// spa serves static files and falls back to index.html for unknown paths.
-// A directory with its own index.html (info/, the 更新情報 page) is a page
-// too: the file server serves /info/ and redirects /info there.
+// spa serves static files and falls back to index.html for unknown paths
+// at the top level (/?mode=game has no path of its own, but an old link
+// might). A directory with its own index.html (info/, the 更新情報 page) is
+// a page too: the file server serves /info/ and redirects /info there.
+// Anything else is a 404: the build's paths are relative (base './'), so
+// index.html served at a deeper path would load its assets from the wrong
+// place.
+//
+// The build's hashed assets (assets/index-C2ZR0Mrc.js) never change, so a
+// browser keeps them for good; anything else (the pages, version.json, the
+// engine, which the page loads as worker.js?v=<hash> and so on) it checks
+// with the server on every load, by its ETag, so a reload only fetches what
+// a new binary's build changed.
 func spa(static fs.FS) http.Handler {
 	files := http.FileServerFS(static)
+	etags := etags(static)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -228,18 +245,52 @@ func spa(static fs.FS) http.Handler {
 		if name == "" {
 			name = "index.html"
 		}
-		if st, err := fs.Stat(static, name); err == nil && (!st.IsDir() || isFile(static, path.Join(name, "index.html"))) {
+		w.Header().Set("Cache-Control", "no-cache")
+		st, err := fs.Stat(static, name)
+		if err == nil && st.IsDir() {
+			name = path.Join(name, "index.html")
+			st, err = fs.Stat(static, name)
+		}
+		if err == nil && !st.IsDir() {
+			if hashedAsset.MatchString(name) {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			w.Header().Set("ETag", etags[name])
 			files.ServeHTTP(w, r)
 			return
 		}
 		index, err := fs.ReadFile(static, "index.html")
-		if err != nil {
-			http.Error(w, "frontend not built", http.StatusNotFound)
+		if strings.Contains(name, "/") || err != nil {
+			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(index)
+		w.Header().Set("ETag", etags["index.html"])
+		http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(index))
 	})
+}
+
+// hashedAsset matches the build's files named by their content hash.
+var hashedAsset = regexp.MustCompile(`^assets/[^/]*-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$`)
+
+// etags is each file's ETag in fsys: a hash of its content.
+func etags(fsys fs.FS) map[string]string {
+	m := map[string]string{}
+	err := fs.WalkDir(fsys, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(b)
+		m[name] = `"` + hex.EncodeToString(sum[:8]) + `"`
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	return m
 }
 
 func isFile(fsys fs.FS, name string) bool {

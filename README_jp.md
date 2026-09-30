@@ -56,7 +56,7 @@
 ## クイックスタート
 
 ```sh
-make build        # 画面をビルド（make web）してから、それを埋め込んだ bin/mhj-dojo をビルド
+make build        # 静的サイトをビルド（make embed）してから、それを埋め込んだ bin/mhj-dojo をビルド
 ./bin/mhj-dojo    # http://127.0.0.1:8765 で起動し、ブラウザを開く
 ```
 
@@ -78,11 +78,11 @@ make build        # 画面をビルド（make web）してから、それを埋�
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm run build（必要なら先に npm ci）→ internal/server/static/dist（コミットしません）
-make run          # make web のあと go run ./cmd/mhj-dojo
+make embed        # make site（必要なら先に npm ci）の結果を internal/server/static/dist にコピー（コミットしません）
+make run          # make embed のあと go run ./cmd/mhj-dojo
 ```
 
-`web/` を変えたら `make web` で画面を作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make web` で作った画面がそのまま埋め込まれます。
+`mhj-dojo` は静的サイト（後述）と同じビルドを配信し、エンジンはブラウザの中で動きます。`web/` やエンジンを変えたら `make embed` で作り直してください（`make build` や `make run` でも作り直します）。`go build` や `go run` だけでは、最後に `make embed` でコピーした画面がそのまま埋め込まれます。
 
 エンジンへの操作はすべて `internal/apicall` を通します。HTTP API と WebAssembly 版で共有していて、両方の応答が同じことを `internal/server/parity_test.go` で確かめています。新しい操作はここに追加し、画面側に `api.WASM` の分岐を増やさないでください。
 
@@ -92,11 +92,11 @@ make run          # make web のあと go run ./cmd/mhj-dojo
 cd web && npm run dev
 ```
 
-ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習、CPU対戦（鳴き・局の結果・次局・スマホでの表示）、ヘルプと更新情報ページをカバーします。テストは `web/e2e/` にあり、`shared/` はローカル版と静的サイト（後述）の両方で、`server/` と `site/` はそれぞれの版でだけ実行します（HTTP API や、ブラウザへの保存・計算エンジンの Web Worker など）。`npm run e2e` は `shared/` と `server/` を、ビルド済みのフロントエンドに対して専用の `mhj-dojo` サーバを自前で起動して実行するので、他にサーバを立てておく必要はありません。
+ブラウザのE2Eテスト（Playwright + Chromium）は、一人打ち練習、CPU対戦（鳴き・局の結果・次局・スマホでの表示）、ヘルプと更新情報ページをカバーします。テストは `web/e2e/` にあり、`shared/` と `site/` をサイトビルド（後述）に対して実行します。`site/` はサイトビルドにしかないもの（ブラウザへの保存、計算エンジンの Web Worker、卓を作るためにエンジンの応答を書き換えるテスト）を扱います。`server/` は画面が使わなくなった HTTP API のテストなので実行しません。`npm run e2e` は、埋め込んだサイトビルドを配信する専用の `mhj-dojo` サーバを自前で起動して実行するので、他にサーバを立てておく必要はありません。
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # 初回のみ
-cd web && npm run build && npm run e2e
+make embed && cd web && npm run e2e
 ```
 
 ### 静的サイト（WebAssembly）
@@ -107,7 +107,7 @@ cd web && npm run build && npm run e2e
 make site         # make wasm（GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm と wasm_exec.js）のあと npm run build:site
 ```
 
-出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です。両方の版をビルドしてあれば、`npm run e2e:all` で両方の版のテストをまとめて実行できます。
+出力先は `web/dist-site/`（コミットしません）で、`index.html`・JS・CSS・`worker.js`・`mhj-dojo.wasm`・Go の `wasm_exec.js` が入ります。パスは相対なので、どの静的ホスティングのどのサブパスにも置けます。`.wasm` は `application/wasm` で配信してください（他の MIME でも動きますが起動が遅くなります）。確認は `cd web && npm run preview:site`、E2E テスト（`web/e2e/shared` と `web/e2e/site`）は `cd web && npm run e2e:site` です（`npm run e2e` と同じテストを、`mhj-dojo` ではなく `vite preview` に対して実行します。`npm run e2e:all` で両方を実行できます）。
 
 ローカル版との違い:
 
@@ -138,7 +138,7 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
-サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。組み込みビルド（`make web`）は公開URLを持たないため、これらのタグを省きます。
+サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。`mhj-dojo` はこのビルドをそのまま埋め込みます（`make embed`、タグも含む）。既定の `npm run build` は公開URLを持たないため、これらのタグを省きます。
 
 ### ディレクトリ構成
 

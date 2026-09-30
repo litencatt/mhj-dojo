@@ -1,17 +1,11 @@
-.PHONY: web build test run vet wasm site deploy deploy-check
-
-# The frontend into internal/server/static/dist/ (not committed), which the
-# server embeds; a Go build without it serves a page saying to run `make build`.
-# A plain go build or go run embeds whatever this last built.
-web: web/node_modules/.package-lock.json
-	cd web && npm run build
+.PHONY: build test run vet wasm site embed deploy deploy-check
 
 # npm ci wipes node_modules, so it only runs when the lockfile changes (npm
 # writes node_modules/.package-lock.json on every install).
 web/node_modules/.package-lock.json: web/package.json web/package-lock.json
 	cd web && npm ci
 
-build: web
+build: embed
 	go build -o bin/mhj-dojo ./cmd/mhj-dojo
 
 test:
@@ -20,7 +14,7 @@ test:
 vet:
 	go vet ./...
 
-run: web
+run: embed
 	go run ./cmd/mhj-dojo
 
 # The engine (practice and CPU games) as WebAssembly for the static site
@@ -41,8 +35,16 @@ wasm:
 	cp "$$(go env GOROOT)/lib/wasm/wasm_exec.js" web/site-public/wasm_exec.js
 
 # The static site into web/dist-site/ (not committed).
-site: wasm
-	cd web && npm ci && npm run build:site
+site: wasm web/node_modules/.package-lock.json
+	cd web && npm run build:site
+
+# The static site as the frontend mhj-dojo serves, in
+# internal/server/static/dist/ (not committed): the server embeds it, and a
+# Go build without it serves a page saying to run `make build`. A plain go
+# build or go run embeds whatever this last copied.
+embed: site
+	rm -rf internal/server/static/dist
+	cp -R web/dist-site internal/server/static/dist
 
 # Fails fast (even under `make -n`, via the leading '+') if DEPLOY_PROJECT
 # isn't set, before building anything. The project id isn't committed;

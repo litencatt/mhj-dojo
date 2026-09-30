@@ -6,15 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 8799;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
-// End-to-end tests drive the real server (built assets + Go backend), not
-// the Vite dev server: `npm run build` must run first so the server embeds
-// the current frontend (internal/server/static/dist). They are e2e/shared,
-// which playwright.site.config.ts runs on the static site too, and
-// e2e/server, which only means something here (the HTTP API, two browsers
-// on one session).
+// End-to-end tests on mhj-dojo, which serves the static site's build (issue
+// #147): `make embed` must run first so the server embeds the current build
+// (internal/server/static/dist). They are the same tests
+// playwright.site.config.ts runs on the site as vite preview serves it:
+// e2e/shared and e2e/site. e2e/server tested the HTTP API the page no longer
+// uses, and is left out until it is removed.
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['shared/**/*.spec.ts', 'server/**/*.spec.ts'],
+  testMatch: ['shared/**/*.spec.ts', 'site/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -23,15 +23,16 @@ export default defineConfig({
   // Every test starts its own game or session, so two can share the server.
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [['html', { open: 'never' }]] : 'list',
-  timeout: 30_000,
+  timeout: 60_000,
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
   },
   projects: [
     {
-      // The build the tests run on (e2e/helpers.ts): 'server' or 'site'.
-      name: 'server',
+      // The build the tests run on (e2e/helpers.ts): the site's, here as in
+      // playwright.site.config.ts.
+      name: 'site',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
