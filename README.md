@@ -91,7 +91,7 @@ make wasm
 cd web && npm run dev
 ```
 
-Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`: `shared/` and `site/` run on the site build (below), `site/` covering what only it has (the saves in the browser, the engine's worker, its answers patched to set up a table); `server/`, for the HTTP API the page no longer uses, is not run. `npm run e2e` runs them on their own `mhj-dojo` server serving the embedded site build, so no other server needs to be running:
+Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`, and `npm run e2e` runs them on their own `mhj-dojo` server serving the embedded site build (below), so no other server needs to be running:
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # once
@@ -106,7 +106,7 @@ The app can also be built as a static site that needs no server: the Go engine (
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site` (the same tests as `npm run e2e`, on `vite preview` instead of `mhj-dojo`; `npm run e2e:all` runs both).
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview`, and run the E2E tests (`web/e2e/`) with `make embed && cd web && npm run e2e`: they run on `mhj-dojo`, which serves a copy of this build.
 
 In the browser, on the site as in `mhj-dojo`:
 
