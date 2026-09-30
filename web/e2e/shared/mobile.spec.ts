@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { engineCalls } from '../helpers';
+import { engineCalls, waitForPlayback } from '../helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
@@ -447,6 +447,15 @@ for (const width of [320, 360, 390]) {
         const b = await box(l);
         return b.y + b.height / 2;
       };
+      const offRow = async () => {
+        const row = await middle(yaku.getByRole('button', { name: '役満' }));
+        const others = [yaku.getByRole('button', { name: '1翻' }), yaku.locator('.yaku-filter-count'), clear];
+        return Math.max(...(await Promise.all(others.map(async (l) => Math.abs((await middle(l)) - row)))));
+      };
+      // Measured once the page has settled: in a game the CPU turns before
+      // yours play back first, the count changing as they land.
+      if (mode === 'game') await waitForPlayback(page);
+      await expect.poll(offRow).toBeLessThanOrEqual(1);
       const chipsRow = await middle(yaku.getByRole('button', { name: '役満' }));
       expect(Math.abs((await middle(yaku.getByRole('button', { name: '1翻' }))) - chipsRow)).toBeLessThanOrEqual(1);
       expect(Math.abs((await middle(yaku.locator('.yaku-filter-count'))) - chipsRow)).toBeLessThanOrEqual(1);
