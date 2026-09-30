@@ -2,7 +2,6 @@ package apicall
 
 import (
 	"encoding/json"
-	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -161,39 +160,6 @@ func TestRestore(t *testing.T) {
 		if status, v := Restore(store, "", strings.NewReader(body)); status != want {
 			t.Errorf("Restore(%s) = %d %v, want %d", body, status, v, want)
 		}
-	}
-}
-
-// TestVersion reads the commit from the go command's VCS stamp and falls
-// back to "dev" without one (go run, go test, a build outside git).
-func TestVersion(t *testing.T) {
-	stamped := &debug.BuildInfo{Settings: []debug.BuildSetting{
-		{Key: "-trimpath", Value: "true"},
-		{Key: "vcs", Value: "git"},
-		{Key: "vcs.revision", Value: "b083fb0498b732b077e4b85af931ede37292438f"},
-		{Key: "vcs.time", Value: "2026-09-26T13:16:27Z"},
-		{Key: "vcs.modified", Value: "true"},
-	}}
-	for _, c := range []struct {
-		bi   *debug.BuildInfo
-		ok   bool
-		want VersionInfo
-	}{
-		{stamped, true, VersionInfo{Version: "b083fb0", Revision: "b083fb0498b732b077e4b85af931ede37292438f", Time: "2026-09-26T13:16:27Z", Modified: true}},
-		{&debug.BuildInfo{}, true, VersionInfo{Version: "dev"}},
-		{nil, false, VersionInfo{Version: "dev"}},
-	} {
-		if got := versionOf(c.bi, c.ok); got != c.want {
-			t.Errorf("versionOf(%v) = %+v, want %+v", c.bi, got, c.want)
-		}
-	}
-	// The test binary itself has no VCS stamp.
-	status, b := call(t, session.NewStore(), "GET", "/api/version", "")
-	if status != statusOK || string(b) != `{"version":"dev","revision":"","time":"","modified":false}` {
-		t.Errorf("GET /api/version = %d %s", status, b)
-	}
-	if status, _ := call(t, session.NewStore(), "POST", "/api/version", ""); status != statusNotFound {
-		t.Errorf("POST /api/version = %d, want %d", status, statusNotFound)
 	}
 }
 

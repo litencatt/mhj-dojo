@@ -4,7 +4,7 @@ All endpoints return JSON (`Content-Type: application/json`). Errors: HTTP 4xx/5
 
 The static site (README, "Static site") has no server: the engine built as WebAssembly
 (`cmd/mhj-dojo-wasm`) defines `mhjDojoRequest(method, path, body)` in its Web Worker, which takes a
-request below — practice (`/api/sessions…`), game (`/api/games…`) or `GET /api/version` — as its
+request below — practice (`/api/sessions…`) or game (`/api/games…`) — as its
 method, path and JSON body and returns `{status, body, save}` with the status and JSON body the
 server would send (both use `internal/apicall`). It also defines two functions that are not HTTP
 endpoints: `mhjDojoRestore(body, query)`, which rebuilds a session from its moves in one call after a page
@@ -89,31 +89,6 @@ unknown parameters are ignored, and of a parameter given twice the last value co
 advice panel is minimized (opening it asks for the state shown again, with the advice), and
 `tree_from` on every request but those that load a session afresh (a new one, the first of a page,
 the re-fetch after a `409`), which take the whole tree.
-
-### `GET /api/version`
-The commit the answering binary was built from, as the go command stamps it into a build
-made in the git checkout (`runtime/debug.ReadBuildInfo`; `-trimpath` keeps it):
-
-```json
-{"version": "b083fb0", "revision": "b083fb0498b732b077e4b85af931ede37292438f", "time": "2026-09-26T13:16:27Z", "modified": false}
-```
-
-`version` is the first 7 hex digits of `revision`, or `"dev"` for a build without the stamp
-(`go run`, `go test`, a build outside a git checkout), where `revision` and `time` are `""`.
-`time` is the commit time (RFC 3339, UTC), `modified` whether the build had uncommitted changes
-(as `git status` reports them, so untracked files that are not ignored count too).
-The static site's engine answers it too (with the WebAssembly binary's own stamp). The UI shows
-it in the header.
-
-### `GET /api/changelog`
-The repository's `CHANGELOG.md` (which tagpr updates on every release), as the binary embedded it:
-
-```json
-{"markdown": "# Changelog\n\n## [v2026.0929.1](https://github.com/…) - 2026-09-29\n…"}
-```
-
-The local build's 更新情報 page (`/info/`, `web/info`) renders it. Only the server has it: the
-static site's page is rendered from `CHANGELOG.md` at build time instead.
 
 ## `State`
 

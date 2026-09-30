@@ -450,7 +450,7 @@ func TestRouteStatuses(t *testing.T) {
 		{"GET", base + "?tree_from=x", "", http.StatusBadRequest},
 		{"POST", "/api/sessions?tree_from=", create, http.StatusBadRequest},
 		{"GET", "/api/sessions/nope?advice=2", "", http.StatusNotFound},
-		{"GET", "/api/version?advice=0", "", http.StatusOK},
+		{"GET", "/api/version?advice=0", "", http.StatusNotFound}, // gone with the server (issue #147)
 		// Unknown paths, wrong methods and trailing slashes.
 		{"GET", "/api/sessions", "", http.StatusNotFound},
 		{"PUT", "/api/sessions", "{}", http.StatusNotFound},
@@ -462,7 +462,7 @@ func TestRouteStatuses(t *testing.T) {
 		{"POST", base + "/undo", "{}", http.StatusNotFound},
 		{"GET", "/api/sessionsx", "", http.StatusNotFound},
 		{"GET", "/api/nothing", "", http.StatusNotFound},
-		{"GET", "/api/version", "", http.StatusOK},
+		{"GET", "/api/version", "", http.StatusNotFound},
 		{"POST", "/api/version", "{}", http.StatusNotFound},
 		{"GET", "/api/version/", "", http.StatusNotFound},
 		// The game's.

@@ -9,10 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/match"
@@ -212,53 +210,13 @@ func GameAction(m *match.Match, body io.Reader) (match.State, error) {
 	return m.Act(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles})
 }
 
-// VersionInfo is the body of GET /api/version: the commit the answering
-// binary (the server, or the WebAssembly engine) was built from, as the go
-// command stamped it (debug.ReadBuildInfo). A build without that stamp, such
-// as `go run`, `go test` or a build outside a git checkout, reports "dev".
-type VersionInfo struct {
-	Version  string `json:"version"`  // the commit's first 7 hex digits, or "dev"
-	Revision string `json:"revision"` // the full commit hash; "" when unknown
-	Time     string `json:"time"`     // the commit time (RFC 3339, UTC); "" when unknown
-	Modified bool   `json:"modified"` // built with uncommitted changes
-}
-
-// Version is GET /api/version.
-var Version = sync.OnceValue(func() VersionInfo { return versionOf(debug.ReadBuildInfo()) })
-
-func versionOf(bi *debug.BuildInfo, ok bool) VersionInfo {
-	v := VersionInfo{Version: "dev"}
-	if !ok {
-		return v
-	}
-	for _, s := range bi.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			v.Revision = s.Value
-		case "vcs.time":
-			v.Time = s.Value
-		case "vcs.modified":
-			v.Modified = s.Value == "true"
-		}
-	}
-	if len(v.Revision) >= 7 {
-		v.Version = v.Revision[:7]
-	}
-	return v
-}
-
-// Route runs one request given as its HTTP method and API path, with any
-// query (such as "POST", "/api/sessions/{id}/discard?advice=0"), for a
-// transport without an HTTP
-// router (the WebAssembly build). It returns the status and the response
-// value the HTTP server would send: a session.State, a match.State, a
-// VersionInfo or an ErrorBody. Any other path is a 404 as for an unknown
-// endpoint.
+// Route runs one request given as its method and path, with any query (such
+// as "POST", "/api/sessions/{id}/discard?advice=0"): the engine's entry for
+// every operation, which the WebAssembly build calls. It returns the status
+// (an HTTP status code) and the response value: a session.State, a
+// match.State or an ErrorBody. Any other path is a 404.
 func Route(store *session.Store, games *match.Store, method, path string, body io.Reader) (int, any) {
 	path, query, _ := strings.Cut(path, "?")
-	if method == methodGet && path == "/api/version" {
-		return statusOK, Version()
-	}
 	return result(route(store, games, method, path, query, body))
 }
 
