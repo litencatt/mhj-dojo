@@ -1,29 +1,29 @@
 //go:build js && wasm
 
-// Command mhj-dojo-wasm is the practice mode and the CPU games compiled to
-// WebAssembly for the static site: the browser (a Web Worker,
-// web/site-public/worker.js) runs the sessions and games itself instead of
-// calling the mhj-dojo server.
+// Command mhj-dojo-wasm is the engine, the practice mode and the CPU games,
+// compiled to WebAssembly: the browser (a Web Worker,
+// web/site-public/worker.js) runs the sessions and games itself, on the
+// public site as in mhj-dojo.
 //
 // It defines three global functions:
 //
 //	mhjDojoRequest(method, path, body) -> {status, body, save}
 //
-// answers a request of the HTTP API (docs/api.md), practice or game, given
-// as its method, path and JSON body, with the status and JSON body the
-// server would send (apicall.Route). A game response with a state also
-// carries save, the game's match.Save as a JSON string ("" otherwise);
+// answers a request (docs/api.md), practice or game, given as its method,
+// path and JSON body, with its status and JSON body (apicall.Route). A game
+// response with a state also carries save, the game's match.Save as a JSON
+// string ("" otherwise);
 //
 //	mhjDojoRestore(body, query) -> {status, body, save}
 //
 // rebuilds a session from its moves in one call after a page reload
-// (apicall.Restore; not an HTTP endpoint), answering with its state as the
+// (apicall.Restore; not a request), answering with its state as the
 // view options in query (a request's URL query, such as "advice=0"; may be
 // left out) pick it; and
 //
 //	mhjDojoRestoreGame(save) -> {status, body, save}
 //
-// rebuilds a game from a save (apicall.RestoreGame; not an HTTP endpoint).
+// rebuilds a game from a save (apicall.RestoreGame; not a request).
 // Both rebuild under a new id: the page maps its own ids to the engine's.
 package main
 
@@ -38,8 +38,8 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
-// maxSessions bounds the engine's in-memory sessions much tighter than the
-// native server's session.MaxSessions (256): this runs in a browser tab's
+// maxSessions bounds the engine's in-memory sessions much tighter than
+// session.MaxSessions (256, NewStore's default): this runs in a browser tab's
 // memory, and each practice session (its branch tree plus its own
 // yakushanten.Analyzer memo) can hold up to ~9.8 MiB (briefly a few MiB
 // more as a memo turns over), never released by Go's wasm runtime back to
@@ -50,7 +50,7 @@ import (
 const maxSessions = 4
 
 // maxGames bounds the engine's in-memory games the same way, much tighter
-// than the native server's match.MaxGames (256): a game holds its analyzer
+// than match.MaxGames (256, NewStore's default): a game holds its analyzer
 // memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and ~10.3
 // MiB at most, briefly a few MiB more as a memo turns over (docs/api.md
 // "Memory"). 2 keeps the game being played plus one more; an evicted game is

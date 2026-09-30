@@ -124,7 +124,7 @@ export function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R)
 
 /** Yaku key → display name, for the chart legend. */
 /**
- * The last non-empty analysis: after a call the server stops sending one,
+ * The last non-empty analysis: after a call the engine stops sending one,
  * but the chart still draws the history from before the call.
  */
 export function useLastAnalysis(analysis: YakuRow[] | undefined): YakuRow[] {

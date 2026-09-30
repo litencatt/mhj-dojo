@@ -69,7 +69,7 @@ function isTenpai(shanten: number | null): boolean {
 }
 
 /** 複合役: the best combinations of yaku one hand can score together, ranked
- * by the server (docs/api.md "Yaku combos"). While previewing, a combination
+ * by the engine (docs/api.md "Yaku combos"). While previewing, a combination
  * the current node also lists shows its shanten delta. */
 function ComboTable({ combos, base, remaining }: { combos: ComboRow[]; base: ComboRow[] | null; remaining: Remaining }) {
   if (combos.length === 0) return null;
