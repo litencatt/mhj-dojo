@@ -1,22 +1,8 @@
-// The 更新情報 page (web/info/index.html). The site build has already
-// rendered the changelog into the page; the local build, which is committed
-// and must not change with every release, asks the server for CHANGELOG.md.
+// The 更新情報 page (web/info/index.html): the build has rendered the
+// changelog into the page (vite.config.ts); this only wires its links.
 
-import { changelogHtml } from './changelog';
 import './tokens.css';
 import './info.css';
-
-const main = document.getElementById('changelog');
-if (main && main.childElementCount === 0) {
-  fetch('../api/changelog')
-    .then((res) => (res.ok ? (res.json() as Promise<{ markdown: string }>) : Promise.reject(new Error(`HTTP ${res.status}`))))
-    .then(({ markdown }) => {
-      main.innerHTML = changelogHtml(markdown);
-    })
-    .catch(() => {
-      main.innerHTML = '<p class="release-internal">更新情報を読み込めませんでした。</p>';
-    });
-}
 
 // Came here from the mode a link goes to: go back instead, to the session
 // or game that page had in its URL.

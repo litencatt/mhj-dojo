@@ -1,32 +1,20 @@
-// The version shown in the header, and (static site only) the check for a
-// newer deploy.
+// The version shown in the header, and the check for a newer deploy.
 
 import { useEffect, useState } from 'preact/hooks';
-import * as api from './api';
 
-// The static site's build (vite.config.ts, which also writes it to
-// version.json): the commit, the release (if the Release site workflow built
-// it), an id that changes with anything the build reads, and the build time. The default build is committed and has none of
-// them, so it shows the server's version.
-export const SITE_BUILD =
-  __MHJDOJO_SITE_VERSION__ !== null && __MHJDOJO_SITE_ID__ !== null && __MHJDOJO_SITE_BUILT__ !== null
-    ? { version: __MHJDOJO_SITE_VERSION__, release: __MHJDOJO_SITE_RELEASE__, id: __MHJDOJO_SITE_ID__, built: __MHJDOJO_SITE_BUILT__ }
-    : null;
+// The site's build (vite.config.ts, which also writes it to version.json):
+// the commit, the release (if the Release site workflow built it), an id
+// that changes with anything the build reads, and the build time.
+export const SITE_BUILD = {
+  version: __MHJDOJO_SITE_VERSION__,
+  release: __MHJDOJO_SITE_RELEASE__,
+  id: __MHJDOJO_SITE_ID__,
+  built: __MHJDOJO_SITE_BUILT__,
+};
 
 // The bundle's file name (its content hash), e.g. "index-DkR2xq3v": which
-// build of the page is running, even where both builds report "dev".
+// build of the page is running, even where two builds report "dev".
 export const BUNDLE = /\/assets\/([^/]+)\.js$/.exec(new URL(import.meta.url).pathname)?.[1] ?? null;
-
-/** The server's (or the site's engine's) GET /api/version; null until it answers or if it fails. */
-export function useVersion(): api.VersionInfo | null {
-  const [v, setV] = useState<api.VersionInfo | null>(null);
-  useEffect(() => {
-    api.getVersion().then(setV, () => {
-      // An older server without the endpoint: show nothing.
-    });
-  }, []);
-  return v;
-}
 
 const CHECK_INTERVAL = 10 * 60 * 1000;
 const MIN_GAP = 60 * 1000; // at most one check a minute
@@ -52,18 +40,17 @@ function readTried(): string | null {
 }
 
 /**
- * Whether a newer static site has been deployed: version.json, fetched past
+ * Whether a newer build has been deployed: version.json, fetched past
  * every cache at startup, every 10 minutes and whenever the tab becomes
  * visible again (not while it is hidden, and at most once a minute), names
  * another commit or id than the running build. Checking stops once it does.
- * Always 'current' in the default build; network errors are ignored.
+ * Network errors are ignored.
  */
 export function useNewVersion(): { state: UpdateState; reload: () => void } {
   const [deployed, setDeployed] = useState<string | null>(null); // the newer build's id
   const state: UpdateState = deployed === null ? 'current' : readTried() === deployed ? 'pending' : 'newer';
 
   useEffect(() => {
-    if (!SITE_BUILD) return;
     // Drop the reload's cache-busting parameter from the address bar.
     const url = new URL(location.href);
     if (url.searchParams.has(RELOAD_PARAM)) {
@@ -73,7 +60,7 @@ export function useNewVersion(): { state: UpdateState; reload: () => void } {
   }, []);
 
   useEffect(() => {
-    if (!SITE_BUILD || deployed !== null) return;
+    if (deployed !== null) return;
     const running = SITE_BUILD;
     let done = false;
     let last = -Infinity;
