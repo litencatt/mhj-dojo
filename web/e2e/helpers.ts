@@ -59,6 +59,168 @@ export function handPanel(page: Page) {
   return page.getByRole('region', { name: '手牌' });
 }
 
+/** A call the page made to its engine: fn 'request' with the method and path (with the engine's own ids), or 'restore' / 'restoreGame' rebuilding a save. */
+export interface EngineCall {
+  id: number;
+  fn: string;
+  method?: string;
+  path?: string;
+}
+
+/** The engine's answer to a call: its status and its parsed JSON body. */
+export interface EngineReply {
+  status: number;
+  data: any; // a state the test reads and patches as it likes
+}
+
+type ReplyHook = (call: EngineCall, reply: EngineReply) => void;
+
+interface Watch {
+  hooks: ReplyHook[];
+  // The replies waited for, by call id, until the page has them.
+  delivered: Map<number, () => void>;
+}
+
+const watches = new WeakMap<Page, Watch>();
+
+/**
+ * Lets the test see, and change, the engine's answers before the page does,
+ * as page.route does with a server's responses: see onEngineReply and
+ * nextEngineReply. Call it before the page loads (the engine's worker must
+ * start with the hook in place); it lasts across reloads.
+ */
+export async function watchEngine(page: Page) {
+  if (watches.has(page)) return;
+  const watch: Watch = { hooks: [], delivered: new Map() };
+  watches.set(page, watch);
+  await page.exposeFunction('__mhjEngineReply', (call: EngineCall, reply: EngineReply) => {
+    for (const hook of [...watch.hooks]) hook(call, reply);
+    return reply;
+  });
+  await page.exposeFunction('__mhjEngineDelivered', (id: number) => {
+    watch.delivered.get(id)?.();
+    watch.delivered.delete(id);
+  });
+  await page.addInitScript(() => {
+    type Message = { id?: number; fn?: string; args?: string[]; status?: number; body?: string };
+    const w = window as unknown as {
+      Worker: typeof Worker;
+      __mhjEngineReply: (call: object, reply: { status: number; data: unknown }) => Promise<{ status: number; data: unknown }>;
+      __mhjEngineDelivered: (id: number) => void;
+      __mhjAsk?: (method: string, path: string) => Promise<unknown>;
+      __mhjSession?: string;
+    };
+    const Native = w.Worker;
+    let asked = 1e9; // ids of the test's own calls (engineState), past any of the page's
+    w.Worker = class extends Native {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        const calls = new Map<number, Message>();
+        const asks = new Map<number, (body: unknown) => void>();
+        const post = this.postMessage.bind(this) as (m: Message) => void;
+        this.postMessage = ((m: Message) => {
+          if (typeof m?.id === 'number') calls.set(m.id, m);
+          post(m);
+        }) as typeof this.postMessage;
+        w.__mhjAsk = (method, path) =>
+          new Promise((resolve) => {
+            const id = asked++;
+            asks.set(id, resolve);
+            post({ id, fn: 'request', args: [method, path, ''] });
+          });
+        // The page's onmessage gets each message once the test has seen it,
+        // in the order the engine sent them.
+        let handler: ((e: MessageEvent) => void) | null = null;
+        Object.defineProperty(this, 'onmessage', { get: () => handler, set: (h) => (handler = h) });
+        let order = Promise.resolve();
+        this.addEventListener('message', (e: MessageEvent) => {
+          order = order.then(async () => {
+            let data = e.data as Message;
+            const id = data?.id;
+            if (typeof id === 'number' && asks.has(id)) {
+              asks.get(id)!(JSON.parse(data.body!));
+              asks.delete(id);
+              return;
+            }
+            const call = typeof id === 'number' ? calls.get(id) : undefined;
+            if (call) {
+              calls.delete(id!);
+              const [method, path] = call.fn === 'request' ? call.args ?? [] : [];
+              const reply = await w.__mhjEngineReply({ id, fn: call.fn, method, path }, { status: data.status!, data: JSON.parse(data.body!) });
+              const session = (reply.data as { session_id?: string } | null)?.session_id;
+              if (reply.status === 200 && session) w.__mhjSession = session;
+              data = { ...data, status: reply.status, body: JSON.stringify(reply.data) };
+            }
+            handler?.call(this, new MessageEvent('message', { data }));
+            if (call) w.__mhjEngineDelivered(id!);
+          });
+        });
+      }
+    };
+  });
+}
+
+function watching(page: Page) {
+  const watch = watches.get(page);
+  if (!watch) throw new Error('watchEngine(page) must run before the page loads');
+  return watch;
+}
+
+/**
+ * Calls hook on each of the engine's answers before the page gets it: the
+ * hook may change reply (its status, or its data in place), and the page
+ * gets the changed one. Returns a function that removes the hook.
+ */
+export function onEngineReply(page: Page, hook: ReplyHook) {
+  const { hooks } = watching(page);
+  hooks.push(hook);
+  return () => {
+    const i = hooks.indexOf(hook);
+    if (i >= 0) hooks.splice(i, 1);
+  };
+}
+
+/**
+ * The engine's next answer to a call that match accepts, as the page got
+ * it (after any onEngineReply hook), once the page has it: the site's
+ * page.waitForResponse. Call it before the click that makes the call.
+ */
+export function nextEngineReply(page: Page, match: (call: EngineCall) => boolean): Promise<EngineReply> {
+  const watch = watching(page);
+  return new Promise((resolve) => {
+    const hook: ReplyHook = (call, reply) => {
+      if (!match(call)) return;
+      watch.hooks.splice(watch.hooks.indexOf(hook), 1);
+      watch.delivered.set(call.id, () => resolve(reply));
+    };
+    watch.hooks.push(hook);
+  });
+}
+
+/** Whether a call is a request with this method, its path (query left out) matching path. */
+export function isRequest(call: EngineCall, method: string, path: RegExp) {
+  return call.fn === 'request' && call.method === method && path.test(call.path!.split('?')[0]);
+}
+
+/** A CPU game's action (POST /api/games/{id}/action). */
+export function isGameAction(call: EngineCall) {
+  return isRequest(call, 'POST', /^\/api\/games\/[^/]+\/action$/);
+}
+
+/**
+ * The whole state of the page's practice session as the engine has it, with
+ * nothing left out (the view the page doesn't ask for): the test's own call
+ * to the page's engine, which the page never sees. Needs watchEngine.
+ */
+export async function engineSession<T>(page: Page): Promise<T> {
+  watching(page);
+  await expect(page).toHaveURL(/[?&]session=/);
+  return (await page.evaluate(async () => {
+    const w = window as unknown as { __mhjAsk: (m: string, p: string) => Promise<unknown>; __mhjSession: string };
+    return w.__mhjAsk('GET', `/api/sessions/${encodeURIComponent(w.__mhjSession)}`);
+  })) as T;
+}
+
 /** The tiles' names in the hand panel's hand (.hand-tiles) or river (.discard-river), in order. */
 export function labels(page: Page, selector: string) {
   return handPanel(page)

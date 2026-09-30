@@ -522,7 +522,7 @@ func TestChangelog(t *testing.T) {
 }
 
 // TestEmbeddedFrontend checks what this binary serves: the static site's
-// build after make embed (as in CI's E2E job, which drives it in the
+// build after make embed (as in CI's site job, which drives it in the
 // browser), the not-built page otherwise (as in the Go test jobs and
 // `go install`).
 func TestEmbeddedFrontend(t *testing.T) {
