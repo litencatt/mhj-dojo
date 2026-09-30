@@ -49,14 +49,16 @@ For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H t
 ## Requirements
 
 - Go 1.27+
-- Node.js 24+ (only needed to rebuild the frontend; the built assets are committed)
+- Node.js 24+ (to build the frontend, which the binary embeds)
 
 ## Quick start
 
 ```sh
-make build        # builds bin/mhj-dojo (frontend is embedded)
+make build        # builds the frontend (make web), then bin/mhj-dojo with it embedded
 ./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
+
+The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: the API works, but the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
 
 ### Flags
 
@@ -74,9 +76,13 @@ The server only accepts requests whose `Host` header names localhost. That stops
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj-dojo
+make web          # npm run build (npm ci first if needed) → internal/server/static/dist (not committed)
+make run          # make web, then go run ./cmd/mhj-dojo
 ```
+
+After changing `web/`, rebuild the frontend with `make web` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make web` last built.
+
+Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
 
 Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj-dojo` running):
 
@@ -84,7 +90,7 @@ Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep
 cd web && npm run dev
 ```
 
-Browser end-to-end tests (Playwright + Chromium) cover practice mode and a CPU game (calls, round result, next round, a mobile viewport). They start their own `mhj-dojo` server against the built frontend, so no other server needs to be running:
+Browser end-to-end tests (Playwright + Chromium) cover practice mode, a CPU game (calls, round result, next round, phone layouts), the help and the 更新情報 page. They live in `web/e2e/`: `shared/` runs on both the local version and the static site (below), `server/` and `site/` only on their own build (the HTTP API; the saves in the browser and the engine's worker). `npm run e2e` runs `shared/` and `server/` on their own `mhj-dojo` server against the built frontend, so no other server needs to be running:
 
 ```sh
 cd web && npx playwright install --with-deps chromium   # once
@@ -99,7 +105,7 @@ The app can also be built as a static site that needs no server: the Go engine (
 make site         # make wasm (GOOS=js GOARCH=wasm → web/site-public/mhj-dojo.wasm + wasm_exec.js), then npm run build:site
 ```
 
-The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests with `cd web && npm run e2e:site`.
+The site lands in `web/dist-site/` (not committed): `index.html`, JS, CSS, `worker.js`, `mhj-dojo.wasm` and Go's `wasm_exec.js`. Asset paths are relative, so any static host and subpath works; serve `.wasm` as `application/wasm` (other types still work, only slower to start). Preview it with `cd web && npm run preview:site`, and run its E2E tests (`web/e2e/shared` and `web/e2e/site`) with `cd web && npm run e2e:site`; with both builds in place, `npm run e2e:all` runs both builds' tests.
 
 Differences from the local version:
 
@@ -115,7 +121,7 @@ The 更新情報 (what's new) page at `info/` (https://mhj-dojo.lolipop-now.app/
 
 The build and the deploy are split into two workflows, so the release artifact isn't tied to any one host. Releases go through [tagpr](https://github.com/Songmu/tagpr) (`.tagpr`, `.github/workflows/tagpr.yml`):
 
-1. On every push to `main`, tagpr keeps a release pull request open that updates `CHANGELOG.md` from GitHub's generated release notes, grouped into categories (`.github/release.yml`) by the label **Label pull requests** (`.github/workflows/labeler.yml`) adds from each pull request's head branch prefix (`feat/` → enhancement, `fix/` → bug, `perf/` → performance, `docs/` → documentation, `ci/`/`chore/` → ci/chore, `dependabot/` → dependencies).
+1. On every push to `main`, tagpr keeps a release pull request open that updates `CHANGELOG.md` from GitHub's generated release notes, grouped into categories (`.github/release.yml`) by the label **Label pull requests** (`.github/workflows/labeler.yml`) adds from each pull request's head branch prefix (`feat/` → enhancement, `fix/` → bug, `perf/` → performance, `docs/` → documentation, `ci/` → ci, `chore/`/`build/`/`test/` → chore, `dependabot/` → dependencies).
 2. Merging it tags the release, named by the date in Japan and the release's number that day (`v2026.0927.0`, then `v2026.0927.1`), and creates the GitHub Release. The same workflow then runs **Build site release** (`.github/workflows/build-site-release.yml`) for the tag: it builds the tagged commit with the release in the header (`MHJDOJO_RELEASE`), runs the site's E2E tests on the build, packages `web/dist-site` as `mhj-dojo-site-<tag>.tar.gz` (plus a `.sha256`) and attaches both to the tag's GitHub Release.
 3. Build site release then calls **Deploy to Lolipop** (`.github/workflows/deploy-lolipop.yml`) with the tag. It downloads and verifies that release artifact, merges the tag into a release branch cut from `lolipop-deploy-now`, replaces `web/dist-site` there entirely with the artifact's contents (gitignored on `main`, since Deploy Now can't build the Go WebAssembly engine) and opens a pull request into `lolipop-deploy-now`. The site is published from that branch: Lolipop Deploy Now's GitHub integration watches it (framework: static, no install or build command, output directory `web/dist-site`) and publishes each merge into it.
 4. Merging that pull request with a merge commit (not squash) publishes the release.
@@ -130,7 +136,7 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
-The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags and stays byte-stable across builds (CI checks `internal/server/static` is up to date).
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags.
 
 ### Layout
 

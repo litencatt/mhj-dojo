@@ -1,8 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { versionPattern } from '../helpers';
 
-// The header's version and the help dialog, in both modes.
-
-const VERSION = /^(dev|[0-9a-f]{7})( · \d{4}-\d{2}-\d{2})?$/;
+// The header's version and the help dialog, in both modes, on both builds.
 
 async function openHelp(page: Page) {
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
@@ -12,14 +11,8 @@ async function openHelp(page: Page) {
 }
 
 test('practice: the header shows the version and the help opens, closes and links to the glossary', async ({ page }) => {
-  const version = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/version');
-  await page.goto('/?seed=1&turns=18');
-  const res = await version;
-  expect(res.status()).toBe(200);
-  const body = (await res.json()) as { version: string };
-  // The E2E server runs under `go run`, which stamps no commit.
-  expect(body.version).toBe('dev');
-  await expect(page.locator('.app-header .version-tag')).toHaveText(VERSION);
+  await page.goto('./?seed=1&turns=18');
+  await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
   await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
 
   const helpButton = page.getByRole('button', { name: 'ヘルプ', exact: true });
@@ -72,7 +65,7 @@ test('practice: the header shows the version and the help opens, closes and link
 
 test('a click on the backdrop closes the help, a drag that ends there does not', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/?seed=1&turns=18');
+  await page.goto('./?seed=1&turns=18');
   await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
 
   // Selecting text inside and letting go over the backdrop.
@@ -91,8 +84,10 @@ test('a click on the backdrop closes the help, a drag that ends there does not',
 });
 
 test('game mode: the header shows the version, and the help links to the glossary', async ({ page }) => {
-  await page.goto('/?mode=game&seed=1');
-  await expect(page.locator('.app-header .version-tag')).toHaveText(VERSION);
+  await page.goto('./?mode=game&seed=1');
+  await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
+  // The game is dealt (on the site the engine takes a moment to load) before the help opens.
+  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
   // The glossary starts in the dock.
   const glossary = page.getByRole('region', { name: '用語表' });
   await expect(glossary).toBeHidden();
@@ -108,7 +103,7 @@ test('game mode: the header shows the version, and the help links to the glossar
 // A phone game has no glossary: the help points to practice mode's instead.
 test('game mode on a phone: the help points to the glossary in practice mode', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?mode=game&seed=1');
+  await page.goto('./?mode=game&seed=1');
   const dialog = await openHelp(page);
   await expect(dialog.getByRole('button', { name: '用語表', exact: true })).toHaveCount(0);
   await expect(dialog.locator('.help-lead')).toContainText('麻雀の用語は練習モードの用語表で調べられます。');
@@ -116,7 +111,7 @@ test('game mode on a phone: the help points to the glossary in practice mode', a
 
 test('the help fits a phone screen and scrolls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?seed=1&turns=18');
+  await page.goto('./?seed=1&turns=18');
   const dialog = await openHelp(page);
   const box = await dialog.boundingBox();
   expect(box).not.toBeNull();
@@ -132,22 +127,4 @@ test('the help fits a phone screen and scrolls', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: 'ヘルプを閉じる' })).toBeInViewport();
   // The page behind scrolls no wider than the screen.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-});
-
-// The commit time is UTC (Go's build info); the header shows the viewer's
-// local date, so a commit at 07:57 JST reads as that day, not the UTC one.
-test.describe('in Tokyo', () => {
-  test.use({ timezoneId: 'Asia/Tokyo' });
-  test('the version date is the local one', async ({ page }) => {
-    await page.route('**/api/version', (route) =>
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ version: 'c0123d1', revision: 'c0123d1', time: '2026-09-26T22:57:20Z', modified: false }),
-      }),
-    );
-    await page.goto('/?seed=1&turns=18');
-    const tag = page.locator('.app-header .version-tag');
-    await expect(tag).toHaveText('c0123d1 · 2026-09-27');
-    await expect(tag).toHaveAttribute('title', /エンジン: c0123d1（2026-09-27 07:57）/);
-  });
 });

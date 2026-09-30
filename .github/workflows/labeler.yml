@@ -29,7 +29,7 @@ jobs:
             fix/*) label=bug ;;
             perf/*) label=performance ;;
             ci/*) label=ci ;;
-            chore/*) label=chore ;;
+            chore/*|build/*|test/*) label=chore ;;
             docs/*) label=documentation ;;
             dependabot/*) label=dependencies ;;
             *) echo "::notice::No label for head branch $HEAD_REF"; exit 0 ;;

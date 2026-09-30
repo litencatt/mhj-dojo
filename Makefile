@@ -1,9 +1,17 @@
 .PHONY: web build test run vet wasm site deploy deploy-check
 
-web:
-	cd web && npm ci && npm run build
+# The frontend into internal/server/static/dist/ (not committed), which the
+# server embeds; a Go build without it serves a page saying to run `make build`.
+# A plain go build or go run embeds whatever this last built.
+web: web/node_modules/.package-lock.json
+	cd web && npm run build
 
-build:
+# npm ci wipes node_modules, so it only runs when the lockfile changes (npm
+# writes node_modules/.package-lock.json on every install).
+web/node_modules/.package-lock.json: web/package.json web/package-lock.json
+	cd web && npm ci
+
+build: web
 	go build -o bin/mhj-dojo ./cmd/mhj-dojo
 
 test:
@@ -12,7 +20,7 @@ test:
 vet:
 	go vet ./...
 
-run:
+run: web
 	go run ./cmd/mhj-dojo
 
 # The engine (practice and CPU games) as WebAssembly for the static site

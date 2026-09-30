@@ -833,7 +833,7 @@ its own analyzer memo, up to ~8 MiB) only ever grows the
 tab's memory until the store evicts it. A session evicted this way, or lost
 to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
-works; `web/e2e-site/practice.spec.ts` checks the eviction and rebuild
+works; `web/e2e/site/practice.spec.ts` checks the eviction and rebuild
 together.
 
 Games get the same treatment with a max of 2 (`match.NewStoreWithMax`): a

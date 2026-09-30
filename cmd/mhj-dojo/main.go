@@ -54,6 +54,9 @@ func run(host string, port int, open bool, store *session.Store, games *match.St
 	}
 	url := fmt.Sprintf("http://%s/", net.JoinHostPort(urlHost, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
 	fmt.Printf("mhj-dojo listening on %s (Ctrl+C to quit)\n", url)
+	if !server.FrontendBuilt() {
+		fmt.Fprintln(os.Stderr, "warning: this binary was built without the web frontend, so only the API works; rebuild it with `make build`")
+	}
 	if addr := ln.Addr().(*net.TCPAddr); !addr.IP.IsLoopback() {
 		fmt.Fprintf(os.Stderr, "warning: bound to %s: the API has no authentication and the Host check only stops browsers, so other machines on the network can use it\n", addr)
 	}

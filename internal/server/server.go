@@ -18,6 +18,10 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
+// static/dist is the built frontend (make web; not committed), and
+// static/notbuilt the page served in its place by a binary built without
+// it, such as one from `go install`.
+//
 //go:embed all:static
 var staticFS embed.FS
 
@@ -30,11 +34,26 @@ func init() {
 
 // New returns the HTTP handler for the API and the embedded frontend.
 func New(store *session.Store, games *match.Store) http.Handler {
-	static, err := fs.Sub(staticFS, "static")
+	return NewWithFS(store, games, frontend(staticFS))
+}
+
+// FrontendBuilt reports whether the binary embeds the built frontend.
+func FrontendBuilt() bool {
+	return isFile(staticFS, "static/dist/index.html")
+}
+
+// frontend is the built frontend in fsys's static/dist, or the static/notbuilt
+// page if it has none.
+func frontend(fsys fs.FS) fs.FS {
+	dir := "static/dist"
+	if !isFile(fsys, dir+"/index.html") {
+		dir = "static/notbuilt"
+	}
+	sub, err := fs.Sub(fsys, dir)
 	if err != nil {
 		panic(err)
 	}
-	return NewWithFS(store, games, static)
+	return sub
 }
 
 // NewWithFS is New with an explicit frontend file system (for tests).
