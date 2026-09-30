@@ -209,21 +209,25 @@ func TestNoAPI(t *testing.T) {
 func TestGuards(t *testing.T) {
 	c := newClient(t)
 	for _, tc := range []struct {
-		host string
-		want int
+		host, path string
+		want       int
 	}{
-		{"", http.StatusOK},
-		{"localhost:8765", http.StatusOK},
-		{"LOCALHOST", http.StatusOK},
-		{"[::1]:8765", http.StatusOK},
-		{"127.0.0.1", http.StatusOK},
-		{"127.0.0.2:8765", http.StatusOK},
-		{"evil.example:8765", http.StatusForbidden},
-		{"evil.example", http.StatusForbidden},
-		{"192.168.1.10:8765", http.StatusForbidden},
-		{"localhost.evil.example", http.StatusForbidden},
+		{"", "/", http.StatusOK},
+		{"localhost:8765", "/", http.StatusOK},
+		{"LOCALHOST", "/", http.StatusOK},
+		{"[::1]:8765", "/", http.StatusOK},
+		{"127.0.0.1", "/", http.StatusOK},
+		{"127.0.0.2:8765", "/", http.StatusOK},
+		{"evil.example:8765", "/", http.StatusForbidden},
+		{"evil.example", "/", http.StatusForbidden},
+		{"192.168.1.10:8765", "/", http.StatusForbidden},
+		{"localhost.evil.example", "/", http.StatusForbidden},
+		// The Host check comes first, whatever the path.
+		{"evil.example", "/api/x", http.StatusForbidden},
+		{"evil.example", "/assets/app-C2ZR0Mrc.js", http.StatusForbidden},
+		{"", "/api/x", http.StatusNotFound},
 	} {
-		req, _ := http.NewRequest("GET", c.srv.URL+"/", nil)
+		req, _ := http.NewRequest("GET", c.srv.URL+tc.path, nil)
 		if tc.host != "" {
 			req.Host = tc.host
 		}
@@ -233,7 +237,7 @@ func TestGuards(t *testing.T) {
 		}
 		_ = res.Body.Close()
 		if res.StatusCode != tc.want {
-			t.Errorf("host=%q: %d, want %d", tc.host, res.StatusCode, tc.want)
+			t.Errorf("host=%q %s: %d, want %d", tc.host, tc.path, res.StatusCode, tc.want)
 		}
 	}
 }

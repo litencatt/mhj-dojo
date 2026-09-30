@@ -69,7 +69,7 @@ The built frontend isn't committed, so a plain `go build` or `go install github.
 | `--open` | `true` | Open the browser on start |
 | `--seed` | random | Open practice on this wall seed (the page `/?seed=N`) |
 
-The server only answers requests whose `Host` header names localhost, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
+The server only answers requests whose `Host` header names localhost or a loopback address, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
 
 ## Development
 
@@ -82,7 +82,7 @@ make run          # make embed, then go run ./cmd/mhj-dojo
 
 `mhj-dojo` serves the same build as the static site (below), its engine running in the browser. After changing `web/` or the engine, rebuild it with `make embed` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make embed` last copied.
 
-Every engine operation goes through `internal/apicall` (`apicall.Route`, which the WebAssembly engine answers with), and its behaviour is tested there. Add new operations there, and the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
+Every engine operation goes through `internal/apicall` (`apicall.Route`, which the WebAssembly engine answers with), and its behaviour is tested there. Add new operations there; the UI calls them only through the engine in the browser (`web/src/wasm.ts`).
 
 Frontend dev server with hot reload (the engine runs in the page, so build it into `web/site-public/` first):
 
@@ -155,9 +155,9 @@ internal/session/    solo game session and history tree
 internal/score/      points from han and fu
 internal/game/       four-player round engine (riichi, furiten, settlement)
 internal/cpu/        CPU player
-internal/match/      games against CPU players for the API
+internal/match/      games against CPU players
 internal/store/      in-memory store for sessions and games
-internal/apicall/    request handling shared by the HTTP API and the WebAssembly build
+internal/apicall/    request handling for the WebAssembly engine (apicall.Route)
 internal/server/     serves the embedded frontend
 web/                 Vite + Preact + TypeScript frontend
 docs/api.md          HTTP API and definitions

@@ -107,7 +107,7 @@ jobs:
           restore-keys: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-
       # -short shrinks the CPU-bound random/oracle loops and skips whole-game
       # playthroughs, which run on one goroutine; the race detector only adds
-      # value for the concurrency paths (session, store, match via server).
+      # value for the concurrency paths (session, store, match via apicall).
       - name: go test -race -short
         env:
           PACKAGES: ${{ matrix.packages }}

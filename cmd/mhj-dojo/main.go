@@ -34,6 +34,11 @@ func main() {
 			page = "/?seed=" + strconv.FormatInt(*seed, 10)
 		}
 	})
+	// The page reads the seed as a JavaScript number, exact below 2^53.
+	if *seed < 0 || *seed >= 1<<53 {
+		fmt.Fprintf(os.Stderr, "invalid --seed %d: it must be from 0 to 2^53-1 (%d)\n", *seed, int64(1<<53-1))
+		os.Exit(2)
+	}
 
 	if err := run(*host, *port, *open, page); err != nil {
 		log.Fatal(err)

@@ -71,7 +71,7 @@ make build        # 静的サイトをビルド（make embed）してから、�
 | `--open` | `true` | 起動時にブラウザを開く |
 | `--seed` | ランダム | 一人打ち練習をこのシードの山で開く（`/?seed=N` のページ） |
 
-`Host` ヘッダーが localhost を指すリクエストにしか応答しません。ブラウザ上のページが DNS リバインディングで到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
+`Host` ヘッダーが localhost かループバックアドレスを指すリクエストにしか応答しません。ブラウザ上のページが DNS リバインディングで到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
 
 ## 開発
 
@@ -157,9 +157,9 @@ internal/session/    一人打ちセッションと履歴ツリー
 internal/score/      翻と符からの点数計算
 internal/game/       4人打ちの局の進行（リーチ・フリテン・精算）
 internal/cpu/        CPU の思考
-internal/match/      API 用の CPU 対戦
+internal/match/      CPU 対戦
 internal/store/      セッションと対局のメモリ保持
-internal/apicall/    HTTP API と WebAssembly 版で共有するリクエスト処理
+internal/apicall/    WebAssembly 版のエンジンのリクエスト処理（apicall.Route）
 internal/server/     埋め込んだフロントエンドの配信
 web/                 Vite + Preact + TypeScript のフロントエンド
 docs/api.md          HTTP API と各種定義
