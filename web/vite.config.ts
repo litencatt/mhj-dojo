@@ -46,11 +46,10 @@ function siteChangelogPlugin(): Plugin {
   };
 }
 
-// Injects the absolute og:url/og:image(+size/alt)/twitter:image tags: they
-// only make sense for the published site (a crawler fetches og:image
-// directly, without page context, so it must be absolute). index.html
-// carries the rest of the OG/Twitter tags itself, since those don't depend
-// on any URL and are the same in the embedded build.
+// Injects the absolute og:url/og:image(+size/alt)/twitter:image tags, for
+// the published site's URL (a crawler fetches og:image directly, without
+// page context, so it must be absolute). index.html carries the rest of the
+// OG/Twitter tags itself, since those don't depend on any URL.
 function siteOgTagsPlugin(siteUrl: string): Plugin {
   const image = `${siteUrl}og-image.png`;
   return {

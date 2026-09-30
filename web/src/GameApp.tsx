@@ -107,8 +107,8 @@ export function GameApp() {
   }
 
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
-  // reload resumes the game, or deals the same seed and options again after
-  // a server restart (on the static site, if the game's save is gone).
+  // reload resumes the game, or deals the same seed and options again when
+  // its save is gone (404).
   const resume = useUrlResume({
     idKey: 'game',
     request,

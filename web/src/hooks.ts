@@ -62,7 +62,7 @@ export function useSingleTab(key: string | null): boolean {
 }
 
 export interface UrlResumeOptions<T> {
-  idKey: string; // the query key holding the server-side id
+  idKey: string; // the query key holding the session's or game's id
   request: (fn: () => Promise<T>) => Promise<unknown>;
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
@@ -70,10 +70,10 @@ export interface UrlResumeOptions<T> {
 }
 
 /**
- * Keeps the id in the URL so a reload resumes the same session or game. They
- * live only in server memory, so after a server restart (404) the same wall is
- * dealt again from the params instead. Returns resume, which does it again
- * (for a tab taking the session or game back from another tab).
+ * Keeps the id in the URL so a reload resumes the same session or game. When
+ * the engine has no save for it (404), the same wall is dealt again from the
+ * params instead. Returns resume, which does it again (for a tab taking the
+ * session or game back from another tab).
  */
 export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
   function resume() {

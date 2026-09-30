@@ -91,8 +91,8 @@ export function App() {
     return request(() => load((v) => api.createSession({ seed, max_turns: maxTurns ?? 18 }, v), null));
   }
 
-  // The URL carries ?session=&seed=&turns= so a reload resumes the game, or
-  // replays the same wall from the seed after a server restart.
+  // The URL carries ?session=&seed=&turns= so a reload resumes the session,
+  // or replays the same wall from the seed when it has no save (404).
   const resume = useUrlResume({
     idKey: 'session',
     request,
