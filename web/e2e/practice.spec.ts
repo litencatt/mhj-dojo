@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, stoppedDialog } from '../helpers';
+import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, stoppedDialog } from './helpers';
 
 // Solo practice mode (the root page).
 

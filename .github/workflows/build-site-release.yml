@@ -68,7 +68,9 @@ jobs:
           # when the published host moves: set the SITE_URL repository
           # variable, or this falls back to the current host.
           MHJDOJO_SITE_URL: ${{ vars.SITE_URL || 'https://mhj-dojo.lolipop-now.app/' }}
-        run: make site
+        # make site, then the build copied into mhj-dojo for the E2E tests:
+        # web/dist-site stays the artifact.
+        run: make embed
       - name: Get installed Playwright version
         id: playwright-version
         working-directory: web
@@ -86,14 +88,14 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         working-directory: web
         run: npx playwright install-deps chromium
-      - name: Site E2E tests (web/e2e/shared and web/e2e/site)
+      - name: E2E tests (on mhj-dojo, serving the same build)
         working-directory: web
-        run: npm run e2e:site
+        run: npm run e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: playwright-report-site
-          path: web/playwright-report-site/
+          name: playwright-report
+          path: web/playwright-report/
           retention-days: 7
 
       - name: Verify the site build

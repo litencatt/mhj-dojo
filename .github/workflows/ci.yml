@@ -219,7 +219,7 @@ jobs:
           MHJDOJO_RELEASE: v2000.0101.0
         run: |
           make -C .. embed
-          npx playwright test e2e/site/version.spec.ts e2e/shared/help.spec.ts
+          npx playwright test e2e/version.spec.ts e2e/help.spec.ts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:

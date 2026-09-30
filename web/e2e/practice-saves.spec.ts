@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, engineCalls, expectStopped, labels, stoppedDialog } from '../helpers';
+import { discardDrawn, engineCalls, expectStopped, labels, stoppedDialog } from './helpers';
 
-// The static site (issue #67): practice mode with the engine running as
-// WebAssembly in a Web Worker, no mhj-dojo server behind it
-// (e2e/shared has the practice tests for both builds).
+// Practice mode's saves and tabs: the engine runs as WebAssembly in a Web
+// Worker, and each session's moves are saved to localStorage so a reload (or
+// the engine evicting it) rebuilds it; one tab plays a session at a time
+// (practice.spec.ts has the rest of practice mode).
 
 /** Opens the 履歴ツリー panel, which starts in the dock, on every load of the page. */
 async function openTree(page: Page) {

@@ -6,5 +6,4 @@ formal/.lake/
 web/dist-site/
 web/site-public/mhj-dojo.wasm
 web/site-public/wasm_exec.js
-playwright-report-site/
 internal/server/static/dist/

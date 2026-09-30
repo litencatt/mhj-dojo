@@ -6,15 +6,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 8799;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
-// End-to-end tests on mhj-dojo, which serves the static site's build (issue
-// #147): `make embed` must run first so the server embeds the current build
-// (internal/server/static/dist). They are the same tests
-// playwright.site.config.ts runs on the site as vite preview serves it:
-// e2e/shared and e2e/site. e2e/server tested the HTTP API the page no longer
-// uses, and is left out until it is removed.
+// End-to-end tests on mhj-dojo, which serves the site's build (issue #147):
+// `make embed` must run first so the server embeds the current build
+// (internal/server/static/dist), a copy of web/dist-site, the files the
+// public site deploys.
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['shared/**/*.spec.ts', 'site/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

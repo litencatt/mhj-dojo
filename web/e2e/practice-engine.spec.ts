@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { discardDrawn, engineSession, isRequest, nextEngineReply, onEngineReply, watchEngine } from '../helpers';
+import { discardDrawn, engineSession, isRequest, nextEngineReply, onEngineReply, watchEngine } from './helpers';
 
 // Practice mode against what its engine answers: an error in the engine's
 // shape, which calls the page makes (?advice=0, ?tree_from=), and the tables
 // checked against the whole session as the engine has it (engineSession).
-// e2e/shared and e2e/site/practice.spec.ts have the rest.
+// practice.spec.ts and practice-saves.spec.ts have the rest.
 
 test.beforeEach(async ({ page }) => {
   await watchEngine(page);
@@ -86,7 +86,7 @@ test('advice: left out while minimized, filled in (the review too) when the pane
 
 // The page asks only for the tree nodes it lacks (?tree_from=) and appends
 // them: the tree stays whole across moves, branches, gotos and a reload.
-// (e2e/site/practice.spec.ts checks the save keeps up with them.)
+// (practice-saves.spec.ts checks the save keeps up with them.)
 test('history tree: only new nodes are sent, the tree stays whole across goto, branches and reload', async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem('e2e-minimized')) return;
