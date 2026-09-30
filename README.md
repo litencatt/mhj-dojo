@@ -49,14 +49,16 @@ For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H t
 ## Requirements
 
 - Go 1.27+
-- Node.js 24+ (only needed to rebuild the frontend; the built assets are committed)
+- Node.js 24+ (to build the frontend, which the binary embeds)
 
 ## Quick start
 
 ```sh
-make build        # builds bin/mhj-dojo (frontend is embedded)
+make build        # builds the frontend (make web), then bin/mhj-dojo with it embedded
 ./bin/mhj-dojo    # serves http://127.0.0.1:8765 and opens the browser
 ```
+
+The built frontend isn't committed, so a plain `go build` or `go install github.com/litencatt/mhj-dojo/cmd/mhj-dojo@latest` gives a binary without it: the API works, but the page only says to rebuild with `make build`. No prebuilt binaries are published; clone the repository and use `make build`.
 
 ### Flags
 
@@ -74,9 +76,13 @@ The server only accepts requests whose `Host` header names localhost. That stops
 ```sh
 make test         # go test ./...
 make vet          # go vet ./...
-make web          # npm ci && npm run build → internal/server/static
-make run          # go run ./cmd/mhj-dojo
+make web          # npm run build (npm ci first if needed) → internal/server/static/dist (not committed)
+make run          # make web, then go run ./cmd/mhj-dojo
 ```
+
+After changing `web/`, rebuild the frontend with `make web` (or use `make build` / `make run`): a plain `go build` or `go run` embeds whatever `make web` last built.
+
+Every engine operation goes through `internal/apicall`, shared by the HTTP API and the WebAssembly build; `internal/server/parity_test.go` checks both give the same responses. Add new operations there, and don't add new `api.WASM` branches to the UI.
 
 Frontend dev server with hot reload (proxies `/api` to `127.0.0.1:8765`, so keep `mhj-dojo` running):
 
@@ -130,7 +136,7 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
-The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags and stays byte-stable across builds (CI checks `internal/server/static` is up to date).
+The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. The embedded build (`make web`) has no public URL to share, so it omits those tags.
 
 ### Layout
 

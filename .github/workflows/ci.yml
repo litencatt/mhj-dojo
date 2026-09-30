@@ -150,14 +150,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Embedded assets are up to date
-        working-directory: .
-        run: |
-          if [ -n "$(git status --porcelain internal/server/static)" ]; then
-            git status --short internal/server/static
-            echo "::error::internal/server/static is stale; run 'make web' and commit the result."
-            exit 1
-          fi
 
   e2e:
     name: E2E (Playwright)
@@ -190,7 +182,13 @@ jobs:
       - name: Install Playwright's OS dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
+      # The server embeds the built frontend (internal/server/static/dist,
+      # not committed): build it before the server starts. The Go test jobs
+      # run without it, so check here that the server embeds it.
       - run: npm run build
+      - name: go test (embedded frontend)
+        working-directory: .
+        run: go test -count=1 -run '^TestEmbeddedFrontend$' ./internal/server
       - run: npm run e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()

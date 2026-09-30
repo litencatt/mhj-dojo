@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -468,6 +469,9 @@ func TestChangelog(t *testing.T) {
 	}
 }
 
+// TestEmbeddedFrontend checks what this binary serves: the built frontend
+// after make web (as in CI's E2E job, which drives it in the browser), the
+// not-built page otherwise (as in the Go test jobs and `go install`).
 func TestEmbeddedFrontend(t *testing.T) {
 	srv := httptest.NewServer(New(session.NewStore(), match.NewStore()))
 	defer srv.Close()
@@ -477,8 +481,30 @@ func TestEmbeddedFrontend(t *testing.T) {
 	}
 	defer func() { _ = res.Body.Close() }()
 	b, _ := io.ReadAll(res.Body)
-	if res.StatusCode != http.StatusOK || !strings.Contains(strings.ToLower(string(b)), "<html") {
-		t.Fatalf("embedded index: %d %q", res.StatusCode, b)
+	want := "<title>mhj-dojo - 画面が組み込まれていません</title>"
+	if FrontendBuilt() {
+		want = "<title>mhj-dojo - 麻雀道場</title>"
+	}
+	if res.StatusCode != http.StatusOK || !strings.Contains(string(b), want) {
+		t.Fatalf("embedded index (built %v): %d %q", FrontendBuilt(), res.StatusCode, b)
+	}
+}
+
+func TestFrontend(t *testing.T) {
+	notbuilt := &fstest.MapFile{Data: []byte("not built")}
+	for _, tc := range []struct {
+		name string
+		fsys fstest.MapFS
+		want string
+	}{
+		{"built", fstest.MapFS{"static/dist/index.html": {Data: []byte("app")}, "static/notbuilt/index.html": notbuilt}, "app"},
+		{"not built", fstest.MapFS{"static/notbuilt/index.html": notbuilt}, "not built"},
+		{"dist without index", fstest.MapFS{"static/dist/assets/app.js": {}, "static/notbuilt/index.html": notbuilt}, "not built"},
+	} {
+		b, err := fs.ReadFile(frontend(tc.fsys), "index.html")
+		if err != nil || string(b) != tc.want {
+			t.Errorf("%s: index.html = %q, %v; want %q", tc.name, b, err, tc.want)
+		}
 	}
 }
 
