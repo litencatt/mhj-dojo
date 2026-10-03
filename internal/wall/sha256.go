@@ -6,8 +6,8 @@ import (
 )
 
 // sha256Block is SHA-256 of a 16-byte message, the same as crypto/sha256's
-// Sum256 (the test checks). crypto/sha256 brings the FIPS 140 module with it,
-// which adds about 240 KB to the WASM build (#148); RoundSeed needs only this.
+// Sum256 (the test checks). crypto/sha256 brings the FIPS 140 module into the
+// WASM build (#148); RoundSeed needs only this.
 func sha256Block(m [16]byte) [32]byte {
 	// The one padded block: the message, a 1 bit, then the length in bits.
 	var blk [64]byte

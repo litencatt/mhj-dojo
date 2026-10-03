@@ -78,7 +78,7 @@ func (s *Store[T]) touch(id string) {
 
 // NewID returns a random 12-hex-digit id. An id only tells a session or game
 // apart from the others in the same browser, so it doesn't need crypto/rand,
-// which adds about 80 KB of crypto code to the WASM build (#148).
+// which brings crypto code into the WASM build (#148).
 func NewID() string {
 	var b [6]byte
 	v := rand.Uint64()

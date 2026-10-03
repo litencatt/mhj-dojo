@@ -1,6 +1,7 @@
 // Package sortx sorts slices with one shared sort for every element type.
 // slices.Sort and slices.SortFunc are generic, so each element type sorted
-// adds its own copy of the sort to the WASM build; these wrap sort.SliceStable, so each type adds only the wrapper (#148).
+// adds its own copy of the sort to the WASM build; these wrap
+// sort.SliceStable, so each type adds only the wrapper (#148).
 package sortx
 
 import (
