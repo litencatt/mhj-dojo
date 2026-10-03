@@ -13,6 +13,7 @@ import (
 
 	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
@@ -178,7 +179,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, v
 		o.shanten = sh
 		opts = append(opts, o)
 	}
-	slices.SortStableFunc(opts, func(a, b option) int {
+	sortx.Func(opts, func(a, b option) int {
 		switch {
 		case a.shanten != b.shanten:
 			return a.shanten - b.shanten

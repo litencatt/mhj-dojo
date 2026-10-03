@@ -2,7 +2,6 @@ package game
 
 import (
 	"fmt"
-	"log"
 	"slices"
 )
 
@@ -108,9 +107,9 @@ func (g *Game) run() {
 		a.Seat = seat
 		if err := r.Apply(a); err != nil {
 			// An illegal CPU move must not stall a live game: replace it with
-			// a legal one, count it and log it (a CPU bug, not a rule outcome).
+			// a legal one and count it (a CPU bug, not a rule outcome). No log:
+			// package log adds about 70 KB to the WASM build (#148).
 			g.Fallbacks++
-			log.Printf("game: seat %d illegal CPU move %+v (%v); replaced", seat, a, err)
 			g.mustApply(fallback(seat, legal))
 		}
 	}
