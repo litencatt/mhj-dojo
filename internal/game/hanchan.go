@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
 )
@@ -181,7 +182,7 @@ func (h *Hanchan) Standings() [4]Standing {
 	order := []int{0, 1, 2, 3}
 	pts := func(s int) int { return h.round.players[s].points }
 	near := func(s int) int { return (s - h.firstDealer + 4) % 4 }
-	slices.SortStableFunc(order, func(a, b int) int {
+	sortx.Func(order, func(a, b int) int {
 		if pts(a) != pts(b) {
 			return pts(b) - pts(a)
 		}

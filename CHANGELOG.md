@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1003.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.3...v2026.1003.0) - 2026-10-03
+
+### パフォーマンス
+- エンジンを約 500 KB 小さくして読み込みを軽くする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/172
+
 ## [v2026.0930.3](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.2...v2026.0930.3) - 2026-09-30
 
 ### CI・リポジトリ

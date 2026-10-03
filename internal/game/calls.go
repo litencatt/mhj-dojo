@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
@@ -161,7 +162,7 @@ func (r *Round) call(a Action) {
 	case Chii:
 		used = tilesByString(p.hand, a.Tiles)
 		ks := []tile.Kind{used[0].Kind, used[1].Kind, t.Kind}
-		slices.Sort(ks)
+		sortx.Ordered(ks)
 		meld = yaku.Meld{Type: yaku.Seq, Kind: ks[0], Open: true}
 		p.kuikae = kuikaeChii(t.Kind, ks[0])
 	}
@@ -465,7 +466,7 @@ func removeTiles(ts, used []tile.Tile) []tile.Tile {
 
 func sameTiles(a []tile.Tile, ss []string) bool {
 	x, y := tile.Strings(a), slices.Clone(ss)
-	slices.Sort(x)
-	slices.Sort(y)
+	sortx.Ordered(x)
+	sortx.Ordered(y)
 	return slices.Equal(x, y)
 }

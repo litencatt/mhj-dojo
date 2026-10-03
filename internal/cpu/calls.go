@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
@@ -53,7 +54,7 @@ func (p *Player) decideCall(v game.View, l game.Legal) (game.Action, bool) {
 	for _, pair := range l.Chii {
 		used := byString(me.Hand, pair)
 		ks := []tile.Kind{used[0].Kind, used[1].Kind, t.Kind}
-		slices.Sort(ks)
+		sortx.Ordered(ks)
 		try(game.Action{Type: game.Chii, Tiles: pair}, used, yaku.Meld{Type: yaku.Seq, Kind: ks[0], Open: true}, true)
 	}
 	return best, best.Type != ""

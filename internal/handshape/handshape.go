@@ -16,6 +16,7 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
@@ -58,14 +59,14 @@ func Groups(c tile.Counts, fixedMelds int) []Group {
 		}
 		out = append(out, Group{Type: b.typ, Kinds: b.kinds()})
 	}
-	slices.SortStableFunc(out, func(a, b Group) int {
+	sortx.Func(out, func(a, b Group) int {
 		if d := cmp.Compare(order[a.Type], order[b.Type]); d != 0 {
 			return d
 		}
 		return cmp.Compare(a.Kinds[0], b.Kinds[0])
 	})
 	if len(floats) > 0 {
-		slices.Sort(floats)
+		sortx.Ordered(floats)
 		out = append(out, Group{Type: Float, Kinds: floats})
 	}
 	if len(out) == 0 {
