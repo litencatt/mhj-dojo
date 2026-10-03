@@ -9,6 +9,7 @@ import (
 
 	"github.com/litencatt/mhj-dojo/internal/memo"
 	"github.com/litencatt/mhj-dojo/internal/shanten"
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
@@ -214,7 +215,7 @@ func buildCombos(w Winds) []comboDef {
 	shapes := map[string]int{}
 	for i := range out {
 		out[i].order = i
-		slices.SortFunc(out[i].keys, func(a, b string) int { return order[a] - order[b] })
+		sortx.Func(out[i].keys, func(a, b string) int { return order[a] - order[b] })
 		var shape []string
 		for _, k := range out[i].keys {
 			if !isYakuhai(k) {
@@ -440,7 +441,7 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 		}
 	}
 	if prune {
-		slices.SortStableFunc(todo, func(x, y pending) int { return x.lb - y.lb })
+		sortx.Func(todo, func(x, y pending) int { return x.lb - y.lb })
 	}
 	a.todo = todo
 	evald := a.evald[:0]
@@ -610,7 +611,7 @@ func (a *Analyzer) comboUkeire(cd *comboCand, c tile.Counts, dd *comboDist) []ti
 func (a *Analyzer) selectCombos(evald []comboCand) []comboCand {
 	sorted := append(a.sel[:0], evald...)
 	a.sel = sorted
-	slices.SortStableFunc(sorted, func(x, y comboCand) int {
+	sortx.Func(sorted, func(x, y comboCand) int {
 		if d := ComboRank(x.han, x.shanten) - ComboRank(y.han, y.shanten); d != 0 {
 			return d
 		}

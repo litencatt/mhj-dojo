@@ -3,8 +3,9 @@ package tile
 
 import (
 	"fmt"
-	"slices"
 	"strings"
+
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 )
 
 // NumKinds is the number of distinct tile kinds.
@@ -172,7 +173,7 @@ func Compare(a, b Tile) int {
 }
 
 // Sort sorts tiles in place (m, p, s, z).
-func Sort(ts []Tile) { slices.SortFunc(ts, Compare) }
+func Sort(ts []Tile) { sortx.Func(ts, Compare) }
 
 // CountsOf returns the kind histogram of ts.
 func CountsOf(ts []Tile) Counts {

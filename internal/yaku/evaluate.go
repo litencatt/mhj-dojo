@@ -3,6 +3,7 @@ package yaku
 import (
 	"slices"
 
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 )
 
@@ -622,7 +623,7 @@ func init() {
 
 // order sorts yaku into the canonical display order.
 func order(ys []Yaku) []Yaku {
-	slices.SortStableFunc(ys, func(a, b Yaku) int { return displayOrder[a.Key] - displayOrder[b.Key] })
+	sortx.Func(ys, func(a, b Yaku) int { return displayOrder[a.Key] - displayOrder[b.Key] })
 	return ys
 }
 

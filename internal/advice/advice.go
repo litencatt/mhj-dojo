@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/litencatt/mhj-dojo/internal/handshape"
+	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
@@ -170,7 +171,7 @@ func Compute(in Input) *Advice {
 		}
 		cs = append(cs, c)
 	}
-	slices.SortStableFunc(cs, compare)
+	sortx.Func(cs, compare)
 
 	adv := &Advice{all: cs, Junme: in.Turn + 1, DrawsLeft: max(in.MaxTurns-in.Turn-1, 0), NearYaku: []NearYaku{}, Notes: []string{}}
 	for _, c := range cs[:min(3, len(cs))] {
@@ -428,7 +429,7 @@ func nearYaku(cs []cand, han func(string) int) []NearYaku {
 		}
 		out = append(out, NearYaku{Key: r.Key, Name: r.Name, Han: han(r.Key), Shanten: bestSh, Kept: r.Possible && r.Shanten == bestSh})
 	}
-	slices.SortStableFunc(out, func(a, b NearYaku) int {
+	sortx.Func(out, func(a, b NearYaku) int {
 		if d := cmp.Compare(a.Shanten, b.Shanten); d != 0 {
 			return d
 		}
