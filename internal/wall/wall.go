@@ -2,7 +2,6 @@
 package wall
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
@@ -197,7 +196,7 @@ func RoundSeed(master int64, round int) int64 {
 	var b [16]byte
 	binary.BigEndian.PutUint64(b[:8], uint64(master))
 	binary.BigEndian.PutUint64(b[8:], uint64(round))
-	sum := sha256.Sum256(b[:])
+	sum := sha256Block(b)
 	return int64(binary.BigEndian.Uint64(sum[:8]) >> 11)
 }
 

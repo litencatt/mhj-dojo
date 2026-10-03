@@ -2,8 +2,8 @@
 package store
 
 import (
-	"crypto/rand"
 	"encoding/hex"
+	"math/rand/v2"
 	"sync"
 )
 
@@ -76,11 +76,14 @@ func (s *Store[T]) touch(id string) {
 	s.order = append(s.order, id)
 }
 
-// NewID returns a random 12-hex-digit id.
+// NewID returns a random 12-hex-digit id. An id only tells a session or game
+// apart from the others in the same browser, so it doesn't need crypto/rand,
+// which adds about 80 KB of crypto code to the WASM build (#148).
 func NewID() string {
 	var b [6]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
+	v := rand.Uint64()
+	for i := range b {
+		b[i] = byte(v >> (8 * i))
 	}
 	return hex.EncodeToString(b[:])
 }
