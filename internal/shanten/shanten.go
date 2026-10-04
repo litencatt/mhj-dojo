@@ -81,6 +81,37 @@ func Kokushi(c tile.Counts) Result {
 	return Result{Shanten: dist - 1, Ukeire: kinds(&set)}
 }
 
+// Form is a winning-hand form.
+type Form int
+
+const (
+	FormNormal Form = iota // 4 melds + pair
+	FormChiitoitsu
+	FormKokushi
+)
+
+// Lowest takes the lowest shanten of a concealed 13-tile hand c over the
+// normal form (already computed: normal, with its ukeire in set), chiitoitsu
+// and kokushi. set becomes the union of the ukeire of every form reaching
+// it. The form returned is the first reaching it, normal before chiitoitsu
+// before kokushi. Seven pairs and thirteen orphans need a concealed hand:
+// call it only without melds.
+func Lowest(c *tile.Counts, normal int, set *[tile.NumKinds]bool) (int, Form) {
+	best, form := normal, FormNormal
+	for i, r := range [...]Result{Chiitoitsu(*c), Kokushi(*c)} {
+		if r.Shanten > best {
+			continue
+		}
+		if r.Shanten < best {
+			best, form, *set = r.Shanten, Form(i+1), [tile.NumKinds]bool{}
+		}
+		for _, k := range r.Ukeire {
+			set[k] = true
+		}
+	}
+	return best, form
+}
+
 func kinds(set *[tile.NumKinds]bool) []tile.Kind {
 	var out []tile.Kind
 	for k, ok := range set {
