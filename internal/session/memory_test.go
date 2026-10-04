@@ -51,7 +51,7 @@ func fillTree(tb testing.TB, s *Session, target int) {
 }
 
 // BenchmarkSessionMemory estimates the heap held by one session whose tree
-// has grown to MaxNodes, to project the worst case for MaxSessions sessions
+// has grown to MaxNodes, to project the worst case for the sessions
 // kept in the store. See docs/api.md "Memory" for the method and the
 // resulting estimate.
 //

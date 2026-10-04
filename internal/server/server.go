@@ -68,8 +68,7 @@ func NewWithFS(static fs.FS) http.Handler {
 }
 
 // guard rejects requests whose Host is not a loopback name (DNS rebinding:
-// another site's page reading the app, or its saves in this origin's
-// storage), and sets the response headers that keep other origins from
+// another site's page reaching the app), and sets the response headers that keep other origins from
 // embedding the app. It is a browser-side defence only: a network client can
 // send any Host.
 func guard(next http.Handler) http.Handler {

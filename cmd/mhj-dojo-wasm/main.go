@@ -48,9 +48,9 @@ import (
 // eviction past this cap and its rebuild-from-save, so keep the two in sync.
 const maxSessions = 4
 
-// maxGames bounds the engine's in-memory games the same way: a game holds its analyzer
-// memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and ~10.3
-// MiB at most, briefly a few MiB more as a memo turns over (docs/api.md
+// maxGames bounds the engine's in-memory games the same way: a game holds its
+// analyzer memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and
+// ~10.5 MiB at most, briefly a few MiB more as a memo turns over (docs/api.md
 // "Memory"). 2 keeps the game being played plus one more; an evicted game is
 // rebuilt from its save (mhjDojoRestoreGame).
 const maxGames = 2

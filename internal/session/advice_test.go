@@ -97,7 +97,7 @@ func TestAdviceAtTerminalNodes(t *testing.T) {
 // checks the discard request's p95 against the 200 ms action budget.
 func TestPracticeActionP95(t *testing.T) {
 	if testing.Short() {
-		t.Skip("CPU-bound timing; skip under the race job's -short")
+		t.Skip("CPU-bound timing; skipped under -short")
 	}
 	st := NewStore(256)
 	var took []time.Duration

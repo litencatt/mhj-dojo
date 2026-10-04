@@ -24,7 +24,7 @@ const requestBudget = 300 * time.Millisecond
 // CPU-heavy tests.
 func TestTreeRequestLatency(t *testing.T) {
 	if testing.Short() {
-		t.Skip("CPU-bound, no concurrency to check; skip under the race job's -short")
+		t.Skip("CPU-bound; skipped under -short")
 	}
 	const n = 120
 	st := NewStore(256)

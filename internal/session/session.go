@@ -310,8 +310,8 @@ func (s *Session) tsumo(expectedNode *int) error {
 
 // checkExpectedNode returns ErrConflict if expectedNode is non-nil and does
 // not match the current node (another tab moved it on first).
-// a nil expectedNode always passes (older or same-tab clients
-// that don't send one keep today's behaviour).
+// A nil expectedNode always passes (older or same-tab clients that don't
+// send one keep today's behaviour).
 func (s *Session) checkExpectedNode(expectedNode *int) error {
 	if expectedNode != nil && *expectedNode != s.current {
 		return fmt.Errorf("%w: stale node_id %d: the current node is %d", ErrConflict, *expectedNode, s.current)

@@ -805,11 +805,11 @@ bounds" below (at most ~9 MiB per analyzer and ~1 MiB per CPU player).
 
 The WebAssembly build (`cmd/mhj-dojo-wasm`) keeps at most 4 sessions and
 2 games (the `max` argument of `session.NewStore` and `match.NewStore`), so
-the stores hold at most about 4 x 9.8 + 2 x 10.3 = ~60 MiB of memos and trees
+the stores hold at most about 4 x 9.8 + 2 x 10.5 = ~60 MiB of memos and trees
 (a few MiB more while a memo turns over). It runs in a browser tab's memory,
-and the engine is single-threaded (no locks). Go's wasm
+and the engine is single-threaded (no per-session or per-game locks). Go's wasm
 runtime never returns freed heap pages to the OS, so a session's cost (its
-branch tree plus its own analyzer memo, up to ~8 MiB) only ever grows the
+branch tree plus its own analyzer memo, up to ~9.8 MiB) only ever grows the
 tab's memory until the store evicts it. A session evicted this way, or lost
 to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still

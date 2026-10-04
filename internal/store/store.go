@@ -15,8 +15,12 @@ type Store[T any] struct {
 	max   int
 }
 
-// New returns an empty store that keeps at most max items.
+// New returns an empty store that keeps at most max items. It panics if max
+// is less than 1.
 func New[T any](max int) *Store[T] {
+	if max < 1 {
+		panic("store: max must be at least 1")
+	}
 	return &Store[T]{items: make(map[string]T), max: max}
 }
 
