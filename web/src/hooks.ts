@@ -235,12 +235,18 @@ function leadStep(build: PlaybackBuild, state: GameState): number {
  * Replays a game response's events (docs/api.md "events") one at a time
  * instead of snapping straight to the final state (issue #29): each CPU
  * discard, riichi, call and kan lands in turn, then the round result (if
- * any) is left to the caller to reveal once `playing` goes false.
+ * any) is left to the caller to reveal once `playing` goes false. A `seen`
+ * state (one reopened from a save or a reload) is shown as it stands: the
+ * player already watched those moves.
  */
-export function usePlayback(state: GameState | null): Playback {
+export function usePlayback(state: GameState | null, seen: GameState | null = null): Playback {
   const build = useMemo(() => (state ? buildPlayback(state.seats, state.events) : null), [state]);
   // build is memoized on state, so [build] also covers the state read here.
-  const lead = useMemo(() => (build && state ? leadStep(build, state) : 0), [build]);
+  // seen is set before its state arrives, so [build] covers it too.
+  const lead = useMemo(
+    () => (build && state ? (state === seen ? build.opsPerEvent.length : leadStep(build, state)) : 0),
+    [build],
+  );
   // The step, with the build it was set for. Until the first tick (or skip)
   // sets it for a new build, the step is that build's lead step: derived
   // here, so a new build needs no extra render to start (and never shows the
