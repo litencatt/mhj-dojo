@@ -1,9 +1,15 @@
 name: CI
 
+# The push to main that merges the release pull request changes only
+# CHANGELOG.md and skips CI (the tag's build is verified by
+# build-site-release.yml). The release pull request itself gets no CI run
+# anyway, since tagpr opens it with GITHUB_TOKEN.
 on:
   push:
     branches: [main]
+    paths-ignore: [CHANGELOG.md]
   pull_request:
+    paths-ignore: [CHANGELOG.md]
 
 permissions:
   contents: read
@@ -30,15 +36,13 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod
 
-  # The test jobs keep their own build caches: with setup-go's cache they
-  # shared one key, so only the first job to save it (with or without -race)
-  # found its builds there, and the cache never refreshed after a hit. Each
-  # push to main saves a fresh cache; pull requests only restore it.
+  # The test job keeps its own build cache: each push to main saves a fresh
+  # one; pull requests only restore it.
   #
-  # Both test jobs split the packages into groups that run on parallel
-  # runners, balanced by measured test time. "rest" is every package not
-  # named in another group (so new packages land there): keep its grep in
-  # step with the other groups' package lists.
+  # It splits the packages into groups that run on parallel runners, balanced
+  # by measured test time. "rest" is every package not named in another group
+  # (so new packages land there): keep its grep in step with the other
+  # groups' package lists.
   go-test:
     name: Go test (${{ matrix.group }})
     runs-on: ubuntu-latest
@@ -82,46 +86,6 @@ jobs:
           path: ~/.cache/go-build
           key: go-test-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
 
-  go-test-race:
-    name: Go test race (${{ matrix.group }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - group: games
-            packages: ./internal/cpu ./internal/game ./internal/match
-          - group: oracles
-            packages: ./internal/yakushanten ./internal/shanten ./internal/handshape ./internal/advice
-          - group: rest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/go-build
-          key: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
-          restore-keys: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-
-      # -short shrinks the CPU-bound random/oracle loops and skips whole-game
-      # playthroughs, which run on one goroutine; the race detector only adds
-      # value for the concurrency paths (session, store, match via apicall).
-      - name: go test -race -short
-        env:
-          PACKAGES: ${{ matrix.packages }}
-        run: |
-          if [ -z "$PACKAGES" ]; then
-            PACKAGES=$(go list ./... | grep -v -E '/internal/(cpu|game|match|yakushanten|shanten|handshape|advice)$')
-          fi
-          go test -race -short -count=1 $PACKAGES
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          path: ~/.cache/go-build
-          key: go-test-race-${{ matrix.group }}-${{ runner.os }}-${{ hashFiles('go.mod') }}-${{ github.sha }}
-
   govulncheck:
     name: Go vulnerability check
     runs-on: ubuntu-latest
@@ -152,11 +116,13 @@ jobs:
       # The build needs the WASM engine: the site job builds it.
 
   # The static site (issue #67): the engine built as WebAssembly and the site
-  # built on it, which mhj-dojo embeds and serves (issue #147), then the E2E
-  # tests in the browser against mhj-dojo. Build site release runs the same
-  # tests on the release build, on mhj-dojo too.
+  # built on it, which mhj-dojo embeds and serves (issue #147). This job
+  # builds it and the mhj-dojo binaries (a normal build and one with a release
+  # in the header); the E2E job below runs the browser tests against them, in
+  # shards. Build site release runs the same tests on the release build, on
+  # mhj-dojo too.
   site:
-    name: Static site (WASM) build + E2E
+    name: Static site (WASM) build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -197,6 +163,55 @@ jobs:
       - name: go test (embedded frontend)
         working-directory: .
         run: go test -count=1 -run '^TestEmbeddedFrontend$' ./internal/server
+      - name: Build mhj-dojo
+        working-directory: .
+        run: go build -o bin/mhj-dojo ./cmd/mhj-dojo
+      # The Release site workflow builds with the release tag in the header:
+      # build that too, for the version tests (the help's included).
+      - name: Build mhj-dojo with a release build of the site
+        working-directory: .
+        env:
+          MHJDOJO_RELEASE: v2000.0101.0
+        # Only the site is built again (the WASM engine is the same).
+        run: |
+          (cd web && npm run build:site)
+          rm -rf internal/server/static/dist
+          cp -R web/dist-site internal/server/static/dist
+          go build -o bin/mhj-dojo-release ./cmd/mhj-dojo
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mhj-dojo-bin
+          path: bin/
+          retention-days: 1
+
+  # The site's E2E tests in the browser against the built mhj-dojo, in
+  # shards that run in parallel. A test that fails and then passes on its
+  # retry stays green but is reported as a warning.
+  e2e:
+    name: E2E (shard ${{ matrix.shard }}/3)
+    needs: site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mhj-dojo-bin
+          path: bin
+      - run: chmod +x ../bin/*
+      - run: npm ci
       - name: Get installed Playwright version
         id: playwright-version
         run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
@@ -211,18 +226,27 @@ jobs:
       - name: Install Playwright's OS dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run e2e
-      # The Release site workflow builds with the release tag in the header:
-      # check that build's version tests too (the help's included).
-      - name: Site version tests on a release build
+      - name: E2E tests
         env:
-          MHJDOJO_RELEASE: v2000.0101.0
-        run: |
-          make -C .. embed
-          npx playwright test e2e/version.spec.ts e2e/help.spec.ts
+          MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
+        run: npm run e2e -- --shard=${{ matrix.shard }}/3
+      - name: Report flaky tests
+        if: always()
+        run: scripts/report-flaky.sh
+      # The version tests on the release build (shard 2, currently the shortest, runs them).
+      - name: Site version tests on a release build
+        id: release
+        if: matrix.shard == 2
+        env:
+          MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
+          MHJDOJO_EXPECT_RELEASE: v2000.0101.0
+        run: npx playwright test e2e/version.spec.ts e2e/help.spec.ts
+      - name: Report flaky release-build tests
+        if: always() && steps.release.outcome != 'skipped'
+        run: scripts/report-flaky.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: web/playwright-report/
           retention-days: 7

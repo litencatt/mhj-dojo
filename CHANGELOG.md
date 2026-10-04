@@ -1,5 +1,24 @@
 # Changelog
 
+## [v2026.1004.3](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.2...v2026.1004.3) - 2026-10-04
+
+### 新機能
+- CPUの動きの再生速度を選べるように、補助文字を読みやすく by @litencatt in https://github.com/litencatt/mhj-dojo/pull/201
+- 保存した練習・対局に「続きから」で戻れるように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/205
+- エラー表示に「再試行」を追加し、保存できないときに知らせる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/209
+- 天和・地和を役に追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/211
+### 修正
+- 和了形の分解で同じ形が重複して返らないように修正 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/204
+- 練習のアドバイスで七対子・国士無双も考えるように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/206
+### ドキュメント
+- 流し満貫は対象外と明記 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/199
+### CI・リポジトリ
+- リリースから公開までの手作業を減らす（CHANGELOG のみの CI 省略と公開後の自動確認） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/200
+- 計算ロジックの性質テストと総当たり照合を追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/203
+- CI を短くし、E2E を安定させる（分割実行・ビルド済みバイナリ・flaky 警告） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/202
+- 符計算の形式モデルと検証ベクトルを追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/208
+- サーバー時代の足場（ロック・既定上限・race CI）を削除 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/210
+
 ## [v2026.1004.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.1...v2026.1004.2) - 2026-10-04
 
 ### 修正

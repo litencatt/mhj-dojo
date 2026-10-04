@@ -39,8 +39,6 @@ type SavedAction struct {
 
 // Save returns what rebuilds the game as it is now.
 func (m *Match) Save() Save {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	actions := slices.Clone(m.actions)
 	if actions == nil {
 		actions = []SavedAction{}
@@ -59,7 +57,7 @@ func (m *Match) Save() Save {
 // check returns an FNV-1a digest, in hex, of the action logs of every round
 // so far, CPU moves and skips included. The finished rounds' logs no longer
 // change, so the hash after them is kept (checked) and only the current
-// round is hashed on each call. Callers hold m.mu.
+// round is hashed on each call.
 func (m *Match) check() string {
 	logs := m.game.H.Logs()
 	done, cur := logs[:len(logs)-1], logs[len(logs)-1]
@@ -110,9 +108,6 @@ func (st *Store) Restore(s Save) (*Match, error) {
 		return nil, err
 	}
 	m := newMatch(deal(s.Seed, rules, o), o, s.SeedKnown)
-	// Nobody else can see m yet; the lock is for act and next's contract.
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	// Only the last round's history shows in the state: up to the last
 	// next, the rounds skip its analysis, and that next's round then starts
 	// over with it.

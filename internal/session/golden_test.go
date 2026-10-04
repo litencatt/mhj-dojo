@@ -20,7 +20,7 @@ func goldenSession(t *testing.T, seed int64) string {
 		h.Write([]byte(stateJSON(t, st)))
 		return st
 	}
-	s := mustCreate(t, NewStore(), seed, 10+int(seed%5))
+	s := mustCreate(t, NewStore(256), seed, 10+int(seed%5))
 	v := put(s.State(View{}), nil)
 	for step := 0; v.Drawn != nil; step++ {
 		if v.CanTsumo && step%2 == 0 {
@@ -57,13 +57,16 @@ func goldenSession(t *testing.T, seed int64) string {
 // tile kinds counted by one remaining map, by_discard rows without the
 // analysis's names and han, node_count): converted to that shape, the old
 // states were the same as the new ones, state for state (a one-off check
-// described in the message of commit 776859a, which re-pinned them).
+// described in the message of commit 776859a, which re-pinned them). They
+// were re-pinned again when the advice began counting chiitoitsu and kokushi
+// (issue #189): with advice and discard_review stripped, seeds 2–4 gave the
+// same states as before; seed 1's script follows a different best discard.
 func TestGoldenStates(t *testing.T) {
 	want := map[int64]string{
-		1: "bdf2bd60871aa04a10460196971bd97dc06e4da57e269bdbe92e90d0e254782a",
-		2: "d5e264e2474c0a73e15a78962cc253397f264fdf5a957121f14d33cc86f7d5ca",
-		3: "4b9195d2bc29e621b717b645bf047b3730b6933fdfb2d082160c998d74467589",
-		4: "8e763c52de89ef8b1a0ef4d045fef09496e0e2bbfb65cab2cd15d0e572383b00",
+		1: "b44d0bf1b66affa911a605966a26ede87c5f2f26a29d1ee9fd36d6b09f8a639f",
+		2: "5484c6b66893d81bd527d02b84dc197cef4c2c6138e1551936af0e70d5b02d9a",
+		3: "f697e0b3fd1353835b01bb9de657729d5d9d02e3f02c35cdc3e751315e9b499b",
+		4: "8ace01331dcda1ee8a0be6269fa5d70b9a7aa73b2c339fd45dc60b548235896d",
 	}
 	for seed := int64(1); seed <= 4; seed++ {
 		if got := goldenSession(t, seed); got != want[seed] {

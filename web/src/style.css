@@ -167,6 +167,21 @@ h2 {
   inherits: true;
   initial-value: 0px;
 }
+.speed-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.speed-option select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
 /* The CPU game's 「設定」, folding the new-game options away: phones only. */
 .options-toggle {
   display: none;
@@ -190,6 +205,93 @@ h2 {
   border: 1px solid var(--danger);
   border-radius: 8px;
   padding: 10px 14px;
+}
+.error-banner,
+.save-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.error-message,
+.save-failed > span {
+  flex: 1 1 auto;
+}
+.error-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.error-banner button,
+.save-failed button {
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.error-banner button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Storage refused a save: a warning, not an error. */
+.save-failed {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  font-size: 0.9rem;
+}
+
+/* The saved sessions or games offered when the page opens without one. */
+.resume-panel {
+  padding: 12px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.resume-panel p {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+.resume-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.resume-panel button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.resume-panel .action-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
+}
+.resume-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.resume-heading {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.resume-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* Layout by width:

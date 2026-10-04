@@ -1,10 +1,11 @@
 // Package testmode sizes the randomized and whole-game test loops for the
 // three ways the suite runs:
 //
-//   - go test -short ./...       the race job: the smallest loops
+//   - go test -short ./...       quick local runs: the smallest loops
 //   - go test ./...              pull requests: a reduced, fixed-seed subset
 //   - MHJDOJO_FULL=1 go test ./...  the nightly workflow: the exhaustive loops
 //
+// Timing tests are not meant for -race: its overhead breaks their budgets.
 // -short wins over MHJDOJO_FULL, so -short means the same with or without it.
 package testmode
 

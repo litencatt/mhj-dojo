@@ -565,7 +565,7 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(form).toBeVisible();
-    await expect(form.getByRole('combobox')).toHaveCount(3);
+    await expect(form.getByRole('combobox')).toHaveCount(4);
     expect((await form.boundingBox())!.y).toBeGreaterThan((await toggle.boundingBox())!.y);
     expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(

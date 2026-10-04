@@ -2,13 +2,10 @@ package apicall
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -51,7 +48,7 @@ func nextMove(st match.State) string {
 }
 
 func TestGamePlaysToTheEnd(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, raw := c.game("POST", "/api/games", `{"seed":42}`)
 	if st.Seed == nil || *st.Seed != 42 || st.Dealer != 2 || st.You != 0 || st.Actor != 0 || st.Seats[0].Wind != "3z" {
 		t.Fatalf("new game: seed %d dealer %d actor %d wind %s", st.Seed, st.Dealer, st.Actor, st.Seats[0].Wind)
@@ -103,7 +100,7 @@ func TestGamePlaysToTheEnd(t *testing.T) {
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
 	t.Logf("result %s, action p95 %v over %d moves", st.Result.Kind, p95, len(took))
-	if !testing.Short() && !raceEnabled && p95 > 200*time.Millisecond {
+	if !testing.Short() && p95 > 200*time.Millisecond {
 		t.Errorf("action p95 %v, want < 200ms", p95)
 	}
 }
@@ -125,7 +122,7 @@ func checkHidden(t *testing.T, raw map[string]any) {
 }
 
 func TestGameOptions(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	for _, body := range []string{`{"first_dealer":"me"}`, `{"first_dealer":0}`, `{"cpu":"strong"}`, `{"cpu":"Weak"}`} {
 		c.wantError("POST", "/api/games", body, http.StatusBadRequest)
 	}
@@ -144,7 +141,7 @@ func TestGameOptions(t *testing.T) {
 }
 
 func TestGameActionErrors(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, _ := c.game("POST", "/api/games", `{"seed":4}`) // dealer 0: you move first
 	path := "/api/games/" + st.GameID + "/action"
 	c.wantError("GET", "/api/games/nope", "", http.StatusNotFound)
@@ -173,7 +170,7 @@ func TestRandomSeedHiddenUntilTheEnd(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
 	}
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, raw := c.game("POST", "/api/games", ``)
 	if st.Seed != nil || raw["seed"] != nil {
 		t.Fatalf("random seed exposed: %v", raw["seed"])
@@ -198,7 +195,7 @@ func TestRandomSeedHiddenUntilTheEnd(t *testing.T) {
 }
 
 func TestGameLength(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, _ := c.game("POST", "/api/games", `{"seed":5,"length":"hanchan"}`)
 	if st.Length != "hanchan" || st.RoundWind != "1z" || st.RoundNumber != 1 || st.Honba != 0 || st.FirstDealer != 1 {
 		t.Fatalf("hanchan start: %+v", st.Length)
@@ -219,7 +216,7 @@ func TestRiichiHistoryAndByDiscard(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
 	}
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	// Playing the last legal tile, seed 67 is the first seed whose hand reaches
 	// riichi; later seeds are only a safety net if the engine changes.
 	for seed := 67; seed < 200; seed++ {
@@ -252,7 +249,7 @@ func TestRiichiHistoryAndByDiscard(t *testing.T) {
 // A seed with the human as a non-dealer: the CPUs move first, and those
 // moves are reported as events.
 func TestGameStartsWithCPUMoves(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, _ := c.game("POST", "/api/games", `{"seed":1}`) // dealer 1
 	if st.Dealer != 1 || len(st.Events) != 3 || st.Events[0].Seat != 1 || st.Events[2].Seat != 3 {
 		t.Fatalf("dealer %d events %+v", st.Dealer, st.Events)
@@ -268,7 +265,7 @@ func TestHumanPon(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
 	}
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	for seed := 0; seed < 300; seed++ {
 		st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+`}`)
 		path := "/api/games/" + st.GameID + "/action"
@@ -326,65 +323,4 @@ func TestHumanPon(t *testing.T) {
 		}
 	}
 	t.Fatal("no seed offered the human a pon")
-}
-
-// Concurrent requests on one game and on the store: the race job relies on
-// this test to cover the locks in match and store.
-func TestGameConcurrentRequests(t *testing.T) {
-	c := newClient(t, session.NewStore())
-	st, _ := c.game("POST", "/api/games", `{"seed":7}`)
-	path := "/api/games/" + st.GameID
-	send := func(method, path, body string) (int, match.State, error) {
-		code, v := Route(c.store, c.games, method, path, strings.NewReader(body))
-		st, _ := v.(match.State)
-		if code == http.StatusOK && st.GameID == "" {
-			return code, st, fmt.Errorf("%s %s: %T", method, path, v)
-		}
-		return code, st, nil
-	}
-	var wg sync.WaitGroup
-	var moved atomic.Int32
-	errs := make(chan error, 64)
-	for g := range 6 {
-		wg.Go(func() {
-			for i := range 8 {
-				if g%3 == 0 { // other games come and go in the store meanwhile
-					if i >= 3 {
-						return
-					}
-					if code, _, err := send("POST", "/api/games", `{}`); err != nil || code != http.StatusOK {
-						errs <- fmt.Errorf("create: %d %v", code, err)
-						return
-					}
-					continue
-				}
-				code, cur, err := send("GET", path, "")
-				if err != nil || code != http.StatusOK {
-					errs <- fmt.Errorf("get: %d %v", code, err)
-					return
-				}
-				if cur.Result != nil {
-					return
-				}
-				// Another goroutine may move first, so the move can be stale.
-				code, _, err = send("POST", path+"/action", nextMove(cur))
-				if err != nil || (code != http.StatusOK && code != http.StatusConflict && code != http.StatusBadRequest) {
-					errs <- fmt.Errorf("action: %d %v", code, err)
-					return
-				}
-				if code == http.StatusOK {
-					moved.Add(1)
-				}
-			}
-		})
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		t.Error(err)
-	}
-	if moved.Load() == 0 {
-		t.Error("no concurrent action succeeded")
-	}
-	c.game("GET", "/api/games/"+st.GameID, "")
 }

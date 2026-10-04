@@ -228,17 +228,7 @@ func (p *Player) shanten(c tile.Counts, melds int) (int, []tile.Kind) {
 	if melds > 0 {
 		return best, kindsOf(&set)
 	}
-	for _, r := range []shanten.Result{shanten.Chiitoitsu(c), shanten.Kokushi(c)} {
-		if r.Shanten > best {
-			continue
-		}
-		if r.Shanten < best {
-			best, set = r.Shanten, [tile.NumKinds]bool{}
-		}
-		for _, k := range r.Ukeire {
-			set[k] = true
-		}
-	}
+	best, _ = shanten.Lowest(&c, best, &set)
 	return best, kindsOf(&set)
 }
 

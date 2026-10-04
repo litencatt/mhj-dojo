@@ -143,6 +143,20 @@ function loadAll(): SavedMap {
 }
 
 let warnedStorage = false;
+const storageListeners = new Set<() => void>();
+
+/**
+ * Calls listener once storage has refused a save (at once if it already
+ * has), for the page to tell the player. Returns what unsubscribes it.
+ */
+export function onStorageFailed(listener: () => void): () => void {
+  if (warnedStorage) {
+    listener();
+    return () => {};
+  }
+  storageListeners.add(listener);
+  return () => storageListeners.delete(listener);
+}
 
 // Writes saves to localStorage. When that fails (most likely the quota),
 // keeps only the one just saved (keep) and tries once more; if storage
@@ -167,6 +181,8 @@ function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<st
   if (!warnedStorage) {
     warnedStorage = true;
     console.warn('mhj-dojo: cannot save to localStorage; a reload will start over from the URL');
+    for (const listener of storageListeners) listener();
+    storageListeners.clear();
   }
 }
 
@@ -174,9 +190,9 @@ function storeAll(sessions: SavedMap, keep?: string) {
   write(STORAGE_KEY, sessions, (s) => ({ v: 2, sessions: s }), keep);
 }
 
-// Drops all but the max most recently used entries.
+// Drops all but the max most recently used entries (an unreadable one counts as the oldest).
 function trim<T extends { used: number }>(saved: Record<string, T>, max: number) {
-  const ids = Object.keys(saved).sort((a, b) => (saved[b].used ?? 0) - (saved[a].used ?? 0));
+  const ids = Object.keys(saved).sort((a, b) => (saved[b]?.used ?? 0) - (saved[a]?.used ?? 0));
   for (const id of ids.slice(max)) delete saved[id];
 }
 
@@ -231,6 +247,14 @@ const MAX_SAVED_GAMES = 5; // games kept; the least recently used goes first
 interface SavedGame {
   save: string;
   used: number; // Date.now() of the last save
+  round?: SavedRound; // where the game stood, for the page's list of saves
+}
+
+export interface SavedRound {
+  wind: string; // the round wind's tile
+  number: number;
+  honba: number;
+  over: boolean; // the game has ended
 }
 
 type SavedGames = Record<string, SavedGame>; // by public game id
@@ -249,9 +273,10 @@ function storeGames(games: SavedGames, keep?: string) {
   write(GAMES_KEY, games, (g) => ({ v: 1, games: g }), keep);
 }
 
-function saveGame(publicId: string, save: string) {
+function saveGame(publicId: string, save: string, st: GameState) {
   const games = loadGames();
-  games[publicId] = { save, used: Date.now() };
+  const round = { wind: st.round_wind, number: st.round_number, honba: st.honba, over: st.game_over };
+  games[publicId] = { save, used: Date.now(), round };
   trim(games, MAX_SAVED_GAMES);
   storeGames(games, publicId);
 }
@@ -260,6 +285,71 @@ function forgetGame(publicId: string) {
   const games = loadGames();
   delete games[publicId];
   storeGames(games);
+}
+
+// Newest first.
+function byUsed<T extends { used: number }>(list: T[]): T[] {
+  return list.sort((a, b) => b.used - a.used);
+}
+
+// Date.now() of a save's last use, 0 when it has none.
+function usedOf(saved: { used?: unknown }): number {
+  return typeof saved.used === 'number' ? saved.used : 0;
+}
+
+export interface SessionSummary {
+  id: string; // the public id
+  seed: number;
+  maxTurns: number;
+  used: number; // 0: unknown
+}
+
+/** The saved practice sessions, the most recently used first; unreadable ones are left out. */
+export function savedSessions(): SessionSummary[] {
+  const list: SessionSummary[] = [];
+  for (const [id, s] of Object.entries(loadAll() as Record<string, Partial<Saved> | null>)) {
+    if (!s || typeof s.seed !== 'number' || typeof s.max_turns !== 'number') continue;
+    list.push({ id, seed: s.seed, maxTurns: s.max_turns, used: usedOf(s) });
+  }
+  return byUsed(list);
+}
+
+export interface GameSummary {
+  id: string; // the public id
+  seed: number | null; // null while the game hides it (a random seed, until the end)
+  seedKnown: boolean; // the seed was chosen: the game shows it from the start
+  length: string;
+  firstDealer: string;
+  cpu: string;
+  round: SavedRound | null; // null for a save from before rounds were kept
+  used: number; // 0: unknown
+}
+
+/** The saved CPU games, the most recently used first; unreadable ones are left out. */
+export function savedGames(): GameSummary[] {
+  const list: GameSummary[] = [];
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  for (const [id, g] of Object.entries(loadGames() as Record<string, Partial<SavedGame> | null>)) {
+    if (!g || typeof g.save !== 'string') continue;
+    try {
+      const s = JSON.parse(g.save) as Record<string, unknown>;
+      const round = g.round && typeof g.round === 'object' ? g.round : null;
+      const seed = typeof s.seed === 'number' ? s.seed : null;
+      list.push({
+        id,
+        seed: s.seed_known === true || round?.over ? seed : null,
+        seedKnown: s.seed_known === true && seed !== null,
+        length: str(s.length),
+        firstDealer: str(s.first_dealer),
+        cpu: str(s.cpu),
+        round,
+        used: usedOf(g),
+      });
+    } catch {
+      // unreadable: not offered
+    }
+  }
+  return byUsed(list);
 }
 
 // What the page keeps in the engine: practice sessions and CPU games. Each
@@ -325,7 +415,7 @@ const kinds: Kind[] = [
     rebuilt: () => {},
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
-      if (res.save) saveGame(id, res.save);
+      if (res.save) saveGame(id, res.save, res.data as GameState);
       return true;
     },
     forget: forgetGame,
@@ -380,7 +470,7 @@ const stoppedResponse = (): WasmResponse => ({ status: STOPPED, data: { error: S
 
 // The answer when this tab's engine can't rebuild another tab's save (most
 // likely that tab runs a newer version of the site).
-const NEWER_SAVE = '別の画面で新しい版に保存されています。再読み込みしてください';
+const NEWER_SAVE = '別の画面で新しい版に保存されています';
 
 const MAX_RESTORE_FAILURES = 2;
 
@@ -505,8 +595,12 @@ async function answer(
       if (whole.status === 200) kind.save(publicId, whole, '');
     }
   } else if (target && res.status !== 200) {
-    // Error messages name the engine's id; show the page's instead.
     const engineId = target.kind.engineOf.get(target.id);
+    // The engine failed partway (a panic): its copy may be half changed, so
+    // the next request rebuilds it from the last save, and a retry acts on
+    // the state the page still shows.
+    if (res.status >= 500) target.kind.known.delete(engineId ?? target.id);
+    // Error messages name the engine's id; show the page's instead.
     const data = res.data as { error?: string } | null;
     if (engineId && typeof data?.error === 'string') data.error = data.error.split(engineId).join(target.id);
   }

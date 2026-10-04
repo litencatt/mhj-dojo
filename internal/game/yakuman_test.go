@@ -12,6 +12,7 @@ func TestDoubleYakumanSettlement(t *testing.T) {
 	// dealer tsumo: 32000 all
 	r := newRound(t)
 	r.honba = 1
+	pastFirstDraw(r, 0)
 	setHand(r, 0, "111m222p333s666z5z", "5z")
 	mustApply(t, r, Action{Seat: 0, Type: Tsumo})
 	res := r.Result()

@@ -43,7 +43,8 @@ build)
 vectors)
 	image
 	run "$CACHE && lake build && lake exe gen-vectors /work &&
-		chown $(id -u):$(id -g) /work/internal/score/testdata/lean_*.json /work/internal/game/testdata/lean_*.json"
+		chown $(id -u):$(id -g) /work/internal/score/testdata/lean_*.json /work/internal/game/testdata/lean_*.json \
+			/work/internal/yaku/testdata/lean_*.json"
 	;;
 shell)
 	image

@@ -1,0 +1,122 @@
+name: Verify live site
+
+# Post-deploy check (issue #191): merging the deploy pull request into
+# lolipop-deploy-now makes Lolipop Deploy Now publish the release. This
+# workflow runs on that push, reads the release from the pushed
+# web/dist-site/version.json, waits until the live site's version.json
+# reports the same release, then runs the live smoke test
+# (web/e2e-live, `npm run e2e:live`) against it. A failure opens an issue.
+#
+# Can be run by hand to re-check the live site against any tag.
+on:
+  push:
+    branches: [lolipop-deploy-now]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag the live site should be serving (e.g. v2026.0927.0); empty to read it from web/dist-site/version.json on lolipop-deploy-now
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  issues: write # report a failed check
+
+concurrency:
+  group: verify-live
+  cancel-in-progress: true # a newer deploy supersedes the check of an older one
+
+jobs:
+  verify:
+    name: Wait for the release to go live and smoke test it
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The same site URL the site build uses (build-site-release.yml).
+      MHJDOJO_SITE_URL: ${{ vars.SITE_URL || 'https://mhj-dojo.lolipop-now.app/' }}
+      INPUT_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The pushed commit itself (a newer push cancels this run), or the
+          # branch's tip for a manual run.
+          ref: ${{ github.event_name == 'push' && github.sha || 'lolipop-deploy-now' }}
+
+      - name: Which release should be live?
+        id: tag
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ]; then
+            tag=$(jq -r '.release // empty' web/dist-site/version.json)
+          fi
+          if [ -z "$tag" ]; then
+            echo "::error::no release tag: web/dist-site/version.json has no release"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # Deploy Now publishes a moment after the merge, and a cache-busting
+      # query gets version.json past any cached copy.
+      - name: Wait for the live site to serve the release
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          url="${MHJDOJO_SITE_URL%/}/version.json"
+          deadline=$((SECONDS + 600))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            live=$(curl -fsS --max-time 20 "$url?cb=$RANDOM$RANDOM" 2>/dev/null | jq -r '.release // empty' 2>/dev/null || true)
+            echo "live release: ${live:-<none>} (want $TAG)"
+            if [ "$live" = "$TAG" ]; then
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::$url did not report $TAG within 10 minutes"
+          exit 1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies and Chromium
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Live smoke test
+        working-directory: web
+        env:
+          EXPECT_RELEASE: ${{ steps.tag.outputs.tag }}
+        run: npm run e2e:live
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report-live
+          path: web/playwright-report-live/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Open an issue for the failed check
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "公開サイト（$MHJDOJO_SITE_URL）の公開後確認（Verify live site）が失敗しました。リリース: \`${TAG:-不明}\`"
+            echo
+            echo "ログ: $run_url"
+            echo
+            echo "公開が遅れているだけの場合は、Actions から Verify live site を再実行してください。"
+          } > "$RUNNER_TEMP/body.md"
+          title="公開後の確認に失敗: ${TAG:-不明なリリース}"
+          # One issue per release: a re-run comments on the open one.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label ci --search "\"$title\" in:title" --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --label ci --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi

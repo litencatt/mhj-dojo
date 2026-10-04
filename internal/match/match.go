@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/apiview"
 	"github.com/litencatt/mhj-dojo/internal/cpu"
@@ -23,8 +22,6 @@ import (
 var ErrNotFound = errors.New("not found")
 
 const (
-	// MaxGames bounds memory; the least recently used game is evicted beyond it.
-	MaxGames = 256
 	// Human is the human player's seat.
 	Human = 0
 )
@@ -34,14 +31,11 @@ type Store struct {
 	games *store.Store[*Match]
 }
 
-// NewStore returns an empty store that keeps at most MaxGames games.
-func NewStore() *Store { return NewStoreWithMax(MaxGames) }
-
-// NewStoreWithMax returns an empty store that keeps at most max games,
-// evicting the least recently used one beyond that. The wasm build
-// (cmd/mhj-dojo-wasm) uses a much smaller max than MaxGames: it runs in a
-// browser tab's memory (see docs/api.md "Memory").
-func NewStoreWithMax(max int) *Store { return &Store{games: store.New[*Match](max)} }
+// NewStore returns an empty store that keeps at most max games, evicting the
+// least recently used one beyond that. The wasm build runs in a browser
+// tab's memory, so max is small (see docs/api.md "Memory"). Stores and
+// matches are not safe for concurrent use: wasm is single-threaded.
+func NewStore(max int) *Store { return &Store{games: store.New[*Match](max)} }
 
 // Lengths of a game.
 const (
@@ -155,9 +149,8 @@ func (st *Store) Get(id string) (*Match, error) {
 	return m, nil
 }
 
-// Match is one game. Methods are safe for concurrent use.
+// Match is one game.
 type Match struct {
-	mu       sync.Mutex
 	id       string
 	game     *game.Game
 	analyzer *yakushanten.Analyzer
@@ -195,16 +188,12 @@ func (m *Match) ID() string { return m.id }
 
 // State returns the human's view of the game.
 func (m *Match) State() State {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	return m.state()
 }
 
 // Act applies the human's move and plays the CPUs up to the human's next
 // decision. Errors wrap game.ErrInvalid or game.ErrConflict.
 func (m *Match) Act(a game.Action) (State, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	if err := m.act(a); err != nil {
 		return State{}, err
 	}
@@ -212,7 +201,7 @@ func (m *Match) Act(a game.Action) (State, error) {
 }
 
 // act is Act without the state, which a replay (Store.Restore) needs only
-// at its end. Callers hold m.mu.
+// at its end.
 func (m *Match) act(a game.Action) error {
 	before, shown := len(m.game.Round.Events()), m.game.Round.KanDora()
 	if err := m.game.Act(a); err != nil {
@@ -226,15 +215,13 @@ func (m *Match) act(a game.Action) error {
 // Next deals the next round once the current one has ended and plays the
 // CPUs up to the human's first decision in it.
 func (m *Match) Next() (State, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	if err := m.next(); err != nil {
 		return State{}, err
 	}
 	return m.state(), nil
 }
 
-// next is Next without the state. Callers hold m.mu.
+// next is Next without the state.
 func (m *Match) next() error {
 	ended := m.summary()
 	if err := m.game.Next(); err != nil {

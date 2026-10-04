@@ -192,7 +192,7 @@ func TestSelfPlay(t *testing.T) {
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
 	t.Logf("outcomes %v, decision p95 %v", kinds, p95)
-	if !testing.Short() && !raceEnabled && p95 > 20*time.Millisecond {
+	if !testing.Short() && p95 > 20*time.Millisecond {
 		t.Errorf("decision p95 %v, want < 20ms", p95)
 	}
 }
@@ -441,6 +441,12 @@ func TestKyuushu(t *testing.T) {
 	l.Kyuushu = true
 	if a := New().Decide(v, l); a.Type == game.Kyuushu {
 		t.Fatal("declared kyuushu on a kokushi tenpai-level hand")
+	}
+	v = view("119m19p19s123456z", "7z") // a first-draw win (天和) with nine kinds: win
+	l = legal(v)
+	l.Tsumo, l.Kyuushu = true, true
+	if a := New().Decide(v, l); a.Type != game.Tsumo {
+		t.Fatalf("tenhou with kyuushu: got %+v", a)
 	}
 }
 
