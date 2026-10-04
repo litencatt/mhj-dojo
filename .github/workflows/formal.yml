@@ -11,6 +11,7 @@ on:
       - internal/score/**
       - internal/game/round.go
       - internal/game/hanchan.go
+      - internal/yaku/**
       - internal/game/testdata/lean_*.json
       - internal/score/testdata/lean_*.json
       - .github/workflows/formal.yml
@@ -20,6 +21,7 @@ on:
       - internal/score/**
       - internal/game/round.go
       - internal/game/hanchan.go
+      - internal/yaku/**
       - internal/game/testdata/lean_*.json
       - internal/score/testdata/lean_*.json
       - .github/workflows/formal.yml
@@ -72,10 +74,10 @@ jobs:
         working-directory: formal
         run: lake exe gen-vectors "$GITHUB_WORKSPACE"
       - name: Committed vectors match the model
-        run: git diff --exit-code -- internal/score/testdata internal/game/testdata
+        run: git diff --exit-code -- internal/score/testdata internal/game/testdata internal/yaku/testdata
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
       - name: Go matches the vectors
-        run: go test ./internal/score ./internal/game -run Lean
+        run: go test ./internal/score ./internal/game ./internal/yaku -run Lean
