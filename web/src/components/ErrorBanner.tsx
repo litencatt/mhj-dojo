@@ -14,7 +14,7 @@ interface ErrorBannerProps {
 export function ErrorBanner({ message, busy, onRetry }: ErrorBannerProps) {
   return (
     <div class="error-banner" role="alert">
-      <span>{message}</span>
+      <span class="error-message">{message}</span>
       <span class="error-banner-actions">
         <button type="button" disabled={busy} onClick={onRetry}>
           再試行

@@ -42,7 +42,7 @@ test('an engine error with a tile code shows the tile name, not the code', async
   });
 
   await drawn.click();
-  const banner = page.getByRole('alert');
+  const banner = page.getByRole('alert').locator('.error-message');
   await expect(banner).toHaveText('tile 5筒 is not in hand or drawn (also 5筒, seat 2, 18p)');
 });
 
