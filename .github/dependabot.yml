@@ -6,6 +6,8 @@ updates:
       interval: "weekly"
   # The web frontend (Vite, Preact, Playwright, TypeScript). Minor and patch
   # updates come as one grouped PR a week; a major update gets its own PR.
+  # @types/node follows the Node the workflows run (node-version: 24), so its
+  # major goes up with that by hand, not on its own.
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
@@ -15,3 +17,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
