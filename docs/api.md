@@ -552,7 +552,7 @@ Calls: pon and open kan on any other seat's discard, chii on the discard of
 the seat to your left, and on your own turn a concealed kan or an added kan
 onto your pon. After a discard every seat that can claim it answers in turn
 order: a ron wins at once (head bump), otherwise a pon or kan beats a chii.
-Declining a ron makes you furiten; declining a call does not. The last discard
+Declining a ron makes you furiten, and so does passing a winning tile you cannot ron for lack of a yaku; declining a call does not. The last discard
 of the round cannot be called, and a seat in riichi can only ron (or make a
 concealed kan that keeps its waits). After a pon or chii you discard without
 drawing and may not discard the called kind, nor the tile on the far side

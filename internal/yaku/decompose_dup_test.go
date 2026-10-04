@@ -12,7 +12,12 @@ import (
 func TestDecomposeHasNoDuplicateReadings(t *testing.T) {
 	for _, hand := range []string{"34577m333345888s", "11122233344455m", "33334444555566s"} {
 		seen := map[string]bool{}
-		for _, d := range Decompose(tile.MustCounts(hand)) {
+		c := tile.MustCounts(hand)
+		ds := Decompose(c)
+		if want := len(refReadings(c, 4)); len(ds) != want {
+			t.Errorf("%s: %d readings, reference has %d", hand, len(ds), want)
+		}
+		for _, d := range ds {
 			ms := slices.Clone(d.Melds[:])
 			slices.SortFunc(ms, func(a, b Meld) int {
 				if a.Type != b.Type {
