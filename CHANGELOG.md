@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.1004.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.1...v2026.1004.2) - 2026-10-04
+
+### 修正
+- 役別向聴の三暗刻・四暗刻はツモ和了で数えることを明記 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/183
+- 再読み込みや開き直しで直前のCPUの手を再生し直さないように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/182
+### CI・リポジトリ
+- E2E: シード依存のシーン(ポン等)をGoテストで守る by @litencatt in https://github.com/litencatt/mhj-dojo/pull/181
+
 ## [v2026.1004.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.0...v2026.1004.1) - 2026-10-04
 
 ### 依存関係
