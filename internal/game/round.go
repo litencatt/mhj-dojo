@@ -499,6 +499,7 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 	p := &r.players[seat]
 	last := r.DrawsLeft() == 0
 	chankan := ron && r.robbing != nil
+	first := !ron && !p.rinshan && r.firstGoAround(seat)
 	return yaku.Context{
 		WinTile:        win,
 		Ron:            ron,
@@ -509,6 +510,8 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 		Houtei:         ron && last && !chankan,
 		Rinshan:        !ron && p.rinshan,
 		Chankan:        chankan,
+		Tenhou:         first && seat == r.dealer,
+		Chiihou:        first && seat != r.dealer,
 		Winds:          r.Winds(seat),
 		DoraIndicators: r.doraIndicators(),
 		UraIndicators:  r.uraIndicators(),
