@@ -207,6 +207,57 @@ h2 {
   padding: 10px 14px;
 }
 
+/* The saved sessions or games offered when the page opens without one. */
+.resume-panel {
+  padding: 12px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.resume-panel p {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+.resume-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.resume-panel button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.resume-panel .action-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
+}
+.resume-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.resume-heading {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.resume-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Layout by width:
    - above 1100px the page is exactly one viewport tall and never scrolls.
      The columns are a flex row, each scrolling on its own, so a minimized

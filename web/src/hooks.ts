@@ -67,20 +67,24 @@ export interface UrlResumeOptions<T> {
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
   sync: Record<string, string | null> | null; // params to write back; null deletes the key
+  // With no id in the URL: whether the page offers its saves (the player
+  // picks one with open, or starts a new one) instead of a new one at once.
+  offering?: boolean;
 }
 
 /**
  * Keeps the id in the URL so a reload resumes the same session or game. When
  * the engine has no save for it (404), the same wall is dealt again from the
  * params instead. Returns resume, which does it again (for a tab taking the
- * session or game back from another tab).
+ * session or game back from another tab), and open, which resumes the save
+ * with the given id.
  */
-export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
+export function useUrlResume<T>({ idKey, request, get, create, sync, offering }: UrlResumeOptions<T>) {
   function resume() {
     const params = new URLSearchParams(location.search);
     const id = params.get(idKey);
     if (!id) {
-      void request(() => create(params));
+      if (!offering) void request(() => create(params));
       return;
     }
     void request(async () => {
@@ -109,7 +113,21 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
     history.replaceState(null, '', url);
   }, [syncKey]);
 
-  return resume;
+  // params: those that deal it again should its save be unusable (404).
+  function open(id: string, params: Record<string, string>) {
+    const url = new URL(location.href);
+    url.searchParams.set(idKey, id);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    history.replaceState(null, '', url);
+    resume();
+  }
+
+  return { resume, open };
+}
+
+/** Whether the page was opened with nothing to resume or deal in the URL (no id, seed or options). */
+export function bareUrl(): boolean {
+  return [...new URLSearchParams(location.search).keys()].every((k) => k === 'mode');
 }
 
 /**

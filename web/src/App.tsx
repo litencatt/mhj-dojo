@@ -12,8 +12,10 @@ import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
+import { ResumePanel, type ResumeItem } from './components/ResumePanel';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
+  bareUrl,
   useRowNames,
   useSerialRequest,
   useSingleTab,
@@ -22,6 +24,7 @@ import {
   useYakuTop,
 } from './hooks';
 import { claim } from './singleTab';
+import { savedSessions } from './wasm';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -30,6 +33,18 @@ export function App() {
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
   const { minimized, isMin, minimize, restore } = useMinimized();
+  // Opened with no session or seed in the URL: the saved sessions, if any,
+  // are offered instead of a new one.
+  const [offered] = useState<ResumeItem[]>(() =>
+    bareUrl()
+      ? savedSessions().map((s) => ({
+          id: s.id,
+          label: `シード ${s.seed}`,
+          used: s.used,
+          params: { seed: String(s.seed), turns: String(s.maxTurns) },
+        }))
+      : [],
+  );
   const adviceOpen = !isMin('advice');
   // The states that came with the advice (see load).
   const withAdvice = useRef(new WeakSet<SessionState>());
@@ -93,8 +108,9 @@ export function App() {
 
   // The URL carries ?session=&seed=&turns= so a reload resumes the session,
   // or replays the same wall from the seed when it has no save (404).
-  const resume = useUrlResume({
+  const { resume, open } = useUrlResume({
     idKey: 'session',
+    offering: offered.length > 0,
     request,
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
@@ -224,7 +240,11 @@ export function App() {
             </div>
           )}
 
-          {!state && !error && (
+          {!state && offered.length > 0 && (
+            <ResumePanel noun="練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
+          )}
+
+          {!state && !error && offered.length === 0 && (
             <p class="muted">
               計算エンジンを読み込んでいます…
             </p>
