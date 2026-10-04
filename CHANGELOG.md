@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.1004.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1003.0...v2026.1004.0) - 2026-10-04
+
+### CI・リポジトリ
+- Dependabot: @types/node のメジャー更新は Node 本体と一緒に上げる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/176
+### 依存関係
+- Bump leanprover/lean-action from 1.6.0 to 1.6.1 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/171
+- Bump Songmu/tagpr from 1.21.0 to 1.21.1 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/170
+
 ## [v2026.1003.0](https://github.com/litencatt/mhj-dojo/compare/v2026.0930.3...v2026.1003.0) - 2026-10-03
 
 ### パフォーマンス
