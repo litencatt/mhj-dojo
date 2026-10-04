@@ -7,15 +7,17 @@ import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, seatLabel } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
+import { ResumePanel, type ResumeItem } from './components/ResumePanel';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
+  bareUrl,
   useLastAnalysis,
   useMediaQuery,
   usePlayback,
@@ -29,6 +31,7 @@ import {
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
+import { savedGames, type GameSummary } from './wasm';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
 // not reset on every render.
@@ -55,6 +58,13 @@ function parseOptions(get: (key: string) => string | null): GameOptions {
   };
 }
 
+/** A saved game in the list of saves: 「東風戦 東2局 シード 5」. */
+function savedLabel(g: GameSummary): string {
+  const round = g.round && (g.round.over ? '終局' : roundName(g.round.wind, g.round.number, g.round.honba));
+  const seed = g.seed !== null && `シード ${g.seed}`;
+  return [LENGTH_NAMES[g.length as GameOptions['length']], round, seed].filter(Boolean).join(' ');
+}
+
 function urlOptions(): GameOptions {
   const params = new URLSearchParams(location.search);
   return parseOptions((k) => params.get(k));
@@ -77,6 +87,11 @@ export function GameApp() {
   const shownGame = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const phone = useMediaQuery(PHONE);
+  // Opened with no game, seed or options in the URL: the saved games, if
+  // any, are offered instead of a new one.
+  const [offered] = useState<ResumeItem[]>(() =>
+    bareUrl() ? savedGames().map((g) => ({ id: g.id, label: savedLabel(g), used: g.used })) : [],
+  );
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   // The state last reopened from a save: shown as it stands, not replayed.
@@ -113,8 +128,9 @@ export function GameApp() {
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again when
   // its save is gone (404).
-  const resume = useUrlResume({
+  const { resume, open } = useUrlResume({
     idKey: 'game',
+    offering: offered.length > 0,
     request,
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
@@ -150,6 +166,8 @@ export function GameApp() {
   async function handleNewGame(e: Event) {
     e.preventDefault();
     const fromForm = !!formRef.current?.contains(document.activeElement);
+    // The game on stays saved, but only the list of saves leads back to it.
+    if (state && !state.game_over && !window.confirm('対局中です。新しい対局を始めますか？')) return;
     const started = await startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
     const toggle = toggleRef.current;
     if (!started || !toggle || toggle.offsetParent === null) return;
@@ -344,7 +362,10 @@ export function GameApp() {
               {error}
             </div>
           )}
-          {!state && !error && (
+          {!state && offered.length > 0 && (
+            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={open} />
+          )}
+          {!state && !error && offered.length === 0 && (
             <p class="muted">
               計算エンジンを読み込んでいます…
             </p>

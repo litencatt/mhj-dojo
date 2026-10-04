@@ -231,6 +231,14 @@ const MAX_SAVED_GAMES = 5; // games kept; the least recently used goes first
 interface SavedGame {
   save: string;
   used: number; // Date.now() of the last save
+  round?: SavedRound; // where the game stood, for the page's list of saves
+}
+
+export interface SavedRound {
+  wind: string; // the round wind's tile
+  number: number;
+  honba: number;
+  over: boolean; // the game has ended
 }
 
 type SavedGames = Record<string, SavedGame>; // by public game id
@@ -249,9 +257,10 @@ function storeGames(games: SavedGames, keep?: string) {
   write(GAMES_KEY, games, (g) => ({ v: 1, games: g }), keep);
 }
 
-function saveGame(publicId: string, save: string) {
+function saveGame(publicId: string, save: string, st: GameState) {
   const games = loadGames();
-  games[publicId] = { save, used: Date.now() };
+  const round = { wind: st.round_wind, number: st.round_number, honba: st.honba, over: st.game_over };
+  games[publicId] = { save, used: Date.now(), round };
   trim(games, MAX_SAVED_GAMES);
   storeGames(games, publicId);
 }
@@ -260,6 +269,53 @@ function forgetGame(publicId: string) {
   const games = loadGames();
   delete games[publicId];
   storeGames(games);
+}
+
+// Newest first.
+function byUsed<T extends { used: number }>(list: T[]): T[] {
+  return list.sort((a, b) => b.used - a.used);
+}
+
+export interface SessionSummary {
+  id: string; // the public id
+  seed: number;
+  maxTurns: number;
+  used: number;
+}
+
+/** The saved practice sessions, the most recently used first. */
+export function savedSessions(): SessionSummary[] {
+  return byUsed(
+    Object.entries(loadAll()).map(([id, s]) => ({ id, seed: s.seed, maxTurns: s.max_turns, used: s.used ?? 0 })),
+  );
+}
+
+export interface GameSummary {
+  id: string; // the public id
+  seed: number | null; // null while the game hides it (a random seed, until the end)
+  length: string;
+  round: SavedRound | null; // null for a save from before rounds were kept
+  used: number;
+}
+
+/** The saved CPU games, the most recently used first. */
+export function savedGames(): GameSummary[] {
+  const list: GameSummary[] = [];
+  for (const [id, g] of Object.entries(loadGames())) {
+    try {
+      const s = JSON.parse(g.save) as { seed?: number; seed_known?: boolean; length?: string };
+      list.push({
+        id,
+        seed: (s.seed_known || g.round?.over) && typeof s.seed === 'number' ? s.seed : null,
+        length: s.length ?? '',
+        round: g.round ?? null,
+        used: g.used ?? 0,
+      });
+    } catch {
+      // unreadable: not offered
+    }
+  }
+  return byUsed(list);
 }
 
 // What the page keeps in the engine: practice sessions and CPU games. Each
@@ -325,7 +381,7 @@ const kinds: Kind[] = [
     rebuilt: () => {},
     save: (id, res) => {
       // "" when the response isn't a game state: keep the save there is.
-      if (res.save) saveGame(id, res.save);
+      if (res.save) saveGame(id, res.save, res.data as GameState);
       return true;
     },
     forget: forgetGame,

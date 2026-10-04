@@ -115,6 +115,8 @@ test('an upright phone shows your seat in the hand panel', async ({ page }) => {
 // open, as chosen.
 test('a phone\'s 設定: Tab into the options, Escape and a new game fold them back', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  // 新規対局 mid-game asks first.
+  page.on('dialog', (d) => void d.accept());
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const toggle = page.getByRole('button', { name: /^設定/ });
