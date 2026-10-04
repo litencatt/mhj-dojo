@@ -32,7 +32,7 @@ const SPEED_KEY = 'mhj-dojo.playback-speed.v1';
 export function loadPlaybackSpeed(): PlaybackSpeed {
   try {
     const v = localStorage.getItem(SPEED_KEY);
-    if (v && v in PLAYBACK_SPEEDS) return v as PlaybackSpeed;
+    if (v && Object.hasOwn(PLAYBACK_SPEEDS, v)) return v as PlaybackSpeed;
   } catch {
     // Storage unavailable: use the default.
   }

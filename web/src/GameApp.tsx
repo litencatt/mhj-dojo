@@ -199,6 +199,25 @@ export function GameApp() {
   // header, the table and the hand (style.css), as in practice.
   const appRef = useYakuTop(!!state);
 
+  const speedOption = (
+    <label class="speed-option">
+      再生速度
+      <select
+        value={speed}
+        onChange={(e) => {
+          const v = (e.target as HTMLSelectElement).value as PlaybackSpeed;
+          setSpeed(v);
+          savePlaybackSpeed(v);
+        }}
+      >
+        {(Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).map((k) => (
+          <option key={k} value={k}>
+            {PLAYBACK_SPEEDS[k].label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
   return (
     <div ref={appRef} class={appClass}>
       <div class="area-main">
@@ -257,6 +276,7 @@ export function GameApp() {
                   uraDoraIndicators={table.ura_dora_indicators}
                   uraDora={table.ura_dora}
                 />
+                {!phone && speedOption}
                 <button
                   ref={toggleRef}
                   type="button"
@@ -307,23 +327,6 @@ export function GameApp() {
                 </select>
               </label>
               <label>
-                CPUの動き
-                <select
-                  value={speed}
-                  onChange={(e) => {
-                    const v = (e.target as HTMLSelectElement).value as PlaybackSpeed;
-                    setSpeed(v);
-                    savePlaybackSpeed(v);
-                  }}
-                >
-                  {(Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).map((k) => (
-                    <option key={k} value={k}>
-                      {PLAYBACK_SPEEDS[k].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
                 シード
                 <input
                   type="number"
@@ -332,6 +335,7 @@ export function GameApp() {
                   onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
                 />
               </label>
+              {phone && speedOption}
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
           </header>

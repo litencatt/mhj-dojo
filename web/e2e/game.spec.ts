@@ -707,7 +707,7 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
     await expect(page.getByLabel('起家')).toHaveValue('you');
-    await expect(page.getByLabel(/^CPU(?!の)/)).toHaveValue('weak');
+    await expect(page.getByLabel('CPU')).toHaveValue('weak');
     await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
     await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
     await expect(page).toHaveURL(/[?&]game=/);
