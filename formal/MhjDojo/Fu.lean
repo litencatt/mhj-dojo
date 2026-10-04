@@ -2,11 +2,15 @@
 Fu: the readings of a complete hand and the fu of each, as in internal/yaku
 (DecomposeWith, ReadingsWith, waitOf, Fu). The fu rules are stated in the
 rule's own terms (a table per meld, not Go's doubling); docs/api.md's house
-choice: a pair of the round wind that is also the seat wind is 4 fu.
+choice: a pair of the round wind that is also the seat wind is 4 fu. The
+readings and waits follow the same approach as Go, guarded by
+readings_nodup and readings_win. Seven pairs (a fixed 25 fu) and thirteen
+orphans have no reading.
 -/
 import Mathlib.Tactic.Ring
 import Mathlib.Tactic.NormNum
 import Mathlib.Algebra.Order.BigOperators.Group.List
+import Mathlib.Data.List.Dedup
 
 namespace MhjDojo.Fu
 
@@ -84,7 +88,7 @@ structure Reading where
   ron : Bool
   round : Nat
   seat : Nat
-  deriving Repr
+  deriving DecidableEq, Repr
 
 namespace Reading
 
@@ -136,9 +140,6 @@ def fu : Nat :=
 
 end Reading
 
-/-- Seven pairs: always 25 fu. -/
-def chiitoitsuFu : Nat := 25
-
 /-! ### Proofs -/
 
 open Reading
@@ -175,6 +176,11 @@ theorem meldsFu_le_nokan (h : ∀ g ∈ r.groups, g.kan = false) :
   simpa [mul_comm] using this
 
 theorem pairFu_le : r.pairFu ≤ 6 := by unfold pairFu; split_ifs <;> omega
+
+/-- With a wind for the round, a pair is at most 4 fu (a dragon is not the
+round wind). -/
+theorem pairFu_le_winds (hr : 27 ≤ r.round ∧ r.round ≤ 30) : r.pairFu ≤ 4 := by
+  unfold pairFu isDragon; split_ifs <;> simp_all; omega
 
 theorem waitFu_le : r.waitFu ≤ 2 := by unfold waitFu; split <;> omega
 
@@ -268,19 +274,51 @@ def groupsOf : Nat → Counts → List (List Group)
           ({ shape := .seq, kind := k } :: ·)
       else [])
 
-/-- The 4 groups + pair decompositions of concealed tiles `c` with the
-called melds: (pair, concealed groups). -/
-def decompositions (c : Counts) (called : List Group) : List (Nat × List Group) :=
-  ((List.range 34).filter (2 ≤ cnt c ·)).flatMap fun p =>
-    (groupsOf (4 - called.length) (take c p 2)).map (p, ·)
+/-- The order readings list their concealed groups in: sequences, then
+triplets, by kind (the winning group after an identical one). -/
+def groupKey (g : Group) : Nat :=
+  2 * ((if g.shape = .trip then 100 else 0) + g.kind) + (if g.won then 1 else 0)
 
-/-- Every reading of a hand won on `w`: the winning tile completes the pair
-or one concealed group (identical groups give one reading). -/
+def sortGroups (gs : List Group) : List Group := gs.mergeSort fun a b => groupKey a ≤ groupKey b
+
+/-- The 4 groups + pair decompositions of concealed tiles `c` with the
+called melds: (pair, concealed groups), each once. `groupsOf` can split the
+same groups in two orders (a sequence and a triplet from four of a kind), so
+each list is sorted and duplicates dropped. -/
+def decompositions (c : Counts) (called : List Group) : List (Nat × List Group) :=
+  (((List.range 34).filter (2 ≤ cnt c ·)).flatMap fun p =>
+    (groupsOf (4 - called.length) (take c p 2)).map fun gs => (p, sortGroups gs)).dedup
+
+/-- Every reading of a hand won on `w`, each once: the winning tile
+completes the pair or one concealed group (identical groups give one
+reading). -/
 def readings (c : Counts) (called : List Group) (w : Nat) (ron : Bool) (round seat : Nat) :
     List Reading :=
-  (decompositions c called).flatMap fun (p, gs) =>
-    let mk := fun (hs : List Group) => Reading.mk p (hs ++ called) w ron round seat
+  ((decompositions c called).flatMap fun (p, gs) =>
+    let mk := fun (hs : List Group) => Reading.mk p (sortGroups hs ++ called) w ron round seat
     (if p = w then [mk gs] else []) ++
-      ((gs.eraseDups.filter (·.contains w)).map fun g => mk (gs.replace g { g with won := true }))
+      ((gs.filter (·.contains w)).map fun g => mk ({ g with won := true } :: gs.erase g))).dedup
+
+theorem decompositions_nodup (c : Counts) (called : List Group) :
+    (decompositions c called).Nodup := List.nodup_dedup _
+
+theorem readings_nodup (c : Counts) (called : List Group) (w : Nat) (ron : Bool)
+    (round seat : Nat) : (readings c called w ron round seat).Nodup := List.nodup_dedup _
+
+/-- In every reading the winning tile is the pair or in the group marked as
+completed by it. -/
+theorem readings_win {c : Counts} {called : List Group} {w : Nat} {ron : Bool} {round seat : Nat}
+    {r : Reading} (h : r ∈ readings c called w ron round seat) :
+    r.winTile = w ∧ (r.pair = w ∨ ∃ g ∈ r.groups, g.won = true ∧ g.contains w = true) := by
+  simp only [readings, List.mem_dedup, List.mem_flatMap, List.mem_append, List.mem_map,
+    List.mem_filter] at h
+  obtain ⟨⟨p, gs⟩, -, h⟩ := h
+  rcases h with h | ⟨g, ⟨-, hg⟩, rfl⟩
+  · split_ifs at h with hp
+    · simp only [List.mem_singleton] at h; subst h; exact ⟨rfl, Or.inl hp⟩
+    · simp at h
+  · refine ⟨rfl, Or.inr ⟨{ g with won := true }, ?_, rfl, ?_⟩⟩
+    · simp [sortGroups, List.mem_mergeSort]
+    · cases g; exact hg
 
 end MhjDojo.Fu

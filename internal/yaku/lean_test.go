@@ -61,8 +61,8 @@ func TestLeanFuVectors(t *testing.T) {
 	if err := json.Unmarshal(b, &vs); err != nil {
 		t.Fatal(err)
 	}
-	if len(vs) == 0 {
-		t.Fatal("no vectors")
+	if len(vs) < 4000 {
+		t.Fatalf("%d vectors, want at least 4000", len(vs))
 	}
 	for _, v := range vs {
 		ctx := Context{WinTile: tile.Kind(v.Win), Ron: v.Ron,

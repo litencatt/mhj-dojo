@@ -143,7 +143,7 @@ def parseHand (s : String) : Counts := Id.run do
       ds := []
   return c
 
-def groupKey (g : Group) : Nat := (if g.shape = .trip then 100 else 0) + g.kind
+def tokenKey (g : Group) : Nat := (if g.shape = .trip then 100 else 0) + g.kind
 
 def groupToken (g : Group) : String := (if g.shape = .trip then "t" else "s") ++ toString g.kind
 
@@ -151,7 +151,7 @@ def groupToken (g : Group) : String := (if g.shape = .trip then "t" else "s") ++
 group the winning tile completed, the wait and the fu. -/
 def readingString (r : Reading) : String :=
   let conc := r.groups.filter fun g => !g.called && !g.kan
-  let toks := ((conc.map groupKey).mergeSort (· ≤ ·)).map fun k =>
+  let toks := ((conc.map tokenKey).mergeSort (· ≤ ·)).map fun k =>
     groupToken { shape := if k ≥ 100 then .trip else .seq, kind := k % 100 }
   let win := match r.groups.find? (·.won) with
     | some g => groupToken g
