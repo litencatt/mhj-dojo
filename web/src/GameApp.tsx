@@ -109,7 +109,7 @@ export function GameApp() {
   const optionsSynced = useRef(false);
   // The state last reopened from a save: shown as it stands, not replayed.
   const reopened = useRef<GameState | null>(null);
-  const { busy, error, request, retry } = useSerialRequest<GameState>(
+  const { busy, error, retryable, request, retry } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
@@ -370,8 +370,8 @@ export function GameApp() {
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
           </header>
-          {/* With no state yet, the session or game is asked for again from the URL. */}
-          {error && <ErrorBanner message={error} busy={busy} onRetry={state ? retry : resume} />}
+          {/* 再試行 only for an engine failure: a refused request would fail again. */}
+          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
           <SaveFailedNotice />
           {!state && offered.length > 0 && (
             <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />

@@ -69,7 +69,7 @@ export function App() {
     return next;
   }
 
-  const { busy, error, request, retry } = useSerialRequest<SessionState>(
+  const { busy, error, retryable, request, retry } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
@@ -235,8 +235,8 @@ export function App() {
             )}
           </header>
 
-          {/* With no state yet, the session or game is asked for again from the URL. */}
-          {error && <ErrorBanner message={error} busy={busy} onRetry={state ? retry : resume} />}
+          {/* 再試行 only for an engine failure: a refused request would fail again. */}
+          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
           <SaveFailedNotice />
 
           {!state && offered.length > 0 && (

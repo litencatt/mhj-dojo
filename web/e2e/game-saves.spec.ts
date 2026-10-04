@@ -170,11 +170,14 @@ test('a save from a newer engine is kept when this tab takes the game back, and 
   });
 
   await stoppedDialog(page).getByRole('button', { name: 'このタブで続ける' }).click();
-  await expect(page.locator('.error-banner')).toContainText('再読み込み');
+  await expect(page.locator('.error-message')).toContainText('新しい版');
+  // A retry would be refused the same way: only 再読み込み.
+  await expect(page.locator('.error-banner').getByRole('button', { name: '再試行' })).toHaveCount(0);
+  await expect(page.locator('.error-banner').getByRole('button', { name: '再読み込み' })).toBeVisible();
   expect(await savedGame(page)).toBe(save);
   // A move on the old screen is refused the same way.
   await (await nextMove(page)).click();
-  await expect(page.locator('.error-banner')).toContainText('再読み込み');
+  await expect(page.locator('.error-message')).toContainText('新しい版');
   expect(await savedGame(page)).toBe(save);
 
   // Reloaded (a new engine), A shows B's game.

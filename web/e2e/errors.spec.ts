@@ -1,9 +1,66 @@
 import { expect, test } from '@playwright/test';
-import { SEED, discardDrawn, handPanel, playOneStep } from './helpers';
+import {
+  SEED,
+  discardDrawn,
+  gameSnapshot,
+  handPanel,
+  isGameAction,
+  nextMove,
+  onEngineReply,
+  playOneStep,
+  waitForPlayback,
+  watchEngine,
+} from './helpers';
 
 // What the page offers when something goes wrong (issue #190): the error
 // banner's 再試行 sends the request again, and a browser refusing to save
 // is told once.
+
+// An engine that made the move and then failed (a panic partway) leaves its
+// copy changed: the retry rebuilds the game from its last save and makes
+// the move there, rather than sending it to a game that has moved on.
+test('a move the engine failed partway: 再試行 makes it on the saved game', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await watchEngine(page);
+  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await playOneStep(page);
+  let failed = false;
+  const stop = onEngineReply(page, (call, reply) => {
+    if (failed || !isGameAction(call)) return;
+    failed = true;
+    reply.status = 500;
+    reply.data = { error: 'internal error' };
+  });
+  await waitForPlayback(page);
+  const before = await gameSnapshot(page);
+  await (await nextMove(page)).click();
+  const banner = page.locator('.error-banner');
+  await expect(banner.locator('.error-message')).toHaveText('internal error');
+  stop();
+  expect(await gameSnapshot(page)).toBe(before);
+  await banner.getByRole('button', { name: '再試行' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect.poll(() => gameSnapshot(page)).not.toBe(before);
+  await playOneStep(page);
+  await expect(banner).toHaveCount(0);
+});
+
+test('a refused request: no 再試行', async ({ page }) => {
+  await watchEngine(page);
+  await page.goto('./?seed=1&turns=18');
+  const hand = handPanel(page);
+  await expect(hand.locator('.hand-drawn button')).toBeEnabled();
+  onEngineReply(page, (call, reply) => {
+    if (call.fn !== 'request' || !/\/discard/.test(call.path ?? '')) return;
+    reply.status = 409;
+    reply.data = { error: 'conflict' };
+  });
+  await hand.locator('.hand-drawn button').click();
+  const banner = page.locator('.error-banner');
+  await expect(banner.locator('.error-message')).toHaveText('conflict');
+  await expect(banner.getByRole('button', { name: '再試行' })).toHaveCount(0);
+  await expect(banner.getByRole('button', { name: '再読み込み' })).toBeVisible();
+});
 
 test('an engine that fails to load: 再試行 deals the URL\'s seed again', async ({ page }) => {
   await page.route('**/mhj-dojo.wasm*', (route) => route.fulfill({ status: 404, body: 'not found' }));

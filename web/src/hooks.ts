@@ -21,6 +21,9 @@ import {
 export function useSerialRequest<T>(onSuccess: (next: T) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether the error may pass on a retry: the engine failed (5xx, or it
+  // could not start), rather than refusing the request (4xx).
+  const [retryable, setRetryable] = useState(false);
 
   const inFlight = useRef(false);
   const last = useRef<(() => Promise<T>) | null>(null);
@@ -37,6 +40,7 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
       return true;
     } catch (err) {
       setError(errorMessage(err));
+      setRetryable(!(err instanceof api.ApiError) || err.status >= 500);
       return false;
     } finally {
       inFlight.current = false;
@@ -45,12 +49,13 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
   }
 
   // Sends the last request again (one that failed: it acts on the state
-  // still shown).
-  function retry() {
+  // still shown), or, before any, calls otherwise.
+  function retry(otherwise: () => void) {
     if (last.current) void request(last.current);
+    else otherwise();
   }
 
-  return { busy, error, request, retry };
+  return { busy, error, retryable, request, retry };
 }
 
 /**

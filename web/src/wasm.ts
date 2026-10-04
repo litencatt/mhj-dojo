@@ -470,7 +470,7 @@ const stoppedResponse = (): WasmResponse => ({ status: STOPPED, data: { error: S
 
 // The answer when this tab's engine can't rebuild another tab's save (most
 // likely that tab runs a newer version of the site).
-const NEWER_SAVE = '別の画面で新しい版に保存されています。再読み込みしてください';
+const NEWER_SAVE = '別の画面で新しい版に保存されています';
 
 const MAX_RESTORE_FAILURES = 2;
 
@@ -595,8 +595,12 @@ async function answer(
       if (whole.status === 200) kind.save(publicId, whole, '');
     }
   } else if (target && res.status !== 200) {
-    // Error messages name the engine's id; show the page's instead.
     const engineId = target.kind.engineOf.get(target.id);
+    // The engine failed partway (a panic): its copy may be half changed, so
+    // the next request rebuilds it from the last save, and a retry acts on
+    // the state the page still shows.
+    if (res.status >= 500) target.kind.known.delete(engineId ?? target.id);
+    // Error messages name the engine's id; show the page's instead.
     const data = res.data as { error?: string } | null;
     if (engineId && typeof data?.error === 'string') data.error = data.error.split(engineId).join(target.id);
   }
