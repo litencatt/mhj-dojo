@@ -85,6 +85,31 @@ test('a CPU game runs in the browser and a reload resumes it', async ({ page }) 
   expect(apiRequests).toEqual([]);
 });
 
+test('a reload shows the game as it stands without replaying the CPU moves', async ({ page }) => {
+  test.setTimeout(90_000);
+  // Playback on (the other tests turn it off): a live move is replayed.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await expect(handPanel(page)).toBeVisible();
+  await waitForPlayback(page);
+  await (await nextMove(page)).click();
+  await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'true');
+  await waitForPlayback(page);
+  const before = await tableState(page);
+
+  await page.reload();
+  await expect(handPanel(page)).toBeVisible();
+  // Not playing from the first frame it is shown, and nothing changes after.
+  expect(await page.locator('.game-table').getAttribute('data-playing')).toBe('false');
+  expect(await page.getByText('CPUの動きを再生中…').count()).toBe(0);
+  expect(await tableState(page)).toEqual(before);
+
+  // Live moves still replay after the reopen.
+  await (await nextMove(page)).click();
+  await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'true');
+  await waitForPlayback(page);
+});
+
 test('a CPU game plays a round to its result and the next round, across a reload', async ({ page }) => {
   // A whole round of CPU turns in wasm.
   test.setTimeout(180_000);
