@@ -26,6 +26,7 @@ import {
   useUrlResume,
   useYakuTop,
 } from './hooks';
+import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
 
@@ -65,6 +66,7 @@ export function GameApp() {
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
+  const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -302,6 +304,23 @@ export function GameApp() {
                 <select value={optionsInput.cpu} onChange={setOption('cpu')}>
                   <option value="weak">{CPU_NAMES.weak}</option>
                   <option value="normal">{CPU_NAMES.normal}</option>
+                </select>
+              </label>
+              <label>
+                CPUの動き
+                <select
+                  value={speed}
+                  onChange={(e) => {
+                    const v = (e.target as HTMLSelectElement).value as PlaybackSpeed;
+                    setSpeed(v);
+                    savePlaybackSpeed(v);
+                  }}
+                >
+                  {(Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).map((k) => (
+                    <option key={k} value={k}>
+                      {PLAYBACK_SPEEDS[k].label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label>

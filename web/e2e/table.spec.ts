@@ -217,7 +217,7 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   const finalDora = st!.dora_indicators.length;
   const sticks = (d: number) => (d > 0 ? `供託 ${d / 1000}本` : null);
 
-  // Your own discard shows at once; each CPU move follows PLAYBACK_STEP_MS later.
+  // Your own discard shows at once; each CPU move follows one playback step (350ms, 普通) later.
   for (let step = 1; step < events.length; step++) {
     await expect(table).toHaveAttribute('data-playing', 'true');
     await expect(log).toHaveCount(earlier + step);

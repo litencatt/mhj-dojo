@@ -17,8 +17,40 @@
 // hand sizes) follow the same steps: see playbackState.
 import type { GameEvent, GameState, Meld, RiverTile, Seat, Standing, Tile } from './api';
 
-/** One place for the playback timing: ~300-400ms per event, per issue #29. */
-export const PLAYBACK_STEP_MS = 350;
+/** The playback pace (ms per event; "none" reveals everything at once). The
+ * default is ~300-400ms per event, per issue #29. */
+export const PLAYBACK_SPEEDS = {
+  slow: { label: '遅い', ms: 700 },
+  normal: { label: '普通', ms: 350 },
+  fast: { label: '速い', ms: 150 },
+  none: { label: 'なし', ms: 0 },
+} as const;
+export type PlaybackSpeed = keyof typeof PLAYBACK_SPEEDS;
+
+const SPEED_KEY = 'mhj-dojo.playback-speed.v1';
+
+export function loadPlaybackSpeed(): PlaybackSpeed {
+  try {
+    const v = localStorage.getItem(SPEED_KEY);
+    if (v && v in PLAYBACK_SPEEDS) return v as PlaybackSpeed;
+  } catch {
+    // Storage unavailable: use the default.
+  }
+  return 'normal';
+}
+
+export function savePlaybackSpeed(speed: PlaybackSpeed) {
+  try {
+    localStorage.setItem(SPEED_KEY, speed);
+  } catch {
+    // Storage unavailable: the choice just won't persist.
+  }
+}
+
+/** The current step delay in ms, read when needed so a change applies at once. */
+export function playbackStepMs(): number {
+  return PLAYBACK_SPEEDS[loadPlaybackSpeed()].ms;
+}
 
 type Op =
   | { kind: 'river'; seat: number; tile: RiverTile }
