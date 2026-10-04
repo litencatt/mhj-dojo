@@ -24,7 +24,7 @@ func TestAnkouRowsCountTsumo(t *testing.T) {
 		{"sanankou", "111m222p345s4455z", "45z", ""},       // two ankou + shanpon
 		{"sanankou", "111m222p333s456m7z", "7z", "7z"},     // tanki
 		{"sanankou", "111222333m45p55z", "36p", "36p"},     // ryanmen
-		{"sanankou", "111m222p333s5578m", "69m", "69m"},    // ryanmen, the pair fixed
+		{"sanankou", "111m222p333s5578m", "69m", "69m"},    // ryanmen on 78m, 55m the pair
 		{"sanankou", "111m222p33s345s55z", "36s5z", "36s"}, // ron 3s reads as 345s
 	} {
 		hand := tile.MustParseHand(tc.hand)

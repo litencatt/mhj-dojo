@@ -422,7 +422,8 @@ For a 13-tile hand H and yaku Y:
 Tile t is ukeire for Y iff t ∈ W \ H for some optimal W (equivalently drawing t lowers shanten_Y).
 W counts as won by tsumo: a triplet the winning tile completes is concealed for `sanankou` and
 `suuankou`. On a ron it would be open, so e.g. the shanpon wait `111m222p333s44z55z` is suuankou
-tenpai on 4z/5z by tsumo only (scoring an actual win does count a ron's triplet as open).
+tenpai on 4z/5z by tsumo only (`yaku.Evaluate`, which scores real wins, counts it as open; this matters only in CPU
+games, since practice sessions win by tsumo only).
 
 `normal` uses standard 4 melds + 1 pair only (chiitoitsu / kokushi have their own rows).
 
