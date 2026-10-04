@@ -274,14 +274,14 @@ jobs:
         run: |
           [ -f test-results/results.json ] || exit 0
           jq -r '.. | objects | select(has("tests") and has("file")) | .file as $f | .title as $t | .tests[] | select(.status == "flaky") | "::warning file=web/e2e/\($f),title=Flaky E2E test::\($t) failed, then passed on retry"' test-results/results.json
-      # The version tests on the release build (one shard runs them).
+      # The version tests on the release build (shard 2, the lightest, runs them).
       - name: Site version tests on a release build
-        if: matrix.shard == 1
+        if: matrix.shard == 2
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
         run: npx playwright test e2e/version.spec.ts e2e/help.spec.ts
       - name: Report flaky release-build tests
-        if: matrix.shard == 1 && always()
+        if: matrix.shard == 2 && always()
         run: |
           [ -f test-results/results.json ] || exit 0
           jq -r '.. | objects | select(has("tests") and has("file")) | .file as $f | .title as $t | .tests[] | select(.status == "flaky") | "::warning file=web/e2e/\($f),title=Flaky E2E test::\($t) failed, then passed on retry"' test-results/results.json
