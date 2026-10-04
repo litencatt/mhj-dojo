@@ -565,7 +565,7 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(form).toBeVisible();
-    await expect(form.getByRole('combobox')).toHaveCount(3);
+    await expect(form.getByRole('combobox')).toHaveCount(4);
     expect((await form.boundingBox())!.y).toBeGreaterThan((await toggle.boundingBox())!.y);
     expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(
@@ -707,7 +707,7 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
     await expect(page.getByLabel('起家')).toHaveValue('you');
-    await expect(page.getByLabel('CPU')).toHaveValue('weak');
+    await expect(page.getByLabel(/^CPU(?!の)/)).toHaveValue('weak');
     await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
     await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
     await expect(page).toHaveURL(/[?&]game=/);
