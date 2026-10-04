@@ -356,7 +356,9 @@ var green = map[tile.Kind]bool{
 	tile.MakeKind(tile.Sou, 6): true, tile.MakeKind(tile.Sou, 8): true, tile.Hatsu: true,
 }
 
-// firstDraw returns 天和 or 地和 for a closed tsumo on the first draw.
+// firstDraw returns 天和 or 地和 for a closed tsumo on the first draw. The
+// game sets the flags only via firstGoAround, which already rules out melds;
+// the checks here keep a hand-built Context honest.
 func firstDraw(ctx Context) []Yaku {
 	switch {
 	case ctx.Ron || len(ctx.Melds) > 0:

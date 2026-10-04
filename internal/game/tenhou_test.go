@@ -98,3 +98,34 @@ func TestTenhouChiihouVoidedByKan(t *testing.T) {
 		t.Fatalf("after its own kan: yaku %v", yakuKeys(res))
 	}
 }
+
+// A dealer kokushi on the first draw is 天和 + 国士無双, a double yakuman
+// (32000 all). The hand also has 九種九牌, and both are offered.
+func TestTenhouKokushi(t *testing.T) {
+	r := newRound(t)
+	setHand(r, 0, "119m19p19s123456z", "7z")
+	if l := r.LegalFor(0); !l.Tsumo || !l.Kyuushu {
+		t.Fatalf("legal tsumo %v kyuushu %v", l.Tsumo, l.Kyuushu)
+	}
+	mustApply(t, r, Action{Seat: 0, Type: Tsumo})
+	res := r.Result()
+	if !slices.Equal(yakuKeys(res), []string{"tenhou", "kokushi"}) || res.Points.Multiplier != 2 || res.Points.FromNonDealer != 32000 {
+		t.Fatalf("yaku %v points %+v", yakuKeys(res), res.Points)
+	}
+	checkDeltas(t, r, res)
+}
+
+// The dealer's double riichi does not interrupt the go-around: 地和 stands.
+func TestChiihouAfterDoubleRiichi(t *testing.T) {
+	r := tenpai0(t)
+	mustApply(t, r, Action{Seat: 0, Type: Riichi, Tile: "9s"})
+	skipCalls(t, r)
+	if !r.players[0].doubleRiichi {
+		t.Fatal("not a double riichi")
+	}
+	setHand(r, 1, "123m456m789m23p55s", "1p")
+	mustApply(t, r, Action{Seat: 1, Type: Tsumo})
+	if res := r.Result(); !slices.Equal(yakuKeys(res), []string{"chiihou"}) {
+		t.Fatalf("yaku %v", yakuKeys(res))
+	}
+}

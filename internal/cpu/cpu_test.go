@@ -442,6 +442,12 @@ func TestKyuushu(t *testing.T) {
 	if a := New().Decide(v, l); a.Type == game.Kyuushu {
 		t.Fatal("declared kyuushu on a kokushi tenpai-level hand")
 	}
+	v = view("119m19p19s123456z", "7z") // a first-draw win (天和) with nine kinds: win
+	l = legal(v)
+	l.Tsumo, l.Kyuushu = true, true
+	if a := New().Decide(v, l); a.Type != game.Tsumo {
+		t.Fatalf("tenhou with kyuushu: got %+v", a)
+	}
 }
 
 // callView is seat 0 facing a discard of s from seat 3 in the call phase.

@@ -506,14 +506,16 @@ These clarify points the contract above leaves open; none changes the JSON shape
   (never with `chanta`/`junchan`; also with chiitoitsu), `shousangen` 2 (the dragon triplets also
   score their yakuhai).
   **Yakuman** (`kokushi`, `suuankou`, `daisangen`, `tsuuiisou`, `shousuushii`, `daisuushii`,
-  `ryuuiisou`, `chinroutou`, `chuuren`): 13 han each, 26 for a double yakuman; several yakuman add up
+  `ryuuiisou`, `chinroutou`, `chuuren`, and in games `tenhou`, `chiihou`): 13 han each, 26 for a double yakuman; several yakuman add up
   (e.g. `suuankou` + `tsuuiisou` + `daisangen` = 39, a triple yakuman). The double yakuman keep their
   key and have their own `name`: `suuankou` won on the pair (四暗刻単騎, ron or tsumo), `kokushi` whose
   13 tiles before the win held one of each kind (国士無双十三面待ち), `chuuren` whose 13 tiles before
   the win were exactly 1112345678999 of the suit (純正九蓮宝燈), and `daisuushii` (大四喜, always
   double). The analysis rows' `han` stays 13 for every yakuman. When any yakuman is present, only the
   yakuman are listed (no 門前清自摸和 or other yaku). In games `tenhou` (天和) and `chiihou` (地和) are
-  13-han yakuman too, stacking with the hand's own (see the round rules). A closed tsumo with four triplets is always
+  13-han yakuman too, stacking with the hand's own (see the round rules). For `tenhou` the winning tile
+  is the dealer's 14th tile (its first draw), so the double forms that depend on the wait (国士無双十三面待ち,
+  四暗刻単騎, 純正九蓮宝燈) depend on which tile that was. A closed tsumo with four triplets is always
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
 
