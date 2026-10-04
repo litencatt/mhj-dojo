@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1004.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.0...v2026.1004.1) - 2026-10-04
+
+### 依存関係
+- Bump preact from 10.29.8 to 11.0.0 in /web by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/177
+
 ## [v2026.1004.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1003.0...v2026.1004.0) - 2026-10-04
 
 ### CI・リポジトリ
