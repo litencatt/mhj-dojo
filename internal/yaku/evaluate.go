@@ -53,8 +53,11 @@ type Context struct {
 	// Rinshan is a tsumo on the replacement tile after a kan, Chankan a ron
 	// on the tile added to a pon (robbing the kan).
 	Rinshan, Chankan bool
-	Winds            Winds
-	DoraIndicators   []tile.Tile
+	// Tenhou (dealer) and Chiihou (non-dealer) are a tsumo on the seat's
+	// first draw with no call made before it.
+	Tenhou, Chiihou bool
+	Winds           Winds
+	DoraIndicators  []tile.Tile
 	// UraIndicators are counted only when the hand is in riichi.
 	UraIndicators []tile.Tile
 	// Melds are the called melds (and ankan), and MeldTiles their tiles,
@@ -123,6 +126,8 @@ var (
 	yChinroutou  = Yaku{"chinroutou", "清老頭", 13, openSame}
 	yChuuren     = Yaku{"chuuren", "九蓮宝燈", 13, openNever}
 	ySuukantsu   = Yaku{"suukantsu", "四槓子", 13, openSame}
+	yTenhou      = Yaku{"tenhou", "天和", 13, openNever}
+	yChiihou     = Yaku{"chiihou", "地和", 13, openNever}
 )
 
 // Double yakuman: 26 han. They keep the key of the yakuman, whose single form
@@ -145,7 +150,7 @@ var byKey = func() map[string]Yaku {
 		yChanta, yJunchan, yHonroutou, yHonitsu, yChinitsu, yToitoi, ySanankou,
 		yShousangen, yHaku, yHatsu, yChun, yChiitoitsu,
 		yKokushi, ySuuankou, yDaisangen, yTsuuiisou, yShousuushii, yDaisuushii,
-		yRyuuiisou, yChinroutou, yChuuren,
+		yRyuuiisou, yChinroutou, yChuuren, yTenhou, yChiihou,
 	} {
 		m[y.Key] = y
 	}
@@ -211,8 +216,8 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		if c[ctx.WinTile] == 2 { // the 13 tiles held one of each kind: a 13-sided wait
 			y = yKokushi13
 		}
-		win.Yaku = []Yaku{y}
-		win.HanTotal = y.Han
+		win.Yaku = order(append([]Yaku{y}, firstDraw(ctx)...))
+		win.HanTotal = sumHan(win.Yaku)
 		return win, true
 	}
 	var best, bestYakuman []Yaku
@@ -233,11 +238,12 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 			ys = append(ys, yHonroutou)
 		}
 		ys = append(ys, yChiitoitsu)
-		consider(ys, yakumanWide(c, false, true, ctx.WinTile), chiitoitsuFu, nil)
+		consider(ys, append(yakumanWide(c, false, true, ctx.WinTile), firstDraw(ctx)...), chiitoitsuFu, nil)
 	}
 	for _, r := range ReadingsWith(c, ctx.Melds, ctx.WinTile) {
 		ys := evalReading(all, r, ctx)
-		consider(ys, append(yakumanWide(all, true, len(ctx.Melds) == 0, ctx.WinTile), yakumanReading(r, ctx)...), Fu(r, ctx), &r)
+		yakuman := append(yakumanWide(all, true, len(ctx.Melds) == 0, ctx.WinTile), yakumanReading(r, ctx)...)
+		consider(ys, append(yakuman, firstDraw(ctx)...), Fu(r, ctx), &r)
 	}
 	if bestYakumanHan > 0 {
 		win.Yaku = bestYakuman
@@ -348,6 +354,21 @@ func yakumanWide(c tile.Counts, standard, noMelds bool, win tile.Kind) []Yaku {
 var green = map[tile.Kind]bool{
 	tile.MakeKind(tile.Sou, 2): true, tile.MakeKind(tile.Sou, 3): true, tile.MakeKind(tile.Sou, 4): true,
 	tile.MakeKind(tile.Sou, 6): true, tile.MakeKind(tile.Sou, 8): true, tile.Hatsu: true,
+}
+
+// firstDraw returns 天和 or 地和 for a closed tsumo on the first draw. The
+// game sets the flags only via firstGoAround, which already rules out melds;
+// the checks here keep a hand-built Context honest.
+func firstDraw(ctx Context) []Yaku {
+	switch {
+	case ctx.Ron || len(ctx.Melds) > 0:
+		return nil
+	case ctx.Tenhou:
+		return []Yaku{yTenhou}
+	case ctx.Chiihou:
+		return []Yaku{yChiihou}
+	}
+	return nil
 }
 
 // yakumanReading returns the yakuman of one reading.
@@ -614,7 +635,7 @@ func init() {
 		"riichi", "double_riichi", "ippatsu", "tsumo", "haitei", "houtei", "rinshan", "chankan", "tanyao", "pinfu", "iipeikou", "ryanpeikou", "sanshoku", "sanshoku_doukou",
 		"ittsu", "chanta", "junchan", "honroutou", "honitsu", "chinitsu", "toitoi", "sanankou", "sankantsu",
 		"shousangen", "haku", "hatsu", "chun", "ton", "nan", "shaa", "pei", "chiitoitsu",
-		"kokushi", "suuankou", "daisangen", "tsuuiisou", "shousuushii", "daisuushii",
+		"tenhou", "chiihou", "kokushi", "suuankou", "daisangen", "tsuuiisou", "shousuushii", "daisuushii",
 		"ryuuiisou", "chinroutou", "chuuren", "suukantsu",
 	} {
 		displayOrder[k] = i

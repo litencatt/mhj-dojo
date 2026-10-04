@@ -75,9 +75,6 @@ func BenchmarkAnalyzeAllDiscards(b *testing.B) {
 const p95Limit = 100 * time.Millisecond
 
 func TestAnalyzeAllDiscardsP95(t *testing.T) {
-	if raceEnabled {
-		t.Skip("timing is not meaningful under the race detector")
-	}
 	r := rand.New(rand.NewPCG(9, 10))
 	n := testmode.N(200, 100, 40)
 	for _, open := range []bool{false, true} {

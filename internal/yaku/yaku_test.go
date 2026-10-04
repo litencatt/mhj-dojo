@@ -274,3 +274,31 @@ func TestDoubleYakumanNames(t *testing.T) {
 		}
 	}
 }
+
+// 天和/地和 stack with the hand's yakuman, replace its other yaku, and need a
+// closed tsumo.
+func TestTenhouChiihou(t *testing.T) {
+	pon := []Meld{{Type: Trip, Kind: tile.MakeKind(tile.Man, 1), Open: true}}
+	cases := []struct {
+		hand, win            string
+		ron, tenhou, chiihou bool
+		melds                []Meld
+		want                 string
+		han                  int
+	}{
+		{"123m456m789m123p55s", "1p", false, true, false, nil, "tenhou", 13},
+		{"1133m5577p22s3366z", "1m", false, false, true, nil, "chiihou", 13},
+		{"119m19p19s1234567z", "9m", false, true, false, nil, "tenhou,kokushi", 26},
+		{"123m456m789m123p55s", "1p", true, false, true, nil, "pinfu,ittsu", 3},
+		{"456m789m123p55s", "1p", false, true, false, pon, "", 0},
+	}
+	for _, tc := range cases {
+		wt, _ := tile.Parse(tc.win)
+		ctx := east()
+		ctx.WinTile, ctx.Ron, ctx.Tenhou, ctx.Chiihou, ctx.Melds = wt.Kind, tc.ron, tc.tenhou, tc.chiihou, tc.melds
+		w, ok := Evaluate(tile.MustParseHand(tc.hand), ctx)
+		if !ok || keys(w) != tc.want || w.HanTotal != tc.han {
+			t.Errorf("%s win %s: got [%s] han %d, want [%s] han %d", tc.hand, tc.win, keys(w), w.HanTotal, tc.want, tc.han)
+		}
+	}
+}

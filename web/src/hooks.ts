@@ -5,7 +5,7 @@ import { errorMessage } from './panels';
 import { claim, isStopped, onChange } from './singleTab';
 import {
   buildPlayback,
-  PLAYBACK_STEP_MS,
+  playbackStepMs,
   playbackHighlight,
   playbackState,
   type PlaybackBuild,
@@ -21,13 +21,18 @@ import {
 export function useSerialRequest<T>(onSuccess: (next: T) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether the error may pass on a retry: the engine failed (5xx, or it
+  // could not start), rather than refusing the request (4xx).
+  const [retryable, setRetryable] = useState(false);
 
   const inFlight = useRef(false);
+  const last = useRef<(() => Promise<T>) | null>(null);
 
   // Resolves to whether fn's own state was shown (not dropped, and not failed).
   async function request(fn: () => Promise<T>): Promise<boolean> {
     if (inFlight.current) return false;
     inFlight.current = true;
+    last.current = fn;
     setBusy(true);
     setError(null);
     try {
@@ -35,6 +40,7 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
       return true;
     } catch (err) {
       setError(errorMessage(err));
+      setRetryable(!(err instanceof api.ApiError) || err.status >= 500);
       return false;
     } finally {
       inFlight.current = false;
@@ -42,7 +48,14 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
     }
   }
 
-  return { busy, error, request };
+  // Sends the last request again (one that failed: it acts on the state
+  // still shown), or, before any, calls otherwise.
+  function retry(otherwise: () => void) {
+    if (last.current) void request(last.current);
+    else otherwise();
+  }
+
+  return { busy, error, retryable, request, retry };
 }
 
 /**
@@ -67,20 +80,24 @@ export interface UrlResumeOptions<T> {
   get: (id: string) => Promise<T>;
   create: (params: URLSearchParams) => Promise<T>; // a new one from the URL's other params
   sync: Record<string, string | null> | null; // params to write back; null deletes the key
+  // With no id in the URL: whether the page offers its saves (the player
+  // picks one with open, or starts a new one) instead of a new one at once.
+  offering?: boolean;
 }
 
 /**
  * Keeps the id in the URL so a reload resumes the same session or game. When
  * the engine has no save for it (404), the same wall is dealt again from the
  * params instead. Returns resume, which does it again (for a tab taking the
- * session or game back from another tab).
+ * session or game back from another tab), and open, which resumes the save
+ * with the given id.
  */
-export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResumeOptions<T>) {
+export function useUrlResume<T>({ idKey, request, get, create, sync, offering }: UrlResumeOptions<T>) {
   function resume() {
     const params = new URLSearchParams(location.search);
     const id = params.get(idKey);
     if (!id) {
-      void request(() => create(params));
+      if (!offering) void request(() => create(params));
       return;
     }
     void request(async () => {
@@ -109,7 +126,21 @@ export function useUrlResume<T>({ idKey, request, get, create, sync }: UrlResume
     history.replaceState(null, '', url);
   }, [syncKey]);
 
-  return resume;
+  // params: those that deal it again should its save be unusable (404).
+  function open(id: string, params: Record<string, string>) {
+    const url = new URL(location.href);
+    url.searchParams.set(idKey, id);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    history.replaceState(null, '', url);
+    resume();
+  }
+
+  return { resume, open };
+}
+
+/** Whether the page was opened with nothing to resume or deal in the URL (no id, seed or options). */
+export function bareUrl(): boolean {
+  return [...new URLSearchParams(location.search).keys()].every((k) => k === 'mode');
 }
 
 /**
@@ -227,7 +258,7 @@ export interface Playback {
 // response with no events at all) reveals everything at once.
 function leadStep(build: PlaybackBuild, state: GameState): number {
   const total = build.opsPerEvent.length;
-  if (total === 0 || prefersReducedMotion()) return total;
+  if (total === 0 || prefersReducedMotion() || playbackStepMs() === 0) return total;
   return state.events[0].seat === state.you ? 1 : 0;
 }
 
@@ -269,9 +300,9 @@ export function usePlayback(state: GameState | null, seen: GameState | null = nu
     const tick = () => {
       cur += 1;
       setAt({ build, step: cur });
-      if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+      if (cur < total) timer.current = window.setTimeout(tick, playbackStepMs());
     };
-    if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+    if (cur < total) timer.current = window.setTimeout(tick, playbackStepMs());
     return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [build]);

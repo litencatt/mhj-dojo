@@ -429,6 +429,7 @@ func TestAuditOpenHandNeedsAYakuToTsumo(t *testing.T) {
 		t.Fatalf("tsumo without yaku: %v", err)
 	}
 	r = newRound(t)
+	pastFirstDraw(r, 0)
 	setHand(r, 0, "123m567m345p789s9s", "9s")
 	if !r.LegalFor(0).Tsumo {
 		t.Fatal("closed tsumo not offered")

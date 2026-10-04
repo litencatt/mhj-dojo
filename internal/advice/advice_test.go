@@ -2,9 +2,11 @@ package advice
 
 import (
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
@@ -223,13 +225,96 @@ func TestNearYaku(t *testing.T) {
 	}
 }
 
+// Five pairs and 46s: discarding 4s or 6s is chiitoitsu tenpai, while
+// breaking a pair (1m) stays 1-shanten. The normal form alone calls every
+// discard 3-shanten.
+func TestChiitoitsuTenpai(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "113355m2277p99s46s", "", 5, 18))
+	if c := a.Candidates[0]; (c.Tile != "4s" && c.Tile != "6s") || c.Shanten != 0 || c.Ukeire != 3 || c.Wait == nil || *c.Wait != 3 {
+		t.Fatalf("best %+v, want 4s/6s chiitoitsu tenpai on 3 tiles", c)
+	}
+	if want := "打 4索 後: 七対子: 対子6。浮き牌は 6索"; a.Shape != want {
+		t.Fatalf("shape %q, want %q", a.Shape, want)
+	}
+	if want := "打 4索 と打 6索 はどちらも聴牌。待ちは同じ。"; !strings.HasPrefix(a.Notes[0], want) {
+		t.Fatalf("notes %q, want prefix %q", a.Notes, want)
+	}
+	if r := a.Review(tile.MustParseHand("6s")[0]); !r.IsBest {
+		t.Fatalf("6s review %+v", r)
+	}
+	if r := a.Review(tile.MustParseHand("1m")[0]); r.IsBest || r.Shanten != 1 || !strings.Contains(r.Text, "向聴が1つ遠い") {
+		t.Fatalf("1m review %+v", r)
+	}
+}
+
+// Five pairs and three honors and 4s: discarding a single keeps chiitoitsu
+// 1-shanten; the expected wait is a tanki on the other single (3 unseen).
+func TestChiitoitsuOneShanten(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "1133m5577p99s123z4s", "", 5, 18))
+	c := a.Candidates[0]
+	if c.Shanten != 1 || c.UkeireKinds != 3 || c.Ukeire != 9 || c.Wait == nil || *c.Wait != 3 {
+		t.Fatalf("best %+v, want chiitoitsu 1-shanten (9 tiles, wait 3)", c)
+	}
+	if r := a.Review(tile.MustParseHand("1m")[0]); r.IsBest || r.Shanten != 2 {
+		t.Fatalf("breaking a pair: %+v", r)
+	}
+}
+
+// Twelve kokushi kinds and 55m: 5m leaves kokushi 1-shanten on all 13 kinds
+// (40 tiles). Drawing 7z (4) reaches the 13-sided wait (39 unseen), any other
+// (36) a wait on 7z (4): (4*39 + 36*4) / 40 = 7.5.
+func TestKokushi(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "19m19p19s123456z55m", "", 5, 18))
+	if c := a.Candidates[0]; c.Tile != "5m" || c.Shanten != 1 || c.UkeireKinds != 13 || c.Ukeire != 40 || c.Wait == nil || *c.Wait != 7.5 {
+		t.Fatalf("best %+v, want 5m kokushi 1-shanten", c)
+	}
+	if want := "打 5萬 後: 国士無双: 12種・対子なし"; a.Shape != want {
+		t.Fatalf("shape %q, want %q", a.Shape, want)
+	}
+	b := Compute(input(yakushanten.NewAnalyzer(), "19m19p19s1234567z5m", "", 5, 18))
+	if c := b.Candidates[0]; c.Tile != "5m" || c.Shanten != 0 || c.Ukeire != 39 {
+		t.Fatalf("best %+v, want 5m 13-sided tenpai", c)
+	}
+}
+
+// 112233m55p678s99s: normal-form shanpon tenpai beats chiitoitsu 1-shanten,
+// so only the normal waits (5p, 9s) count.
+func TestNormalBeatsChiitoitsu(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "112233m55p67899s1z", "", 5, 18))
+	if c := a.Candidates[0]; c.Tile != "1z" || c.Shanten != 0 || c.UkeireKinds != 2 || c.Ukeire != 4 {
+		t.Fatalf("best %+v, want 1z shanpon tenpai on 5p/9s", c)
+	}
+}
+
+// 112233m4455p89s1z: normal and chiitoitsu are both 1-shanten, so the
+// ukeire are the union of both forms' (chiitoitsu adds 1z).
+func TestFormsUnion(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "112233m4455p89s1z9p", "", 5, 18))
+	c := find(t, a, "9p")
+	left := tile.CountsOf(tile.MustParseHand("112233m4455p89s1z"))
+	ct := shanten.Chiitoitsu(left)
+	normal := yakushanten.NewAnalyzer().NormalShanten(left)
+	if c.shanten != 1 || normal.Shanten != 1 || ct.Shanten != 1 {
+		t.Fatalf("9p %d, normal %d, chiitoitsu %d: want all 1-shanten", c.shanten, normal.Shanten, ct.Shanten)
+	}
+	for _, k := range append(normal.Ukeire, ct.Ukeire...) {
+		if !slices.Contains(c.uke, k) {
+			t.Fatalf("ukeire %v misses %v", c.uke, k)
+		}
+	}
+	if len(c.uke) <= len(normal.Ukeire) || len(c.uke) <= len(ct.Ukeire) {
+		t.Fatalf("ukeire %v is no wider than one form", c.uke)
+	}
+}
+
 // BenchmarkCompute times the advice alone (the per-discard analysis is
 // built outside the loop) on hands from 3-shanten to tenpai, where the
-// expected-wait search does the most work.
+// expected-wait search does the most work, plus a chiitoitsu and a kokushi
+// 1-shanten hand.
 func BenchmarkCompute(b *testing.B) {
 	a := yakushanten.NewAnalyzer()
 	var ins []Input
-	for _, h := range []string{"123m456p789s23s11z9m", "123m456p11z3457s79p", "11m345m678p22s456s7z", "234m678p13s46s55z9m1p", "139m468p2479s1257z"} {
+	for _, h := range []string{"123m456p789s23s11z9m", "123m456p11z3457s79p", "11m345m678p22s456s7z", "234m678p13s46s55z9m1p", "139m468p2479s1257z", "113355m22p111s777z", "19m19p19s123456z55m"} {
 		ins = append(ins, input(a, h, "", 5, 18))
 	}
 	b.ResetTimer()

@@ -236,9 +236,9 @@ position always gets the same advice. The text fields are Japanese.
 {
   "candidates": [                 // the best three distinct discards, best first
     { "tile": "9m",               // exact tile; a plain five is offered before a red one
-      "shanten": 1,               // normal-form shanten of the 13 tiles left
+      "shanten": 1,               // shanten of the 13 tiles left (lowest of normal, chiitoitsu, kokushi)
       "ukeire_kinds": 8,          // tile types that lower it
-      "ukeire": 28,               // their unseen copies (as by_discard's normal row ukeire_total)
+      "ukeire": 28,               // their unseen copies (4 − visible copies, as ukeire_total)
       "wait": 5.8,                // expected tenpai wait (0.1 steps); null above 1-shanten
       "yaku": ["断么九"] }         // near yaku of the 13 tiles left (see below)
   ],
@@ -248,23 +248,26 @@ position always gets the same advice. The text fields are Japanese.
   "draws_left": 14,               // draws after this discard: max_turns − turn − 1
   "tenpai_chance": 0.62,          // after the best discard, 0..1 (0.001 steps)
   "win_chance": 0.21,
-  "shape": "打 9萬 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split
+  "shape": "打 9萬 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split; when chiitoitsu or kokushi gives the shanten: "七対子: 対子6。浮き牌は 2筒" / "国士無双: 12種・対子なし"
   "near_yaku": [ { "key": "tanyao", "name": "断么九", "han": 1, "shanten": 1, "kept": true } ],
   "notes": ["打 9萬 と打 北 はどちらも1向聴。9萬 を切るほうが有効牌が4枚多い（28枚と24枚）。…"]
 }
 ```
 
 **Ranking.** Every distinct discard kind is compared by, in order:
-1. normal-form shanten (lower first; chiitoitsu and kokushi are not considered);
-2. `ukeire` (more first), counted like `by_discard`: 4 − visible copies;
+1. shanten (lower first): the lowest of the normal form, chiitoitsu and
+   kokushi (concealed hands only), as the CPU counts it;
+2. `ukeire` (more first), counted like `by_discard`: 4 − visible copies, over
+   the union of the ukeire of every form reaching that shanten;
 3. `wait` (more first), only between two discards at tenpai or 1-shanten. At
    tenpai it is the wait itself (= `ukeire`). At 1-shanten: for each ukeire
    type with unseen copies, draw it (it becomes visible), try every discard,
-   and take the most unseen waits of any tenpai reached; `wait` is the average
+   and take the most unseen waits of any tenpai reached (in any of the three
+   forms, so a chiitoitsu tanki or kokushi wait counts); `wait` is the average
    of those, weighted by the unseen copies of each ukeire type. Waits are
    compared as shown, rounded to 0.1, so closer ones tie;
 4. near yaku of the 13 tiles left: rows other than `normal` and the yakuman
-   whose shanten is ≤ max(1, the discard's normal shanten) — more rows first,
+   whose shanten is ≤ max(1, the discard's normal-form shanten) — more rows first,
    then more total `han`;
 5. dora kept: a dora kind or red five is discarded last; then terminals and
    honors before simples; then kind order.
@@ -285,8 +288,8 @@ to tenpai; 終盤: says so when `tenpai_chance` < 0.3, and at the last discard,
 the junme, so a short game (small `max_turns`) never shows 序盤 advice at its end. `notes[0]` explains the
 first two candidates by the first key that differs; a further note names the
 near yaku the best discard gives up. `near_yaku` lists up to 6 rows (the
-yakuman aside) whose best shanten over all discards is ≤ max(1, the best
-normal shanten), closest first; `kept` is whether the best discard keeps
+yakuman aside) whose best shanten over all discards is ≤ max(1, the lowest
+normal-form shanten over all discards), closest first; `kept` is whether the best discard keeps
 that shanten.
 
 ### Review
@@ -503,13 +506,16 @@ These clarify points the contract above leaves open; none changes the JSON shape
   (never with `chanta`/`junchan`; also with chiitoitsu), `shousangen` 2 (the dragon triplets also
   score their yakuhai).
   **Yakuman** (`kokushi`, `suuankou`, `daisangen`, `tsuuiisou`, `shousuushii`, `daisuushii`,
-  `ryuuiisou`, `chinroutou`, `chuuren`): 13 han each, 26 for a double yakuman; several yakuman add up
+  `ryuuiisou`, `chinroutou`, `chuuren`, and in games `tenhou`, `chiihou`): 13 han each, 26 for a double yakuman; several yakuman add up
   (e.g. `suuankou` + `tsuuiisou` + `daisangen` = 39, a triple yakuman). The double yakuman keep their
   key and have their own `name`: `suuankou` won on the pair (四暗刻単騎, ron or tsumo), `kokushi` whose
   13 tiles before the win held one of each kind (国士無双十三面待ち), `chuuren` whose 13 tiles before
   the win were exactly 1112345678999 of the suit (純正九蓮宝燈), and `daisuushii` (大四喜, always
   double). The analysis rows' `han` stays 13 for every yakuman. When any yakuman is present, only the
-  yakuman are listed (no 門前清自摸和 or other yaku). A closed tsumo with four triplets is always
+  yakuman are listed (no 門前清自摸和 or other yaku). In games `tenhou` (天和) and `chiihou` (地和) are
+  13-han yakuman too, stacking with the hand's own (see the round rules). For `tenhou` the winning tile
+  is the dealer's 14th tile (its first draw), so the double forms that depend on the wait (国士無双十三面待ち,
+  四暗刻単騎, 純正九蓮宝燈) depend on which tile that was. A closed tsumo with four triplets is always
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
 
@@ -526,10 +532,13 @@ have a choice again or the round ends; after a round ends you send `next`.
 Round rules: riichi (closed, costs a 1000-point stick and needs at least 1000
 points, at least 4 draws left, tenpai after the discard; after riichi only the
 drawn tile can be discarded, and the engine discards it for you unless you can
-tsumo), double riichi, ippatsu, ura dora, haitei, houtei, furiten (own
+tsumo), double riichi, ippatsu, ura dora, haitei, houtei, 天和 / 地和
+(`tenhou` / `chiihou`: a yakuman tsumo on the dealer's / a non-dealer's first
+draw with no call, concealed kan included, before it; never on a ron or a
+rinshan draw), furiten (own
 discards, same go-around, and after riichi), head bump (no double ron),
 3000-point noten penalty at the exhaustive draw, and the abortive draws 九種九牌
-(declared), 四風連打, 四家立直 and 四開槓. Points: no kiriage mangan, a pair of a wind
+(declared), 四風連打, 四家立直 and 四開槓; no nagashi mangan (流し満貫). Points: no kiriage mangan, a pair of a wind
 that is both the round and the seat wind is 4 fu (2 per reason, as for any
 value pair), counted yakuman at 13 han, yakuman multiples (a double yakuman or
 stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a
@@ -552,7 +561,7 @@ Calls: pon and open kan on any other seat's discard, chii on the discard of
 the seat to your left, and on your own turn a concealed kan or an added kan
 onto your pon. After a discard every seat that can claim it answers in turn
 order: a ron wins at once (head bump), otherwise a pon or kan beats a chii.
-Declining a ron makes you furiten; declining a call does not. The last discard
+Declining a ron makes you furiten, and so does passing a winning tile you cannot ron for lack of a yaku; declining a call does not. The last discard
 of the round cannot be called, and a seat in riichi can only ron (or make a
 concealed kan that keeps its waits). After a pon or chii you discard without
 drawing and may not discard the called kind, nor the tile on the far side
@@ -800,20 +809,20 @@ so one the page keeps acting on stays in). Each session or game owns a
 `cpu.Player`; each keeps a shanten memo bounded as described under "Memo
 bounds" below (at most ~9 MiB per analyzer and ~1 MiB per CPU player).
 
-The WebAssembly build (`cmd/mhj-dojo-wasm`) keeps at most 4 sessions
-(`session.NewStoreWithMax`; `session.MaxSessions` = 256 is `session.NewStore`'s
-default, for the tests): it runs in a browser tab's memory, and Go's wasm
+The WebAssembly build (`cmd/mhj-dojo-wasm`) keeps at most 4 sessions and
+2 games (the `max` argument of `session.NewStore` and `match.NewStore`), so
+the stores hold at most about 4 x 9.8 + 2 x 10.5 = ~60 MiB of memos and trees
+(a few MiB more while a memo turns over). It runs in a browser tab's memory,
+and the engine is single-threaded (no per-session or per-game locks). Go's wasm
 runtime never returns freed heap pages to the OS, so a session's cost (its
-branch tree plus its own analyzer memo, up to ~8 MiB) only ever grows the
+branch tree plus its own analyzer memo, up to ~9.8 MiB) only ever grows the
 tab's memory until the store evicts it. A session evicted this way, or lost
 to a reload, is rebuilt from its moves on its next request
 (`mhjDojoRestore`, `web/src/wasm.ts`), so revisiting an old game by URL still
 works; `web/e2e/practice-saves.spec.ts` checks the eviction and rebuild
 together.
 
-Games get the same treatment with a max of 2 (`match.NewStoreWithMax`;
-`match.MaxGames` = 256 is the default): a
-game holds its analyzer memo and its CPU players' memo, and an evicted or
+A game holds its analyzer memo and its CPU players' memo, and an evicted or
 reloaded game is rebuilt from its save (`mhjDojoRestoreGame`, "Game saves").
 
 Measured with `internal/match/memory_test.go`'s `BenchmarkGameMemory` and

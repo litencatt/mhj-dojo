@@ -15,7 +15,7 @@ import (
 var defaults = Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Normal}
 
 func TestCreateOptions(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	for _, o := range []Options{{Length: "x"}, {FirstDealer: "me"}, {CPU: "strong"}} {
 		if _, err := st.Create(nil, o); !errors.Is(err, game.ErrInvalid) {
 			t.Fatalf("%+v: %v", o, err)
@@ -54,7 +54,7 @@ func TestWeakGameReplays(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
 	}
-	st := NewStore()
+	st := NewStore(256)
 	for seed := range testmode.N(int64(3), 1, 1) {
 		var logs [2][][]game.Action
 		for i := range logs {

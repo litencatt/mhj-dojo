@@ -7,15 +7,18 @@ import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, seatLabel } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
+import { ResumePanel, type ResumeItem } from './components/ResumePanel';
+import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
+  bareUrl,
   useLastAnalysis,
   useMediaQuery,
   usePlayback,
@@ -26,8 +29,10 @@ import {
   useUrlResume,
   useYakuTop,
 } from './hooks';
+import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
+import { savedGames, type GameSummary } from './wasm';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
 // not reset on every render.
@@ -54,6 +59,25 @@ function parseOptions(get: (key: string) => string | null): GameOptions {
   };
 }
 
+/** A saved game in the list of saves: 「東風戦 東2局 シード 5」, and the URL params that deal it again. */
+function savedItem(g: GameSummary): ResumeItem {
+  const r = g.round;
+  const round = r && (r.over ? '終局' : WIND_NAMES[r.wind] && roundName(r.wind, r.number, r.honba));
+  const seed = g.seed !== null && `シード ${g.seed}`;
+  const params: Record<string, string> = {};
+  if (g.length) params.length = g.length;
+  if (g.firstDealer) params.first_dealer = g.firstDealer;
+  if (g.cpu) params.cpu = g.cpu;
+  if (g.seedKnown) params.seed = String(g.seed);
+  return {
+    id: g.id,
+    label: [LENGTH_NAMES[g.length as GameOptions['length']], round, seed].filter(Boolean).join(' '),
+    used: g.used,
+    params,
+    over: !!r?.over,
+  };
+}
+
 function urlOptions(): GameOptions {
   const params = new URLSearchParams(location.search);
   return parseOptions((k) => params.get(k));
@@ -65,6 +89,7 @@ export function GameApp() {
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
+  const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -75,11 +100,16 @@ export function GameApp() {
   const shownGame = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const phone = useMediaQuery(PHONE);
+  // Opened with no game, seed or options in the URL: the saved games, if
+  // any, are offered instead of a new one.
+  const [offered] = useState<ResumeItem[]>(() =>
+    bareUrl() ? savedGames().map(savedItem) : [],
+  );
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   // The state last reopened from a save: shown as it stands, not replayed.
   const reopened = useRef<GameState | null>(null);
-  const { busy, error, request } = useSerialRequest<GameState>(
+  const { busy, error, retryable, request, retry } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
@@ -111,8 +141,9 @@ export function GameApp() {
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
   // reload resumes the game, or deals the same seed and options again when
   // its save is gone (404).
-  const resume = useUrlResume({
+  const { resume, open } = useUrlResume({
     idKey: 'game',
+    offering: offered.length > 0,
     request,
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
@@ -148,6 +179,8 @@ export function GameApp() {
   async function handleNewGame(e: Event) {
     e.preventDefault();
     const fromForm = !!formRef.current?.contains(document.activeElement);
+    // The game on stays saved, but only the list of saves leads back to it.
+    if (state && !state.game_over && !window.confirm('対局中です。新しい対局を始めますか？')) return;
     const started = await startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
     const toggle = toggleRef.current;
     if (!started || !toggle || toggle.offsetParent === null) return;
@@ -197,6 +230,25 @@ export function GameApp() {
   // header, the table and the hand (style.css), as in practice.
   const appRef = useYakuTop(!!state);
 
+  const speedOption = (
+    <label class="speed-option">
+      再生速度
+      <select
+        value={speed}
+        onChange={(e) => {
+          const v = (e.target as HTMLSelectElement).value as PlaybackSpeed;
+          setSpeed(v);
+          savePlaybackSpeed(v);
+        }}
+      >
+        {(Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).map((k) => (
+          <option key={k} value={k}>
+            {PLAYBACK_SPEEDS[k].label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
   return (
     <div ref={appRef} class={appClass}>
       <div class="area-main">
@@ -255,6 +307,7 @@ export function GameApp() {
                   uraDoraIndicators={table.ura_dora_indicators}
                   uraDora={table.ura_dora}
                 />
+                {!phone && speedOption}
                 <button
                   ref={toggleRef}
                   type="button"
@@ -313,15 +366,17 @@ export function GameApp() {
                   onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
                 />
               </label>
+              {phone && speedOption}
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
           </header>
-          {error && (
-            <div class="error-banner" role="alert">
-              {error}
-            </div>
+          {/* 再試行 only for an engine failure: a refused request would fail again. */}
+          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
+          <SaveFailedNotice />
+          {!state && offered.length > 0 && (
+            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
-          {!state && !error && (
+          {!state && !error && offered.length === 0 && (
             <p class="muted">
               計算エンジンを読み込んでいます…
             </p>

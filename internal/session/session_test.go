@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/litencatt/mhj-dojo/internal/tile"
@@ -31,7 +30,7 @@ func mustCreate(t *testing.T, st *Store, seed int64, maxTurns int) *Session {
 }
 
 func TestCreateState(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 42, 0)
 	v := s.State(View{})
 	if v.Seed != 42 || v.MaxTurns != DefaultMaxTurns || v.NodeID != 0 || v.Turn != 0 || v.Status != StatusPlaying {
@@ -74,7 +73,7 @@ func TestCreateState(t *testing.T) {
 }
 
 func TestRemainingCountsVisibleTiles(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, _ := st.CreateWithWall(fixedWall(t, "123456789m1234p", "5z"), 0)
 	v := s.State(View{})
 	// visible: hand + drawn 5z + dora indicator
@@ -100,7 +99,7 @@ func TestRemainingCountsVisibleTiles(t *testing.T) {
 }
 
 func TestDiscardGotoBranch(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 1, 0)
 	root := s.State(View{})
 	drawn := *root.Drawn
@@ -155,7 +154,7 @@ func TestDiscardGotoBranch(t *testing.T) {
 // lets a client detect that another tab moved the session on first (issue
 // #53), the way a stale game action already does.
 func TestExpectedNodeGuard(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 1, 0)
 	root := s.State(View{})
 	drawn := *root.Drawn
@@ -194,7 +193,7 @@ func TestExpectedNodeGuard(t *testing.T) {
 // TestExpectedNodeGuardTsumo is TestExpectedNodeGuard for Tsumo, which needs
 // a hand that can actually win.
 func TestExpectedNodeGuardTsumo(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +223,7 @@ func TestExpectedNodeGuardTsumo(t *testing.T) {
 }
 
 func TestExhausted(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 3, 2)
 	for i := 0; i < 2; i++ {
 		v := s.State(View{})
@@ -248,7 +247,7 @@ func TestExhausted(t *testing.T) {
 }
 
 func TestTsumo(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
 	if err != nil {
 		t.Fatal(err)
@@ -302,7 +301,7 @@ func TestTsumo(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	if _, err := st.Get("nope"); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -319,7 +318,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestRedFiveDiscardIsExact(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, _ := st.CreateWithWall(fixedWall(t, "0m5m123p456p789s11z", "9m"), 0)
 	v := s.State(View{})
 	if _, ok := v.ByDiscard["0m"]; !ok {
@@ -344,23 +343,10 @@ func TestRedFiveDiscardIsExact(t *testing.T) {
 	}
 }
 
-func TestStoreEviction(t *testing.T) {
-	st := NewStore()
-	first := mustCreate(t, st, 1, 1)
-	for i := 0; i < MaxSessions; i++ {
-		mustCreate(t, st, int64(i), 1)
-	}
-	if _, err := st.Get(first.ID()); !errors.Is(err, ErrNotFound) {
-		t.Fatal("oldest session should be evicted")
-	}
-}
-
-// TestNewStoreWithMaxEvictsOldest exercises the smaller cap the wasm build
-// (cmd/mhj-dojo-wasm) passes to NewStoreWithMax instead of MaxSessions: the
-// oldest session is evicted once the store holds more than its own custom
-// max, and sessions within that max stay reachable.
-func TestNewStoreWithMaxEvictsOldest(t *testing.T) {
-	st := NewStoreWithMax(2)
+// TestNewStoreEvictsOldest: the oldest session is evicted once the store
+// holds more than its max, and sessions within that max stay reachable.
+func TestNewStoreEvictsOldest(t *testing.T) {
+	st := NewStore(2)
 	a := mustCreate(t, st, 1, 1)
 	b := mustCreate(t, st, 2, 1)
 	c := mustCreate(t, st, 3, 1)
@@ -374,32 +360,9 @@ func TestNewStoreWithMaxEvictsOldest(t *testing.T) {
 	}
 }
 
-func TestConcurrentUse(t *testing.T) {
-	st := NewStore()
-	s := mustCreate(t, st, 9, 0)
-	var wg sync.WaitGroup
-	for g := 0; g < 8; g++ {
-		wg.Add(1)
-		go func(g int) {
-			defer wg.Done()
-			for i := 0; i < 5; i++ {
-				v := s.State(View{})
-				if v.Drawn != nil {
-					_, _ = s.Discard(*v.Drawn, nil, View{}) // conflicts between goroutines are expected
-				}
-				_, _ = s.Goto(g%2, View{})
-			}
-		}(g)
-	}
-	wg.Wait()
-	if n := len(s.State(View{}).Tree); n < 2 {
-		t.Fatalf("tree has %d nodes", n)
-	}
-}
-
 // Regression: a chiitoitsu win is still a complete hand, so the tree shows -1.
 func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.CreateWithWall(fixedWall(t, "1122m3344p5566s7z", "7z"), 0)
 	if err != nil {
 		t.Fatal(err)
@@ -419,7 +382,7 @@ func TestTsumoChiitoitsuTreeShanten(t *testing.T) {
 
 // Regression: the "tsumo" child key must not be reachable as a discard.
 func TestDiscardCannotReachTsumoChild(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s"), 0)
 	if _, err := s.Tsumo(nil, View{}); err != nil {
 		t.Fatal(err)
@@ -437,7 +400,7 @@ func TestDiscardCannotReachTsumoChild(t *testing.T) {
 
 // Dora are always shown; ura dora stay hidden until the game ends.
 func TestDoraAndUraDora(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 3, 1)
 	w := wall.New(3)
 	ind, ura := w.DoraIndicators()[0], w.UraDoraIndicators()[0]
@@ -472,7 +435,7 @@ func TestDoraAndUraDora(t *testing.T) {
 func TestTreeIsBounded(t *testing.T) {
 	defer func(n int) { maxNodes = n }(maxNodes)
 	maxNodes = 10
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.Create(nil, wall.LiveDraws)
 	if err != nil {
 		t.Fatal(err)
@@ -508,7 +471,7 @@ func TestTreeIsBounded(t *testing.T) {
 // once it's no longer the current node or on its history path; revisiting
 // it must recompute the exact same state(), not just cheaper data.
 func TestStateUnchangedAfterCachePruning(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s := mustCreate(t, st, 42, wall.LiveDraws)
 
 	// Two distinct first moves from the root, so branch A and branch B

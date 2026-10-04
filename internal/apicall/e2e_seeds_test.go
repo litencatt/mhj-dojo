@@ -50,7 +50,7 @@ func newE2EGame(c *client, seed int, firstDealer string) (match.State, string) {
 // SEED: a pon is offered within 60 moves (maxSteps of playUntilPonOffered).
 func TestE2ESeedOffersPon(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "SEED")
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, path := newE2EGame(c, seed, "random")
 	for i := 0; i < 60 && st.Result == nil && !st.Legal.Pon; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
@@ -64,7 +64,7 @@ func TestE2ESeedOffersPon(t *testing.T) {
 // events, and the round reaches a result within 150 moves (playToResult).
 func TestE2ESeedRound(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "SEED")
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st, path := newE2EGame(c, seed, "random")
 	if st.Actor != 0 || len(st.Events) != 0 {
 		t.Errorf("seed %d (SEED): want you to move first with no CPU events, got actor %d, %d events; see the comment above tsConst",
@@ -85,7 +85,7 @@ func TestE2ESeedRound(t *testing.T) {
 // CPU_DEALS: a CPU deals first.
 func TestE2ESeedCPUDeals(t *testing.T) {
 	seed := tsConst(t, "table.spec.ts", "CPU_DEALS")
-	st, _ := newE2EGame(newClient(t, session.NewStore()), seed, "random")
+	st, _ := newE2EGame(newClient(t, session.NewStore(256)), seed, "random")
 	if len(st.Events) == 0 || st.Events[0].Seat == 0 {
 		t.Errorf("seed %d (CPU_DEALS): want a CPU dealer, got events %+v; see the comment above tsConst", seed, st.Events)
 	}

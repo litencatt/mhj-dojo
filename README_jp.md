@@ -34,7 +34,7 @@
 - **操作**：打牌、**リーチ**（聴牌が残る牌だけ選べます。以後のツモ牌は和了できるとき以外は自動でツモ切り）、**ツモ**、捨て牌で和了れるときは **ロン** / **見逃す**、鳴きが選べるときの **ポン** / **チー** / **カン**、自分の手番での暗槓・加槓。
 - **鳴き**：ポンと明槓は他家全員の捨て牌に、チーは上家の捨て牌にのみ宣言できます。その局の最後の捨て牌は鳴けません。リーチ中はロンと、待ちが変わらない暗槓だけができます。ポン・チーの直後は、鳴いた牌と同じ種類（辺張チーは筋の反対側の牌も）を打てません（喰い替え）。加槓は槍槓（チャンカン）で振り込みます。カンをすると嶺上牌をツモり（和了れば嶺上開花）、槓ドラが増えます。鳴くと門前限定の役が消え、食い下がりの役は翻が1つ下がります。
 - **CPUの打牌の再生**：あなたの操作のあと、CPU全員分の手番をエンジンがまとめて処理し、卓の表示はそれを1手ずつ再生します（打牌・鳴き・リーチ）。**スキップ** ボタンで、あなたの次の選択まで一気に進められます。
-- **ルール**：リーチ、ダブルリーチ、一発、裏ドラ、海底・河底、フリテン（自分の捨て牌・同巡内・リーチ後の見逃し）、頭ハネ、流局時のノーテン罰符、途中流局（九種九牌・四風連打・四家立直・四開槓）。
+- **ルール**：リーチ、ダブルリーチ、一発、裏ドラ、海底・河底、天和・地和、フリテン（自分の捨て牌・同巡内・リーチ後の見逃し）、頭ハネ、流局時のノーテン罰符、途中流局（九種九牌・四風連打・四家立直・四開槓）。流し満貫はなし。
 - **点数**：符と翻、満貫から（数え）役満まで、ダブル役満と複合役満（ダブル役満は26翻、複数の役満は合算）、親・子の支払い、本場（ロン300点／ツモ各100点）とリーチ棒（誰かが和了るまで場に残ります）を、終局時の点数の増減とともに表示します。
 - **対局の進行**：親は和了・聴牌での流局・途中流局のときに連荘し、それ以外は次の親に移ります。本場は連荘と流局（途中流局を含む）で1つ増え、子の和了で0に戻ります。最終局が終わる（親が連荘のときを除く）か、誰かの点数が0点未満になる（トビ）と終局します。最終順位は点数順（ウマ +20 / +10 / −10 / −20、オカ トップに+20）で決まります。
 - **鳴いた手の役別向聴**：副露は固定の面子として扱われ、向聴は残りの手牌だけで数えます。副露がその役の形に合わない場合はその行が不可能になります。副露があると七対子・国士無双・九蓮宝燈・平和・二盃口は成立せず、ポン・チー・明槓で手が開くと一盃口・四暗刻も成立しません（暗槓だけなら門前は保たれます）。
@@ -71,7 +71,7 @@ make build        # 静的サイトをビルド（make embed）してから、�
 | `--open` | `true` | 起動時にブラウザを開く |
 | `--seed` | ランダム | 一人打ち練習をこのシード（0〜2^53-1）の山で開く（`/?seed=N` のページ）。新しく始める練習やCPU対戦には影響しません |
 
-`Host` ヘッダーが localhost かループバックアドレスを指すリクエストにしか応答しません。ブラウザ上のページが DNS リバインディングで到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
+`Host` ヘッダーが localhost かループバックアドレスを指すリクエストにしか応答しません。他サイトのページが DNS リバインディングでアプリに到達するのを防ぐためです。そのため `--host 0.0.0.0` を指定しても、他の端末のブラウザからは開けません（ループバック以外のアドレスで待ち受けると起動時に警告を出します）。
 
 ### 保存
 
@@ -104,6 +104,8 @@ cd web && npx playwright install --with-deps chromium   # 初回のみ
 make embed && cd web && npm run e2e
 ```
 
+`make e2e` なら `bin/mhj-dojo` をビルドして、`go run` の代わりにそれに対してテストを実行します（`EXTRA=--shard=1/3` やスペックのパスで絞り込めます）。`npm run e2e` でも `MHJDOJO_BIN=<パス>` で同じことができ、CI はこれを使います。
+
 ### 静的サイト（WebAssembly）
 
 このアプリは静的サイトです。Go のエンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にし、画面が固まらないよう Web Worker で動かします。リクエストの形式は [docs/api.md](docs/api.md) のとおりです。`mhj-dojo`（`make embed`）でも、どの静的ホスティングでも配信できます。
@@ -126,8 +128,11 @@ Lolipop Deploy Now で https://mhj-dojo.lolipop-now.app/ に公開していま�
 2. その PR をマージすると、リリースのタグ（日本の日付とその日の何回目か。`v2026.0927.0`、次は `v2026.0927.1`）と GitHub Release が作られます。続けて同じワークフローが、そのタグで **Build site release**（`.github/workflows/build-site-release.yml`）を実行します。Build site release は、タグのコミットをヘッダーにリリース名を入れてビルドし（`MHJDOJO_RELEASE`）、そのビルドで公開サイトの E2E テストを実行し、`web/dist-site` を `mhj-dojo-site-<tag>.tar.gz`（と `.sha256`）にまとめて、そのタグの GitHub Release に添付します。
 3. Build site release は続けて **Deploy to Lolipop**（`.github/workflows/deploy-lolipop.yml`）をそのタグで呼び出します。この成果物をダウンロード・検証し、`lolipop-deploy-now` から切ったリリース用ブランチにタグを取り込み、そのブランチの `web/dist-site` を成果物の内容に完全に置き換えて（Deploy Now では Go の WebAssembly エンジンをビルドできないため。`main` では `.gitignore` 対象）、`lolipop-deploy-now` 向けの PR を作ります。公開サイトはこの `lolipop-deploy-now` ブランチから公開されます。Lolipop Deploy Now の GitHub 連携がこのブランチを監視していて（フレームワーク: 静的サイト、インストール・ビルドコマンドなし、出力ディレクトリ `web/dist-site`）、マージされるたびに公開します。
 4. その PR を「Create a merge commit」でマージすると（squash しない）、リリースが公開されます。
+5. `lolipop-deploy-now` への push で **Verify live site**（`.github/workflows/verify-live.yml`）が動きます。公開サイトの `version.json` がそのリリースになるまで最大 10 分待ち、公開サイトのスモークテスト（`EXPECT_RELEASE=<tag> npm run e2e:live`）を実行します。失敗すると `ci` ラベルの issue を作ります。
 
-どちらのワークフローも手動で実行できます（Actions → 各ワークフロー → Run workflow）。Build site release はタグを指定するか、空欄で `main` をそのまま対象にします（タグなしの場合はビルドと E2E のみを行い、成果物はワークフローアーティファクトとして残すだけで、Release への添付やデプロイの呼び出しは行いません）。Deploy to Lolipop は、成果物がまだ Release に残っている既存のタグを指定して再デプロイ、または**ロールバック**に使えます。`web/dist-site` はファイル単位でマージせず完全に置き換えるため、どちらの操作でも、ブランチには間のタグの内容を持ち込まず、指定したタグどおりのファイルだけが残ります。どちらのワークフローにも「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、これらが作る PR では CI が動きません（公開サイトの E2E は Build site release 自身が実行し、それ以外は `main` の CI で確認済みです）。
+手作業で残るのは、tagpr が作るリリース PR のマージと、公開用 PR のマージ（マージコミット）です。どちらも `GITHUB_TOKEN` で作られるため CI が動かず、チェックは付きません（`gh pr checks --watch` は監視するものがなく、すぐ戻ることがあります）。タグと公開用 PR の中身は作成前に Build site release が、公開後の状態は Verify live site が確認します。リリース PR のマージによる `main` への push は `CHANGELOG.md` だけの変更で、`ci.yml` は `paths-ignore` で対象外にします。Build site release がタグで失敗したら、不安定な失敗なら再実行し、本当の不具合なら `main` を直して改めてリリースしてください（失敗したタグは公開されません）。
+
+Build site release、Deploy to Lolipop、Verify live site は手動でも実行できます（Actions → 各ワークフロー → Run workflow）。Build site release はタグを指定するか、空欄で `main` をそのまま対象にします（タグなしの場合はビルドと E2E のみを行い、成果物はワークフローアーティファクトとして残すだけで、Release への添付やデプロイの呼び出しは行いません）。Deploy to Lolipop は、成果物がまだ Release に残っている既存のタグを指定して再デプロイ、または**ロールバック**に使えます。`web/dist-site` はファイル単位でマージせず完全に置き換えるため、どちらの操作でも、ブランチには間のタグの内容を持ち込まず、指定したタグどおりのファイルだけが残ります。Verify live site はタグを指定（または空欄で `lolipop-deploy-now` から取得）して公開サイトを再確認できます。Build site release と Deploy to Lolipop には「Allow GitHub Actions to create and approve pull requests」（Settings → Actions → General）が必要です。また、これらが作る PR では CI が動きません（公開サイトの E2E は Build site release 自身が実行し、それ以外は `main` の CI で確認済みです）。
 
 サイトの公開先 URL（OGP タグなどに使用）は 1 か所に集約しています。ビルド時変数 `MHJDOJO_SITE_URL` が、リポジトリ変数 `SITE_URL` から読み込まれ（`gh variable set SITE_URL --body https://your-host.example/` のように末尾のスラッシュ込みで設定）、未設定なら現在の `https://mhj-dojo.lolipop-now.app/` にフォールバックします。`web/playwright.live.config.ts`（`web/` で `npm run e2e:live`。直接 URL を指定するときは `LIVE_BASE_URL=... npm run e2e:live`）も同じ変数をデフォルトのベース URL として読みます。
 

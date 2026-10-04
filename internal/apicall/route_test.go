@@ -28,7 +28,7 @@ type client struct {
 }
 
 func newClient(t *testing.T, store *session.Store) *client {
-	return &client{t: t, store: store, games: match.NewStore()}
+	return &client{t: t, store: store, games: match.NewStore(256)}
 }
 
 // do returns the status and the JSON body of a request.
@@ -69,7 +69,7 @@ func (c *client) wantError(method, path, body string, status int) {
 
 // TestStateContract checks the raw JSON shape against docs/api.md.
 func TestStateContract(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	_, b := c.do("POST", "/api/sessions", `{"seed": 42}`)
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -169,7 +169,7 @@ func checkAdviceContract(t *testing.T, raw map[string]json.RawMessage) {
 }
 
 func TestDiscardReviewContract(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	root := c.state("POST", "/api/sessions", `{"seed": 42, "max_turns": 1}`)
 	_, b := c.do("POST", "/api/sessions/"+root.SessionID+"/discard", `{"tile": "`+root.Advice.Candidates[0].Tile+`"}`)
 	var raw map[string]json.RawMessage
@@ -195,7 +195,7 @@ func TestDiscardReviewContract(t *testing.T) {
 }
 
 func TestCreateDiscardGotoBranch(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	root := c.state("POST", "/api/sessions", `{"seed": 42, "max_turns": 3}`)
 	if root.Seed != 42 || root.MaxTurns != 3 || root.Drawn == nil {
 		t.Fatalf("create: %+v", root)
@@ -253,7 +253,7 @@ func TestCreateDiscardGotoBranch(t *testing.T) {
 // that another tab already moved the session on, instead of silently
 // discarding against whatever node happens to be current.
 func TestSessionNodeIDGuard(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	root := c.state("POST", "/api/sessions", `{"seed": 1}`)
 	base := "/api/sessions/" + root.SessionID
 	drawn := *root.Drawn
@@ -282,7 +282,7 @@ func TestSessionNodeIDGuard(t *testing.T) {
 
 // TestTsumoNodeIDGuard is TestSessionNodeIDGuard for tsumo.
 func TestTsumoNodeIDGuard(t *testing.T) {
-	store := session.NewStore()
+	store := session.NewStore(256)
 	w, err := wall.WithFront(1, tile.MustParseHand("123m456p789s1122z1z"))
 	if err != nil {
 		t.Fatal(err)
@@ -341,7 +341,7 @@ func checkHandGroups(t *testing.T, hand []string, groups []apiview.HandGroup) {
 }
 
 func TestSessionHandGroups(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	s := c.state("POST", "/api/sessions", `{"seed": 7}`)
 	base := "/api/sessions/" + s.SessionID
 	for s.Status == session.StatusPlaying {
@@ -352,7 +352,7 @@ func TestSessionHandGroups(t *testing.T) {
 }
 
 func TestTsumoFlow(t *testing.T) {
-	store := session.NewStore()
+	store := session.NewStore(256)
 	w, err := wall.WithFront(1, tile.MustParseHand("123m456p789s1122z1z"))
 	if err != nil {
 		t.Fatal(err)
@@ -385,7 +385,7 @@ func TestTsumoFlow(t *testing.T) {
 }
 
 func TestRequestErrors(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	st := c.state("POST", "/api/sessions", "")
 	base := "/api/sessions/" + st.SessionID
 	c.wantError("GET", "/api/sessions/nope", "", http.StatusNotFound)
@@ -406,7 +406,7 @@ func TestRequestErrors(t *testing.T) {
 // checked to answer alike (issue #147 moved the server's API out): each
 // status, and a JSON error body on every failure.
 func TestRouteStatuses(t *testing.T) {
-	c := newClient(t, session.NewStore())
+	c := newClient(t, session.NewStore(256))
 	create := `{"seed":1,"max_turns":6}`
 	c.state("POST", "/api/sessions?advice=0&tree_from=1", create)
 	st := c.state("POST", "/api/sessions", create)

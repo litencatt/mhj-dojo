@@ -11,7 +11,7 @@ import (
 
 func gameCall(t *testing.T, games *match.Store, method, path, body string) (int, []byte) {
 	t.Helper()
-	status, v := Route(session.NewStore(), games, method, path, strings.NewReader(body))
+	status, v := Route(session.NewStore(256), games, method, path, strings.NewReader(body))
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func gameState(t *testing.T, games *match.Store, method, path, body string) matc
 // TestGameRoutes creates a game, reads it and moves in it by method and
 // path, as the WebAssembly build does.
 func TestGameRoutes(t *testing.T) {
-	games := match.NewStore()
+	games := match.NewStore(256)
 	st := gameState(t, games, "POST", "/api/games", `{"seed":4,"length":"hanchan","first_dealer":"you","cpu":"weak"}`)
 	if st.Seed == nil || *st.Seed != 4 || st.Length != match.Hanchan || st.FirstDealer != match.Human || st.CPU != "weak" {
 		t.Fatalf("create: seed %v length %s first dealer %d cpu %s", st.Seed, st.Length, st.FirstDealer, st.CPU)
@@ -55,7 +55,7 @@ func TestGameRoutes(t *testing.T) {
 }
 
 func TestGameErrors(t *testing.T) {
-	games := match.NewStore()
+	games := match.NewStore(256)
 	st := gameState(t, games, "POST", "/api/games", `{"seed":4,"first_dealer":"you"}`)
 	base := "/api/games/" + st.GameID
 	for _, c := range []struct {
@@ -94,7 +94,7 @@ func TestGameErrors(t *testing.T) {
 // TestRestoreGame rebuilds a game from its save under a new id, with the
 // state it had, and refuses a save that does not replay.
 func TestRestoreGame(t *testing.T) {
-	games := match.NewStore()
+	games := match.NewStore(256)
 	st := gameState(t, games, "POST", "/api/games", `{"seed":4,"first_dealer":"you"}`)
 	base := "/api/games/" + st.GameID
 	gameState(t, games, "POST", base+"/action", `{"type":"discard","tile":"`+st.Legal.Discards[0]+`"}`)

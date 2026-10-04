@@ -11,7 +11,7 @@ import (
 
 func call(t *testing.T, store *session.Store, method, path, body string) (int, []byte) {
 	t.Helper()
-	status, v := Route(store, match.NewStore(), method, path, strings.NewReader(body))
+	status, v := Route(store, match.NewStore(256), method, path, strings.NewReader(body))
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func state(t *testing.T, store *session.Store, method, path, body string) sessio
 // TestSessionRoutes drives a session through every practice operation by
 // method and path, as the WebAssembly build does.
 func TestSessionRoutes(t *testing.T) {
-	store := session.NewStore()
+	store := session.NewStore(256)
 	st := state(t, store, "POST", "/api/sessions", `{"seed":1,"max_turns":5}`)
 	if st.Seed != 1 || st.MaxTurns != 5 || st.NodeID != 0 {
 		t.Fatalf("create: seed %d, max_turns %d, node %d", st.Seed, st.MaxTurns, st.NodeID)
@@ -58,7 +58,7 @@ func TestSessionRoutes(t *testing.T) {
 }
 
 func TestSessionErrors(t *testing.T) {
-	store := session.NewStore()
+	store := session.NewStore(256)
 	st := state(t, store, "POST", "/api/sessions", `{"seed":1}`)
 	base := "/api/sessions/" + st.SessionID
 	for _, c := range []struct {
@@ -108,7 +108,7 @@ func TestRestoreBodyFitsFullTree(t *testing.T) {
 	if len(b) > maxBody {
 		t.Fatalf("a %d-node restore body is %d bytes, over the %d limit", session.MaxNodes, len(b), maxBody)
 	}
-	status, v := Restore(session.NewStore(), "", strings.NewReader(string(b)))
+	status, v := Restore(session.NewStore(256), "", strings.NewReader(string(b)))
 	if msg := v.(map[string]string)["error"]; status != statusNotFound || strings.Contains(msg, "JSON") {
 		t.Fatalf("Restore = %d %v; want the 404 of its first move's parent", status, v)
 	}
@@ -116,7 +116,7 @@ func TestRestoreBodyFitsFullTree(t *testing.T) {
 
 // TestRestore rebuilds a branched session from its moves in one call.
 func TestRestore(t *testing.T) {
-	store := session.NewStore()
+	store := session.NewStore(256)
 	st := state(t, store, "POST", "/api/sessions", `{"seed":2,"max_turns":6}`)
 	base := "/api/sessions/" + st.SessionID
 	state(t, store, "POST", base+"/discard", `{"tile":"`+*st.Drawn+`"}`)

@@ -17,8 +17,6 @@ type Move struct {
 // reload): it builds the state only once, at the end, and leaves each
 // discard's review to be computed when its node is shown.
 func (s *Session) Replay(moves []Move, current int, v View) (State, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, m := range moves {
 		next := len(s.nodes)
 		if err := s.goTo(m.Parent); err != nil {

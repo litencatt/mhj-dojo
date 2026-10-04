@@ -1,8 +1,7 @@
 // Package game plays four-player riichi mahjong against CPU seats: a Round
 // (deal, draws and discards, riichi, tsumo and ron, exhaustive and abortive
 // draws, settlement) and a Hanchan of rounds (dealer rotation, honba,
-// carried sticks, end of the game and standings). Calls (pon, chii, kan)
-// come later (#27).
+// carried sticks, end of the game and standings), with calls (pon, chii, kan).
 package game
 
 import (
@@ -16,7 +15,7 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
-// Errors returned by Apply; the server maps them to HTTP statuses.
+// Errors returned by Apply; apicall maps them to status codes.
 var (
 	ErrInvalid  = errors.New("invalid action")
 	ErrConflict = errors.New("action not allowed now")
@@ -500,6 +499,7 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 	p := &r.players[seat]
 	last := r.DrawsLeft() == 0
 	chankan := ron && r.robbing != nil
+	first := !ron && !p.rinshan && r.firstGoAround(seat)
 	return yaku.Context{
 		WinTile:        win,
 		Ron:            ron,
@@ -510,6 +510,8 @@ func (r *Round) ctx(seat int, win tile.Kind, ron bool) yaku.Context {
 		Houtei:         ron && last && !chankan,
 		Rinshan:        !ron && p.rinshan,
 		Chankan:        chankan,
+		Tenhou:         first && seat == r.dealer,
+		Chiihou:        first && seat != r.dealer,
 		Winds:          r.Winds(seat),
 		DoraIndicators: r.doraIndicators(),
 		UraIndicators:  r.uraIndicators(),

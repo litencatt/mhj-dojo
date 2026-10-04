@@ -115,6 +115,8 @@ test('an upright phone shows your seat in the hand panel', async ({ page }) => {
 // open, as chosen.
 test('a phone\'s 設定: Tab into the options, Escape and a new game fold them back', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  // 新規対局 mid-game asks first.
+  page.on('dialog', (d) => void d.accept());
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const toggle = page.getByRole('button', { name: /^設定/ });
@@ -217,7 +219,7 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   const finalDora = st!.dora_indicators.length;
   const sticks = (d: number) => (d > 0 ? `供託 ${d / 1000}本` : null);
 
-  // Your own discard shows at once; each CPU move follows PLAYBACK_STEP_MS later.
+  // Your own discard shows at once; each CPU move follows one playback step (350ms, 普通) later.
   for (let step = 1; step < events.length; step++) {
     await expect(table).toHaveAttribute('data-playing', 'true');
     await expect(log).toHaveCount(earlier + step);
