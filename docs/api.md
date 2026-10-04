@@ -512,7 +512,8 @@ These clarify points the contract above leaves open; none changes the JSON shape
   13 tiles before the win held one of each kind (国士無双十三面待ち), `chuuren` whose 13 tiles before
   the win were exactly 1112345678999 of the suit (純正九蓮宝燈), and `daisuushii` (大四喜, always
   double). The analysis rows' `han` stays 13 for every yakuman. When any yakuman is present, only the
-  yakuman are listed (no 門前清自摸和 or other yaku). A closed tsumo with four triplets is always
+  yakuman are listed (no 門前清自摸和 or other yaku). In games `tenhou` (天和) and `chiihou` (地和) are
+  13-han yakuman too, stacking with the hand's own (see the round rules). A closed tsumo with four triplets is always
   `suuankou`. `dora` counts indicator dora (9→1, 北→東, 中→白) plus red fives; `han_total` = yaku
   han + dora, except for yakuman: `dora` is still reported but `han_total` is the yakuman han only.
 
@@ -529,7 +530,10 @@ have a choice again or the round ends; after a round ends you send `next`.
 Round rules: riichi (closed, costs a 1000-point stick and needs at least 1000
 points, at least 4 draws left, tenpai after the discard; after riichi only the
 drawn tile can be discarded, and the engine discards it for you unless you can
-tsumo), double riichi, ippatsu, ura dora, haitei, houtei, furiten (own
+tsumo), double riichi, ippatsu, ura dora, haitei, houtei, 天和 / 地和
+(`tenhou` / `chiihou`: a yakuman tsumo on the dealer's / a non-dealer's first
+draw with no call, concealed kan included, before it; never on a ron or a
+rinshan draw), furiten (own
 discards, same go-around, and after riichi), head bump (no double ron),
 3000-point noten penalty at the exhaustive draw, and the abortive draws 九種九牌
 (declared), 四風連打, 四家立直 and 四開槓; no nagashi mangan (流し満貫). Points: no kiriage mangan, a pair of a wind

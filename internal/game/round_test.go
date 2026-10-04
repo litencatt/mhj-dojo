@@ -377,6 +377,7 @@ func TestExhaustiveDraw(t *testing.T) {
 
 func TestHaiteiHoutei(t *testing.T) {
 	r := newRound(t)
+	pastFirstDraw(r, 0)
 	setHand(r, 0, "123m567m345p789s9s", "9s")
 	r.draws = wall.LiveDraws4
 	if !r.LegalFor(0).Tsumo {
