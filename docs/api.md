@@ -420,6 +420,10 @@ For a 13-tile hand H and yaku Y:
 `shanten_Y(H) = min over complete 14-tile hands W that satisfy Y (≤4 copies per tile) of |W \ H| − 1`
 (multiset difference). Tenpai = 0. No such W → impossible (`null`).
 Tile t is ukeire for Y iff t ∈ W \ H for some optimal W (equivalently drawing t lowers shanten_Y).
+W counts as won by tsumo: a triplet the winning tile completes is concealed for `sanankou` and
+`suuankou`. On a ron it would be open, so e.g. the shanpon wait `111m222p333s44z55z` is suuankou
+tenpai on 4z/5z by tsumo only (`yaku.Evaluate`, which scores real wins, counts it as open; this matters only in CPU
+games, since practice sessions win by tsumo only).
 
 `normal` uses standard 4 melds + 1 pair only (chiitoitsu / kokushi have their own rows).
 
