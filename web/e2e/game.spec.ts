@@ -430,7 +430,7 @@ test('an upright phone stacks the CPU seats at the full width', async ({ page })
   await waitForPlayback(page);
   const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
   await expect(page.locator('.seat-bottom')).toBeHidden();
-  // Seed 12 deals you the first turn: no CPU has discarded yet.
+  // SEED deals you the first turn: no CPU has discarded yet.
   await expect(page.locator('#river-top')).toBeHidden();
   const seat = await box('.seat-top');
   const head = await box('.seat-top .seat-head');
