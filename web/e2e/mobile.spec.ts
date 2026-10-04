@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { discardsSent, engineCalls, waitForPlayback } from './helpers';
+import { SEED, discardsSent, engineCalls, waitForPlayback } from './helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
@@ -265,7 +265,7 @@ for (const [label, viewport] of [
     });
 
     test('CPU game: only the header, the table, the hand and 役別向聴 are open', async ({ page }) => {
-      await page.goto('./?mode=game&seed=12');
+      await page.goto(`./?mode=game&seed=${SEED}`);
       await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
       await expect(page.getByRole('region', { name: '卓' })).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
