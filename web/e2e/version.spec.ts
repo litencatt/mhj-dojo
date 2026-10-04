@@ -41,6 +41,8 @@ test('the header shows the version and the help opens', async ({ page }) => {
   expect(served.version).toMatch(/^(dev|[0-9a-f]{7})$/);
   expect(served.id).toMatch(/^[0-9a-f]{16}$/);
   expect(Number.isNaN(Date.parse(served.built))).toBe(false);
+  // CI's release-build run says which release the server was built with.
+  if (process.env.MHJDOJO_EXPECT_RELEASE) expect(served.release).toBe(process.env.MHJDOJO_EXPECT_RELEASE);
   await page.goto('./?seed=1&turns=18');
   await loaded(page);
   // A release shows its tag; any other build its commit and date.

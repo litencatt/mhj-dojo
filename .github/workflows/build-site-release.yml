@@ -96,6 +96,10 @@ jobs:
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
         run: npm run e2e
+      - name: Report flaky tests
+        if: always()
+        working-directory: web
+        run: scripts/report-flaky.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:

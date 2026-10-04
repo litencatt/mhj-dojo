@@ -214,8 +214,11 @@ jobs:
         working-directory: .
         env:
           MHJDOJO_RELEASE: v2000.0101.0
+        # Only the site is built again (the WASM engine is the same).
         run: |
-          make embed
+          (cd web && npm run build:site)
+          rm -rf internal/server/static/dist
+          cp -R web/dist-site internal/server/static/dist
           go build -o bin/mhj-dojo-release ./cmd/mhj-dojo
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -271,20 +274,18 @@ jobs:
         run: npm run e2e -- --shard=${{ matrix.shard }}/3
       - name: Report flaky tests
         if: always()
-        run: |
-          [ -f test-results/results.json ] || exit 0
-          jq -r '.. | objects | select(has("tests") and has("file")) | .file as $f | .title as $t | .tests[] | select(.status == "flaky") | "::warning file=web/e2e/\($f),title=Flaky E2E test::\($t) failed, then passed on retry"' test-results/results.json
-      # The version tests on the release build (shard 2, the lightest, runs them).
+        run: scripts/report-flaky.sh
+      # The version tests on the release build (shard 2, currently the shortest, runs them).
       - name: Site version tests on a release build
+        id: release
         if: matrix.shard == 2
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
+          MHJDOJO_EXPECT_RELEASE: v2000.0101.0
         run: npx playwright test e2e/version.spec.ts e2e/help.spec.ts
       - name: Report flaky release-build tests
-        if: matrix.shard == 2 && always()
-        run: |
-          [ -f test-results/results.json ] || exit 0
-          jq -r '.. | objects | select(has("tests") and has("file")) | .file as $f | .title as $t | .tests[] | select(.status == "flaky") | "::warning file=web/e2e/\($f),title=Flaky E2E test::\($t) failed, then passed on retry"' test-results/results.json
+        if: always() && steps.release.outcome != 'skipped'
+        run: scripts/report-flaky.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:

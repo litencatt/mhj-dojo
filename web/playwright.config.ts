@@ -16,7 +16,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 // is slow on a loaded machine.
 const SERVER_ARGS = `--port ${PORT} --host 127.0.0.1 --open=false`;
 const SERVER_COMMAND = process.env.MHJDOJO_BIN
-  ? `${process.env.MHJDOJO_BIN} ${SERVER_ARGS}`
+  ? `${JSON.stringify(path.resolve(process.env.MHJDOJO_BIN))} ${SERVER_ARGS}`
   : `go run ./cmd/mhj-dojo ${SERVER_ARGS}`;
 export default defineConfig({
   testDir: './e2e',
