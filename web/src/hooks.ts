@@ -113,9 +113,11 @@ export function useUrlResume<T>({ idKey, request, get, create, sync, offering }:
     history.replaceState(null, '', url);
   }, [syncKey]);
 
-  function open(id: string) {
+  // params: those that deal it again should its save be unusable (404).
+  function open(id: string, params: Record<string, string>) {
     const url = new URL(location.href);
     url.searchParams.set(idKey, id);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     history.replaceState(null, '', url);
     resume();
   }

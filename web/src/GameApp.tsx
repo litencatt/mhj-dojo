@@ -58,11 +58,23 @@ function parseOptions(get: (key: string) => string | null): GameOptions {
   };
 }
 
-/** A saved game in the list of saves: 「東風戦 東2局 シード 5」. */
-function savedLabel(g: GameSummary): string {
-  const round = g.round && (g.round.over ? '終局' : roundName(g.round.wind, g.round.number, g.round.honba));
+/** A saved game in the list of saves: 「東風戦 東2局 シード 5」, and the URL params that deal it again. */
+function savedItem(g: GameSummary): ResumeItem {
+  const r = g.round;
+  const round = r && (r.over ? '終局' : WIND_NAMES[r.wind] && roundName(r.wind, r.number, r.honba));
   const seed = g.seed !== null && `シード ${g.seed}`;
-  return [LENGTH_NAMES[g.length as GameOptions['length']], round, seed].filter(Boolean).join(' ');
+  const params: Record<string, string> = {};
+  if (g.length) params.length = g.length;
+  if (g.firstDealer) params.first_dealer = g.firstDealer;
+  if (g.cpu) params.cpu = g.cpu;
+  if (g.seedKnown) params.seed = String(g.seed);
+  return {
+    id: g.id,
+    label: [LENGTH_NAMES[g.length as GameOptions['length']], round, seed].filter(Boolean).join(' '),
+    used: g.used,
+    params,
+    over: !!r?.over,
+  };
 }
 
 function urlOptions(): GameOptions {
@@ -90,7 +102,7 @@ export function GameApp() {
   // Opened with no game, seed or options in the URL: the saved games, if
   // any, are offered instead of a new one.
   const [offered] = useState<ResumeItem[]>(() =>
-    bareUrl() ? savedGames().map((g) => ({ id: g.id, label: savedLabel(g), used: g.used })) : [],
+    bareUrl() ? savedGames().map(savedItem) : [],
   );
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
@@ -363,7 +375,7 @@ export function GameApp() {
             </div>
           )}
           {!state && offered.length > 0 && (
-            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={open} />
+            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
           {!state && !error && offered.length === 0 && (
             <p class="muted">

@@ -36,7 +36,14 @@ export function App() {
   // Opened with no session or seed in the URL: the saved sessions, if any,
   // are offered instead of a new one.
   const [offered] = useState<ResumeItem[]>(() =>
-    bareUrl() ? savedSessions().map((s) => ({ id: s.id, label: `シード ${s.seed}`, used: s.used })) : [],
+    bareUrl()
+      ? savedSessions().map((s) => ({
+          id: s.id,
+          label: `シード ${s.seed}`,
+          used: s.used,
+          params: { seed: String(s.seed), turns: String(s.maxTurns) },
+        }))
+      : [],
   );
   const adviceOpen = !isMin('advice');
   // The states that came with the advice (see load).
@@ -234,7 +241,7 @@ export function App() {
           )}
 
           {!state && offered.length > 0 && (
-            <ResumePanel noun="練習" items={offered} busy={busy} onOpen={open} />
+            <ResumePanel noun="練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
 
           {!state && !error && offered.length === 0 && (

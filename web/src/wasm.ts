@@ -174,9 +174,9 @@ function storeAll(sessions: SavedMap, keep?: string) {
   write(STORAGE_KEY, sessions, (s) => ({ v: 2, sessions: s }), keep);
 }
 
-// Drops all but the max most recently used entries.
+// Drops all but the max most recently used entries (an unreadable one counts as the oldest).
 function trim<T extends { used: number }>(saved: Record<string, T>, max: number) {
-  const ids = Object.keys(saved).sort((a, b) => (saved[b].used ?? 0) - (saved[a].used ?? 0));
+  const ids = Object.keys(saved).sort((a, b) => (saved[b]?.used ?? 0) - (saved[a]?.used ?? 0));
   for (const id of ids.slice(max)) delete saved[id];
 }
 
@@ -276,40 +276,58 @@ function byUsed<T extends { used: number }>(list: T[]): T[] {
   return list.sort((a, b) => b.used - a.used);
 }
 
+// Date.now() of a save's last use, 0 when it has none.
+function usedOf(saved: { used?: unknown }): number {
+  return typeof saved.used === 'number' ? saved.used : 0;
+}
+
 export interface SessionSummary {
   id: string; // the public id
   seed: number;
   maxTurns: number;
-  used: number;
+  used: number; // 0: unknown
 }
 
-/** The saved practice sessions, the most recently used first. */
+/** The saved practice sessions, the most recently used first; unreadable ones are left out. */
 export function savedSessions(): SessionSummary[] {
-  return byUsed(
-    Object.entries(loadAll()).map(([id, s]) => ({ id, seed: s.seed, maxTurns: s.max_turns, used: s.used ?? 0 })),
-  );
+  const list: SessionSummary[] = [];
+  for (const [id, s] of Object.entries(loadAll() as Record<string, Partial<Saved> | null>)) {
+    if (!s || typeof s.seed !== 'number' || typeof s.max_turns !== 'number') continue;
+    list.push({ id, seed: s.seed, maxTurns: s.max_turns, used: usedOf(s) });
+  }
+  return byUsed(list);
 }
 
 export interface GameSummary {
   id: string; // the public id
   seed: number | null; // null while the game hides it (a random seed, until the end)
+  seedKnown: boolean; // the seed was chosen: the game shows it from the start
   length: string;
+  firstDealer: string;
+  cpu: string;
   round: SavedRound | null; // null for a save from before rounds were kept
-  used: number;
+  used: number; // 0: unknown
 }
 
-/** The saved CPU games, the most recently used first. */
+/** The saved CPU games, the most recently used first; unreadable ones are left out. */
 export function savedGames(): GameSummary[] {
   const list: GameSummary[] = [];
-  for (const [id, g] of Object.entries(loadGames())) {
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  for (const [id, g] of Object.entries(loadGames() as Record<string, Partial<SavedGame> | null>)) {
+    if (!g || typeof g.save !== 'string') continue;
     try {
-      const s = JSON.parse(g.save) as { seed?: number; seed_known?: boolean; length?: string };
+      const s = JSON.parse(g.save) as Record<string, unknown>;
+      const round = g.round && typeof g.round === 'object' ? g.round : null;
+      const seed = typeof s.seed === 'number' ? s.seed : null;
       list.push({
         id,
-        seed: (s.seed_known || g.round?.over) && typeof s.seed === 'number' ? s.seed : null,
-        length: s.length ?? '',
-        round: g.round ?? null,
-        used: g.used ?? 0,
+        seed: s.seed_known === true || round?.over ? seed : null,
+        seedKnown: s.seed_known === true && seed !== null,
+        length: str(s.length),
+        firstDealer: str(s.first_dealer),
+        cpu: str(s.cpu),
+        round,
+        used: usedOf(g),
       });
     } catch {
       // unreadable: not offered
