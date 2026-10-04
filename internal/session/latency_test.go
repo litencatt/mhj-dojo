@@ -20,16 +20,14 @@ const requestBudget = 300 * time.Millisecond
 // the regular `go test ./...` run; BenchmarkLargeTreeRequestLatency and
 // BenchmarkTypicalTreeRequestLatency below have the full MaxNodes-sized
 // measurements (not run by `go test ./...`, like the memory benchmarks).
-// It's single-goroutine, CPU-bound work with nothing concurrency-specific
-// to check, and the race detector's instrumentation overhead alone pushes
-// it close to the latency budget, so -short skips it like the other
-// CPU-heavy tests the race job doesn't need.
+// It's single-goroutine, CPU-bound work, so -short skips it like the other
+// CPU-heavy tests.
 func TestTreeRequestLatency(t *testing.T) {
 	if testing.Short() {
 		t.Skip("CPU-bound, no concurrency to check; skip under the race job's -short")
 	}
 	const n = 120
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.CreateWithWall(wall.New(1), wall.LiveDraws)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +48,7 @@ func TestTreeRequestLatency(t *testing.T) {
 	elapsed := time.Since(start)
 	perCall := elapsed / time.Duration(calls)
 	t.Logf("%d requests over a %d-node tree: %v total, %v/request", calls, len(s.nodes), elapsed, perCall)
-	if !raceEnabled && perCall > requestBudget {
+	if perCall > requestBudget {
 		t.Fatalf("%v/request exceeds the %v budget", perCall, requestBudget)
 	}
 }
@@ -71,7 +69,7 @@ var (
 
 func largeTreeFixture(tb testing.TB) *Session {
 	largeTreeOnce.Do(func() {
-		st := NewStore()
+		st := NewStore(256)
 		s, err := st.CreateWithWall(wall.New(1), wall.LiveDraws)
 		if err != nil {
 			tb.Fatal(err)
@@ -89,7 +87,7 @@ func largeTreeFixture(tb testing.TB) *Session {
 
 func typicalTreeFixture(tb testing.TB) *Session {
 	typicalTreeOnce.Do(func() {
-		st := NewStore()
+		st := NewStore(256)
 		s, err := st.CreateWithWall(wall.New(1), wall.LiveDraws)
 		if err != nil {
 			tb.Fatal(err)

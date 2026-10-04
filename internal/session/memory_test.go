@@ -64,7 +64,7 @@ func BenchmarkSessionMemory(b *testing.B) {
 		b.Skip("grows every session to a 2000-node tree; run without -short")
 	}
 	const n = 2
-	st := NewStore()
+	st := NewStore(256)
 	sessions := make([]*Session, n)
 
 	var before, after runtime.MemStats

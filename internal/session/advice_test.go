@@ -9,7 +9,7 @@ import (
 )
 
 func TestAdviceAndReview(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	// 9m makes tenpai on 1s-4s; 1z breaks the pair.
 	s, err := st.CreateWithWall(fixedWall(t, "123m456p789s23s11z", "9m5z7z"), 0)
 	if err != nil {
@@ -66,7 +66,7 @@ func TestAdviceAndReview(t *testing.T) {
 }
 
 func TestAdviceAtTerminalNodes(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, err := st.CreateWithWall(fixedWall(t, "123m456p789s23s11z", "9m5z"), 1)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestPracticeActionP95(t *testing.T) {
 	if testing.Short() {
 		t.Skip("CPU-bound timing; skip under the race job's -short")
 	}
-	st := NewStore()
+	st := NewStore(256)
 	var took []time.Duration
 	for seed := int64(1); seed <= testmode.N(int64(8), 3, 1); seed++ {
 		s := mustCreate(t, st, seed, DefaultMaxTurns)
@@ -117,7 +117,7 @@ func TestPracticeActionP95(t *testing.T) {
 	}
 	p95 := took[len(took)*95/100]
 	t.Logf("%d discards: mean %v, p95 %v, max %v", len(took), sum/time.Duration(len(took)), p95, took[len(took)-1])
-	if !raceEnabled && p95 > 200*time.Millisecond {
+	if p95 > 200*time.Millisecond {
 		t.Errorf("discard p95 %v, want < 200ms", p95)
 	}
 }

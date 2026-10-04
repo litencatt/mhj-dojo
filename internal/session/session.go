@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/advice"
 	"github.com/litencatt/mhj-dojo/internal/apiview"
@@ -39,9 +38,6 @@ const (
 const (
 	// DefaultMaxTurns is the default number of discards before the game ends.
 	DefaultMaxTurns = 18
-	// MaxSessions bounds memory; the least recently used session is evicted
-	// beyond it.
-	MaxSessions = 256
 	// MaxNodes bounds a session's tree.
 	MaxNodes = 2000
 )
@@ -57,15 +53,11 @@ type Store struct {
 	sessions *store.Store[*Session]
 }
 
-// NewStore returns an empty store that keeps at most MaxSessions sessions.
-func NewStore() *Store { return NewStoreWithMax(MaxSessions) }
-
-// NewStoreWithMax returns an empty store that keeps at most max sessions,
-// evicting the least recently used one beyond that. The wasm build
-// (cmd/mhj-dojo-wasm) uses a much smaller max than MaxSessions: it runs in a
-// browser tab's memory, so it can't afford to hold
-// hundreds of sessions' trees and analyzer memos (see docs/api.md "Memory").
-func NewStoreWithMax(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
+// NewStore returns an empty store that keeps at most max sessions, evicting
+// the least recently used one beyond that. The wasm build runs in a browser
+// tab's memory, so max is small (see docs/api.md "Memory"). Stores and
+// sessions are not safe for concurrent use: wasm is single-threaded.
+func NewStore(max int) *Store { return &Store{sessions: store.New[*Session](max)} }
 
 // Create starts a session. A nil seed picks a random seed;
 // maxTurns 0 means DefaultMaxTurns.
@@ -104,10 +96,8 @@ func (st *Store) Get(id string) (*Session, error) {
 	return s, nil
 }
 
-// Session is one solo game with its branch tree. Methods are safe for
-// concurrent use.
+// Session is one solo game with its branch tree.
 type Session struct {
-	mu       sync.Mutex
 	id       string
 	wall     *wall.Wall
 	maxTurns int
@@ -198,8 +188,6 @@ func (s *Session) drawn(n *node) (tile.Tile, bool) {
 
 // State returns the view of the current node.
 func (s *Session) State(v View) State {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.state(v)
 }
 
@@ -209,15 +197,13 @@ func (s *Session) State(v View) State {
 // of silently acting on whatever node happens to be current. A new node's
 // review of the discard is computed now unless v leaves the advice out.
 func (s *Session) Discard(t string, expectedNode *int, v View) (State, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := s.discard(t, expectedNode, !v.NoAdvice); err != nil {
 		return State{}, err
 	}
 	return s.state(v), nil
 }
 
-// discard is Discard without the state; callers hold s.mu. Unless review
+// discard is Discard without the state. Unless review
 // is set, the new node's review is left for nodeReview to compute.
 func (s *Session) discard(t string, expectedNode *int, review bool) error {
 	if err := s.checkExpectedNode(expectedNode); err != nil {
@@ -282,15 +268,13 @@ func (s *Session) seedAnalysis(n, cur *node) {
 
 // Tsumo declares a win with the pending draw. expectedNode is as in Discard.
 func (s *Session) Tsumo(expectedNode *int, v View) (State, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := s.tsumo(expectedNode); err != nil {
 		return State{}, err
 	}
 	return s.state(v), nil
 }
 
-// tsumo is Tsumo without the state; callers hold s.mu.
+// tsumo is Tsumo without the state.
 func (s *Session) tsumo(expectedNode *int) error {
 	if err := s.checkExpectedNode(expectedNode); err != nil {
 		return err
@@ -325,8 +309,8 @@ func (s *Session) tsumo(expectedNode *int) error {
 }
 
 // checkExpectedNode returns ErrConflict if expectedNode is non-nil and does
-// not match the current node (another tab moved it on first). Callers hold
-// s.mu already; a nil expectedNode always passes (older or same-tab clients
+// not match the current node (another tab moved it on first).
+// a nil expectedNode always passes (older or same-tab clients
 // that don't send one keep today's behaviour).
 func (s *Session) checkExpectedNode(expectedNode *int) error {
 	if expectedNode != nil && *expectedNode != s.current {
@@ -341,15 +325,13 @@ func (s *Session) checkExpectedNode(expectedNode *int) error {
 // exists (it does; the tree only grows) or doesn't (ErrNotFound already).
 // It has no expectedNode guard.
 func (s *Session) Goto(id int, v View) (State, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := s.goTo(id); err != nil {
 		return State{}, err
 	}
 	return s.state(v), nil
 }
 
-// goTo is Goto without the state; callers hold s.mu.
+// goTo is Goto without the state.
 func (s *Session) goTo(id int) error {
 	if id < 0 || id >= len(s.nodes) {
 		return fmt.Errorf("%w: node %d", ErrNotFound, id)

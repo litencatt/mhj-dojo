@@ -20,7 +20,7 @@ func goldenSession(t *testing.T, seed int64) string {
 		h.Write([]byte(stateJSON(t, st)))
 		return st
 	}
-	s := mustCreate(t, NewStore(), seed, 10+int(seed%5))
+	s := mustCreate(t, NewStore(256), seed, 10+int(seed%5))
 	v := put(s.State(View{}), nil)
 	for step := 0; v.Drawn != nil; step++ {
 		if v.CanTsumo && step%2 == 0 {

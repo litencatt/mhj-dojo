@@ -38,9 +38,8 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/session"
 )
 
-// maxSessions bounds the engine's in-memory sessions much tighter than
-// session.MaxSessions (256, NewStore's default): this runs in a browser tab's
-// memory, and each practice session (its branch tree plus its own
+// maxSessions bounds the engine's in-memory sessions tightly: this runs in a
+// browser tab's memory, and each practice session (its branch tree plus its own
 // yakushanten.Analyzer memo) can hold up to ~9.8 MiB (briefly a few MiB
 // more as a memo turns over), never released by Go's wasm runtime back to
 // the OS (docs/api.md "Memory"). 4 is enough for the
@@ -49,8 +48,7 @@ import (
 // eviction past this cap and its rebuild-from-save, so keep the two in sync.
 const maxSessions = 4
 
-// maxGames bounds the engine's in-memory games the same way, much tighter
-// than match.MaxGames (256, NewStore's default): a game holds its analyzer
+// maxGames bounds the engine's in-memory games the same way: a game holds its analyzer
 // memo and the CPU players' shanten memo, ~8 MiB after a 半荘戦 and ~10.3
 // MiB at most, briefly a few MiB more as a memo turns over (docs/api.md
 // "Memory"). 2 keeps the game being played plus one more; an evicted game is
@@ -58,8 +56,8 @@ const maxSessions = 4
 const maxGames = 2
 
 func main() {
-	store := session.NewStoreWithMax(maxSessions)
-	games := match.NewStoreWithMax(maxGames)
+	store := session.NewStore(maxSessions)
+	games := match.NewStore(maxGames)
 	js.Global().Set("mhjDojoRequest", js.FuncOf(func(_ js.Value, args []js.Value) any {
 		if len(args) != 3 {
 			return response(games, 400, apicall.ErrorBody("mhjDojoRequest takes method, path and body"))

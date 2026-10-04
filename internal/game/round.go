@@ -1,8 +1,7 @@
 // Package game plays four-player riichi mahjong against CPU seats: a Round
 // (deal, draws and discards, riichi, tsumo and ron, exhaustive and abortive
 // draws, settlement) and a Hanchan of rounds (dealer rotation, honba,
-// carried sticks, end of the game and standings). Calls (pon, chii, kan)
-// come later (#27).
+// carried sticks, end of the game and standings), with calls (pon, chii, kan).
 package game
 
 import (
@@ -16,7 +15,7 @@ import (
 	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
-// Errors returned by Apply; the server maps them to HTTP statuses.
+// Errors returned by Apply; apicall maps them to status codes.
 var (
 	ErrInvalid  = errors.New("invalid action")
 	ErrConflict = errors.New("action not allowed now")

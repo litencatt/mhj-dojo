@@ -23,7 +23,7 @@ func TestCachesMatchFresh(t *testing.T) {
 	requests, seeded := 0, 0
 	for seed := int64(1); seed <= testmode.N(int64(16), 4, 2); seed++ {
 		rng := rand.New(rand.NewPCG(uint64(seed), 1))
-		st := NewStore()
+		st := NewStore(256)
 		s, plain := mustCreate(t, st, seed, 12), mustCreate(t, st, seed, 12)
 		plain.analyzer.DisableResultMemo()
 		fresh := yakushanten.NewAnalyzer()

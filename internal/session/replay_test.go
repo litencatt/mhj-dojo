@@ -40,7 +40,7 @@ func TestReplayMatchesPlay(t *testing.T) {
 	combos := 0
 	for seed := int64(1); seed <= testmode.N(int64(20), 4, 2); seed++ {
 		rng := rand.New(rand.NewPCG(uint64(seed), 0))
-		st := NewStore()
+		st := NewStore(256)
 		s := mustCreate(t, st, seed, 8)
 		var last State
 		for range testmode.N(60, 30, 12) {
@@ -85,7 +85,7 @@ func TestReplayMatchesPlay(t *testing.T) {
 }
 
 func TestReplayTsumo(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	s, _ := st.CreateWithWall(fixedWall(t, "234m567p345s6788s", "5s1z"), 0)
 	want, err := s.Tsumo(nil, View{})
 	if err != nil {
@@ -102,7 +102,7 @@ func TestReplayTsumo(t *testing.T) {
 }
 
 func TestReplayErrors(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	tile := func(s string) *string { return &s }
 	for _, c := range []struct {
 		moves   []Move

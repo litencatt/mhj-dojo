@@ -19,7 +19,7 @@ func TestViewLeavesOut(t *testing.T) {
 	reviews := 0
 	for seed := int64(1); seed <= testmode.N(int64(12), 3, 2); seed++ {
 		rng := rand.New(rand.NewPCG(uint64(seed), 1))
-		st := NewStore()
+		st := NewStore(256)
 		full, slim := mustCreate(t, st, seed, 8), mustCreate(t, st, seed, 8)
 		known := len(slim.State(View{NoAdvice: true}).Tree)
 		check := func(want, got State, v View) {
@@ -84,7 +84,7 @@ func treeNodeEqual(a, b TreeNode) bool {
 // TestNoAdviceSkipsAdvice checks that a discard made without the advice
 // computes none: neither the new node's nor, for its review, its parent's.
 func TestNoAdviceSkipsAdvice(t *testing.T) {
-	s := mustCreate(t, NewStore(), 3, 0)
+	s := mustCreate(t, NewStore(256), 3, 0)
 	v := View{NoAdvice: true}
 	st := s.State(v)
 	st, err := s.Discard(*st.Drawn, nil, v)

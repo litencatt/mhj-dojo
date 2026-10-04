@@ -4,14 +4,12 @@ package store
 import (
 	"encoding/hex"
 	"math/rand/v2"
-	"sync"
 )
 
 // Store holds up to max items; adding beyond that evicts the least recently
-// used one (by Add or Get, whichever was more recent). It is safe for
-// concurrent use.
+// used one (by Add or Get, whichever was more recent). It is not safe for
+// concurrent use: the wasm build runs on a single thread.
 type Store[T any] struct {
-	mu    sync.Mutex
 	items map[string]T
 	order []string
 	max   int
@@ -25,8 +23,6 @@ func New[T any](max int) *Store[T] {
 // Add stores v under a new random id and returns the id.
 func (s *Store[T]) Add(v T) string {
 	id := NewID()
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.items[id] = v
 	s.order = append(s.order, id)
 	for len(s.order) > s.max {
@@ -38,8 +34,6 @@ func (s *Store[T]) Add(v T) string {
 
 // Delete removes the item stored under id, if any.
 func (s *Store[T]) Delete(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, ok := s.items[id]; !ok {
 		return
 	}
@@ -55,8 +49,6 @@ func (s *Store[T]) Delete(id string) {
 // Get returns the item stored under id, marking it most recently used (so a
 // session in active use isn't the one evicted just because it's old).
 func (s *Store[T]) Get(id string) (T, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	v, ok := s.items[id]
 	if ok {
 		s.touch(id)
@@ -65,7 +57,6 @@ func (s *Store[T]) Get(id string) (T, bool) {
 }
 
 // touch moves id to the most-recently-used end of the eviction order.
-// Callers hold s.mu already.
 func (s *Store[T]) touch(id string) {
 	for i, x := range s.order {
 		if x == id {
