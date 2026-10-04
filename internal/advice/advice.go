@@ -2,14 +2,16 @@
 // choice with fixed rules, so the same position always gets the same advice
 // (docs/api.md "Advice"). Discards are compared, in order, by:
 //
-//  1. the normal-form shanten of the 13 tiles left (lower first),
-//  2. their ukeire: unseen copies of the tiles that lower it (more first),
+//  1. the shanten of the 13 tiles left (lower first): the lowest of the
+//     normal form, chiitoitsu and kokushi, as the CPU counts it,
+//  2. their ukeire: unseen copies of the tiles that lower it in any form
+//     reaching that shanten (more first),
 //  3. at 1-shanten or tenpai, the expected wait at tenpai (more first): the
 //     wait itself at tenpai; at 1-shanten, for each ukeire tile, the widest
 //     wait any discard reaches after drawing it, averaged with the tile's
 //     unseen copies as weights,
 //  4. near yaku: rows (yakuman aside) at 1-shanten or better, or no further
-//     than the normal shanten, by count and then by total han,
+//     than the shanten, by count and then by total han,
 //  5. dora kept (a dora or red five is discarded last), terminals and
 //     honors before simples, and finally kind order.
 //
@@ -27,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/litencatt/mhj-dojo/internal/handshape"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
@@ -43,7 +46,7 @@ type Input struct {
 	// 13 tiles left after discarding it.
 	ByDiscard map[tile.Kind][]yakushanten.Result
 	Han       func(key string) int
-	// Analyzer computes the normal shanten of hypothetical hands (the waits).
+	// Analyzer computes the shanten of hypothetical hands (the waits).
 	Analyzer *yakushanten.Analyzer
 }
 
@@ -126,7 +129,7 @@ type cand struct {
 
 // Compute ranks the discards of in.Tiles.
 func Compute(in Input) *Advice {
-	w := waiter{a: in.Analyzer, memo: map[tile.Counts]yakushanten.Result{}}
+	w := waiter{a: in.Analyzer, memo: map[tile.Counts]form{}}
 	all14 := tile.CountsOf(in.Tiles)
 	var cs []cand
 	seen := map[tile.Kind]int{}
@@ -141,13 +144,13 @@ func Compute(in Input) *Advice {
 		seen[t.Kind] = len(cs)
 		res := in.ByDiscard[t.Kind]
 		c := cand{t: t, res: res}
-		normal := res[0]
-		c.shanten, c.uke = normal.Shanten, normal.Ukeire
-		for _, k := range normal.Ukeire {
-			c.ukeire += max(4-in.Visible[k], 0)
-		}
 		left := all14
 		left[t.Kind]--
+		f := lowest(res[0], left)
+		c.shanten, c.uke = f.shanten, f.uke
+		for _, k := range c.uke {
+			c.ukeire += max(4-in.Visible[k], 0)
+		}
 		switch c.shanten {
 		case 0:
 			c.wait, c.hasWait = float64(c.ukeire), true
@@ -301,25 +304,61 @@ func compare(a, b cand) int {
 	return cmp.Compare(a.t.Kind, b.t.Kind)
 }
 
-// waiter computes expected waits, memoizing the normal shanten of the
+// form is the lowest shanten of a 13-tile hand and the kinds that lower it.
+type form struct {
+	shanten int
+	uke     []tile.Kind
+}
+
+// lowest takes the lowest shanten of the concealed 13 tiles c over the
+// normal form (already computed as normal), chiitoitsu and kokushi, with the
+// union of the ukeire of every form reaching it (as internal/cpu does).
+func lowest(normal yakushanten.Result, c tile.Counts) form {
+	best := normal.Shanten
+	var set [tile.NumKinds]bool
+	for _, k := range normal.Ukeire {
+		set[k] = true
+	}
+	for _, r := range []shanten.Result{shanten.Chiitoitsu(c), shanten.Kokushi(c)} {
+		if r.Shanten > best {
+			continue
+		}
+		if r.Shanten < best {
+			best, set = r.Shanten, [tile.NumKinds]bool{}
+		}
+		for _, k := range r.Ukeire {
+			set[k] = true
+		}
+	}
+	f := form{shanten: best}
+	for k, ok := range set {
+		if ok {
+			f.uke = append(f.uke, tile.Kind(k))
+		}
+	}
+	return f
+}
+
+// waiter computes expected waits, memoizing the lowest shanten of the
 // hypothetical 13-tile hands (many draw/discard pairs lead to the same one).
 type waiter struct {
 	a    *yakushanten.Analyzer
-	memo map[tile.Counts]yakushanten.Result
+	memo map[tile.Counts]form
 }
 
-func (w *waiter) normal(c tile.Counts) yakushanten.Result {
-	r, ok := w.memo[c]
+func (w *waiter) lowest(c tile.Counts) form {
+	f, ok := w.memo[c]
 	if !ok {
-		r = w.a.NormalShanten(c)
-		w.memo[c] = r
+		f = lowest(w.a.NormalShanten(c), c)
+		w.memo[c] = f
 	}
-	return r
+	return f
 }
 
 // expected returns the expected tenpai wait of a 1-shanten hand c: for each
 // ukeire kind with unseen copies, the most unseen waits any discard reaches
-// after drawing it, weighted by those copies. The drawn copy counts as seen.
+// after drawing it (in any form: a chiitoitsu tanki or kokushi wait counts),
+// weighted by those copies. The drawn copy counts as seen.
 func (w *waiter) expected(c, visible tile.Counts, uke []tile.Kind) float64 {
 	var sum, weight float64
 	for _, u := range uke {
@@ -335,9 +374,9 @@ func (w *waiter) expected(c, visible tile.Counts, uke []tile.Kind) float64 {
 				continue
 			}
 			c[x]--
-			if res := w.normal(c); res.Possible && res.Shanten == 0 {
+			if f := w.lowest(c); f.shanten == 0 {
 				n := 0
-				for _, k := range res.Ukeire {
+				for _, k := range f.uke {
 					n += max(4-visible[k], 0)
 				}
 				best = max(best, n)
@@ -409,7 +448,7 @@ func phase(junme, shanten int, tenpai float64, draws int) (string, string) {
 }
 
 // nearYaku lists the rows (yakuman aside) whose best shanten over all
-// discards is 1 or less, or no more than the best normal shanten, closest
+// discards is 1 or less, or no more than the best shanten, closest
 // first, and whether the best discard keeps that best.
 func nearYaku(cs []cand, han func(string) int) []NearYaku {
 	limit := max(cs[0].shanten, 1)

@@ -57,13 +57,16 @@ func goldenSession(t *testing.T, seed int64) string {
 // tile kinds counted by one remaining map, by_discard rows without the
 // analysis's names and han, node_count): converted to that shape, the old
 // states were the same as the new ones, state for state (a one-off check
-// described in the message of commit 776859a, which re-pinned them).
+// described in the message of commit 776859a, which re-pinned them). They
+// were re-pinned again when the advice began counting chiitoitsu and kokushi
+// (issue #189): with advice and discard_review stripped, seeds 2–4 gave the
+// same states as before; seed 1's script follows a different best discard.
 func TestGoldenStates(t *testing.T) {
 	want := map[int64]string{
-		1: "bdf2bd60871aa04a10460196971bd97dc06e4da57e269bdbe92e90d0e254782a",
-		2: "d5e264e2474c0a73e15a78962cc253397f264fdf5a957121f14d33cc86f7d5ca",
-		3: "4b9195d2bc29e621b717b645bf047b3730b6933fdfb2d082160c998d74467589",
-		4: "8e763c52de89ef8b1a0ef4d045fef09496e0e2bbfb65cab2cd15d0e572383b00",
+		1: "0dd822f0ff6b78d0993199e3e4cdded562946ca95fca1e0d7a5b220ef0b42219",
+		2: "5484c6b66893d81bd527d02b84dc197cef4c2c6138e1551936af0e70d5b02d9a",
+		3: "03f8a98ac401766c774e8c943b3fea55f0bf65b3cfa279e819e13da569f5e990",
+		4: "dc55833e0530174946ba7991d320a34f25cf4f5431c6e86ebf14e3659b9d827d",
 	}
 	for seed := int64(1); seed <= 4; seed++ {
 		if got := goldenSession(t, seed); got != want[seed] {

@@ -236,9 +236,9 @@ position always gets the same advice. The text fields are Japanese.
 {
   "candidates": [                 // the best three distinct discards, best first
     { "tile": "9m",               // exact tile; a plain five is offered before a red one
-      "shanten": 1,               // normal-form shanten of the 13 tiles left
+      "shanten": 1,               // shanten of the 13 tiles left (lowest of normal, chiitoitsu, kokushi)
       "ukeire_kinds": 8,          // tile types that lower it
-      "ukeire": 28,               // their unseen copies (as by_discard's normal row ukeire_total)
+      "ukeire": 28,               // their unseen copies (4 − visible copies, as ukeire_total)
       "wait": 5.8,                // expected tenpai wait (0.1 steps); null above 1-shanten
       "yaku": ["断么九"] }         // near yaku of the 13 tiles left (see below)
   ],
@@ -255,16 +255,19 @@ position always gets the same advice. The text fields are Japanese.
 ```
 
 **Ranking.** Every distinct discard kind is compared by, in order:
-1. normal-form shanten (lower first; chiitoitsu and kokushi are not considered);
-2. `ukeire` (more first), counted like `by_discard`: 4 − visible copies;
+1. shanten (lower first): the lowest of the normal form, chiitoitsu and
+   kokushi (concealed hands only), as the CPU counts it;
+2. `ukeire` (more first), counted like `by_discard`: 4 − visible copies, over
+   the union of the ukeire of every form reaching that shanten;
 3. `wait` (more first), only between two discards at tenpai or 1-shanten. At
    tenpai it is the wait itself (= `ukeire`). At 1-shanten: for each ukeire
    type with unseen copies, draw it (it becomes visible), try every discard,
-   and take the most unseen waits of any tenpai reached; `wait` is the average
+   and take the most unseen waits of any tenpai reached (in any of the three
+   forms, so a chiitoitsu tanki or kokushi wait counts); `wait` is the average
    of those, weighted by the unseen copies of each ukeire type. Waits are
    compared as shown, rounded to 0.1, so closer ones tie;
 4. near yaku of the 13 tiles left: rows other than `normal` and the yakuman
-   whose shanten is ≤ max(1, the discard's normal shanten) — more rows first,
+   whose shanten is ≤ max(1, the discard's shanten) — more rows first,
    then more total `han`;
 5. dora kept: a dora kind or red five is discarded last; then terminals and
    honors before simples; then kind order.
@@ -286,7 +289,7 @@ the junme, so a short game (small `max_turns`) never shows 序盤 advice at its 
 first two candidates by the first key that differs; a further note names the
 near yaku the best discard gives up. `near_yaku` lists up to 6 rows (the
 yakuman aside) whose best shanten over all discards is ≤ max(1, the best
-normal shanten), closest first; `kept` is whether the best discard keeps
+discard's shanten), closest first; `kept` is whether the best discard keeps
 that shanten.
 
 ### Review
