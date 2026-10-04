@@ -11,7 +11,7 @@ import (
 )
 
 // completeWithMelds builds a complete hand of four groups and a pair and moves
-// up to three groups out as called melds (open, or concealed kan-free).
+// up to three groups out as called melds (all called open; no kans).
 func completeWithMelds(r *rand.Rand) (conc tile.Counts, melds []yaku.Meld, ok bool) {
 	var groups [4]yaku.Meld
 	var c tile.Counts
@@ -50,6 +50,13 @@ func completeWithMelds(r *rand.Rand) (conc tile.Counts, melds []yaku.Meld, ok bo
 	return conc, melds, true
 }
 
+// noRow lists the yaku Evaluate can score that have no analysis row: they come
+// from how the hand was won or from kans, not from the tiles.
+var noRow = map[string]bool{
+	"riichi": true, "double_riichi": true, "ippatsu": true, "haitei": true, "houtei": true,
+	"rinshan": true, "chankan": true, "sankantsu": true, "suukantsu": true,
+}
+
 // Every yaku that Evaluate scores for a winning hand must be satisfied by that
 // hand in the per-yaku analysis (shanten -1), and tanyao must agree both ways.
 func TestAnalysisAgreesWithEvaluate(t *testing.T) {
@@ -84,7 +91,10 @@ func TestAnalysisAgreesWithEvaluate(t *testing.T) {
 			}
 			row, found := rows[key]
 			if !found {
-				continue // yaku without a row (e.g. a situational one)
+				if !noRow[key] {
+					t.Fatalf("%s melds %+v: Evaluate scores %s, which has no analysis row", conc, melds, key)
+				}
+				continue
 			}
 			if !row.Possible || row.Shanten != -1 {
 				t.Fatalf("%s melds %+v: Evaluate scores %s but its row is %+v", conc, melds, key, row)

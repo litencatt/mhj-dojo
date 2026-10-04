@@ -45,6 +45,9 @@ func TestEvaluateInvariants(t *testing.T) {
 				}
 				ctx.MeldTiles = append(ctx.MeldTiles, tile.Tile{Kind: k})
 			}
+			if m.Kan {
+				ctx.MeldTiles = append(ctx.MeldTiles, tile.Tile{Kind: m.Kind})
+			}
 		}
 		// situational flags, exclusive as in play
 		closed := !ctx.Open()
@@ -75,7 +78,7 @@ func TestEvaluateInvariants(t *testing.T) {
 		}
 		yakuman := w.HanTotal >= 13 && len(w.Yaku) > 0 && w.Yaku[0].Han >= 13
 		if yakuman {
-			if w.Dora != 0 && w.HanTotal != sumHan(w.Yaku) {
+			if w.HanTotal != sumHan(w.Yaku) {
 				t.Fatalf("%s %+v: yakuman counted dora", conc, ctx)
 			}
 			if w.HanTotal%13 != 0 {

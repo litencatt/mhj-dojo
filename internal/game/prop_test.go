@@ -14,6 +14,20 @@ import (
 // randomMove picks one legal move at random, leaning toward calls, kans and
 // riichi so the rarer rules get exercised.
 func randomMove(rng *rand.Rand, h []tile.Tile, l Legal) Action {
+	// Wins are taken most of the time so that games end in wins often enough
+	// to test them; riichi and kans are tried before the efficient discard.
+	if (l.Tsumo || l.Ron) && rng.IntN(10) != 0 {
+		if l.Tsumo {
+			return Action{Type: Tsumo}
+		}
+		return Action{Type: Ron}
+	}
+	if (len(l.Riichi) > 0 || len(l.Kan) > 0) && rng.IntN(3) == 0 {
+		if len(l.Riichi) > 0 && (len(l.Kan) == 0 || rng.IntN(2) == 0) {
+			return Action{Type: Riichi, Tile: l.Riichi[rng.IntN(len(l.Riichi))]}
+		}
+		return Action{Type: Kan, Tile: l.Kan[rng.IntN(len(l.Kan))]}
+	}
 	var opts []Action
 	if l.Tsumo {
 		opts = append(opts, Action{Type: Tsumo}, Action{Type: Tsumo})
@@ -49,10 +63,26 @@ func randomMove(rng *rand.Rand, h []tile.Tile, l Legal) Action {
 }
 
 // refWaits lists the kinds that complete the concealed tiles, by brute force
-// over the winning-shape check alone.
+// over the winning-shape check alone (a kind held four times is skipped).
 func refWaits(c tile.Counts, melds []yaku.Meld) []tile.Kind {
 	var out []tile.Kind
+	held := c
+	for _, m := range melds {
+		for j := range 3 {
+			if m.Type == yaku.Seq {
+				held[m.Kind+tile.Kind(j)]++
+			} else {
+				held[m.Kind]++
+			}
+		}
+		if m.Kan {
+			held[m.Kind]++
+		}
+	}
 	for k := range c {
+		if held[k] >= 4 {
+			continue
+		}
 		c[k]++
 		if yaku.IsCompleteWith(c, melds) {
 			out = append(out, tile.Kind(k))
@@ -111,7 +141,7 @@ func checkRules(t *testing.T, r *Round, seed int64) {
 }
 
 // checkTiles verifies no kind exists more than four times across hands,
-// melds, rivers and the revealed dora indicators, and that what a seat can see
+// melds and rivers, and that what a seat can see
 // never exceeds four either.
 func checkTiles(t *testing.T, r *Round, seed int64) {
 	t.Helper()
@@ -187,6 +217,9 @@ func TestRandomLegalPlay(t *testing.T) {
 		}
 	}
 	t.Logf("outcomes: %v", outcomes)
+	if wins := outcomes["ron"] + outcomes["tsumo"]; wins < n/20 {
+		t.Fatalf("only %d wins in %d games: %v", wins, n, outcomes)
+	}
 }
 
 // bestDiscard is the legal discard with the lowest normal shanten, so that

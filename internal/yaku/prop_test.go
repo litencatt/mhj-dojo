@@ -1,6 +1,8 @@
 package yaku
 
 import (
+	"fmt"
+	"maps"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -75,7 +77,7 @@ func refComplete(c tile.Counts) bool {
 	return false
 }
 
-// randomGroups builds 14 tiles as four random groups and a pair, which is
+// randomComplete builds 14 tiles as four random groups and a pair, which is
 // complete by construction and rich in shared tiles.
 func randomComplete(r *rand.Rand) tile.Counts {
 	for {
@@ -260,7 +262,7 @@ func refFu(d Decomposition, win tile.Kind, place int, ctx Context) int {
 	return (fu + 9) / 10 * 10
 }
 
-// randomCalled makes up to three called melds from a complete hand's readings
+// randomWinCase makes up to three called melds from a complete hand's readings
 // by moving groups out of the concealed tiles.
 func randomWinCase(r *rand.Rand) (conc tile.Counts, called []Meld, ctx Context, ok bool) {
 	c := randomComplete(r)
@@ -315,6 +317,78 @@ func randomWinCase(r *rand.Rand) (conc tile.Counts, called []Meld, ctx Context, 
 	return conc, called, ctx, true
 }
 
+// refReadings enumerates every way the n concealed melds and a pair split c,
+// with its own search, one entry per distinct reading.
+func refReadings(c tile.Counts, n int) []Decomposition {
+	var out []Decomposition
+	seen := map[string]bool{}
+	var rec func(left tile.Counts, ms []Meld, pair tile.Kind)
+	rec = func(left tile.Counts, ms []Meld, pair tile.Kind) {
+		first := -1
+		for k, v := range left {
+			if v > 0 {
+				first = k
+				break
+			}
+		}
+		if first < 0 {
+			if len(ms) != n {
+				return
+			}
+			d := Decomposition{Pair: pair}
+			copy(d.Melds[:], ms)
+			if key := readingKey(d, n, -2); !seen[key] {
+				seen[key] = true
+				out = append(out, d)
+			}
+			return
+		}
+		if len(ms) == n {
+			return
+		}
+		k := tile.Kind(first)
+		if left[first] >= 3 {
+			next := left
+			next[first] -= 3
+			rec(next, append(slices.Clone(ms), Meld{Type: Trip, Kind: k}), pair)
+		}
+		if !k.IsHonor() && k.Num() <= 7 && left[first+1] > 0 && left[first+2] > 0 {
+			next := left
+			next[first]--
+			next[first+1]--
+			next[first+2]--
+			rec(next, append(slices.Clone(ms), Meld{Type: Seq, Kind: k}), pair)
+		}
+	}
+	for h := range c {
+		if c[h] >= 2 {
+			left := c
+			left[h] -= 2
+			rec(left, nil, tile.Kind(h))
+		}
+	}
+	return out
+}
+
+// readingKey identifies a reading and where the winning tile went (place -1:
+// the pair, -2: nowhere).
+func readingKey(d Decomposition, n, place int) string {
+	ms := slices.Clone(d.Melds[:n])
+	var at string
+	if place >= 0 {
+		at = fmt.Sprint(d.Melds[place])
+	}
+	slices.SortFunc(ms, func(a, b Meld) int {
+		if a.Type != b.Type {
+			return int(a.Type) - int(b.Type)
+		}
+		return int(a.Kind) - int(b.Kind)
+	})
+	return fmt.Sprint(d.Pair, ms, " win in ", place == -1, at)
+}
+
+// TestFuMatchesReference compares the fu of every reading (not just the best)
+// with a textbook count over an independently enumerated set of readings.
 func TestFuMatchesReference(t *testing.T) {
 	r := rand.New(rand.NewPCG(25, 26))
 	checked := 0
@@ -323,24 +397,25 @@ func TestFuMatchesReference(t *testing.T) {
 		if !ok {
 			continue
 		}
-		// reference: best fu over every decomposition and winning-tile placement
-		want := 0
-		for _, d := range DecomposeWith(conc, called) {
+		n := 4 - len(called)
+		want := map[string]int{}
+		for _, d := range refReadings(conc, n) {
+			copy(d.Melds[n:], called)
 			if d.Pair == ctx.WinTile {
-				want = max(want, refFu(d, ctx.WinTile, -1, ctx))
+				want[readingKey(d, n, -1)] = refFu(d, ctx.WinTile, -1, ctx)
 			}
-			for i, m := range d.Melds[:4-len(called)] {
+			for i, m := range d.Melds[:n] {
 				if m.Contains(ctx.WinTile) {
-					want = max(want, refFu(d, ctx.WinTile, i, ctx))
+					want[readingKey(d, n, i)] = refFu(d, ctx.WinTile, i, ctx)
 				}
 			}
 		}
-		got := 0
+		got := map[string]int{}
 		for _, rd := range ReadingsWith(conc, called, ctx.WinTile) {
-			got = max(got, Fu(rd, ctx))
+			got[readingKey(rd.Decomposition, n, rd.WinGroup)] = Fu(rd, ctx)
 		}
-		if got != want {
-			t.Fatalf("conc %s called %+v ctx %+v: fu %d, reference %d", conc, called, ctx, got, want)
+		if !maps.Equal(got, want) {
+			t.Fatalf("conc %s called %+v ctx %+v:\n got %v\nwant %v", conc, called, ctx, got, want)
 		}
 		checked++
 	}
