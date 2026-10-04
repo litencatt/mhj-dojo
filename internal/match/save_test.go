@@ -82,7 +82,7 @@ func TestSaveRestoresAWholeGame(t *testing.T) {
 		{0, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, false}, // riichi, skip
 		{23, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, true}, // kyuushu
 	} {
-		st := NewStore()
+		st := NewStore(256)
 		m, err := st.Create(&c.seed, c.o)
 		if err != nil {
 			t.Fatal(err)
@@ -133,7 +133,7 @@ func TestSaveRestoresAWholeGame(t *testing.T) {
 
 // A random seed stays hidden in the rebuilt game, while its save carries it.
 func TestRestoreKeepsTheSeedHidden(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	m, err := st.Create(nil, Options{FirstDealer: DealerYou})
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestRestoreKeepsTheSeedHidden(t *testing.T) {
 // Failed moves are not saved, and a save that does not replay is refused
 // without storing anything.
 func TestSaveSkipsFailedMoves(t *testing.T) {
-	st := NewStoreWithMax(1)
+	st := NewStore(1)
 	seed := int64(4)
 	m, err := st.Create(&seed, Options{FirstDealer: DealerYou})
 	if err != nil {
@@ -185,7 +185,7 @@ func TestSaveSkipsFailedMoves(t *testing.T) {
 // A save whose check does not match the replay is refused; one without a
 // check is taken as it is.
 func TestRestoreChecksTheSave(t *testing.T) {
-	st := NewStore()
+	st := NewStore(256)
 	seed := int64(4)
 	m, err := st.Create(&seed, Options{FirstDealer: DealerYou})
 	if err != nil {

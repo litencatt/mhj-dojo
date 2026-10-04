@@ -14,7 +14,7 @@ import (
 // the sha256 of every state's JSON and save in turn.
 func goldenGame(t *testing.T, seed int64, o Options, pick func(State, *bool) game.Action) string {
 	t.Helper()
-	m, err := NewStore().Create(&seed, o)
+	m, err := NewStore(256).Create(&seed, o)
 	if err != nil {
 		t.Fatal(err)
 	}

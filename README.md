@@ -69,7 +69,7 @@ The built frontend isn't committed, so a plain `go build` or `go install github.
 | `--open` | `true` | Open the browser on start |
 | `--seed` | random | Open practice on this wall seed (0 to 2^53-1; the page `/?seed=N`); CPU games and later practice sessions are not affected |
 
-The server only answers requests whose `Host` header names localhost or a loopback address, which stops web pages in your browser from reaching it through DNS rebinding. So even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
+The server only answers requests whose `Host` header names localhost or a loopback address, which stops another site's page from reaching the app through DNS rebinding. Even with `--host 0.0.0.0`, browsers on other machines can't open the app (the server prints a warning when bound to a non-loopback address).
 
 ### Saves
 

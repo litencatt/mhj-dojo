@@ -192,7 +192,7 @@ func TestSelfPlay(t *testing.T) {
 	slices.Sort(took)
 	p95 := took[len(took)*95/100]
 	t.Logf("outcomes %v, decision p95 %v", kinds, p95)
-	if !testing.Short() && !raceEnabled && p95 > 20*time.Millisecond {
+	if !testing.Short() && p95 > 20*time.Millisecond {
 		t.Errorf("decision p95 %v, want < 20ms", p95)
 	}
 }

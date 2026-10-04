@@ -9,7 +9,7 @@ import (
 
 // BenchmarkGameMemory estimates the heap held by one finished 半荘 Match —
 // the game state, the human's per-turn history, and the capped shanten/CPU
-// memos — to project the worst case for MaxGames games kept in the store.
+// memos — to project the worst case for the games kept in the store.
 // See docs/api.md "Memory" for the method and the resulting estimate.
 //
 // It does not run under `go test ./...` (only -bench matches Benchmark

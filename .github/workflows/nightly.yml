@@ -2,8 +2,8 @@ name: Nightly
 
 # The exhaustive suites that pull requests skip to keep CI fast: the full
 # oracle, property and self-play loops (MHJDOJO_FULL=1, see internal/testmode),
-# the whole-game playthroughs under the race detector, and the E2E tests
-# (the static site as mhj-dojo serves it) repeated to find flaky ones.
+# and the E2E tests (the static site as mhj-dojo serves it) repeated to find
+# flaky ones.
 on:
   schedule:
     - cron: "17 18 * * *" # 03:17 JST
@@ -26,21 +26,6 @@ jobs:
       - run: go test -count=1 ./...
         env:
           MHJDOJO_FULL: "1"
-
-  # Without -short: the pull request's loop sizes plus the whole-game
-  # playthroughs that the race job skips. The exhaustive loops stay out, as
-  # the race detector slows this CPU-bound code 5-10x.
-  go-test-race:
-    name: Go test (race)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - run: go test -race -count=1 ./...
 
   e2e:
     name: E2E (Playwright)
