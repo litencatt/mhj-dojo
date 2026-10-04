@@ -81,7 +81,9 @@ func DecomposeWith(c tile.Counts, called []Meld) []Decomposition {
 			return
 		}
 		k := tile.Kind(i)
-		if c[i] >= 3 {
+		// A triplet after a sequence of the same kind is the same reading as
+		// the sequence after the triplet, which is tried first.
+		if c[i] >= 3 && !(n > 0 && melds[n-1].Type == Seq && melds[n-1].Kind == k) {
 			c[i] -= 3
 			melds[n] = Meld{Type: Trip, Kind: k}
 			rec(i, n+1, pair)
