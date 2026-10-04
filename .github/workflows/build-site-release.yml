@@ -88,11 +88,13 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         working-directory: web
         run: npx playwright install-deps chromium
-      # Compiled now, so the E2E tests' go run starts at once.
+      # The E2E tests start this binary, rather than compiling with go run.
       - name: Build mhj-dojo
-        run: go build -o /dev/null ./cmd/mhj-dojo
+        run: go build -o bin/mhj-dojo ./cmd/mhj-dojo
       - name: E2E tests (on mhj-dojo, serving the same build)
         working-directory: web
+        env:
+          MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
         run: npm run e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()

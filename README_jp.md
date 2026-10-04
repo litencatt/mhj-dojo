@@ -104,6 +104,8 @@ cd web && npx playwright install --with-deps chromium   # 初回のみ
 make embed && cd web && npm run e2e
 ```
 
+`make e2e` なら `bin/mhj-dojo` をビルドして、`go run` の代わりにそれに対してテストを実行します（`EXTRA=--shard=1/3` やスペックのパスで絞り込めます）。`npm run e2e` でも `MHJDOJO_BIN=<パス>` で同じことができ、CI はこれを使います。
+
 ### 静的サイト（WebAssembly）
 
 このアプリは静的サイトです。Go のエンジン（`cmd/mhj-dojo-wasm`）を WebAssembly にし、画面が固まらないよう Web Worker で動かします。リクエストの形式は [docs/api.md](docs/api.md) のとおりです。`mhj-dojo`（`make embed`）でも、どの静的ホスティングでも配信できます。

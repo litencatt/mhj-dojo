@@ -1,4 +1,4 @@
-.PHONY: build test run vet wasm site embed deploy deploy-check
+.PHONY: build test run vet wasm site embed e2e deploy deploy-check
 
 # npm ci wipes node_modules, so it only runs when the lockfile changes (npm
 # writes node_modules/.package-lock.json on every install).
@@ -45,6 +45,12 @@ site: wasm web/node_modules/.package-lock.json
 embed: site
 	rm -rf internal/server/static/dist
 	cp -R web/dist-site internal/server/static/dist
+
+# The site's E2E tests against a built mhj-dojo (the server the tests start is
+# bin/mhj-dojo instead of `go run`, which compiles during the start-up wait).
+# EXTRA passes more arguments to playwright, e.g. EXTRA=--shard=1/3.
+e2e: build
+	cd web && MHJDOJO_BIN=$(CURDIR)/bin/mhj-dojo npx playwright test $(EXTRA)
 
 # Fails fast (even under `make -n`, via the leading '+') if DEPLOY_PROJECT
 # isn't set, before building anything. The project id isn't committed;

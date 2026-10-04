@@ -10,6 +10,14 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 // `make embed` must run first so the server embeds the current build
 // (internal/server/static/dist), a copy of web/dist-site, the files the
 // public site deploys.
+//
+// The server is `go run` unless MHJDOJO_BIN names a built mhj-dojo (CI does,
+// and `make e2e` builds one): go run compiles inside the start-up wait, which
+// is slow on a loaded machine.
+const SERVER_ARGS = `--port ${PORT} --host 127.0.0.1 --open=false`;
+const SERVER_COMMAND = process.env.MHJDOJO_BIN
+  ? `${process.env.MHJDOJO_BIN} ${SERVER_ARGS}`
+  : `go run ./cmd/mhj-dojo ${SERVER_ARGS}`;
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -19,7 +27,11 @@ export default defineConfig({
   // leaves the tests waiting on the CPU game's playback one after another.
   // Every test starts its own game or session, so two can share the server.
   workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI ? [['html', { open: 'never' }]] : 'list',
+  // The json report lets CI list the tests that passed only on a retry
+  // (flaky) as warnings; see ci.yml.
+  reporter: process.env.CI
+    ? [['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]]
+    : 'list',
   timeout: 60_000,
   use: {
     baseURL: BASE_URL,
@@ -32,7 +44,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `go run ./cmd/mhj-dojo --port ${PORT} --host 127.0.0.1 --open=false`,
+    command: SERVER_COMMAND,
     cwd: path.resolve(__dirname, '..'),
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
