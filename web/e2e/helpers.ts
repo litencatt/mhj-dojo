@@ -284,10 +284,8 @@ export function pageOverflowX(page: Page) {
 // A seed where a "tsumogiri" strategy (discard the tile you just drew; with
 // no drawn tile, right after a call, discard the last hand tile), skipping
 // every non-pon call offer, is offered a pon within a couple of your turns.
-// Found with a small Go harness reusing internal/apicall/route_games_test.go's
-// newClient()/match.State against many seeds, playing that exact strategy
-// (like TestHumanPon's own seed search for a pon); see the PR description
-// for how to re-derive it if game logic changes.
+// Guarded by TestE2ESeedOffersPon in internal/apicall/e2e_seeds_test.go: if game
+// logic changes and it fails, pick a new seed as its message says.
 export const SEED = 12;
 
 /** Waits until the CPU moves have finished replaying: while they replay,
@@ -316,7 +314,8 @@ export async function clickAndWait(page: Page, locator: Locator) {
  * skip/見逃す any call offer (callers wanting a pon check for it first),
  * otherwise tsumogiri (discard the tile you just drew, or with none, right
  * after a call, the last hand tile). Mirrors nextMove() in route_games_test.go,
- * except for the discard rule, which the seed search for SEED used. */
+ * except for the discard rule, which is playTsumogiriUntilPon's
+ * (internal/apicall/e2e_seeds_test.go, guarding SEED). */
 export async function nextMove(page: Page): Promise<Locator> {
   await waitForPlayback(page);
   const actionBar = page.locator('.action-bar');

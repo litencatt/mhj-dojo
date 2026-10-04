@@ -13,7 +13,9 @@
 // enumerate them explicitly. Shape yaku use containment: e.g. a
 // chinitsu-shaped W also satisfies honitsu, and an all-triplet terminal W
 // satisfies junchan. Called melds and concealed kans are fixed groups of W
-// (AnalyzeWith).
+// (AnalyzeWith). W is won by tsumo, as ukeire are draws: a triplet the
+// winning tile completes is concealed (sanankou, suuankou), though a ron on
+// the same tile would make it open.
 package yakushanten
 
 import (
@@ -207,7 +209,8 @@ var targets = func() map[string][]shanten.Target {
 	m["chinroutou"] = []shanten.Target{{Rules: [4]shanten.SuitRule{numTrip19, numTrip19, numTrip19, shanten.RuleNone}, Melds: 4}}
 	m["tsuuiisou"] = []shanten.Target{{Rules: [4]shanten.SuitRule{shanten.RuleNone, shanten.RuleNone, shanten.RuleNone, shanten.RuleHonorAll}, Melds: 4}}
 	m["ryuuiisou"] = []shanten.Target{{Rules: [4]shanten.SuitRule{shanten.RuleNone, shanten.RuleNone, souGreen, honorGreen}, Melds: 4}}
-	// Closed solo play: every triplet is concealed, so suuankou is the toitoi shape.
+	// Won by tsumo, every triplet of a closed hand is concealed, so suuankou
+	// is the toitoi shape (AnalyzeWith drops it for an open hand).
 	m["suuankou"] = m["toitoi"]
 	// n forced honor triplets (offsets from 東) and the pair restricted to one
 	// honor (pairOf < 0: any pair) on top of free melds.

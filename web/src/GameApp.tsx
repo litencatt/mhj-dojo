@@ -77,6 +77,8 @@ export function GameApp() {
   const phone = useMediaQuery(PHONE);
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
+  // The state last reopened from a save: shown as it stands, not replayed.
+  const reopened = useRef<GameState | null>(null);
   const { busy, error, request } = useSerialRequest<GameState>(
     (next) => {
       if (!optionsSynced.current) {
@@ -115,7 +117,7 @@ export function GameApp() {
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
       claim(api.gameKey(id));
-      return api.getGame(id);
+      return api.getGame(id).then((game) => (reopened.current = game));
     },
     create: (params) =>
       api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
@@ -159,8 +161,8 @@ export function GameApp() {
   const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
   // Replays state.events (issue #29) before the player can act again or the
-  // round result appears.
-  const playback = usePlayback(state);
+  // round result appears (but not for a reopened game).
+  const playback = usePlayback(state, reopened.current);
   // The table and the dora follow the replay: points, sticks, the wall and
   // the dora as they stood at the current step.
   const table = playback.view;
