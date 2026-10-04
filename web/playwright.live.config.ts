@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 // overrides it for a local check.
 const BASE_URL = process.env.LIVE_BASE_URL ?? (process.env.MHJDOJO_SITE_URL ?? 'https://mhj-dojo.lolipop-now.app/').replace(/\/$/, '');
 
-// A minimal smoke test against the deployed public site (deploy-lolipop.yml's
+// A minimal smoke test against the deployed public site (verify-live.yml's
 // post-deploy verification): no webServer, since the target already runs on
 // its own.
 export default defineConfig({
