@@ -13,6 +13,7 @@ import { Help } from './components/Help';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { ResumePanel, type ResumeItem } from './components/ResumePanel';
+import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
 import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
 import {
   bareUrl,
@@ -68,7 +69,7 @@ export function App() {
     return next;
   }
 
-  const { busy, error, request } = useSerialRequest<SessionState>(
+  const { busy, error, retryable, request, retry } = useSerialRequest<SessionState>(
     (next) => {
       setState(next);
       setPreviewTile(null);
@@ -234,11 +235,9 @@ export function App() {
             )}
           </header>
 
-          {error && (
-            <div class="error-banner" role="alert">
-              {error}
-            </div>
-          )}
+          {/* 再試行 only for an engine failure: a refused request would fail again. */}
+          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
+          <SaveFailedNotice />
 
           {!state && offered.length > 0 && (
             <ResumePanel noun="練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
