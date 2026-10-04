@@ -233,6 +233,12 @@ func TestChiitoitsuTenpai(t *testing.T) {
 	if c := a.Candidates[0]; (c.Tile != "4s" && c.Tile != "6s") || c.Shanten != 0 || c.Ukeire != 3 || c.Wait == nil || *c.Wait != 3 {
 		t.Fatalf("best %+v, want 4s/6s chiitoitsu tenpai on 3 tiles", c)
 	}
+	if want := "打 4索 後: 七対子: 対子6。浮き牌は 6索"; a.Shape != want {
+		t.Fatalf("shape %q, want %q", a.Shape, want)
+	}
+	if want := "打 4索 と打 6索 はどちらも聴牌。待ちは同じ。"; !strings.HasPrefix(a.Notes[0], want) {
+		t.Fatalf("notes %q, want prefix %q", a.Notes, want)
+	}
 	if r := a.Review(tile.MustParseHand("6s")[0]); !r.IsBest {
 		t.Fatalf("6s review %+v", r)
 	}
@@ -261,6 +267,9 @@ func TestKokushi(t *testing.T) {
 	a := Compute(input(yakushanten.NewAnalyzer(), "19m19p19s123456z55m", "", 5, 18))
 	if c := a.Candidates[0]; c.Tile != "5m" || c.Shanten != 1 || c.UkeireKinds != 13 || c.Ukeire != 40 || c.Wait == nil || *c.Wait != 7.5 {
 		t.Fatalf("best %+v, want 5m kokushi 1-shanten", c)
+	}
+	if want := "打 5萬 後: 国士無双: 12種・対子なし"; a.Shape != want {
+		t.Fatalf("shape %q, want %q", a.Shape, want)
 	}
 	b := Compute(input(yakushanten.NewAnalyzer(), "19m19p19s1234567z5m", "", 5, 18))
 	if c := b.Candidates[0]; c.Tile != "5m" || c.Shanten != 0 || c.Ukeire != 39 {
@@ -300,11 +309,12 @@ func TestFormsUnion(t *testing.T) {
 
 // BenchmarkCompute times the advice alone (the per-discard analysis is
 // built outside the loop) on hands from 3-shanten to tenpai, where the
-// expected-wait search does the most work.
+// expected-wait search does the most work, plus a chiitoitsu and a kokushi
+// 1-shanten hand.
 func BenchmarkCompute(b *testing.B) {
 	a := yakushanten.NewAnalyzer()
 	var ins []Input
-	for _, h := range []string{"123m456p789s23s11z9m", "123m456p11z3457s79p", "11m345m678p22s456s7z", "234m678p13s46s55z9m1p", "139m468p2479s1257z"} {
+	for _, h := range []string{"123m456p789s23s11z9m", "123m456p11z3457s79p", "11m345m678p22s456s7z", "234m678p13s46s55z9m1p", "139m468p2479s1257z", "113355m22p111s777z", "19m19p19s123456z55m"} {
 		ins = append(ins, input(a, h, "", 5, 18))
 	}
 	b.ResetTimer()

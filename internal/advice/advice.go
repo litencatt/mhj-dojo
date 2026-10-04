@@ -11,7 +11,7 @@
 //     wait any discard reaches after drawing it, averaged with the tile's
 //     unseen copies as weights,
 //  4. near yaku: rows (yakuman aside) at 1-shanten or better, or no further
-//     than the shanten, by count and then by total han,
+//     than the normal-form shanten, by count and then by total han,
 //  5. dora kept (a dora or red five is discarded last), terminals and
 //     honors before simples, and finally kind order.
 //
@@ -117,6 +117,8 @@ type cand struct {
 	t       tile.Tile
 	res     []yakushanten.Result
 	shanten int
+	form    shanten.Form
+	normal  int // normal-form shanten: the near-yaku range
 	ukeire  int
 	uke     []tile.Kind
 	wait    float64
@@ -147,7 +149,7 @@ func Compute(in Input) *Advice {
 		left := all14
 		left[t.Kind]--
 		f := lowest(res[0], left)
-		c.shanten, c.uke = f.shanten, f.uke
+		c.shanten, c.form, c.uke, c.normal = f.shanten, f.form, f.uke, res[0].Shanten
 		for _, k := range c.uke {
 			c.ukeire += max(4-in.Visible[k], 0)
 		}
@@ -158,7 +160,7 @@ func Compute(in Input) *Advice {
 			c.wait, c.hasWait = w.expected(left, in.Visible, c.uke), true
 		}
 		for _, r := range res[1:] {
-			if r.Possible && !r.Yakuman && r.Shanten <= max(c.shanten, 1) {
+			if r.Possible && !r.Yakuman && r.Shanten <= max(c.normal, 1) {
 				c.yakuN++
 				c.yakuHan += in.Han(r.Key)
 				c.yaku = append(c.yaku, r.Name)
@@ -192,7 +194,15 @@ func Compute(in Input) *Advice {
 
 	left := all14
 	left[best.t.Kind]--
-	adv.Shape = "打 " + name(best.t) + " 後: " + shape(handshape.Groups(left, 0))
+	adv.Shape = "打 " + name(best.t) + " 後: "
+	switch best.form {
+	case shanten.FormChiitoitsu:
+		adv.Shape += pairsShape(left)
+	case shanten.FormKokushi:
+		adv.Shape += kokushiShape(left)
+	default:
+		adv.Shape += shape(handshape.Groups(left, 0))
+	}
 	adv.NearYaku = nearYaku(cs, in.Han)
 	if len(cs) > 1 {
 		adv.Notes = append(adv.Notes, versus(cs[0], cs[1]))
@@ -304,33 +314,24 @@ func compare(a, b cand) int {
 	return cmp.Compare(a.t.Kind, b.t.Kind)
 }
 
-// form is the lowest shanten of a 13-tile hand and the kinds that lower it.
+// form is the lowest shanten of a 13-tile hand, the form reaching it and
+// the kinds that lower it.
 type form struct {
 	shanten int
+	form    shanten.Form
 	uke     []tile.Kind
 }
 
-// lowest takes the lowest shanten of the concealed 13 tiles c over the
-// normal form (already computed as normal), chiitoitsu and kokushi, with the
-// union of the ukeire of every form reaching it (as internal/cpu does).
+// lowest takes the lowest shanten of the 13 tiles c over the normal form
+// (already computed as normal), chiitoitsu and kokushi (shanten.Lowest). It
+// assumes a concealed hand: practice mode has no calls.
 func lowest(normal yakushanten.Result, c tile.Counts) form {
-	best := normal.Shanten
 	var set [tile.NumKinds]bool
 	for _, k := range normal.Ukeire {
 		set[k] = true
 	}
-	for _, r := range []shanten.Result{shanten.Chiitoitsu(c), shanten.Kokushi(c)} {
-		if r.Shanten > best {
-			continue
-		}
-		if r.Shanten < best {
-			best, set = r.Shanten, [tile.NumKinds]bool{}
-		}
-		for _, k := range r.Ukeire {
-			set[k] = true
-		}
-	}
-	f := form{shanten: best}
+	var f form
+	f.shanten, f.form = shanten.Lowest(&c, normal.Shanten, &set)
 	for k, ok := range set {
 		if ok {
 			f.uke = append(f.uke, tile.Kind(k))
@@ -448,10 +449,15 @@ func phase(junme, shanten int, tenpai float64, draws int) (string, string) {
 }
 
 // nearYaku lists the rows (yakuman aside) whose best shanten over all
-// discards is 1 or less, or no more than the best shanten, closest
-// first, and whether the best discard keeps that best.
+// discards is 1 or less, or no more than the best normal-form shanten (so a
+// near chiitoitsu does not hide the normal-form yaku), closest first, and
+// whether the best discard keeps that best.
 func nearYaku(cs []cand, han func(string) int) []NearYaku {
-	limit := max(cs[0].shanten, 1)
+	limit := cs[0].normal
+	for _, c := range cs {
+		limit = min(limit, c.normal)
+	}
+	limit = max(limit, 1)
 	var out []NearYaku
 	for i, r := range cs[0].res {
 		if i == 0 || r.Yakuman {
@@ -499,6 +505,9 @@ func versus(a, b cand) string {
 		return fmt.Sprintf("%s%sは同じ%d枚だが、%s を切るほうが聴牌時の待ちが平均%.1f枚多い。", head, term, a.ukeire, A, waitKey(a)-waitKey(b))
 	}
 	same := head + term + "・待ちは同じ。"
+	if a.shanten == 0 {
+		same = head + "待ちは同じ。"
+	}
 	switch {
 	case a.yakuN != b.yakuN:
 		return same + fmt.Sprintf("%s を切るほうが近い役が多い（%s）。", A, strings.Join(a.yaku, "・"))
@@ -520,6 +529,40 @@ func missingKinds(a, b []tile.Kind) string {
 		}
 	}
 	return strings.Join(out, "・")
+}
+
+// pairsShape describes a chiitoitsu hand: its pairs and the other tiles.
+func pairsShape(c tile.Counts) string {
+	pairs := 0
+	var rest []string
+	for k, n := range c {
+		if n >= 2 {
+			pairs++
+		}
+		if n%2 == 1 {
+			rest = append(rest, name(tile.Tile{Kind: tile.Kind(k)}))
+		}
+	}
+	s := fmt.Sprintf("七対子: 対子%d", pairs)
+	if len(rest) > 0 {
+		s += "。浮き牌は " + strings.Join(rest, "・")
+	}
+	return s
+}
+
+// kokushiShape describes a kokushi hand: its terminal and honor kinds and
+// whether one is paired.
+func kokushiShape(c tile.Counts) string {
+	kinds, pair := 0, "なし"
+	for k, n := range c {
+		if tile.Kind(k).IsYaochu() && n > 0 {
+			kinds++
+			if n >= 2 {
+				pair = "あり"
+			}
+		}
+	}
+	return fmt.Sprintf("国士無双: %d種・対子%s", kinds, pair)
 }
 
 // shape describes a split: meld and taatsu counts, the pair and the floats.

@@ -248,7 +248,7 @@ position always gets the same advice. The text fields are Japanese.
   "draws_left": 14,               // draws after this discard: max_turns − turn − 1
   "tenpai_chance": 0.62,          // after the best discard, 0..1 (0.001 steps)
   "win_chance": 0.21,
-  "shape": "打 9萬 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split
+  "shape": "打 9萬 後: 面子2・両面2・嵌張1・雀頭あり。浮き牌は 北",  // hand_groups-style split; when chiitoitsu or kokushi gives the shanten: "七対子: 対子6。浮き牌は 2筒" / "国士無双: 12種・対子なし"
   "near_yaku": [ { "key": "tanyao", "name": "断么九", "han": 1, "shanten": 1, "kept": true } ],
   "notes": ["打 9萬 と打 北 はどちらも1向聴。9萬 を切るほうが有効牌が4枚多い（28枚と24枚）。…"]
 }
@@ -267,7 +267,7 @@ position always gets the same advice. The text fields are Japanese.
    of those, weighted by the unseen copies of each ukeire type. Waits are
    compared as shown, rounded to 0.1, so closer ones tie;
 4. near yaku of the 13 tiles left: rows other than `normal` and the yakuman
-   whose shanten is ≤ max(1, the discard's shanten) — more rows first,
+   whose shanten is ≤ max(1, the discard's normal-form shanten) — more rows first,
    then more total `han`;
 5. dora kept: a dora kind or red five is discarded last; then terminals and
    honors before simples; then kind order.
@@ -288,8 +288,8 @@ to tenpai; 終盤: says so when `tenpai_chance` < 0.3, and at the last discard,
 the junme, so a short game (small `max_turns`) never shows 序盤 advice at its end. `notes[0]` explains the
 first two candidates by the first key that differs; a further note names the
 near yaku the best discard gives up. `near_yaku` lists up to 6 rows (the
-yakuman aside) whose best shanten over all discards is ≤ max(1, the best
-discard's shanten), closest first; `kept` is whether the best discard keeps
+yakuman aside) whose best shanten over all discards is ≤ max(1, the lowest
+normal-form shanten over all discards), closest first; `kept` is whether the best discard keeps
 that shanten.
 
 ### Review

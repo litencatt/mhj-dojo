@@ -63,10 +63,10 @@ func goldenSession(t *testing.T, seed int64) string {
 // same states as before; seed 1's script follows a different best discard.
 func TestGoldenStates(t *testing.T) {
 	want := map[int64]string{
-		1: "0dd822f0ff6b78d0993199e3e4cdded562946ca95fca1e0d7a5b220ef0b42219",
+		1: "b44d0bf1b66affa911a605966a26ede87c5f2f26a29d1ee9fd36d6b09f8a639f",
 		2: "5484c6b66893d81bd527d02b84dc197cef4c2c6138e1551936af0e70d5b02d9a",
-		3: "03f8a98ac401766c774e8c943b3fea55f0bf65b3cfa279e819e13da569f5e990",
-		4: "dc55833e0530174946ba7991d320a34f25cf4f5431c6e86ebf14e3659b9d827d",
+		3: "f697e0b3fd1353835b01bb9de657729d5d9d02e3f02c35cdc3e751315e9b499b",
+		4: "8ace01331dcda1ee8a0be6269fa5d70b9a7aa73b2c339fd45dc60b548235896d",
 	}
 	for seed := int64(1); seed <= 4; seed++ {
 		if got := goldenSession(t, seed); got != want[seed] {
