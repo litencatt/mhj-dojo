@@ -529,7 +529,7 @@ drawn tile can be discarded, and the engine discards it for you unless you can
 tsumo), double riichi, ippatsu, ura dora, haitei, houtei, furiten (own
 discards, same go-around, and after riichi), head bump (no double ron),
 3000-point noten penalty at the exhaustive draw, and the abortive draws 九種九牌
-(declared), 四風連打, 四家立直 and 四開槓. Points: no kiriage mangan, a pair of a wind
+(declared), 四風連打, 四家立直 and 四開槓; no nagashi mangan (流し満貫). Points: no kiriage mangan, a pair of a wind
 that is both the round and the seat wind is 4 fu (2 per reason, as for any
 value pair), counted yakuman at 13 han, yakuman multiples (a double yakuman or
 stacked yakuman: `multiplier` = total yakuman han / 13, paying 32000 × n to a
