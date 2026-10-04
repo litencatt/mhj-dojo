@@ -23,11 +23,13 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
   const [error, setError] = useState<string | null>(null);
 
   const inFlight = useRef(false);
+  const last = useRef<(() => Promise<T>) | null>(null);
 
   // Resolves to whether fn's own state was shown (not dropped, and not failed).
   async function request(fn: () => Promise<T>): Promise<boolean> {
     if (inFlight.current) return false;
     inFlight.current = true;
+    last.current = fn;
     setBusy(true);
     setError(null);
     try {
@@ -42,7 +44,13 @@ export function useSerialRequest<T>(onSuccess: (next: T) => void) {
     }
   }
 
-  return { busy, error, request };
+  // Sends the last request again (one that failed: it acts on the state
+  // still shown).
+  function retry() {
+    if (last.current) void request(last.current);
+  }
+
+  return { busy, error, request, retry };
 }
 
 /**

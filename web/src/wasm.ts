@@ -143,6 +143,20 @@ function loadAll(): SavedMap {
 }
 
 let warnedStorage = false;
+const storageListeners = new Set<() => void>();
+
+/**
+ * Calls listener once storage has refused a save (at once if it already
+ * has), for the page to tell the player. Returns what unsubscribes it.
+ */
+export function onStorageFailed(listener: () => void): () => void {
+  if (warnedStorage) {
+    listener();
+    return () => {};
+  }
+  storageListeners.add(listener);
+  return () => storageListeners.delete(listener);
+}
 
 // Writes saves to localStorage. When that fails (most likely the quota),
 // keeps only the one just saved (keep) and tries once more; if storage
@@ -167,6 +181,8 @@ function write<T>(key: string, saved: Record<string, T>, wrap: (saved: Record<st
   if (!warnedStorage) {
     warnedStorage = true;
     console.warn('mhj-dojo: cannot save to localStorage; a reload will start over from the URL');
+    for (const listener of storageListeners) listener();
+    storageListeners.clear();
   }
 }
 

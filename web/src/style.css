@@ -206,6 +206,42 @@ h2 {
   border-radius: 8px;
   padding: 10px 14px;
 }
+.error-banner,
+.save-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.error-banner > span:first-child,
+.save-failed > span {
+  flex: 1 1 auto;
+}
+.error-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.error-banner button,
+.save-failed button {
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.error-banner button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Storage refused a save: a warning, not an error. */
+.save-failed {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  font-size: 0.9rem;
+}
 
 /* The saved sessions or games offered when the page opens without one. */
 .resume-panel {
