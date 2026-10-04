@@ -1,9 +1,13 @@
 name: CI
 
+# CHANGELOG.md-only changes (the release pull request) skip CI: no check is
+# required, and the tag's build is verified by build-site-release.yml.
 on:
   push:
     branches: [main]
+    paths-ignore: [CHANGELOG.md]
   pull_request:
+    paths-ignore: [CHANGELOG.md]
 
 permissions:
   contents: read
