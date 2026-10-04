@@ -92,7 +92,7 @@ func TestEvaluateInvariants(t *testing.T) {
 		if want := sumHan(w.Yaku) + w.Dora + w.UraDora; w.HanTotal != want {
 			t.Fatalf("%s: han %d, parts %d", conc, w.HanTotal, want)
 		}
-		if w.Fu%10 != 0 && !(w.Fu == 25 && w.Reading == nil) {
+		if w.Fu%10 != 0 && (w.Fu != 25 || w.Reading != nil) {
 			t.Fatalf("%s: fu %d", conc, w.Fu)
 		}
 		if w.Fu < 20 {

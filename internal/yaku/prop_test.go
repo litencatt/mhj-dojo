@@ -245,7 +245,7 @@ func refFu(d Decomposition, win tile.Kind, place int, ctx Context) int {
 		if m.Kind.IsYaochu() {
 			v = 4
 		}
-		hidden := !m.Open && !(ctx.Ron && i == place)
+		hidden := !m.Open && (!ctx.Ron || i != place)
 		if hidden {
 			v *= 2
 		}
