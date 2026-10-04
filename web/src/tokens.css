@@ -3,7 +3,7 @@
   color-scheme: light dark;
   --bg: #f4f5f7;
   --fg: #1a1d23;
-  --muted: #6b7280;
+  --muted: #5f6672; /* >= 4.5:1 on --bg and the tinted rows */
   --panel-bg: #ffffff;
   --border: #d8dbe0;
   --accent: #2563eb;

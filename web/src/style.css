@@ -167,6 +167,21 @@ h2 {
   inherits: true;
   initial-value: 0px;
 }
+.speed-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.speed-option select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
 /* The CPU game's 「設定」, folding the new-game options away: phones only. */
 .options-toggle {
   display: none;

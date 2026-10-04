@@ -5,7 +5,7 @@ import { errorMessage } from './panels';
 import { claim, isStopped, onChange } from './singleTab';
 import {
   buildPlayback,
-  PLAYBACK_STEP_MS,
+  playbackStepMs,
   playbackHighlight,
   playbackState,
   type PlaybackBuild,
@@ -227,7 +227,7 @@ export interface Playback {
 // response with no events at all) reveals everything at once.
 function leadStep(build: PlaybackBuild, state: GameState): number {
   const total = build.opsPerEvent.length;
-  if (total === 0 || prefersReducedMotion()) return total;
+  if (total === 0 || prefersReducedMotion() || playbackStepMs() === 0) return total;
   return state.events[0].seat === state.you ? 1 : 0;
 }
 
@@ -269,9 +269,9 @@ export function usePlayback(state: GameState | null, seen: GameState | null = nu
     const tick = () => {
       cur += 1;
       setAt({ build, step: cur });
-      if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+      if (cur < total) timer.current = window.setTimeout(tick, playbackStepMs());
     };
-    if (cur < total) timer.current = window.setTimeout(tick, PLAYBACK_STEP_MS);
+    if (cur < total) timer.current = window.setTimeout(tick, playbackStepMs());
     return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [build]);
