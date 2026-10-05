@@ -37,6 +37,9 @@ func BenchmarkPracticeGame(b *testing.B) {
 			if st.CanTsumo {
 				st = do("POST", base+"/tsumo", `{}`)
 			} else {
+				if st.Advice == nil || len(st.Advice.Candidates) == 0 {
+					b.Fatalf("seed %d turn %d: no advice candidates", seed, st.Turn)
+				}
 				st = do("POST", base+"/discard", fmt.Sprintf(`{"tile":%q}`, st.Advice.Candidates[0].Tile))
 			}
 		}

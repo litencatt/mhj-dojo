@@ -56,11 +56,17 @@ func (m *rankMasks) at(k, p, r int) uint16 {
 	if r == 0 {
 		return m.r0[k][p]
 	}
+	if m.track == nil { // no free triplets without TrackTrips
+		return 0
+	}
 	return m.track[k][p][r-1]
 }
 
 // suitEntry is a memoized table, with its masks once Ukeire has needed them
 // (most tables are never asked for ukeire, so they don't carry the masks).
+// Ukeire fills masks in after the entry is in the memo, although memo.Memo
+// says its values never change: the table itself never does, and the
+// engine is single-threaded, so no reader sees a half-written entry.
 type suitEntry struct {
 	t     Table
 	masks *rankMasks

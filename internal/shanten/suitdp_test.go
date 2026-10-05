@@ -109,7 +109,13 @@ func TestUkeireMatchesDistWith(t *testing.T) {
 			}
 			target.Melds = 1 + r.IntN(4)
 			if r.IntN(4) == 0 {
-				target.MinTrips = r.IntN(4)
+				target.MinTrips = 1 + r.IntN(3)
+				// Free triplets count only in tables tracking them.
+				for s := range target.Rules {
+					if target.Rules[s] != RuleNone {
+						target.Rules[s].TrackTrips = true
+					}
+				}
 			}
 		}
 		ev := e.Evaluate(&c, &target)
