@@ -286,7 +286,7 @@ export function pageOverflowX(page: Page) {
 // every non-pon call offer, is offered a pon within a couple of your turns.
 // Guarded by TestE2ESeedOffersPon in internal/apicall/e2e_seeds_test.go: if game
 // logic changes and it fails, pick a new seed as its message says.
-export const SEED = 8;
+export const SEED = 12;
 
 /** Waits until the CPU moves have finished replaying: while they replay,
  * the action bar holds a playback スキップ button that sends no request. */
