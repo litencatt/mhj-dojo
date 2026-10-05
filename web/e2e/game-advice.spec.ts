@@ -43,7 +43,7 @@ test('a CPU riichi marks the danger of every tile you hold', async ({ page }) =>
   }
   const held = await hand.locator('.hand-tiles .tile, .hand-drawn .tile').count();
   await expect(marked).toHaveCount(held);
-  await expect(marked.first()).toHaveAttribute('aria-label', /、危険度 (安全|低|中|高)（(下家|対面|上家) (安全|低|中|高)/);
+  await expect(marked.first()).toHaveAttribute('aria-label', /、危険度 [安低中危]（(下家|対面|上家)/);
   await expect(marked.first()).toHaveAttribute('title', /^危険度 /);
 
   await page.getByRole('checkbox', { name: 'アドバイス・危険度' }).uncheck();

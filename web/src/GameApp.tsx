@@ -52,14 +52,19 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
-const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安全', 1: '低', 2: '中', 3: '高' };
+// The badge's letter, also used in its text.
+const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
 
-/** Each held tile's danger mark: its highest level over the riichi seats, and the text naming each. */
+/** Each held tile's danger mark: its highest level over the riichi seats,
+ * and a text naming the seats (each with its own level when there are two
+ * or more). */
 function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
   const out: Record<TileT, { className: string; text: string }> = {};
   for (const t of Object.keys(danger[0]?.tiles ?? {})) {
     const level = Math.max(...danger.map((d) => d.tiles[t] ?? 3)) as DangerLevel;
-    const each = danger.map((d) => `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}`).join('・');
+    const each = danger
+      .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
+      .join('・');
     out[t] = { className: `tile-danger tile-danger-${level}`, text: `危険度 ${DANGER_NAMES[level]}（${each}）` };
   }
   return out;
@@ -278,7 +283,8 @@ export function GameApp() {
   const adviceOption = (
     <label class="speed-option">
       <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
-      アドバイス・危険度
+      {/* A phone has no advice panel: the option only shows the danger marks there. */}
+      {phone ? '危険度' : 'アドバイス・危険度'}
     </label>
   );
   return (
