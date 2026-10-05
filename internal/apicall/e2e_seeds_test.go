@@ -79,6 +79,15 @@ func TestE2ESeedRound(t *testing.T) {
 	}
 	if st.Result == nil {
 		t.Errorf("seed %d (SEED): round not over after 150 moves; see the comment above tsConst", seed)
+		return
+	}
+	// game.spec.ts (a phone fits the revealed hands) wants the round won and
+	// more than six tiles in the top seat's river.
+	if k := st.Result.Kind; k != "tsumo" && k != "ron" {
+		t.Errorf("seed %d (SEED): round ended in %s, want a win; see the comment above tsConst", seed, k)
+	}
+	if n := len(st.Seats[2].River); n <= 6 {
+		t.Errorf("seed %d (SEED): %d tiles in the top seat's river, want more than 6; see the comment above tsConst", seed, n)
 	}
 }
 

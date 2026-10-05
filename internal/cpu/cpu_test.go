@@ -661,7 +661,7 @@ func TestLeavesDeadTenpai(t *testing.T) {
 func TestRiverOrder(t *testing.T) {
 	p := New()
 	called, riichi := false, false
-	for seed := int64(0); seed < 40 && !(called && riichi); seed++ {
+	for seed := int64(0); seed < 40 && (!called || !riichi); seed++ {
 		r := game.New(seed)
 		for r.Actor() >= 0 {
 			seat := r.Actor()
