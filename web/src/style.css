@@ -849,6 +849,13 @@ section {
 .panel-heading .yaku-filter-toggle {
   margin: 0 0 8px auto;
 }
+/* Folded on a phone, the count (and ✕) sit in the heading row before 絞り込み. */
+.panel-heading .yaku-filter-status {
+  margin: 0 0 8px auto;
+}
+.panel-heading .yaku-filter-status + .yaku-filter-toggle {
+  margin-left: 0;
+}
 /* Filter bar: the toggle, (when open) the category chips, and the count
    and reset on the first row, then (when open) search, shanten limit and
    sort. It sits outside the scrolling table. */
