@@ -11,6 +11,7 @@ export interface TileProps {
   dimmed?: boolean;
   faceDown?: boolean; // show the tile's back (e.g. unrevealed ura dora)
   label?: string;
+  title?: string; // a tooltip, e.g. the danger of a hand tile
   className?: string; // extra class, e.g. a playback highlight
   onClick?: (e: MouseEvent) => void;
   // A mouse pointer entering or leaving, or keyboard focus. Touch never
@@ -29,7 +30,7 @@ export function mouseOnly(f: () => void) {
 
 /** Renders a single mahjong tile: an ivory body (CSS) with an SVG face. */
 export function Tile(props: TileProps) {
-  const { tile, size = 'md', interactive = false, button = false, dimmed = false, faceDown = false, label, className, onClick, onHoverStart, onHoverEnd } = props;
+  const { tile, size = 'md', interactive = false, button = false, dimmed = false, faceDown = false, label, title, className, onClick, onHoverStart, onHoverEnd } = props;
   const classes = ['tile', `tile-${size}`];
   if (dimmed) classes.push('tile-dimmed');
   if (faceDown) classes.push('tile-back');
@@ -43,6 +44,7 @@ export function Tile(props: TileProps) {
     onFocus: onHoverStart,
     onBlur: onHoverEnd,
     'aria-label': label ?? (faceDown ? '伏せ牌' : tileName(tile)),
+    title,
   };
 
   const content = faceDown ? null : <TileFace tile={tile} />;

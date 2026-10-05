@@ -711,6 +711,47 @@ section {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* CPU game: a hand tile's danger against a riichi, a lettered badge in its
+   corner (the tile's label and title spell it out); ::after is a phone's
+   tap area. */
+.tile.tile-danger::before {
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  min-width: 1.2em;
+  padding: 0 1px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2em;
+  text-align: center;
+  pointer-events: none;
+  z-index: 1;
+}
+.tile.tile-danger-0::before {
+  content: "安";
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+.tile.tile-danger-1::before {
+  content: "低";
+  background: var(--panel-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.tile.tile-danger-2::before {
+  content: "中";
+  background: var(--row-best-bg);
+  color: var(--group-taatsu);
+  border: 1px solid var(--group-taatsu);
+}
+.tile.tile-danger-3::before {
+  content: "危";
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
 
 /* ---- Hand ---- */
 /* Hand tiles scale with the panel so all 14 (13 + drawn) fit on one row:

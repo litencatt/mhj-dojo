@@ -103,6 +103,20 @@ func TestE2ESeedWonRound(t *testing.T) {
 	}
 }
 
+// RIICHI_SEED: a CPU declares riichi within 3 of your tsumogiri moves, so
+// the danger marks show on your turn (game-advice.spec.ts).
+func TestE2ESeedCPURiichi(t *testing.T) {
+	seed := tsConst(t, "game-advice.spec.ts", "RIICHI_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newE2EGame(c, seed, "random")
+	for i := 0; i < 3 && st.Result == nil && len(st.Danger) == 0; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if len(st.Danger) == 0 {
+		t.Errorf("seed %d (RIICHI_SEED): no CPU riichi on your turn within 3 moves; see the comment above tsConst", seed)
+	}
+}
+
 // CPU_DEALS: a CPU deals first.
 func TestE2ESeedCPUDeals(t *testing.T) {
 	seed := tsConst(t, "table.spec.ts", "CPU_DEALS")
