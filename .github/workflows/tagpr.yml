@@ -30,7 +30,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A second run on an already-tagged release merge (GitHub can deliver
+      # the push twice) would tag the same commit again (v2026.1005.1 on
+      # v2026.1005.0's commit), so skip tagpr when a release tag is there.
+      - id: tagged
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          if git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" 'refs/tags/v*' | grep -q "^${SHA}"; then
+            echo "::notice::${SHA} already has a release tag; skipping tagpr"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - id: tagpr
+        if: steps.tagged.outputs.skip != 'true'
         uses: Songmu/tagpr@967f2ab22be958948fb5bd439bfa3d404dd9dee8 # v1.21.1
         with:
           version: v1.21.0
