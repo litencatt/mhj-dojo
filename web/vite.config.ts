@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
 import { changelogHtml } from './src/changelog';
+import { siteServiceWorkerPlugin } from './sw-build.ts';
 
 // The site's own public base URL (must end with '/'), for the absolute
 // og:url/og:image link-preview tags below. Defaults to the deployed site
@@ -125,8 +126,15 @@ export default defineConfig(({ command }) => {
     .sort()
     .map((f) => new URL(`src/${f}`, import.meta.url))
     .filter((f) => statSync(f).isFile());
-  const inputs = ['index.html', 'info/index.html', '../CHANGELOG.md', 'package-lock.json', 'vite.config.ts'].map((f) => new URL(f, import.meta.url));
-  const id = digest([...engine, ...inputs, ...src], 16);
+  const inputs = ['index.html', 'info/index.html', '../CHANGELOG.md', 'package-lock.json', 'vite.config.ts', 'sw-build.ts'].map((f) => new URL(f, import.meta.url));
+  // All of site-public/ (icons, manifest too): the Service Worker precaches
+  // it under this id (sw-build.ts), so any change must change the id.
+  const publicFiles = readdirSync(new URL('site-public/', import.meta.url), { withFileTypes: true })
+    .filter((d) => d.isFile())
+    .map((d) => d.name)
+    .sort()
+    .map((f) => new URL(`site-public/${f}`, import.meta.url));
+  const id = digest([...engine, ...inputs, ...src, ...publicFiles], 16);
   const built = new Date().toISOString();
   return {
     plugins: [
@@ -140,6 +148,7 @@ export default defineConfig(({ command }) => {
           this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ version, release, id, built })}\n` });
         },
       },
+      siteServiceWorkerPlugin(),
     ],
     define: {
       'import.meta.env.VITE_MHJDOJO_ENGINE': JSON.stringify(engineHash.digest('hex').slice(0, 12)),

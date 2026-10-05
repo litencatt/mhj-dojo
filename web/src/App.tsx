@@ -10,6 +10,7 @@ import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
 import { Help } from './components/Help';
+import { EngineLoading } from './components/EngineLoading';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { ResumePanel, type ResumeItem } from './components/ResumePanel';
@@ -244,9 +245,7 @@ export function App() {
           )}
 
           {!state && !error && offered.length === 0 && (
-            <p class="muted">
-              計算エンジンを読み込んでいます…
-            </p>
+            <EngineLoading />
           )}
         </div>
         {state && (
