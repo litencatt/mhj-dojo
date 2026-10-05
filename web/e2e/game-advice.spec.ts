@@ -5,7 +5,7 @@ import { SEED, handPanel, playOneStep, waitForPlayback } from './helpers';
 
 // A CPU declares riichi within 3 of your tsumogiri moves. Guarded by
 // TestE2ESeedCPURiichi in internal/apicall/e2e_seeds_test.go.
-const RIICHI_SEED = 57;
+const RIICHI_SEED = 1;
 
 test('a desktop game offers the advice in the dock, and the option turns it off', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
