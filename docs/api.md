@@ -456,7 +456,7 @@ These clarify points the contract above leaves open; none changes the JSON shape
   (an exhausted node has one); both are `null` with `advice=0`. Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
   each node keeps just its small review. Computing the advice takes ~2 ms per discard along the advice's
   best line (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
-  discard p95 ~20 ms including the rest of the state), which `advice=0` saves.
+  discard p95 ~10 ms including the rest of the state), which `advice=0` saves.
 - **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
@@ -950,6 +950,15 @@ engine's memo), under the tables' ~8.8 MiB bound. At a turnover the dropped
 generation stays on the heap until the next GC, so for that moment a memo
 briefly holds three generations (~3.5 MiB more for the analyzer's tables):
 ordinary GC slack, not a lasting cost.
+
+A table that ukeire is read from also carries its rank masks (issue #197):
+32 more bytes, 112 for a table tracking triplets (sanankou). Filled from
+random hands, ~45% of the tables have them, and the analyzer's measured
+peak went from ~8.1 to ~8.6 MiB (with every table masked, the tables'
+bound would be ~1.7 MiB higher). Ukeire no longer builds a table per tile
+kind, so real play keeps fewer tables: `BenchmarkSessionMemory` went from
+~5.5 to ~3.5 MiB per session and `BenchmarkGameMemory` from ~8.3 to ~7.4
+MiB per game.
 
 The sizes come from counting cache misses (computed tables and folds) on
 real play, which unlike timings is deterministic: 8 practice sessions of

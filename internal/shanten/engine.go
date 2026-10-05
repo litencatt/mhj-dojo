@@ -44,8 +44,20 @@ type Table [5][2][MaxTrips + 1]uint8
 
 // rankMasks maps each entry of a Table to the ranks one more tile of which
 // lowers it (bit i for rank i): the ranks where some cheapest target behind
-// the entry needs more tiles than the suit holds.
-type rankMasks [5][2][MaxTrips + 1]uint16
+// the entry needs more tiles than the suit holds. Only TrackTrips tables
+// reach entries with free triplets (r > 0), so the others leave track nil
+// and take 32 bytes.
+type rankMasks struct {
+	r0    [5][2]uint16
+	track *[5][2][MaxTrips]uint16
+}
+
+func (m *rankMasks) at(k, p, r int) uint16 {
+	if r == 0 {
+		return m.r0[k][p]
+	}
+	return m.track[k][p][r-1]
+}
 
 // suitEntry is a memoized table, with its masks once Ukeire has needed them
 // (most tables are never asked for ukeire, so they don't carry the masks).
@@ -260,8 +272,10 @@ func (d *dpScratch) suitDP(c *[9]int8, n int, rule *SuitRule, t *Table, masks *r
 				} else {
 					t[k][p][r] = v - 1
 				}
-				if masks != nil {
-					masks[k][p][r] = mcur[k*sK+p*sP+r]
+				if m := mcur[k*sK+p*sP+r]; masks != nil && r == 0 {
+					masks.r0[k][p] = m
+				} else if masks != nil && rMax > 0 {
+					masks.track[k][p][r-1] = m
 				}
 			}
 		}
@@ -435,6 +449,9 @@ func (ev *Eval) Ukeire(set *[tile.NumKinds]bool) {
 			v, n := SuitCounts(&ev.counts, s)
 			var t Table
 			en.masks = new(rankMasks)
+			if ev.target.Rules[s].TrackTrips {
+				en.masks.track = new([5][2][MaxTrips]uint16)
+			}
 			ev.e.dp.suitDP(&v, n, &ev.target.Rules[s], &t, en.masks)
 		}
 		a, b := &en.t, &ev.others[s]
@@ -449,7 +466,7 @@ func (ev *Eval) Ukeire(set *[tile.NumKinds]bool) {
 					for r2 := 0; r2 <= MaxTrips; r2++ {
 						v2 := b[melds-k][1-p][r2]
 						if v2 != Inf && min(r1+r2, MaxTrips) >= minTrips && int(v1)+int(v2) == ev.Dist {
-							ranks |= en.masks[k][p][r1]
+							ranks |= en.masks.at(k, p, r1)
 							break
 						}
 					}

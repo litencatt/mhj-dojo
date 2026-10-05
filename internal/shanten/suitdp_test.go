@@ -55,13 +55,13 @@ func TestSuitDPMatchesDenseScan(t *testing.T) {
 		v, n, rule := randomSuit(r)
 		want := refSuitDP(&v, n, &rule)
 		var got, got2 Table
-		var masks rankMasks
+		masks := rankMasks{track: new([5][2][MaxTrips]uint16)}
 		dp.suitDP(&v, n, &rule, &got, nil)
 		dp.suitDP(&v, n, &rule, &got2, &masks)
 		if got != *want || got2 != *want {
 			t.Fatalf("case %d: counts %v n %d rule %+v: got %v / %v, want %v", i, v, n, rule, got, got2, *want)
 		}
-		var wantMasks rankMasks
+		var wantMasks [5][2][MaxTrips + 1]uint16
 		for j := 0; j < n; j++ {
 			if v[j] >= 4 {
 				continue
@@ -79,8 +79,14 @@ func TestSuitDPMatchesDenseScan(t *testing.T) {
 				}
 			}
 		}
-		if masks != wantMasks {
-			t.Fatalf("case %d: counts %v n %d rule %+v: masks %v, want %v", i, v, n, rule, masks, wantMasks)
+		for k := range wantMasks {
+			for p := range wantMasks[k] {
+				for q, want := range wantMasks[k][p] {
+					if got := masks.at(k, p, q); got != want {
+						t.Fatalf("case %d: counts %v n %d rule %+v: mask (%d, %d, %d) %b, want %b", i, v, n, rule, k, p, q, got, want)
+					}
+				}
+			}
 		}
 	}
 }
