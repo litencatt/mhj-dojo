@@ -1,34 +1,51 @@
 // The site's Service Worker (issue #192), for offline use and instant repeat
-// loads. Not bundled: the mhj-dojo-sw plugin (vite.config.ts) fills in
-// BUILD (the build's id, as in version.json) and PRECACHE (paths relative to
-// this file) and writes it as sw.js; src/sw.ts registers it.
+// loads. Not bundled: sw-build.ts fills in BUILD (the build's id, as in
+// version.json) and PRECACHE (paths relative to this file) and writes it as
+// sw.js; src/sw.ts registers it.
 //
 // - install: caches this build's files under mhj-dojo-<BUILD>
-// - the pages (navigations): network first, the cached copy when offline
+// - the pages (navigations): the network, else (offline, a 5xx or no answer
+//   in 4 seconds) the cached copy
 // - the other precached files (content-hashed or ?v=<hash>): cache first
 // - anything else, version.json included: not handled, so the network
 // - activate: deletes the other builds' caches
 //
-// A new build's worker waits until a page of that build, or the update
-// banner's 再読み込み, sends it SKIP_WAITING (src/sw.ts).
+// A new build's worker waits until a page of that build sends it
+// SKIP_WAITING (src/sw.ts).
 /* global BUILD, PRECACHE */
 const CACHE = `mhj-dojo-${BUILD}`;
-const PAGES = ['./', 'info/'];
+const NETWORK_TIMEOUT_MS = 4000;
 const href = (path) => new URL(path, self.registration.scope).href;
 const precached = new Set(PRECACHE.map(href));
-const pages = new Set(PAGES.map(href));
+// Each page's URLs (without the query), and the path it is cached by.
+const pages = new Map([
+  [href('./'), './'],
+  [href('index.html'), './'],
+  [href('info/'), 'info/'],
+  [href('info'), 'info/'],
+]);
+const isPage = (path) => path === './' || path === 'info/';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
       Promise.all(
         PRECACHE.map(async (path) => {
-          // A page past the CDN's cached copy (as 再読み込み does), so it
-          // matches this build's assets; hashed files from any cache.
-          const page = PAGES.includes(path);
-          const res = await fetch(page ? `${path}?_v=${BUILD}` : path, { cache: page ? 'no-cache' : 'default' });
+          if (!isPage(path)) {
+            const res = await fetch(path);
+            if (!res.ok) throw new Error(`${path}: ${res.status}`);
+            return cache.put(href(path), res);
+          }
+          // A page past the CDN's cached copy (as 再読み込み does), which
+          // must be this build's: every asset it loads is precached.
+          // Otherwise the install fails, and the old worker stays.
+          const res = await fetch(`${path}?_v=${BUILD}`, { cache: 'no-cache' });
           if (!res.ok) throw new Error(`${path}: ${res.status}`);
-          await cache.put(href(path), page ? new Response(res.body, res) : res);
+          const html = await res.text();
+          for (const m of html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)) {
+            if (!precached.has(new URL(m[1], href(path)).href)) throw new Error(`${path}: ${m[1]} is not this build's`);
+          }
+          return cache.put(href(path), new Response(html, { headers: res.headers }));
         }),
       ),
     ),
@@ -45,15 +62,26 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') void self.skipWaiting();
 });
 
+async function page(req, path) {
+  const network = fetch(req);
+  network.catch(() => {}); // answered below, or not needed
+  try {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), NETWORK_TIMEOUT_MS));
+    const res = await Promise.race([network, timeout]);
+    if (res.status < 500) return res;
+  } catch {
+    // offline or slow: the cached copy
+  }
+  return (await caches.match(href(path), { cacheName: CACHE })) ?? network;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (req.mode === 'navigate') {
-    if (!pages.has(url.origin + url.pathname)) return;
-    event.respondWith(
-      fetch(req).catch(async () => (await caches.match(url.origin + url.pathname, { cacheName: CACHE })) ?? Response.error()),
-    );
+    const path = pages.get(url.origin + url.pathname);
+    if (path) event.respondWith(page(req, path));
     return;
   }
   if (!precached.has(url.href)) return;

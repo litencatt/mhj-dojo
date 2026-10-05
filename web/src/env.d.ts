@@ -8,3 +8,5 @@ declare const __MHJDOJO_SITE_ID__: string;
 declare const __MHJDOJO_SITE_BUILT__: string;
 /** The release the site was built as (e.g. v2026.0927.0), or null outside the Release site workflow. */
 declare const __MHJDOJO_SITE_RELEASE__: string | null;
+/** The Service Worker's kill switch (MHJDOJO_SW=off at build time; sw-build.ts). */
+declare const __MHJDOJO_SW_OFF__: boolean;
