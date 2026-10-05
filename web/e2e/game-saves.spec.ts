@@ -391,7 +391,8 @@ test('a save the engine fails on twice in a row is dropped', async ({ page }) =>
 test('a full localStorage keeps the current game saved', async ({ page }) => {
   const warnings: string[] = [];
   page.on('console', (m) => {
-    if (m.type() === 'warning') warnings.push(m.text());
+    // Not Playwright's own, for the Service Worker it blocks (playwright.config.ts).
+    if (m.type() === 'warning' && !m.text().startsWith('Service Worker registration blocked')) warnings.push(m.text());
   });
   await page.addInitScript(() => {
     const setItem = Storage.prototype.setItem;

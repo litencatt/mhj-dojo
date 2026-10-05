@@ -3,6 +3,7 @@ import { App } from './App';
 import { GameApp } from './GameApp';
 import { TileSprite } from './components/TileFace';
 import { UpdateBanner } from './components/UpdateBanner';
+import { registerServiceWorker } from './sw';
 import './style.css';
 
 const root = document.getElementById('app');
@@ -19,3 +20,4 @@ render(
   </>,
   root,
 );
+registerServiceWorker();
