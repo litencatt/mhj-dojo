@@ -32,17 +32,17 @@ const RING_RED = '#d1332a';
 const BG = '#f7f7f4';
 const SANS = `"Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif`;
 
-// maskable: a full-bleed square (the OS applies its own mask); the rings
-// already sit inside the 80% safe zone (radius 25 of 32).
+// maskable: a full-bleed square (the OS applies its own mask) with the rings
+// scaled to 85%, so they keep clear of the mask's edge.
 function iconSVG(maskable = false) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="mhj-dojo 麻雀道場">
   <rect width="64" height="64"${maskable ? '' : ' rx="14"'} fill="${BG}"/>
-  <circle cx="32" cy="32" r="25" fill="${RING_BLUE}"/>
+${maskable ? '  <g transform="translate(32 32) scale(.85) translate(-32 -32)">\n' : ''}  <circle cx="32" cy="32" r="25" fill="${RING_BLUE}"/>
   <circle cx="32" cy="32" r="20.5" fill="${BG}"/>
   <circle cx="32" cy="32" r="16" fill="${RING_BLUE}"/>
   <circle cx="32" cy="32" r="11.5" fill="${BG}"/>
   <circle cx="32" cy="32" r="8" fill="${RING_RED}"/>
-</svg>`;
+${maskable ? '  </g>\n' : ''}</svg>`;
 }
 
 // Renders `svg` at exactly `size`x`size` px and returns the PNG buffer.
@@ -143,7 +143,6 @@ async function main() {
   writeFileSync(`${publicDir}/icon-maskable-512.png`, await renderSquarePNG(page, iconSVG(true), 512));
 
   const manifest = {
-    id: './',
     scope: './',
     name: 'mhj-dojo 麻雀道場',
     short_name: '麻雀道場',

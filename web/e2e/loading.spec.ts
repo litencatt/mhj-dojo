@@ -19,17 +19,15 @@ test('engine loading is announced while the wasm downloads, then goes away', asy
   await expect(status).toHaveCount(0);
 });
 
-test('the manifest has an id, a scope, a maskable icon and shortcuts', async ({ page }) => {
+test('the manifest has a scope, a maskable icon and shortcuts', async ({ page }) => {
   const res = await page.request.get('./manifest.webmanifest');
   expect(res.ok()).toBe(true);
   const m = (await res.json()) as {
-    id: string;
     scope: string;
     theme_color: string;
     icons: { src: string; purpose?: string }[];
     shortcuts: { name: string; url: string }[];
   };
-  expect(m.id).toBe('./');
   expect(m.scope).toBe('./');
   const maskable = m.icons.find((i) => i.purpose === 'maskable');
   expect(maskable).toBeTruthy();

@@ -57,12 +57,7 @@ function start(): Promise<Worker> {
     // deploy never mixes cached and new copies of them.
     const version = import.meta.env.VITE_MHJDOJO_ENGINE as string;
     url.searchParams.set('v', version);
-    // The built page starts the worker itself, ahead of this script
-    // (vite.config.ts): take it, and replay what it raised meanwhile.
-    const g = window as { __mhjEngine?: { w: Worker; q: Event[]; f: (e: Event) => void } };
-    const early = g.__mhjEngine;
-    delete g.__mhjEngine;
-    const w = early?.w ?? new Worker(url);
+    const w = new Worker(url);
     const fail = (message: string) => {
       w.terminate();
       if (engine !== started) return; // an old worker, already replaced
@@ -95,14 +90,6 @@ function start(): Promise<Worker> {
     };
     w.onmessageerror = () => fail('計算エンジンの応答を読めませんでした');
     abandon = fail;
-    if (early) {
-      w.removeEventListener('message', early.f);
-      w.removeEventListener('error', early.f);
-      // After `started` is assigned: fail() needs it.
-      queueMicrotask(() => {
-        for (const e of early.q) (e.type === 'message' ? w.onmessage : w.onerror)?.call(w, e as never);
-      });
-    }
   });
   engine = started;
   return started;

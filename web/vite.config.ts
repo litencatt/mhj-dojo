@@ -69,33 +69,6 @@ function siteOgTagsPlugin(siteUrl: string): Plugin {
   };
 }
 
-// Starts the engine's worker from the HTML, in parallel with the JS bundle,
-// instead of after the bundle has run (issue #192): the worker then fetches
-// wasm_exec.js and mhj-dojo.wasm while the bundle downloads. src/wasm.ts
-// takes the worker, with the events it raised before then, from
-// window.__mhjEngine: a message sent before onmessage is set can be lost.
-// (A <link rel=preload> of
-// the wasm doesn't help: a worker's fetch can't use the document's preload,
-// and Chrome warns that it went unused.) The URL is src/wasm.ts's.
-function engineEarlyStartPlugin(engineVersion: string): Plugin {
-  return {
-    name: 'mhj-dojo-engine-early-start',
-    apply: 'build',
-    transformIndexHtml(_html, ctx) {
-      if (ctx.path !== '/index.html') return;
-      return [
-        {
-          tag: 'script',
-          children:
-            `try{var w=new Worker("worker.js?v=${engineVersion}"),q=[],f=function(e){q.push(e)};` +
-            'w.addEventListener("message",f);w.addEventListener("error",f);window.__mhjEngine={w:w,q:q,f:f}}catch(e){}',
-          injectTo: 'head-prepend',
-        },
-      ];
-    },
-  };
-}
-
 // The checkout's commit (7 hex digits), or '' outside git.
 function gitShortSha(): string {
   try {
@@ -134,7 +107,6 @@ export default defineConfig(({ command }) => {
   // copies (src/wasm.ts, site-public/worker.js).
   const engineHash = createHash('sha256');
   for (const f of engine) if (existsSync(f)) engineHash.update(readFileSync(f));
-  const engineVersion = engineHash.digest('hex').slice(0, 12);
   // The site's build, which the page compares with version.json (written
   // next to it) to tell that a newer deploy is out (src/version.ts): the
   // commit it was built from (MHJDOJO_VERSION overrides it, e.g. for a
@@ -161,7 +133,6 @@ export default defineConfig(({ command }) => {
       preact(),
       siteChangelogPlugin(),
       siteOgTagsPlugin(resolveSiteUrl()),
-      engineEarlyStartPlugin(engineVersion),
       {
         name: 'mhj-dojo-version-json',
         apply: 'build',
@@ -171,7 +142,7 @@ export default defineConfig(({ command }) => {
       },
     ],
     define: {
-      'import.meta.env.VITE_MHJDOJO_ENGINE': JSON.stringify(engineVersion),
+      'import.meta.env.VITE_MHJDOJO_ENGINE': JSON.stringify(engineHash.digest('hex').slice(0, 12)),
       __MHJDOJO_SITE_VERSION__: JSON.stringify(version),
       __MHJDOJO_SITE_ID__: JSON.stringify(id),
       __MHJDOJO_SITE_BUILT__: JSON.stringify(built),

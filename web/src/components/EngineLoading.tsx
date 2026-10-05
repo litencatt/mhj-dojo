@@ -9,9 +9,11 @@ export function EngineLoading() {
     return () => clearInterval(timer);
   }, []);
   return (
-    <p class="muted engine-loading" role="status" aria-live="polite">
+    <p class="muted engine-loading" role="status">
       <span class="spinner" aria-hidden="true" />
-      計算エンジンを読み込んでいます…{secs >= 2 && ` ${secs}秒`}
+      計算エンジンを読み込んでいます…
+      {/* Hidden from the status, so it isn't re-announced every second. */}
+      {secs >= 2 && <span aria-hidden="true"> {secs}秒</span>}
     </p>
   );
 }
