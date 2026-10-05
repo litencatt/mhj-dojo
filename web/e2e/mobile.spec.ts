@@ -409,6 +409,16 @@ test.describe('the yaku filter bar on a phone', () => {
     await expect(count.locator('.visually-hidden')).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
     const rows = await yaku.locator('.yaku-table tbody tr').count();
 
+    // The folded group is gone; at 320px the ✕ and – stay inside the panel.
+    await expect(yaku.getByRole('group', { name: '役の絞り込み' })).toHaveCount(0);
+    await page.setViewportSize({ width: 320, height: 640 });
+    const panelBox = await box(yaku);
+    for (const b of [yaku.getByRole('button', { name: '条件をクリア' }), yaku.getByRole('button', { name: '役別向聴を最小化' })]) {
+      const bb = await box(b);
+      expect(bb.x).toBeGreaterThanOrEqual(panelBox.x - 1);
+      expect(bb.x + bb.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1);
+    }
+
     await yaku.getByRole('button', { name: '条件をクリア' }).click();
     await expect(count.locator('.visually-hidden')).toHaveText(/^(\d+) \/ \1役を表示中$/);
     await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
