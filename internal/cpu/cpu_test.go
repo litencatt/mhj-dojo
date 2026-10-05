@@ -572,7 +572,7 @@ func TestFoldsOneShanten(t *testing.T) {
 }
 
 // No riichi on a wait whose tiles are all in sight: 23p waits on 1p and 4p,
-// all eight seen.
+// all eight seen, so the player breaks it for a 1-shanten hand instead.
 func TestNoRiichiOnDeadWait(t *testing.T) {
 	v := view("123m456m789m23p55s", "1z")
 	for _, s := range []string{"1p", "4p"} {
@@ -582,8 +582,8 @@ func TestNoRiichiOnDeadWait(t *testing.T) {
 	}
 	l := legal(v)
 	l.Riichi = []string{"1z"}
-	if a := New().Decide(v, l); a.Type != game.Discard || a.Tile != "1z" {
-		t.Errorf("got %+v, want discard 1z without riichi", a)
+	if a := New().Decide(v, l); a.Type != game.Discard || a.Tile == "1z" {
+		t.Errorf("got %+v, want a discard other than 1z, without riichi", a)
 	}
 }
 
@@ -618,5 +618,87 @@ func TestRouteCalls(t *testing.T) {
 	}
 	if a := New().Decide(v, l); a.Tile != "4p" && a.Tile != "5p" {
 		t.Errorf("after a honitsu pon: got %+v, want 4p or 5p", a)
+	}
+}
+
+// A concealed kan keeps the hand closed: tenpai after it, the player
+// declares riichi instead of discarding toward an open-hand yaku.
+func TestRiichiAfterAnkan(t *testing.T) {
+	v := view("345m678p789s4s", "9p")
+	m := mustTile("2m")
+	v.Seats[0].Melds = []game.Called{{Meld: yaku.Meld{Type: yaku.Trip, Kind: m.Kind, Kan: true}, Tiles: []tile.Tile{m, m, m, m}, From: -1}}
+	l := legal(v)
+	l.Riichi = []string{"4s", "9p"}
+	if a := New().Decide(v, l); a.Type != game.Riichi || a.Tile != "4s" {
+		t.Errorf("got %+v, want riichi 4s (waits 6p 9p)", a)
+	}
+}
+
+// A tenpai whose wait is all in sight is dropped for a 1-shanten hand with
+// tiles left: 23m waits on 1m 4m, all eight seen, so 7z stays.
+func TestLeavesDeadTenpai(t *testing.T) {
+	v := view("23m456m789m55s123p", "9z")
+	v.Seats[0].Drawn = nil
+	v.Seats[0].Hand = tile.MustParseHand("23m678m789p55s123p7z")
+	for _, s := range []string{"1m", "4m"} {
+		for range 4 {
+			v.Seats[2].River = append(v.Seats[2].River, game.RiverTile{Tile: mustTile(s)})
+		}
+	}
+	var l game.Legal
+	for _, x := range v.Seats[0].Hand {
+		if !slices.Contains(l.Discards, x.String()) {
+			l.Discards = append(l.Discards, x.String())
+		}
+	}
+	if a := New().Decide(v, l); a.Tile == "7z" {
+		t.Errorf("got %+v, kept the dead wait", a)
+	}
+}
+
+// RiverTile.Order numbers every seat's discards in the order they were
+// made, called tiles and riichi declaration tiles included.
+func TestRiverOrder(t *testing.T) {
+	p := New()
+	called, riichi := false, false
+	for seed := int64(0); seed < 40 && !(called && riichi); seed++ {
+		r := game.New(seed)
+		for r.Actor() >= 0 {
+			seat := r.Actor()
+			a := p.Decide(r.ViewFor(seat), r.LegalFor(seat))
+			a.Seat = seat
+			if err := r.Apply(a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		byOrder := map[int]game.RiverTile{}
+		seatOf := map[int]int{}
+		for _, s := range r.ViewFor(0).Seats {
+			for _, rt := range s.River {
+				if _, dup := byOrder[rt.Order]; dup {
+					t.Fatalf("seed %d: order %d twice", seed, rt.Order)
+				}
+				byOrder[rt.Order], seatOf[rt.Order] = rt, s.Seat
+				called = called || rt.Called
+				riichi = riichi || rt.Riichi
+			}
+		}
+		i := 0
+		for _, a := range r.Log() {
+			if a.Type != game.Discard && a.Type != game.Riichi {
+				continue
+			}
+			rt, ok := byOrder[i]
+			if !ok || seatOf[i] != a.Seat || rt.Tile.String() != a.Tile {
+				t.Fatalf("seed %d: discard %d %+v, river has %+v (seat %d)", seed, i, a, rt, seatOf[i])
+			}
+			i++
+		}
+		if i != len(byOrder) {
+			t.Fatalf("seed %d: %d discards logged, %d in the rivers", seed, i, len(byOrder))
+		}
+	}
+	if !called || !riichi {
+		t.Fatalf("no called tile (%v) or riichi tile (%v) seen", called, riichi)
 	}
 }

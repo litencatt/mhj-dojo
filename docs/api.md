@@ -613,7 +613,8 @@ dealer); the score is (points − 30000) / 1000 + uma (+20 / +10 / −10 / −20
 + oka (+20 to first), and sticks left at the end go to first place.
 
 CPU players (`cpu`): `"normal"` (普通) takes every win, declares riichi when
-tenpai unless every tile of its wait is in sight, calls when the hand keeps a
+tenpai unless every tile of its wait is in sight (it then breaks the wait
+for a one-step-back hand with tiles left, if any), calls when the hand keeps a
 yaku (a value triplet, tanyao, or within two steps of tenpai honitsu, toitoi
 or a value pair made a triplet later), makes a concealed or added kan when it
 does not set the hand back, discards for tile efficiency (lowest shanten,

@@ -22,7 +22,10 @@ const foldShanten = 2
 
 // memoGen is the number of suit tables in each generation of the player's
 // shanten memo (at most twice as many, ~1 MiB): the three CPU seats build
-// only ~3,000–6,500 tables over a whole game, reusing few across rounds.
+// only a few thousand tables over a whole game, reusing few across rounds.
+// The yaku routes of open hands (byYaku, calls) add tables of their own
+// suit rules; the memo drops the oldest generation past the bound, which
+// costs time, never correctness.
 const memoGen = 4_000
 
 // kyuushuKeep is the thirteen-orphans shanten up to which the player goes
@@ -105,7 +108,7 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	visible := v.Visible()
 
 	best := p.byEfficiency(tiles, len(me.Melds), l.Discards, &visible)
-	if !p.weak && len(me.Melds) > 0 && !hasValueTriplet(v, me.Melds) {
+	if !p.weak && needsRoute(v, me.Melds) {
 		p.byYaku(v, best, tiles, &visible)
 	}
 	if !p.weak {
@@ -114,14 +117,21 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 			return game.Action{Type: game.Discard, Tile: choice}
 		}
 	}
-	choice := best[0].tile
+	pick := best[0]
 	if p.weak {
-		choice = stray(v, best)
+		pick.tile = stray(v, best)
+	} else if pick.shanten == 0 && pick.ukeire == 0 {
+		// A wait whose tiles are all in sight cannot win: keep a hand one
+		// step back with tiles left to draw instead, if there is one.
+		if i := slices.IndexFunc(best, func(o option) bool { return o.shanten <= 1 && o.ukeire > 0 }); i >= 0 {
+			pick = best[i]
+		}
 	}
+	choice := pick.tile
 	// No riichi on a wait whose tiles are all in sight (the weak player
 	// declares anyway).
-	live := best[0].ukeire > 0 || p.weak
-	if best[0].shanten == 0 && live && slices.Contains(l.Riichi, choice) {
+	live := pick.ukeire > 0 || p.weak
+	if pick.shanten == 0 && live && slices.Contains(l.Riichi, choice) {
 		return game.Action{Type: game.Riichi, Tile: choice}
 	}
 	return game.Action{Type: game.Discard, Tile: choice}
@@ -301,6 +311,9 @@ func safeKinds(v game.View, seat int) [tile.NumKinds]bool {
 			declared = rt.Order
 		}
 	}
+	// declared < 0 with Riichi set does not happen in a real round (the
+	// declaration tile keeps its mark, called or not); a hand-built view
+	// gets only the river then.
 	if !s.Riichi || declared < 0 {
 		return safe
 	}

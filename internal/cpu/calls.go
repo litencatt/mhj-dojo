@@ -27,11 +27,18 @@ func (p *Player) decideCall(v game.View, l game.Legal) (game.Action, bool) {
 	if v.LastDiscard == nil {
 		return game.Action{}, false
 	}
+	visible := v.Visible()
 	cur := p.handShanten(me.Hand, len(me.Melds))
+	if needsRoute(v, me.Melds) { // as byYaku counts it for the discards
+		ms := meldShapes(me.Melds)
+		c := tile.CountsOf(me.Hand)
+		if routes := yakuRoutes(v, ms, c, &visible); len(routes) > 0 {
+			cur = p.routeDist(c, ms, routes)
+		}
+	}
 	if p.folds(v, cur, len(riichiThreats(v))) {
 		return game.Action{}, false
 	}
-	visible := v.Visible()
 	t := *v.LastDiscard
 	value := isValue(v, t.Kind)
 	best, bestSh := game.Action{}, cur+1
@@ -184,8 +191,7 @@ func (p *Player) afterCallRoutes(rest []tile.Tile, melds []yaku.Meld, needDiscar
 	return best
 }
 
-// byYaku reorders the ranked discards of an open hand without a value
-// triplet by the shanten toward its nearest yaku route, keeping the order
+// byYaku reorders the ranked discards of a hand that needsRoute by the shanten toward its nearest yaku route, keeping the order
 // among equals; each option's shanten becomes that route shanten.
 func (p *Player) byYaku(v game.View, opts []option, tiles []tile.Tile, visible *tile.Counts) {
 	melds := meldShapes(v.Seats[v.Viewer].Melds)
@@ -206,11 +212,16 @@ func (p *Player) byYaku(v game.View, opts []option, tiles []tile.Tile, visible *
 	sortx.Func(opts, func(a, b option) int { return a.shanten - b.shanten })
 }
 
-// hasValueTriplet reports whether one of melds is a value triplet (a yaku).
-func hasValueTriplet(v game.View, melds []game.Called) bool {
-	return slices.ContainsFunc(melds, func(m game.Called) bool {
-		return m.Meld.Type == yaku.Trip && isValue(v, m.Meld.Kind)
-	})
+// needsRoute reports whether a hand with melds is open (a concealed kan
+// keeps it closed, riichi still a yaku) without a value triplet, so its
+// shanten counts toward its nearest yaku route.
+func needsRoute(v game.View, melds []game.Called) bool {
+	open, value := false, false
+	for _, m := range melds {
+		open = open || m.Meld.Open
+		value = value || m.Meld.Type == yaku.Trip && isValue(v, m.Meld.Kind)
+	}
+	return open && !value
 }
 
 func (p *Player) handShanten(ts []tile.Tile, melds int) int {
