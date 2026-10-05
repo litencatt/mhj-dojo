@@ -116,7 +116,8 @@ for (const width of [320, 360, 390]) {
       const panel = await box(yaku);
       // A phone has no 複合役 and no name search, but keeps the rest of the filter bar.
       await expect(yaku.locator('.combo-table')).toHaveCount(0);
-      await expect(yaku.locator('.yaku-filter')).toBeVisible();
+      await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toBeVisible();
+      await expect(yaku.locator('.yaku-filter-count')).toBeVisible();
       await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
       const t = yaku.locator('.yaku-table');
       await expect(t.locator('tbody tr').first()).toBeVisible();
