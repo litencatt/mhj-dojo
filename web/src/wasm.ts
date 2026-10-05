@@ -98,7 +98,10 @@ function start(): Promise<Worker> {
     if (early) {
       w.removeEventListener('message', early.f);
       w.removeEventListener('error', early.f);
-      for (const e of early.q) (e.type === 'message' ? w.onmessage : w.onerror)?.call(w, e as never);
+      // After `started` is assigned: fail() needs it.
+      queueMicrotask(() => {
+        for (const e of early.q) (e.type === 'message' ? w.onmessage : w.onerror)?.call(w, e as never);
+      });
     }
   });
   engine = started;
