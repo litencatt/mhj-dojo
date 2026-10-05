@@ -269,7 +269,7 @@ for (const [label, viewport] of [
       await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
       await expect(page.getByRole('region', { name: '卓' })).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
-      for (const name of ['時系列チャート', '用語表']) {
+      for (const name of ['時系列チャート', 'アドバイス', '用語表']) {
         await expect(page.getByRole('region', { name })).toBeHidden();
       }
       const dock = page.getByRole('navigation', { name: '最小化したパネル' });
@@ -278,9 +278,7 @@ for (const [label, viewport] of [
         await expect(dock).toHaveCount(0);
         return;
       }
-      await expect(dock.getByRole('button')).toHaveCount(2);
-      await expect(dock.getByRole('button', { name: '時系列チャート' })).toBeVisible();
-      await expect(dock.getByRole('button', { name: '用語表' })).toBeVisible();
+      await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /アドバイス/, /用語表/]);
     });
   });
 }
