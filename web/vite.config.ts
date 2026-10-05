@@ -91,6 +91,57 @@ function digest(files: URL[], length: number): string {
   return hash.digest('hex').slice(0, length);
 }
 
+// The Service Worker (src/sw.template.js, registered by src/sw.ts; issue #192): sw.js
+// with this build's id and the files it precaches, all relative to it: the
+// pages, the bundle, and site-public/ (the engine's three files with the
+// ?v=<hash> the page loads them by), except og-image.png (for link
+// previews) and version.json, which always comes from the network.
+//
+// MHJDOJO_SW=off is the kill switch: the page then unregisters any worker
+// and the sw.js written instead deletes the caches and unregisters itself,
+// for pages of older builds that still register it.
+function siteServiceWorkerPlugin(): Plugin {
+  const off = process.env.MHJDOJO_SW === 'off';
+  let id = '';
+  let engine = '';
+  let publicDir = '';
+  return {
+    name: 'mhj-dojo-sw',
+    apply: 'build',
+    config: () => ({ define: { 'import.meta.env.VITE_MHJDOJO_SW_OFF': JSON.stringify(off) } }),
+    configResolved(config) {
+      id = JSON.parse(config.define?.__MHJDOJO_SITE_ID__ as string);
+      engine = JSON.parse(config.define?.['import.meta.env.VITE_MHJDOJO_ENGINE'] as string);
+      publicDir = config.publicDir;
+    },
+    generateBundle: {
+      order: 'post',
+      handler(_options, bundle) {
+        let source: string;
+        if (off) {
+          source = `self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('mhj-dojo-')).map((k) => caches.delete(k)))).then(() => self.registration.unregister()));
+});
+`;
+        } else {
+          const ENGINE = ['worker.js', 'wasm_exec.js', 'mhj-dojo.wasm'];
+          const files = [
+            ...Object.keys(bundle).filter((f) => f !== 'version.json' && !f.endsWith('.map')),
+            ...readdirSync(publicDir).filter((f) => f !== 'og-image.png' && !f.startsWith('.')),
+          ];
+          const precache = files
+            .map((f) => (ENGINE.includes(f) ? `${f}?v=${engine}` : f.replace(/(^|\/)index\.html$/, '$1') || './'))
+            .sort();
+          const template = readFileSync(new URL('src/sw.template.js', import.meta.url), 'utf8');
+          source = template.replace('/* global BUILD, PRECACHE */', `const BUILD = ${JSON.stringify(id)};\nconst PRECACHE = ${JSON.stringify(precache, null, 2)};`);
+        }
+        this.emitFile({ type: 'asset', fileName: 'sw.js', source });
+      },
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   // The site, which runs the engine as WebAssembly in the browser (issues
   // #67, #147): the public site serves it, and mhj-dojo embeds it (make
@@ -140,6 +191,7 @@ export default defineConfig(({ command }) => {
           this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ version, release, id, built })}\n` });
         },
       },
+      siteServiceWorkerPlugin(),
     ],
     define: {
       'import.meta.env.VITE_MHJDOJO_ENGINE': JSON.stringify(engineHash.digest('hex').slice(0, 12)),

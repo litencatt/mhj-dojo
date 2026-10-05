@@ -142,6 +142,8 @@ Build site release、Deploy to Lolipop、Verify live site は手動でも実行�
 
 サイトのビルドは `version.json`（`{"version": "<コミット>", "id": "<ビルド入力のハッシュ>", "built": "<時刻>"}`）も書き出します。コミットは `MHJDOJO_VERSION` で上書きでき、git の外では `dev` です。開いているページは起動時・10分ごと・タブに戻ったときにこれを確認し、新しいビルドが公開されていれば「新しいバージョンがあります」と表示します。「再読み込み」は、キャッシュされた `index.html` を避けるため `_v=<id>` を付けたURLでページを読み直します。
 
+あわせて `sw.js`（Service Worker）も書き出します。ビルドのファイル（ページ・ハッシュ付きの資産・エンジン）を先にキャッシュし、一度開いたあとはオフラインでも使えます。ページはネットワーク優先、それ以外のキャッシュしたファイルはキャッシュ優先で、`version.json` は常にネットワークから取得します。新しいビルドの Service Worker は、そのビルドのページを開いたときか「再読み込み」で切り替わります。`MHJDOJO_SW=off` でビルドすると停止できます（公開した `sw.js` がキャッシュを消して登録を解除し、ページも登録を解除します）。
+
 サイトビルドの `index.html` には、絶対URLの Open Graph / Twitter 共有タグ（`og:url`、`og:image`、`twitter:image`）も入ります。同じ `MHJDOJO_SITE_URL` から組み立てます。`mhj-dojo` はこのビルドをそのまま埋め込みます（`make embed`、タグも含む）。
 
 ### ディレクトリ構成

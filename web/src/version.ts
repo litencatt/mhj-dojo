@@ -1,6 +1,7 @@
 // The version shown in the header, and the check for a newer deploy.
 
 import { useEffect, useState } from 'preact/hooks';
+import { activateWaiting } from './sw';
 
 // The site's build (vite.config.ts, which also writes it to version.json):
 // the commit, the release (if the Release site workflow built it), an id
@@ -99,7 +100,7 @@ export function useNewVersion(): { state: UpdateState; reload: () => void } {
     // (the same page, with the new id added) fetches the new one.
     const url = new URL(location.href);
     url.searchParams.set(RELOAD_PARAM, deployed);
-    location.replace(url);
+    void activateWaiting().then(() => location.replace(url));
   };
 
   return { state, reload };

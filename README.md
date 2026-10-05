@@ -140,6 +140,8 @@ To deploy by hand instead, run `npx lolipop login` once (opens a browser to auth
 
 The site build also writes `version.json` (`{"version": "<commit>", "id": "<hash of the build's inputs>", "built": "<time>"}`; `MHJDOJO_VERSION` overrides the commit, which is `dev` outside git). An open page checks it at startup, every 10 minutes and when the tab comes back into view, and when a newer build is out it shows 「新しいバージョンがあります」 with a 再読み込み button that loads the page with a `_v=<id>` parameter to get past the cached `index.html`.
 
+It also writes `sw.js`, a Service Worker that precaches the build (the pages, the hashed assets and the engine) so that the app opens offline after a first visit: the pages come from the network when it answers, everything else precached from the cache, and `version.json` always from the network. A new build's worker takes over when a page of that build loads, or on 再読み込み. Building with `MHJDOJO_SW=off` is the kill switch: the deployed `sw.js` then deletes its caches and unregisters itself, and the page unregisters any worker.
+
 The site build's `index.html` also carries absolute Open Graph/Twitter share tags (`og:url`, `og:image`, `twitter:image`), built from that same `MHJDOJO_SITE_URL`. `mhj-dojo` embeds this same build (`make embed`), tags included.
 
 ### Layout

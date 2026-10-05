@@ -36,6 +36,9 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
+    // The site's Service Worker would answer requests the specs route
+    // (page.route doesn't see them); offline.spec.ts allows it.
+    serviceWorkers: 'block',
   },
   projects: [
     {
