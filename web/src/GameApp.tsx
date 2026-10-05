@@ -12,6 +12,7 @@ import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { Help } from './components/Help';
+import { EngineLoading } from './components/EngineLoading';
 import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { ResumePanel, type ResumeItem } from './components/ResumePanel';
@@ -377,9 +378,7 @@ export function GameApp() {
             <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
           {!state && !error && offered.length === 0 && (
-            <p class="muted">
-              計算エンジンを読み込んでいます…
-            </p>
+            <EngineLoading />
           )}
         </div>
         {state && me && table && (
