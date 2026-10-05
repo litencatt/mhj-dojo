@@ -1,9 +1,9 @@
 // Package cpu is the computer player: it always takes a win, declares
-// riichi when tenpai, calls when the hand keeps a yaku (see calls.go),
-// discards for tile efficiency (lowest shanten, then most unseen accepting
-// tiles) and folds against a riichi when it is two or more steps from
-// tenpai. It is deterministic. The weak player (NewWeak) plays worse on
-// purpose.
+// riichi when tenpai with a wait not all in sight, calls when the hand keeps
+// a yaku (see calls.go), discards for tile efficiency (lowest shanten, then
+// most unseen accepting tiles) and folds against a riichi (folds) by the
+// danger of each tile (Danger). It is deterministic. The weak player
+// (NewWeak) plays worse on purpose.
 package cpu
 
 import (
@@ -105,8 +105,11 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	visible := v.Visible()
 
 	best := p.byEfficiency(tiles, len(me.Melds), l.Discards, &visible)
-	if best[0].shanten >= foldShanten && !p.weak {
-		if threats := riichiRivers(v); len(threats) > 0 {
+	if !p.weak && len(me.Melds) > 0 && !hasValueTriplet(v, me.Melds) {
+		p.byYaku(v, best, tiles, &visible)
+	}
+	if !p.weak {
+		if threats := riichiThreats(v); p.folds(v, best[0].shanten, len(threats)) {
 			choice := safest(best, threats, &visible)
 			return game.Action{Type: game.Discard, Tile: choice}
 		}
@@ -115,7 +118,10 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	if p.weak {
 		choice = stray(v, best)
 	}
-	if best[0].shanten == 0 && slices.Contains(l.Riichi, choice) {
+	// No riichi on a wait whose tiles are all in sight (the weak player
+	// declares anyway).
+	live := best[0].ukeire > 0 || p.weak
+	if best[0].shanten == 0 && live && slices.Contains(l.Riichi, choice) {
 		return game.Action{Type: game.Riichi, Tile: choice}
 	}
 	return game.Action{Type: game.Discard, Tile: choice}
@@ -242,30 +248,91 @@ func kindsOf(set *[tile.NumKinds]bool) []tile.Kind {
 	return out
 }
 
-// riichiRivers returns the river kinds of every other seat in riichi.
-func riichiRivers(v game.View) []map[tile.Kind]bool {
-	var out []map[tile.Kind]bool
+// folds reports whether a hand at shanten sh folds against threats riichi
+// seats: always from foldShanten, and one step from tenpai against two or
+// more of them or with a cheap hand.
+func (p *Player) folds(v game.View, sh, threats int) bool {
+	switch {
+	case p.weak || threats == 0 || sh <= 0:
+		return false
+	case sh >= foldShanten:
+		return true
+	}
+	return threats >= 2 || cheap(v)
+}
+
+// cheap reports whether the viewer's hand is not worth pushing one step
+// from tenpai: a non-dealer's hand without dora (red fives included).
+func cheap(v game.View) bool {
+	if v.Dealer == v.Viewer {
+		return false
+	}
+	me := v.Seats[v.Viewer]
+	tiles := slices.Clone(me.Hand)
+	if me.Drawn != nil {
+		tiles = append(tiles, *me.Drawn)
+	}
+	for _, m := range me.Melds {
+		tiles = append(tiles, m.Tiles...)
+	}
+	for _, t := range tiles {
+		if t.Red {
+			return false
+		}
+		for _, ind := range v.DoraIndicators {
+			if t.Kind == tile.DoraFromIndicator(ind.Kind) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// safeKinds returns the kinds that cannot deal into seat: its own river
+// and, once it is in riichi, every tile any seat discarded after its
+// declaration (passing a winning tile then is furiten for the round).
+func safeKinds(v game.View, seat int) [tile.NumKinds]bool {
+	var safe [tile.NumKinds]bool
+	s := v.Seats[seat]
+	declared := -1
+	for _, rt := range s.River {
+		safe[rt.Tile.Kind] = true
+		if rt.Riichi {
+			declared = rt.Order
+		}
+	}
+	if !s.Riichi || declared < 0 {
+		return safe
+	}
+	for _, o := range v.Seats {
+		for _, rt := range o.River {
+			if rt.Order > declared {
+				safe[rt.Tile.Kind] = true
+			}
+		}
+	}
+	return safe
+}
+
+// riichiThreats returns the safe kinds of every other seat in riichi.
+func riichiThreats(v game.View) [][tile.NumKinds]bool {
+	var out [][tile.NumKinds]bool
 	for _, s := range v.Seats {
-		if s.Seat == v.Viewer || !s.Riichi {
-			continue
+		if s.Seat != v.Viewer && s.Riichi {
+			out = append(out, safeKinds(v, s.Seat))
 		}
-		river := map[tile.Kind]bool{}
-		for _, rt := range s.River {
-			river[rt.Tile.Kind] = true
-		}
-		out = append(out, river)
 	}
 	return out
 }
 
 // safest picks the discard with the least danger summed over the riichi
 // seats, keeping the efficiency order among equals.
-func safest(opts []option, threats []map[tile.Kind]bool, visible *tile.Counts) string {
+func safest(opts []option, threats [][tile.NumKinds]bool, visible *tile.Counts) string {
 	best, bestDanger := "", -1
 	for _, o := range opts {
 		d := 0
-		for _, river := range threats {
-			d += danger(o.kind, river, visible)
+		for i := range threats {
+			d += danger(o.kind, &threats[i], visible)
 		}
 		if bestDanger < 0 || d < bestDanger {
 			best, bestDanger = o.tile, d
@@ -274,13 +341,29 @@ func safest(opts []option, threats []map[tile.Kind]bool, visible *tile.Counts) s
 	return best
 }
 
-// danger scores how likely a tile is to deal into one riichi (0 = safe):
-// genbutsu or an honor with all 4 seen, then honors with 3 seen, suji,
-// honors with 2 seen, half suji, other honors, then terminals, 2/8 and
-// middle tiles.
-func danger(k tile.Kind, river map[tile.Kind]bool, visible *tile.Counts) int {
-	if river[k] {
-		return 0 // genbutsu
+// MaxDanger is the highest score Danger returns.
+const MaxDanger = 9
+
+// Danger scores, from 0 (safe) to MaxDanger, how likely discarding k is to
+// deal into seat as the CPU judges it, with the tiles v's viewer can see.
+// It is meant for a seat in riichi; for another seat only its own river
+// counts as safe.
+func Danger(v game.View, seat int, k tile.Kind) int {
+	safe := safeKinds(v, seat)
+	visible := v.Visible()
+	return danger(k, &safe, &visible)
+}
+
+// danger scores k against one seat whose safe kinds are safe (see
+// safeKinds): 0 safe or an honor with all 4 seen, 1 an honor with 3 seen,
+// 2 a number tile with no two-sided wait left on it, 3 an honor with 2
+// seen, 5 one of two two-sided waits ruled out, 6 other honors, then 7
+// terminals, 8 2/8 and 9 middle tiles. A two-sided wait on k is ruled out
+// when its other tile is safe (suji) or one of its two tiles has all 4 in
+// sight (kabe, no-chance).
+func danger(k tile.Kind, safe *[tile.NumKinds]bool, visible *tile.Counts) int {
+	if safe[k] {
+		return 0
 	}
 	if k.IsHonor() {
 		switch visible[k] {
@@ -294,11 +377,24 @@ func danger(k tile.Kind, river map[tile.Kind]bool, visible *tile.Counts) int {
 		return 6
 	}
 	n := k.Num()
-	lo, hi := n-3 >= 1 && river[k-3], n+3 <= 9 && river[k+3]
+	// The two-sided waits on k: k-2 k-1 (from 4 up) and k+1 k+2 (up to 6).
+	sides, open := 0, 0
+	if n >= 4 {
+		sides++
+		if !safe[k-3] && visible[k-1] < 4 && visible[k-2] < 4 {
+			open++
+		}
+	}
+	if n <= 6 {
+		sides++
+		if !safe[k+3] && visible[k+1] < 4 && visible[k+2] < 4 {
+			open++
+		}
+	}
 	switch {
-	case (n <= 3 && hi) || (n >= 7 && lo) || (lo && hi):
-		return 2 // suji
-	case lo || hi:
+	case open == 0:
+		return 2 // suji or no-chance
+	case open < sides:
 		return 5 // half suji of 4, 5, 6
 	case n == 1 || n == 9:
 		return 7

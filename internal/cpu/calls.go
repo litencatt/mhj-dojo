@@ -4,17 +4,21 @@ import (
 	"slices"
 
 	"github.com/litencatt/mhj-dojo/internal/game"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/sortx"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
+	"github.com/litencatt/mhj-dojo/internal/yakushanten"
 )
 
 // The player calls only when the hand keeps a yaku to win with: a value
-// triplet (dragons, the round wind, its seat wind), or tanyao (every meld
-// of simples and at most one terminal or honor left in hand). It pons a
-// value tile whenever that does not set the hand back, and makes other
-// calls only when they bring it closer to tenpai. It never calls while
-// folding against a riichi.
+// triplet (dragons, the round wind, its seat wind), tanyao (every meld of
+// simples and at most one terminal or honor left in hand), or a yaku route
+// (yakuRoutes: honitsu, toitoi, a value pair to triplet) at most
+// routeShanten from tenpai. It pons a value tile whenever that does not set
+// the hand back, and makes other calls only when they bring it closer to
+// tenpai. It never calls while folding against a riichi. An open hand
+// without a value triplet then discards toward its nearest route (byYaku).
 
 // decideCall answers a call offer (pon, chii or open kan); ok is false to
 // skip.
@@ -24,19 +28,26 @@ func (p *Player) decideCall(v game.View, l game.Legal) (game.Action, bool) {
 		return game.Action{}, false
 	}
 	cur := p.handShanten(me.Hand, len(me.Melds))
-	if len(riichiRivers(v)) > 0 && cur >= foldShanten {
+	if p.folds(v, cur, len(riichiThreats(v))) {
 		return game.Action{}, false
 	}
+	visible := v.Visible()
 	t := *v.LastDiscard
 	value := isValue(v, t.Kind)
 	best, bestSh := game.Action{}, cur+1
 	try := func(a game.Action, used []tile.Tile, meld yaku.Meld, needDiscard bool) {
 		rest := removeTiles(me.Hand, used)
 		melds := append(meldShapes(me.Melds), meld)
-		if !keepsYaku(v, melds, rest) {
-			return
+		banned := bannedAfter(a.Type, t.Kind, meld)
+		var sh int
+		if keepsYaku(v, melds, rest) {
+			sh = p.afterCall(rest, len(melds), needDiscard, banned)
+		} else {
+			sh = p.afterCallRoutes(rest, melds, needDiscard, banned, yakuRoutes(v, melds, tile.CountsOf(rest), &visible))
+			if sh > routeShanten {
+				return
+			}
 		}
-		sh := p.afterCall(rest, len(melds), needDiscard, bannedAfter(a.Type, t.Kind, meld))
 		limit := cur - 1 // a call must bring the hand closer to tenpai
 		if meld.Type == yaku.Trip && value {
 			limit = cur // a value triplet is worth it as long as it does not hurt
@@ -104,6 +115,102 @@ func (p *Player) afterCall(rest []tile.Tile, melds int, needDiscard bool, banned
 		best = min(best, p.handShanten(slices.Delete(slices.Clone(rest), i, i+1), melds))
 	}
 	return best
+}
+
+// routeShanten is how far from tenpai a call toward a yaku route (other
+// than a value triplet or tanyao) may leave the hand.
+const routeShanten = 2
+
+// route is the targets of one yaku for a hand with fixed melds (see
+// yakushanten.TargetsWith).
+type route []shanten.Target
+
+// yakuRoutes returns the routes an open hand with these melds and
+// concealed tiles c may win on: tanyao, honitsu, toitoi and a triplet of
+// each value honor that still has enough tiles left.
+func yakuRoutes(v game.View, melds []yaku.Meld, c tile.Counts, visible *tile.Counts) []route {
+	var out []route
+	add := func(key string) {
+		if ts := yakushanten.TargetsWith(key, melds); len(ts) > 0 {
+			out = append(out, ts)
+		}
+	}
+	add("tanyao")
+	add("honitsu")
+	add("toitoi")
+	for k := tile.East; k < tile.NumKinds; k++ {
+		if !isValue(v, k) || c[k]+4-visible[k] < 3 {
+			continue
+		}
+		if k >= tile.Haku {
+			add(dragonKeys[k-tile.Haku])
+		} else {
+			add(yaku.WindKeys[k-tile.East])
+		}
+	}
+	return out
+}
+
+var dragonKeys = [3]string{"haku", "hatsu", "chun"}
+
+// routeDist returns the shanten of concealed tiles c with melds toward the
+// nearest of routes.
+func (p *Player) routeDist(c tile.Counts, melds []yaku.Meld, routes []route) int {
+	full := yakushanten.WithMeldTiles(c, melds)
+	best := shanten.Inf
+	for _, r := range routes {
+		for i := range r {
+			best = min(best, p.eng.Dist(&full, &r[i]))
+		}
+	}
+	return best - 1
+}
+
+// afterCallRoutes is afterCall toward the nearest of routes.
+func (p *Player) afterCallRoutes(rest []tile.Tile, melds []yaku.Meld, needDiscard bool, banned []tile.Kind, routes []route) int {
+	c := tile.CountsOf(rest)
+	if !needDiscard {
+		return p.routeDist(c, melds, routes)
+	}
+	best := 99
+	for k := range c {
+		if c[k] == 0 || slices.Contains(banned, tile.Kind(k)) {
+			continue
+		}
+		c[k]--
+		best = min(best, p.routeDist(c, melds, routes))
+		c[k]++
+	}
+	return best
+}
+
+// byYaku reorders the ranked discards of an open hand without a value
+// triplet by the shanten toward its nearest yaku route, keeping the order
+// among equals; each option's shanten becomes that route shanten.
+func (p *Player) byYaku(v game.View, opts []option, tiles []tile.Tile, visible *tile.Counts) {
+	melds := meldShapes(v.Seats[v.Viewer].Melds)
+	all := tile.CountsOf(tiles)
+	routes := yakuRoutes(v, melds, all, visible)
+	if len(routes) == 0 {
+		return
+	}
+	for i := range opts {
+		if j := slices.IndexFunc(opts[:i], func(x option) bool { return x.kind == opts[i].kind }); j >= 0 {
+			opts[i].shanten = opts[j].shanten
+			continue
+		}
+		c := all
+		c[opts[i].kind]--
+		opts[i].shanten = p.routeDist(c, melds, routes)
+	}
+	sortx.Func(opts, func(a, b option) int { return a.shanten - b.shanten })
+}
+
+// hasValueTriplet reports whether one of melds is a value triplet (a yaku).
+func hasValueTriplet(v game.View, melds []game.Called) bool {
+	return slices.ContainsFunc(melds, func(m game.Called) bool {
+		return m.Meld.Type == yaku.Trip && isValue(v, m.Meld.Kind)
+	})
 }
 
 func (p *Player) handShanten(ts []tile.Tile, melds int) int {

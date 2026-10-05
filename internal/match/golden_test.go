@@ -59,7 +59,9 @@ func goldenGame(t *testing.T, seed int64, o Options, pick func(State, *bool) gam
 // analysis's names and han): converted to that shape, the old states were
 // the same as the new ones, state for state (the saves, match.Save, are
 // untouched; a one-off check described in the message of commit 776859a,
-// which re-pinned them).
+// which re-pinned them). The normal-CPU game (seed 0) was re-pinned when
+// that CPU's defence and calls changed (#193): its moves differ, while the
+// weak-CPU game (seed 5), whose CPU did not change, kept its hash.
 func TestGoldenStates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
@@ -70,7 +72,7 @@ func TestGoldenStates(t *testing.T) {
 		pick func(State, *bool) game.Action
 		want string
 	}{
-		{0, Options{Length: Tonpuu, FirstDealer: DealerYou, CPU: cpu.Normal}, caller, "8c4fd89861e80d5f3288a4797636ef50fd434b61290627796ec03c994ce6dbde"},
+		{0, Options{Length: Tonpuu, FirstDealer: DealerYou, CPU: cpu.Normal}, caller, "028dadf0f19e0452cf727e2cf584685291a6d346078fb45b7de661a3744ae590"},
 		{5, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, move, "29a82b6df508a22389cee80b70cde342b069f455142acec7f92889f94219d4ce"},
 	} {
 		if got := goldenGame(t, c.seed, c.o, c.pick); got != c.want {

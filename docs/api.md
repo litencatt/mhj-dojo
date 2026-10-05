@@ -613,10 +613,16 @@ dealer); the score is (points − 30000) / 1000 + uma (+20 / +10 / −10 / −20
 + oka (+20 to first), and sticks left at the end go to first place.
 
 CPU players (`cpu`): `"normal"` (普通) takes every win, declares riichi when
-tenpai, calls when the hand keeps a yaku (a value triplet, or tanyao), makes
-a concealed or added kan when it does not set the hand back, discards for tile
-efficiency (lowest shanten, then most unseen accepting tiles) and folds
-against a riichi when two or more steps from tenpai. `"weak"` (弱い) also
+tenpai unless every tile of its wait is in sight, calls when the hand keeps a
+yaku (a value triplet, tanyao, or within two steps of tenpai honitsu, toitoi
+or a value pair made a triplet later), makes a concealed or added kan when it
+does not set the hand back, discards for tile efficiency (lowest shanten,
+then most unseen accepting tiles; an open hand first toward its yaku) and
+folds against a riichi when two or more steps from tenpai, or one step
+against two riichi or with a cheap hand (no dora, not the dealer). Folding,
+it discards the safest tile: tiles the riichi seat discarded or let pass
+after its riichi, then suji and kabe (no-chance) tiles and seen honors.
+`"weak"` (弱い) also
 takes every win and declares riichi when tenpai, but never calls or declares
 a kan, never folds, and on about every other discard picks any discard that
 keeps the lowest shanten instead of the most efficient one. That pick is a
