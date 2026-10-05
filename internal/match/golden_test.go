@@ -63,7 +63,8 @@ func goldenGame(t *testing.T, seed int64, o Options, pick func(State, *bool) gam
 // that CPU's defence and calls changed (#193), and again for that change's
 // review fixes (a concealed kan keeps the hand closed, a dead tenpai is
 // broken): its moves differ, while the
-// weak-CPU game (seed 5), whose CPU did not change, kept its hash.
+// weak-CPU game (seed 5), whose CPU did not change, kept its hash. Both were pinned again when the states gained advice and
+// danger: with those two fields left out, the states hashed as before.
 func TestGoldenStates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games on one goroutine; run without -short")
@@ -75,7 +76,7 @@ func TestGoldenStates(t *testing.T) {
 		want string
 	}{
 		{0, Options{Length: Tonpuu, FirstDealer: DealerYou, CPU: cpu.Normal}, caller, "61e36dc97a405af44e62cf778ff5da48acb90a468564a65ae821f642dc616751"},
-		{5, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, move, "29a82b6df508a22389cee80b70cde342b069f455142acec7f92889f94219d4ce"},
+		{5, Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Weak}, move, "98bf714250a9c71e6299f9d5121f8e4081652cfaccc8d071892c141ed12e989d"},
 	} {
 		if got := goldenGame(t, c.seed, c.o, c.pick); got != c.want {
 			t.Errorf("seed %d: states hash to %s, want %s", c.seed, got, c.want)

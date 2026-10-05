@@ -3,7 +3,9 @@ package match
 import (
 	"slices"
 
+	"github.com/litencatt/mhj-dojo/internal/advice"
 	"github.com/litencatt/mhj-dojo/internal/apiview"
+	"github.com/litencatt/mhj-dojo/internal/cpu"
 	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/score"
 	"github.com/litencatt/mhj-dojo/internal/tile"
@@ -48,7 +50,13 @@ type State struct {
 	CombosByDiscard   map[string][]apiview.ComboRow   `json:"combos_by_discard"`
 	Remaining         map[string]int                  `json:"remaining"` // unseen copies of each tile kind, for the ukeire lists
 	History           []apiview.HistoryEntry          `json:"history"`
-	Result            *Result                         `json:"result"`
+	// Advice is the practice advice for your discard: only on your turn
+	// with a drawn tile and a concealed hand, not in riichi.
+	Advice *advice.Advice `json:"advice"`
+	// Danger is, on your turn, each other seat in riichi with the danger
+	// level of every tile you hold (cpu.DangerLevel).
+	Danger []SeatDanger `json:"danger"`
+	Result *Result      `json:"result"`
 }
 
 // Seat is one player. Hand and drawn are present only for you, and for
@@ -65,6 +73,13 @@ type Seat struct {
 	// HandGroups are the blocks of hand, for your seat only (docs/api.md).
 	HandGroups []apiview.HandGroup `json:"hand_groups,omitempty"`
 	Drawn      *string             `json:"drawn,omitempty"`
+}
+
+// SeatDanger is how dangerous each tile you hold is against one riichi:
+// 0 safe, 1 low, 2 medium, 3 high.
+type SeatDanger struct {
+	Seat  int            `json:"seat"`
+	Tiles map[string]int `json:"tiles"`
 }
 
 // Meld is a called meld or a concealed kan.
@@ -170,6 +185,7 @@ func (m *Match) state() State {
 		UraDora:           []string{},
 		Legal:             r.LegalFor(Human),
 		Events:            []Event{},
+		Danger:            []SeatDanger{},
 		ByDiscard:         map[string][]apiview.DiscardRow{},
 		Combos:            []apiview.ComboRow{},
 		CombosByDiscard:   map[string][]apiview.ComboRow{},
@@ -247,6 +263,7 @@ func (m *Match) state() State {
 		}
 		c := tile.CountsOf(all)
 		byDiscard := map[string][]apiview.YakuRow{}
+		byKind := map[tile.Kind][]yakushanten.Result{}
 		// A red five and a plain one leave the same hand: the first key of
 		// each kind is computed, any other shares its rows.
 		var first [tile.NumKinds]string
@@ -262,6 +279,7 @@ func (m *Match) state() State {
 			first[t.Kind] = key
 			c[t.Kind]--
 			res := m.analyze(c, melds)
+			byKind[t.Kind] = res
 			byDiscard[key] = apiview.Rows(res, &visible, han)
 			st.ByDiscard[key] = apiview.DiscardRows(byDiscard[key])
 			st.CombosByDiscard[key] = apiview.Combos(m.combos(c, melds, res), &visible)
@@ -271,10 +289,55 @@ func (m *Match) state() State {
 			st.Analysis = bestRows(byDiscard, st.Legal.Discards)
 			st.Combos = bestCombos(st.CombosByDiscard, st.Legal.Discards)
 		}
+		if me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi {
+			st.Advice = m.advice(v, all, byKind, &visible, han)
+		}
+		st.Danger = danger(v, all)
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
 	return st
+}
+
+// advice is the practice advice (internal/advice) for the human's discard
+// from the 14 concealed tiles all; byKind holds the analysis of the legal
+// discards. Advice assumes no calls. The game's discards so far are the
+// river (no calls, so all the human's own), and the human's draws left are
+// one in four of the wall's.
+func (m *Match) advice(v game.View, all []tile.Tile, byKind map[tile.Kind][]yakushanten.Result, visible *tile.Counts, han func(string) int) *advice.Advice {
+	c := tile.CountsOf(all)
+	for _, t := range all {
+		if _, ok := byKind[t.Kind]; !ok {
+			c[t.Kind]--
+			byKind[t.Kind] = m.analyze(c, nil)
+			c[t.Kind]++
+		}
+	}
+	var dora []tile.Kind
+	for _, ind := range v.DoraIndicators {
+		dora = append(dora, tile.DoraFromIndicator(ind.Kind))
+	}
+	turn := len(v.Seats[Human].River)
+	return advice.Compute(advice.Input{
+		Tiles: all, Visible: *visible, Dora: dora, Turn: turn, MaxTurns: turn + 1 + v.DrawsLeft/4,
+		ByDiscard: byKind, Han: han, Analyzer: m.analyzer,
+	})
+}
+
+// danger rates the tiles all against every other seat in riichi.
+func danger(v game.View, all []tile.Tile) []SeatDanger {
+	out := []SeatDanger{}
+	for s, sv := range v.Seats {
+		if s == Human || !sv.Riichi {
+			continue
+		}
+		d := SeatDanger{Seat: s, Tiles: map[string]int{}}
+		for _, t := range all {
+			d.Tiles[t.String()] = cpu.DangerLevel(v, s, t.Kind)
+		}
+		out = append(out, d)
+	}
+	return out
 }
 
 // reportEvents turns events and their marks into the response's events.
