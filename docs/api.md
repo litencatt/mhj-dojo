@@ -772,7 +772,7 @@ under the 64 KiB body limit.
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
   "remaining": { "1m": 3, "...": 4 },  // unseen copies of every tile kind, for the ukeire lists (see YakuRow)
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
-  "advice": Advice,             // on your turn with a drawn tile and a concealed hand (no calls or kans), not in riichi; else null
+  "advice": Advice,             // on your turn with a drawn tile and a concealed hand (no calls or kans), not in riichi, no tsumo offered; else null
   "danger": [ {"seat": 2, "tiles": {"5p": 3, "1z": 0}} ],  // on your turn: each other seat in riichi, rating every tile you hold
                                 // (hand and drawn): 0 safe, 1 low, 2 medium, 3 high; [] otherwise
   "result": null                // Result once ended
@@ -785,11 +785,13 @@ East, otherwise the round wind row then your seat wind row (1 han each).
 
 `advice` is the practice [Advice](#advice) for the discard: it ranks the
 14 concealed tiles for speed only (no defense), so it is left out once you
-have called or declared a kan, whose hands it does not model, and in riichi.
+have called or declared a kan, whose hands it does not model, in riichi, and
+when you can tsumo.
 `junme` is your discards so far + 1, and `draws_left` your draws left: a
 quarter of `wall_remaining`, rounded down (ignoring calls). `danger` is the
 CPU's own folding judgment (`cpu.DangerLevel`) against that seat: 0 for
-genbutsu or an honor with all 4 visible, 1 for suji or an honor with 2–3
+genbutsu (a kind in that seat's own river; tiles others discarded after its
+riichi are not counted) or an honor with all 4 visible, 1 for suji or an honor with 2–3
 visible, 2 for half suji of 4–6 or another honor, 3 for other terminals, 2/8
 and middle tiles. Both are derived from the table, so saves and replays are
 unaffected.

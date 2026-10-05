@@ -9,7 +9,8 @@ import (
 )
 
 // Advice comes on your turn with a drawn tile and a concealed hand out of
-// riichi, its best candidate a legal discard; danger rates every tile you
+// riichi and with no tsumo, its best candidate a legal discard, junme your
+// discards so far + 1 and draws_left a quarter of the wall; danger rates every tile you
 // hold against each other seat in riichi, on your turn only.
 func TestAdviceAndDanger(t *testing.T) {
 	var advised, warned int
@@ -25,13 +26,16 @@ func TestAdviceAndDanger(t *testing.T) {
 			}
 			me := st.Seats[Human]
 			yourTurn := st.Phase == game.PhaseDiscard && st.Actor == Human
-			if want := yourTurn && me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi; (st.Advice != nil) != want {
+			if want := yourTurn && me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi && !st.Legal.Tsumo; (st.Advice != nil) != want {
 				t.Fatalf("seed %d: advice %v, want %v", seed, st.Advice != nil, want)
 			}
 			if st.Advice != nil {
 				advised++
 				if c := st.Advice.Candidates; len(c) == 0 || !slices.Contains(st.Legal.Discards, c[0].Tile) {
 					t.Fatalf("seed %d: candidates %+v not among %v", seed, c, st.Legal.Discards)
+				}
+				if a := st.Advice; a.Junme != len(me.River)+1 || a.DrawsLeft != st.WallRemaining/4 {
+					t.Fatalf("seed %d: junme %d, draws_left %d; want %d, %d", seed, a.Junme, a.DrawsLeft, len(me.River)+1, st.WallRemaining/4)
 				}
 			}
 			var riichiSeats []int

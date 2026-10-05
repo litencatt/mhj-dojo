@@ -51,7 +51,8 @@ type State struct {
 	Remaining         map[string]int                  `json:"remaining"` // unseen copies of each tile kind, for the ukeire lists
 	History           []apiview.HistoryEntry          `json:"history"`
 	// Advice is the practice advice for your discard: only on your turn
-	// with a drawn tile and a concealed hand, not in riichi.
+	// with a drawn tile and a concealed hand, not in riichi and with no
+	// tsumo to declare.
 	Advice *advice.Advice `json:"advice"`
 	// Danger is, on your turn, each other seat in riichi with the danger
 	// level of every tile you hold (cpu.DangerLevel).
@@ -289,7 +290,7 @@ func (m *Match) state() State {
 			st.Analysis = bestRows(byDiscard, st.Legal.Discards)
 			st.Combos = bestCombos(st.CombosByDiscard, st.Legal.Discards)
 		}
-		if me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi {
+		if me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi && !st.Legal.Tsumo {
 			st.Advice = m.advice(v, all, byKind, &visible, han)
 		}
 		st.Danger = danger(v, all)
