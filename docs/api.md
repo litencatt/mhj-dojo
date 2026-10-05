@@ -790,10 +790,12 @@ when you can tsumo.
 `junme` is your discards so far + 1, and `draws_left` your draws left: a
 quarter of `wall_remaining`, rounded down (ignoring calls). `danger` is the
 CPU's own folding judgment (`cpu.DangerLevel`) against that seat: 0 for
-genbutsu (a kind in that seat's own river; tiles others discarded after its
-riichi are not counted) or an honor with all 4 visible, 1 for suji or an honor with 2–3
-visible, 2 for half suji of 4–6 or another honor, 3 for other terminals, 2/8
-and middle tiles. Both are derived from the table, so saves and replays are
+genbutsu (a kind in that seat's own river, or one any seat discarded after its
+riichi) or an honor with all 4 visible, 1 for a number tile with no two-sided
+wait left on it (suji, or no-chance: all 4 of a tile of that wait in sight)
+or an honor with 2–3 visible, 2 for one of two two-sided waits ruled out or
+another honor, 3 for other terminals, 2/8 and middle tiles (the CPU's 0–9
+score `cpu.Danger`: 0, 1–3, 5–6, 7–9). Both are derived from the table, so saves and replays are
 unaffected.
 
 `Result`:

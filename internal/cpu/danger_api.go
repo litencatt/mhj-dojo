@@ -7,22 +7,16 @@ import (
 
 // Danger levels of a tile against one riichi, as DangerLevel returns them.
 const (
-	DangerSafe = 0 // genbutsu, or an honor with all 4 seen
-	DangerLow  = 1 // suji, or an honor with 2 or 3 seen
-	DangerMid  = 2 // half suji of 4-6, or another honor
+	DangerSafe = 0 // genbutsu (incl. tiles passed after the riichi), or an honor with all 4 seen
+	DangerLow  = 1 // suji or no-chance, or an honor with 2 or 3 seen
+	DangerMid  = 2 // one two-sided wait ruled out, or another honor
 	DangerHigh = 3 // other terminals, 2/8 and middle tiles
 )
 
-// DangerLevel returns how likely discarding a tile of kind k is to deal into
-// seat's riichi, as the player's folding judges it (see danger), from what
-// v's viewer sees.
+// DangerLevel groups Danger's score of k against seat into the four
+// levels above.
 func DangerLevel(v game.View, seat int, k tile.Kind) int {
-	river := map[tile.Kind]bool{}
-	for _, rt := range v.Seats[seat].River {
-		river[rt.Tile.Kind] = true
-	}
-	visible := v.Visible()
-	switch d := danger(k, river, &visible); {
+	switch d := Danger(v, seat, k); {
 	case d == 0:
 		return DangerSafe
 	case d <= 3:

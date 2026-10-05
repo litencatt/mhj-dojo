@@ -13,14 +13,16 @@ func TestDangerLevel(t *testing.T) {
 		v.Seats[s].Seat = s
 	}
 	v.Seats[1].Riichi = true
-	for _, rt := range tile.MustParseHand("4m1z") {
-		v.Seats[1].River = append(v.Seats[1].River, game.RiverTile{Tile: rt})
+	for i, rt := range tile.MustParseHand("4m1z1p") {
+		// 1p declared the riichi.
+		v.Seats[1].River = append(v.Seats[1].River, game.RiverTile{Tile: rt, Order: 1 + i, Riichi: i == 2})
 	}
-	v.Seats[1].River = append(v.Seats[1].River, game.RiverTile{Tile: tile.MustParseHand("1p")[0]})
-	// Seen elsewhere: 2z three times, 3z twice and 4z four times.
-	for _, rt := range tile.MustParseHand("222334444z") {
+	// Seen before the riichi: 2z three times, 3z twice, 4z and 3m four times.
+	for _, rt := range tile.MustParseHand("3333m222334444z") {
 		v.Seats[2].River = append(v.Seats[2].River, game.RiverTile{Tile: rt})
 	}
+	// Passed after the riichi.
+	v.Seats[3].River = append(v.Seats[3].River, game.RiverTile{Tile: tile.MustParseHand("7z")[0], Order: 4})
 	for _, c := range []struct {
 		tile string
 		want int
@@ -28,7 +30,9 @@ func TestDangerLevel(t *testing.T) {
 		{"4m", DangerSafe}, // genbutsu
 		{"1m", DangerLow},  // suji of 4m
 		{"7m", DangerLow},  // suji of 4m
+		{"7z", DangerSafe}, // passed after the riichi
 		{"4z", DangerSafe}, // an honor with all 4 seen
+		{"2m", DangerLow},  // no-chance (kabe): all 4 of 3m seen
 		{"2z", DangerLow},  // an honor with 3 seen
 		{"3z", DangerLow},  // an honor with 2 seen
 		{"5z", DangerMid},  // an honor none of is seen
