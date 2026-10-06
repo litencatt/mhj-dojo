@@ -10,6 +10,7 @@ export interface AdvicePanelProps {
   onHighlight: (tile: string | null) => void; // a hovered candidate, to mark in the hand
   onMinimize: () => void; // send the panel to the dock
   minimized?: boolean; // in the dock: nothing is drawn
+  game?: boolean; // a CPU game: advice for a concealed hand only, and no defense
 }
 
 const PHASE_LABELS: Record<AdvicePhase, string> = { early: '序盤', middle: '中盤', late: '終盤' };
@@ -35,7 +36,7 @@ function percent(p: number): string {
  * It starts minimized in the right-edge dock like the other panels, so the
  * answer is not shown before the player has thought about the hand.
  */
-export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlight, onMinimize, minimized }: AdvicePanelProps) {
+export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlight, onMinimize, minimized, game }: AdvicePanelProps) {
   if (minimized) return null;
   return (
     <section class="advice-panel" aria-label="アドバイス">
@@ -119,10 +120,14 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
                 </ul>
               </div>
             )}
-            <p class="advice-caveat">確率はツモ数と見えていない牌からの目安です。</p>
+            <p class="advice-caveat">
+              確率はツモ数と見えていない牌からの目安です。{game && '他家の手（危険度）は考えません。'}
+            </p>
           </>
         ) : (
-          <p class="advice-caveat">打牌する局面でおすすめを表示します。</p>
+          <p class="advice-caveat">
+            {game ? '鳴いていない手で打牌する局面（リーチ後を除く）でおすすめを表示します。' : '打牌する局面でおすすめを表示します。'}
+          </p>
         )}
       </div>
     </section>

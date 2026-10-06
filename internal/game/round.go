@@ -90,11 +90,14 @@ type Action struct {
 // RiverTile is a discarded tile. Riichi marks the declaration tile (not one
 // that was ronned: that riichi never stood), Called a tile another seat
 // claimed into a meld (it stays in the river for furiten, but counts once,
-// in the meld).
+// in the meld). Order is the discard's place among all the round's
+// discards, every seat's (0 first), so a tile passed after a riichi can be
+// told apart.
 type RiverTile struct {
 	Tile   tile.Tile
 	Riichi bool
 	Called bool
+	Order  int
 }
 
 // Called is a meld a seat has called (or an ankan): its shape, its tiles
@@ -439,7 +442,11 @@ func (r *Round) discard(seat int, s string, declare bool) error {
 	p.rinshan = false
 	p.kuikae = nil
 	p.ippatsu = false // a discard after the declaration ends ippatsu
-	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare})
+	order := 0
+	for i := range r.players {
+		order += len(r.players[i].river)
+	}
+	p.river = append(p.river, RiverTile{Tile: t, Riichi: declare, Order: order})
 	r.revealKanDora() // before the claims: a ron on this discard counts it
 	kind := Discard
 	if declare {

@@ -645,6 +645,23 @@ func withMelds(ts []shanten.Target, melds []yaku.Meld) []shanten.Target {
 	return out
 }
 
+// TargetsWith returns the target family of the 4-meld row key with melds as
+// fixed groups, as AnalyzeWith uses it, for a caller with its own engine
+// (the computer player): a hand's distance to it is that of its concealed
+// tiles plus WithMeldTiles. It is nil for a row that is not a target family
+// or that no hand with these melds satisfies.
+func TargetsWith(key string, melds []yaku.Meld) []shanten.Target {
+	return withMelds(targets[key], melds)
+}
+
+// WithMeldTiles returns c with the tiles of melds added.
+func WithMeldTiles(c tile.Counts, melds []yaku.Meld) tile.Counts {
+	for _, m := range melds {
+		addMeld(&c, m)
+	}
+	return c
+}
+
 // Row computes a single row by key (for tests and tools).
 func (a *Analyzer) Row(c tile.Counts, key string) Result {
 	for _, r := range a.Analyze(c) {

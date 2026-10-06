@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, GameOptions, GameState, Tile as TileT } from './api';
+import type { ActionType, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
+import { AdvicePanel } from './components/AdvicePanel';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -17,7 +18,7 @@ import { TabStopped } from './components/TabStopped';
 import { VersionTag } from './components/VersionTag';
 import { ResumePanel, type ResumeItem } from './components/ResumePanel';
 import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
-import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
+import { PANELS, focusGlossary, optionalInt, useGameAdvice, useMinimized, type PanelKey } from './panels';
 import {
   bareUrl,
   useLastAnalysis,
@@ -39,14 +40,35 @@ import { savedGames, type GameSummary } from './wasm';
 // not reset on every render.
 const NO_TILES: TileT[] = [];
 
-// Game mode has no branch tree: the round only moves forward.
-const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree' && p.key !== 'advice');
+// Game mode has no branch tree: the round only moves forward. The advice
+// is offered unless turned off in the options.
+const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
+const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // On a phone, upright or on its side (style.css), the game leaves the chart
-// and the glossary to practice mode, giving their room to the yaku table. A
+// and the glossary (and the advice; the danger marks stay) to practice mode,
+// giving their room to the yaku table. A
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
+
+// The badge's letter, also used in its text.
+const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
+
+/** Each held tile's danger mark: its highest level over the riichi seats,
+ * and a text naming the seats (each with its own level when there are two
+ * or more). */
+function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
+  const out: Record<TileT, { className: string; text: string }> = {};
+  for (const t of Object.keys(danger[0]?.tiles ?? {})) {
+    const level = Math.max(...danger.map((d) => d.tiles[t] ?? 3)) as DangerLevel;
+    const each = danger
+      .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
+      .join('・');
+    out[t] = { className: `tile-danger tile-danger-${level}`, text: `危険度 ${DANGER_NAMES[level]}（${each}）` };
+  }
+  return out;
+}
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
@@ -88,6 +110,9 @@ function urlOptions(): GameOptions {
 export function GameApp() {
   const [state, setState] = useState<GameState | null>(null);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
+  // A hovered advice candidate, marked in the hand.
+  const [highlightTile, setHighlightTile] = useState<string | null>(null);
+  const [adviceOn, setAdviceOn] = useGameAdvice();
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
   const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
@@ -122,6 +147,7 @@ export function GameApp() {
       }
       setState(next);
       setPreviewTile(null);
+      setHighlightTile(null);
       setRiichiMode(false);
     },
   );
@@ -224,8 +250,12 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
-  // The tree and advice may be minimized from practice mode, but game mode has neither.
-  const docked = (phone ? PHONE_GAME_PANELS : GAME_PANELS).filter((p) => minimized.includes(p.key));
+  // The tree may be minimized from practice mode, but game mode has none.
+  const panels = phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS;
+  const docked = panels.filter((p) => minimized.includes(p.key));
+  const danger = adviceOn && myTurn ? state?.danger : undefined;
+  const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
+  const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
   const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
   // On a phone the yaku panel scrolls on its own in the height left under the
   // header, the table and the hand (style.css), as in practice.
@@ -248,6 +278,13 @@ export function GameApp() {
           </option>
         ))}
       </select>
+    </label>
+  );
+  const adviceOption = (
+    <label class="speed-option">
+      <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
+      {/* A phone has no advice panel: the option only shows the danger marks there. */}
+      {phone ? '危険度' : 'アドバイス・危険度'}
     </label>
   );
   return (
@@ -309,6 +346,7 @@ export function GameApp() {
                   uraDora={table.ura_dora}
                 />
                 {!phone && speedOption}
+                {!phone && adviceOption}
                 <button
                   ref={toggleRef}
                   type="button"
@@ -368,6 +406,7 @@ export function GameApp() {
                 />
               </label>
               {phone && speedOption}
+              {phone && adviceOption}
               <button type="submit" disabled={busy}>新規対局</button>
             </form>
           </header>
@@ -398,6 +437,8 @@ export function GameApp() {
                 disabled={busy || !myTurn}
                 allowed={riichiMode ? state.legal.riichi : state.legal.discards}
                 onlyDrawn={me.riichi}
+                highlight={adviceOn ? highlightTile : null}
+                marks={marks}
                 melds={<Melds melds={me.melds} owner={state.you} size="sm" />}
                 status={<SeatStatus seat={table.seats[table.you]} state={table} />}
                 river={
@@ -474,6 +515,18 @@ export function GameApp() {
           glossary={!phone}
           isMin={isMin}
           onMinimize={minimize}
+          advice={
+            adviceOn && !phone && (
+              <AdvicePanel
+                advice={state.advice ?? null}
+                review={null}
+                onHighlight={setHighlightTile}
+                minimized={isMin('advice')}
+                onMinimize={minimizeAdvice}
+                game
+              />
+            )
+          }
         />
       )}
       {state && (
