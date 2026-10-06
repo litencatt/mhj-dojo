@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { VersionTag } from '../components/VersionTag';
-import { yakuName } from './catalog';
+import { YAKUHAI_KEYS, yakuName } from './catalog';
 import {
   cpuUnlocked,
   dojoGame,
@@ -46,6 +46,16 @@ const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'weak', level: 1 },
   { value: 'normal', level: NORMAL_CPU_LEVEL },
 ];
+
+/** The names of the owned yaku, the dragons and the winds shown once as 役牌 (they are bought as one). */
+function ownedYakuNames(owned: readonly string[]): string[] {
+  const names: string[] = [];
+  for (const k of owned) {
+    const name = YAKUHAI_KEYS.includes(k) ? '役牌' : yakuName(k);
+    if (!names.includes(name)) names.push(name);
+  }
+  return names;
+}
 
 /** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (theme, back, backup). */
 export function DojoHome() {
@@ -228,8 +238,8 @@ export function DojoHome() {
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
         <h2 id="dojo-yaku-heading">所持役</h2>
         <ul class="dojo-yaku" data-testid="dojo-yaku">
-          {progress.ownedYaku.map((k) => (
-            <li key={k}>{yakuName(k)}</li>
+          {ownedYakuNames(progress.ownedYaku).map((name) => (
+            <li key={name}>{name}</li>
           ))}
         </ul>
       </section>

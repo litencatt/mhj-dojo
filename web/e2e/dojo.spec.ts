@@ -541,3 +541,15 @@ test('a backup without the game choice plays 東風戦 against weak CPUs, and �
   await expect(page.getByRole('radio', { name: '弱い' })).toBeChecked();
   await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('title', '東風戦、CPU は弱い');
 });
+
+test('the owned yaku list shows the dragons and the winds once, as 役牌', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), coins: 40, firstGameBonus: true })],
+  );
+  await page.goto('./?mode=dojo');
+  const owned = page.getByTestId('dojo-yaku').getByRole('listitem');
+  await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和']);
+  await page.locator('[data-item="yakuhai"]').getByRole('button', { name: '購入' }).click();
+  await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和', '役牌']);
+});
