@@ -3,6 +3,7 @@ package apicall
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -149,8 +150,13 @@ const dojoE2EYaku = `["tanyao","pinfu","haku","hatsu","chun","ton","nan","shaa",
 // newDojoGame creates a game as the dojo does (tonpuu, the weak CPU, a
 // random first dealer) with dojoE2EYaku, one redraw and one summon a round.
 func newDojoGame(c *client, seed int) (match.State, string) {
-	st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+
-		`,"length":"tonpuu","cpu":"weak","dojo":{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1,"summons_per_round":1}}`)
+	return newDojoGameWith(c, seed, `{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1,"summons_per_round":1}`)
+}
+
+// newDojoGameWith creates a game as the dojo does with the dojo options
+// given as JSON.
+func newDojoGameWith(c *client, seed int, dojo string) (match.State, string) {
+	st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+`,"length":"tonpuu","cpu":"weak","dojo":`+dojo+`}`)
 	return st, "/api/games/" + st.GameID + "/action"
 }
 
@@ -201,5 +207,72 @@ func TestE2ESeedDojoSummon(t *testing.T) {
 	st, _ = c.game("POST", path, `{"type":"summon","tile":"`+kind+`"}`)
 	if d := st.Seats[0].Drawn; len(st.Legal.Summon) > 0 || d == nil || strings.Replace(*d, "0", "5", 1) != kind {
 		t.Errorf("seed %d (DOJO_SUMMON_SEED): after summoning %s: summon %v, drawn %v", seed, kind, st.Legal.Summon, d)
+	}
+}
+
+// dojoFirstYaku are the yaku a new dojo owns (INITIAL_YAKU in
+// web/src/dojo/catalog.ts), as a JSON list.
+const dojoFirstYaku = `["tanyao","pinfu","tsumo"]`
+
+// noLearnedYaku reports whether the hand is tenpai in the general form while
+// no row of the first yaku is: the 役なし警告 (DojoAids in web/src/GameApp.tsx;
+// 門前清自摸和 has no row).
+func noLearnedYaku(st match.State) bool {
+	tenpai, learned := false, false
+	for _, r := range st.Analysis {
+		switch {
+		case r.Shanten == nil:
+		case r.Key == "normal":
+			tenpai = *r.Shanten == 0
+		case slices.Contains([]string{"tanyao", "pinfu", "tsumo"}, r.Key) && *r.Shanten <= 0:
+			learned = true
+		}
+	}
+	return tenpai && !learned && !st.Seats[0].Riichi
+}
+
+// DOJO_NOYAKU_SEED: a new dojo's game is tenpai in the general form without
+// a learned yaku's row within 3 tsumogiri moves (the 役なし警告).
+func TestE2ESeedDojoNoYaku(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_NOYAKU_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`}`)
+	for i := 0; i < 3 && st.Result == nil && !noLearnedYaku(st); i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if !noLearnedYaku(st) {
+		t.Errorf("seed %d (DOJO_NOYAKU_SEED): no tenpai without a learned yaku within 3 moves; see the comment above tsConst", seed)
+	}
+}
+
+// DOJO_RIICHIWAITS_SEED: with the riichi waits peek, a CPU in riichi shows
+// its waits within 3 tsumogiri moves.
+func TestE2ESeedDojoRiichiWaits(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_RIICHIWAITS_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`,"riichi_waits":true}`)
+	shown := func(st match.State) bool {
+		return slices.ContainsFunc(st.Seats[1:], func(s match.Seat) bool { return s.Riichi && len(s.Waits) > 0 })
+	}
+	for i := 0; i < 3 && st.Result == nil && !shown(st); i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if !shown(st) {
+		t.Errorf("seed %d (DOJO_RIICHIWAITS_SEED): no CPU riichi with waits within 3 moves; see the comment above tsConst", seed)
+	}
+}
+
+// DOJO_WIN_SEED: in a new dojo's game you win the first round within 150
+// tsumogiri moves, so the round counts han.
+func TestE2ESeedDojoWin(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_WIN_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`}`)
+	for i := 0; i < 150 && st.Result == nil; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if st.Result == nil || st.Result.Winner != 0 || len(st.Rounds) != 1 || st.Rounds[0].Han <= 0 {
+		t.Errorf("seed %d (DOJO_WIN_SEED): want your win with han in the first round, got result %+v rounds %+v; see the comment above tsConst",
+			seed, st.Result, st.Rounds)
 	}
 }
