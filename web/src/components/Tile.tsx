@@ -13,6 +13,7 @@ export interface TileProps {
   label?: string;
   title?: string; // a tooltip, e.g. the danger of a hand tile
   className?: string; // extra class, e.g. a playback highlight
+  badge?: string; // a small count under the face (the dojo's ukeire per discard); the label should say it too
   onClick?: (e: MouseEvent) => void;
   // A mouse pointer entering or leaving, or keyboard focus. Touch never
   // hovers: iOS would otherwise take a hover that changes the page as the
@@ -30,7 +31,7 @@ export function mouseOnly(f: () => void) {
 
 /** Renders a single mahjong tile: an ivory body (CSS) with an SVG face. */
 export function Tile(props: TileProps) {
-  const { tile, size = 'md', interactive = false, button = false, dimmed = false, faceDown = false, label, title, className, onClick, onHoverStart, onHoverEnd } = props;
+  const { tile, size = 'md', interactive = false, button = false, dimmed = false, faceDown = false, label, title, className, badge, onClick, onHoverStart, onHoverEnd } = props;
   const classes = ['tile', `tile-${size}`];
   if (dimmed) classes.push('tile-dimmed');
   if (faceDown) classes.push('tile-back');
@@ -47,7 +48,16 @@ export function Tile(props: TileProps) {
     title,
   };
 
-  const content = faceDown ? null : <TileFace tile={tile} />;
+  const content = faceDown ? null : (
+    <>
+      <TileFace tile={tile} />
+      {badge !== undefined && (
+        <span class="tile-badge" aria-hidden="true">
+          {badge}
+        </span>
+      )}
+    </>
+  );
 
   if (interactive || button) {
     return (

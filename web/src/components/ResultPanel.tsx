@@ -4,7 +4,7 @@ import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { yakuHanText, yakumanName } from '../yakumanLabel';
-import { yakuName } from '../dojo/catalog';
+import { COINS_PER_HAN, XP_PER_HAN, yakuName } from '../dojo/catalog';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -51,10 +51,11 @@ export interface ResultPanelProps {
   result: GameResult;
   busy: boolean;
   onNext: () => void;
+  dojoHan?: number; // a dojo game: the han of your win this round (paid at once), 0 for none
 }
 
 /** End of the round: the winning hand with yaku, fu and points, or the draw, and the point changes. */
-export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
+export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPanelProps) {
   const who = (s: number) => seatLabel(s, state.you);
   const winner = result.winner >= 0 ? state.seats[result.winner] : null;
   const yakuman = result.yaku.some((y) => y.han >= 13);
@@ -76,6 +77,11 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
           </button>
         )}
       </div>
+      {!!dojoHan && (
+        <p class="dojo-round-reward" data-testid="dojo-round-reward">
+          道場の報酬 +{dojoHan * COINS_PER_HAN} 雀銭・経験値 +{dojoHan * XP_PER_HAN}
+        </p>
+      )}
       {winner && result.win_tile && (
         <>
           <div class="win-tiles" role="group" aria-label="和了形">

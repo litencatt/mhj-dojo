@@ -104,6 +104,57 @@
   --tile-chun: #6d28d9;
 }
 
+/* 桜: a blush ground, plum and leaf inks, a cherry back. */
+:root[data-tile-theme='sakura'] {
+  --tile-bg: #fdf1f3;
+  --tile-border: #d9a7b2;
+  --tile-back: #b0476a;
+  --tile-back-hi: #d06c8e;
+  --tile-pin: #6b2f6e;
+  --tile-sou: #2f6b3a;
+  --tile-red: #c21e4a;
+  --tile-ink: #2a1a20;
+  --tile-man-num: #2a1a20;
+  --tile-man-mark: #c21e4a;
+  --tile-wind: #2a1a20;
+  --tile-hatsu: #2f6b3a;
+  --tile-chun: #c21e4a;
+}
+
+/* 翡翠: a pale jade ground, deep green and teal inks, a jade back. */
+:root[data-tile-theme='hisui'] {
+  --tile-bg: #eef7f1;
+  --tile-border: #93bfa4;
+  --tile-back: #1f6b55;
+  --tile-back-hi: #3a8f74;
+  --tile-pin: #135e72;
+  --tile-sou: #1c6b3c;
+  --tile-red: #b3261e;
+  --tile-ink: #10241c;
+  --tile-man-num: #10241c;
+  --tile-man-mark: #b3261e;
+  --tile-wind: #10241c;
+  --tile-hatsu: #1c6b3c;
+  --tile-chun: #b3261e;
+}
+
+/* 黄金: a cream ground with dark bronze inks, a gold back. */
+:root[data-tile-theme='kogane'] {
+  --tile-bg: #fbf3d9;
+  --tile-border: #c9a64a;
+  --tile-back: #8a6a12;
+  --tile-back-hi: #c39a2a;
+  --tile-pin: #1f3f8a;
+  --tile-sou: #3d5a12;
+  --tile-red: #a8231a;
+  --tile-ink: #2b2006;
+  --tile-man-num: #2b2006;
+  --tile-man-mark: #a8231a;
+  --tile-wind: #5a3f00;
+  --tile-hatsu: #3d5a12;
+  --tile-chun: #a8231a;
+}
+
 @media (prefers-color-scheme: dark) {
   :root[data-tile-theme='wafuu'] {
     --tile-bg: #eadfc2;
@@ -124,5 +175,26 @@
     --tile-border: #8a8264;
     --tile-back: #2c3d6e;
     --tile-back-hi: #4a63a0;
+  }
+
+  :root[data-tile-theme='sakura'] {
+    --tile-bg: #f3e3e7;
+    --tile-border: #9c6b77;
+    --tile-back: #8a3352;
+    --tile-back-hi: #b0547a;
+  }
+
+  :root[data-tile-theme='hisui'] {
+    --tile-bg: #e2eee6;
+    --tile-border: #5f8c72;
+    --tile-back: #175443;
+    --tile-back-hi: #2e7a62;
+  }
+
+  :root[data-tile-theme='kogane'] {
+    --tile-bg: #f0e6c6;
+    --tile-border: #9a7d30;
+    --tile-back: #6e540e;
+    --tile-back-hi: #a68220;
   }
 }

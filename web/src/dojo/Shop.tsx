@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { CATALOG, findItem, type ItemKind, type ShopItem } from './catalog';
-import { level, owns, purchase, setTheme, type DojoProgress, type PurchaseDenied } from './progress';
+import { level, owns, purchase, setBack, setTheme, type DojoProgress, type PurchaseDenied } from './progress';
 
 /** Why an item is not for sale yet; null when it is. */
 function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
@@ -15,13 +15,13 @@ export const DENIED: Record<PurchaseDenied, string> = {
   owned: 'すでに持っています',
   level: 'レベルが足りません',
   requires: '前提の商品が必要です',
-  coins: 'コインが足りません',
+  coins: '雀銭が足りません',
 };
 
 // The shop's tabs, each a group of item kinds (the yakuman pack sells with the yaku).
 const TABS: { key: string; label: string; kinds: ItemKind[] }[] = [
   { key: 'yaku', label: '役', kinds: ['yaku', 'pack'] },
-  { key: 'theme', label: '牌テーマ', kinds: ['theme'] },
+  { key: 'theme', label: '牌テーマ', kinds: ['theme', 'back'] },
   { key: 'assist', label: '補助', kinds: ['assist'] },
   { key: 'cheat', label: 'イカサマ', kinds: ['cheat'] },
 ];
@@ -88,18 +88,25 @@ export function Shop({ progress: p, onChange }: ShopProps) {
             {shown.filter((it) => it.level === n).map((it) => {
               const have = owns(p, it.id);
               const locked = lockedLabel(p, it);
-              const isTheme = it.kind === 'theme';
+              // A theme or a back owned is chosen here (again: back to the default).
+              const active = it.kind === 'theme' ? p.activeTheme : it.kind === 'back' ? p.activeBack : null;
               return (
                 <li key={it.id} class="shop-item" data-item={it.id} data-owned={have || undefined}>
                   <span class="shop-name">{it.name}</span>
-                  <span class="shop-price">{it.price} コイン</span>
-                  {have && isTheme ? (
+                  <span class="shop-price">{it.price} 雀銭</span>
+                  {have && active !== null ? (
                     <button
                       type="button"
-                      aria-pressed={p.activeTheme === it.id}
-                      onClick={() => onChange((cur) => setTheme(cur, cur.activeTheme === it.id ? 'default' : it.id))}
+                      aria-pressed={active === it.id}
+                      onClick={() =>
+                        onChange((cur) =>
+                          it.kind === 'theme'
+                            ? setTheme(cur, cur.activeTheme === it.id ? 'default' : it.id)
+                            : setBack(cur, cur.activeBack === it.id ? 'default' : it.id),
+                        )
+                      }
                     >
-                      {p.activeTheme === it.id ? '使用中' : '使う'}
+                      {active === it.id ? '使用中' : '使う'}
                     </button>
                   ) : have ? (
                     <span class="shop-owned">所持</span>

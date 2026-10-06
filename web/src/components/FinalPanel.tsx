@@ -12,7 +12,7 @@ export interface FinalPanelProps {
   dojo?: { reward: Reward | null; newLabel: string; saveFailed?: boolean };
 }
 
-/** 道場の報酬: XP, coins, the redraws' cost, the level-up and what it unlocked. */
+/** 道場の報酬: XP, coins, the redraws' and summons' cost, the level-up and what it unlocked. */
 function DojoReward({ reward }: { reward: Reward | null }) {
   if (!reward) return <p class="muted dojo-reward">この対局の報酬は受け取り済みです。</p>;
   const unlocked = reward.levelAfter > reward.levelBefore
@@ -24,8 +24,11 @@ function DojoReward({ reward }: { reward: Reward | null }) {
       <ul>
         <li>経験値 +{reward.xp}</li>
         <li>
-          コイン {signed(reward.coins)}（順位と翻の分{reward.firstGameBonus > 0 ? `、初回ボーナス ${reward.firstGameBonus}` : ''}
-          {reward.redraws > 0 ? `、引き直し ${reward.redraws}回 -${reward.redrawCost}` : ''}）
+          雀銭 {signed(reward.coins)}（順位 +{reward.rankCoins}
+          {reward.hanCoins > 0 && `、和了 +${reward.hanCoins}${paidNote(reward)}`}
+          {reward.firstGameBonus > 0 && `、初回ボーナス +${reward.firstGameBonus}`}
+          {reward.redraws > 0 && `、引き直し ${reward.redraws}回 -${reward.redrawCost}`}
+          {reward.summons > 0 && `、牌寄せ ${reward.summons}回 -${reward.summonCost}`}）
         </li>
         {reward.levelAfter > reward.levelBefore && (
           <li class="dojo-levelup">レベルアップ！ Lv {reward.levelBefore} → Lv {reward.levelAfter}</li>
@@ -34,6 +37,12 @@ function DojoReward({ reward }: { reward: Reward | null }) {
       </ul>
     </div>
   );
+}
+
+/** The part of the won han's coins paid as the rounds ended, if any. */
+function paidNote(r: Reward): string {
+  if (r.paidCoins === 0) return '';
+  return r.paidCoins === r.hanCoins ? '（局ごとに受け取り済み）' : `（うち ${r.paidCoins} は局ごとに受け取り済み）`;
 }
 
 /** "+12.3" / "-4.0": the final score with its sign and one decimal. */

@@ -3,12 +3,14 @@
 // localStorage. Plain Node runs the tests, so imports carry the .ts extension.
 import {
   COINS_PER_HAN,
+  DEFAULT_BACK,
   DEFAULT_THEME,
   FIRST_GAME_BONUS,
   INITIAL_YAKU,
   RANK_COINS,
   RANK_XP,
   REDRAW_COST,
+  SUMMON_COST,
   XP_PER_HAN,
   findItem,
 } from './catalog.ts';
@@ -18,10 +20,14 @@ export interface DojoProgress {
   xp: number; // the total, never lowered
   coins: number;
   ownedYaku: string[];
-  ownedItems: string[]; // 'theme:*' | 'assist:*' | 'cheat:*' | 'yakuman-pack' and every bought yaku
+  ownedItems: string[]; // 'theme:*' | 'back:*' | 'assist:*' | 'cheat:*' | 'yakuman-pack' and every bought yaku
   activeTheme: string;
+  activeBack: string; // a 'back:*' item or 'default' (data before the backs had none: 'default')
   settled: string[]; // the seeds (decimal strings) of the games whose reward was paid
   firstGameBonus: boolean; // the first-game bonus was paid
+  // The rounds of an unfinished game (by its public id, the URL's game) whose won han were paid
+  // as they ended; dropped when the game is settled. Data from before had none: {}.
+  paidRounds: Record<string, number>;
 }
 
 export function initialProgress(): DojoProgress {
@@ -32,8 +38,10 @@ export function initialProgress(): DojoProgress {
     ownedYaku: [...INITIAL_YAKU],
     ownedItems: [],
     activeTheme: DEFAULT_THEME,
+    activeBack: DEFAULT_BACK,
     settled: [],
     firstGameBonus: false,
+    paidRounds: {},
   };
 }
 
@@ -57,10 +65,11 @@ export function levelProgress(xp: number): number {
 
 // ---- Rewards ----
 
-/** What the dojo reads of a RoundSummary (the engine adds han and redraws). */
+/** What the dojo reads of a RoundSummary (the engine adds han, redraws and summons). */
 export interface RoundLite {
   han?: number;
   redraws?: number;
+  summons?: number;
 }
 
 /** What the dojo reads of a finished game's state. */
@@ -74,11 +83,17 @@ export interface FinishedGame {
 
 export interface Reward {
   rank: number;
-  xp: number;
-  coins: number; // before the floor at 0: may be negative
+  xp: number; // the game's whole XP, the rounds' won han paid before included
+  coins: number; // the game's whole coins, before the floor at 0: may be negative
+  rankCoins: number;
+  hanCoins: number; // the won han's, all rounds
+  paidCoins: number; // of hanCoins, paid as the rounds ended (paidXp likewise)
+  paidXp: number;
   han: number;
   redraws: number;
   redrawCost: number;
+  summons: number;
+  summonCost: number;
   firstGameBonus: number; // 0 if it was paid before
   coinsAfter: number;
   levelBefore: number;
@@ -93,13 +108,46 @@ export function sumRedraws(rounds: RoundLite[]): number {
   return rounds.reduce((n, r) => n + (r.redraws ?? 0), 0);
 }
 
+export function sumSummons(rounds: RoundLite[]): number {
+  return rounds.reduce((n, r) => n + (r.summons ?? 0), 0);
+}
+
+/** The coins the finished rounds' redraws and summons cost, unpaid until the game ends. */
+function unpaid(rounds: RoundLite[]): number {
+  return sumRedraws(rounds) * REDRAW_COST + sumSummons(rounds) * SUMMON_COST;
+}
+
+/**
+ * Pays the won han of the rounds of an unfinished game that have ended since
+ * last paid (paidRounds keeps the count by the game's public id, which a
+ * reload keeps). Null when there is nothing new to pay.
+ */
+export function payRounds(
+  p: DojoProgress,
+  gameId: string,
+  rounds: RoundLite[],
+): { progress: DojoProgress; xp: number; coins: number } | null {
+  const paid = p.paidRounds[gameId] ?? 0;
+  if (rounds.length <= paid) return null;
+  const han = sumHan(rounds.slice(paid));
+  const xp = han * XP_PER_HAN;
+  const coins = han * COINS_PER_HAN;
+  return {
+    progress: { ...p, xp: p.xp + xp, coins: p.coins + coins, paidRounds: { ...p.paidRounds, [gameId]: rounds.length } },
+    xp,
+    coins,
+  };
+}
+
 /**
  * Pays a finished game once: nothing happens for a game that is not over, has
- * no known seed or whose seed was settled. The floor at 0 applies to the whole
- * balance after the game, not to the game's own difference, or a redraw would
- * cost nothing for a player with no coins left to lose.
+ * no known seed or whose seed was settled. The rounds payRounds has paid (by
+ * gameId) are not paid again; the rank, the first-game bonus and the cheats'
+ * costs are paid here. The floor at 0 applies to the whole balance after the
+ * game, not to the game's own difference, or a redraw would cost nothing for
+ * a player with no coins left to lose.
  */
-export function settle(p: DojoProgress, g: FinishedGame): { progress: DojoProgress; reward: Reward | null } {
+export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { progress: DojoProgress; reward: Reward | null } {
   if (!g.game_over || g.seed === null) return { progress: p, reward: null };
   const key = String(g.seed);
   if (p.settled.includes(key)) return { progress: p, reward: null };
@@ -107,34 +155,50 @@ export function settle(p: DojoProgress, g: FinishedGame): { progress: DojoProgre
   if (rank === undefined || rank < 1 || rank > 4) return { progress: p, reward: null };
 
   const han = sumHan(g.rounds);
+  const paidHan = gameId === undefined ? 0 : sumHan(g.rounds.slice(0, p.paidRounds[gameId] ?? 0));
   const redraws = sumRedraws(g.rounds);
   const redrawCost = redraws * REDRAW_COST;
+  const summons = sumSummons(g.rounds);
+  const summonCost = summons * SUMMON_COST;
   const bonus = p.firstGameBonus ? 0 : FIRST_GAME_BONUS;
   const xp = RANK_XP[rank - 1] + han * XP_PER_HAN;
-  const coins = RANK_COINS[rank - 1] + han * COINS_PER_HAN - redrawCost + bonus;
-  const coinsAfter = Math.max(0, p.coins + coins);
+  const rankCoins = RANK_COINS[rank - 1];
+  const hanCoins = han * COINS_PER_HAN;
+  const coins = rankCoins + hanCoins - redrawCost - summonCost + bonus;
+  const paidXp = paidHan * XP_PER_HAN;
+  const paidCoins = paidHan * COINS_PER_HAN;
+  const coinsAfter = Math.max(0, p.coins + coins - paidCoins);
+  const paidRounds = { ...p.paidRounds };
+  if (gameId !== undefined) delete paidRounds[gameId];
   const progress: DojoProgress = {
     ...p,
-    xp: p.xp + xp,
+    xp: p.xp + xp - paidXp,
     coins: coinsAfter,
     settled: [...p.settled, key],
     firstGameBonus: true,
+    paidRounds,
   };
   return {
     progress,
     reward: {
-      rank, xp, coins, han, redraws, redrawCost, firstGameBonus: bonus, coinsAfter,
-      levelBefore: level(p.xp), levelAfter: level(progress.xp),
+      rank, xp, coins, rankCoins, hanCoins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
+      firstGameBonus: bonus, coinsAfter,
+      levelBefore: level(p.xp - paidXp), levelAfter: level(progress.xp),
     },
   };
 }
 
 /**
- * Whether a redraw may be asked for now: the balance less the redraws of the
- * finished rounds (still unpaid until the game ends) covers one more.
+ * Whether a redraw may be asked for now: the balance less the redraws and
+ * summons of the finished rounds (still unpaid until the game ends) covers one more.
  */
 export function canAffordRedraw(p: DojoProgress, rounds: RoundLite[]): boolean {
-  return p.coins - sumRedraws(rounds) * REDRAW_COST >= REDRAW_COST;
+  return p.coins - unpaid(rounds) >= REDRAW_COST;
+}
+
+/** canAffordRedraw for a summon (牌寄せ). */
+export function canAffordSummon(p: DojoProgress, rounds: RoundLite[]): boolean {
+  return p.coins - unpaid(rounds) >= SUMMON_COST;
 }
 
 // ---- Shop ----
@@ -172,12 +236,29 @@ export function setTheme(p: DojoProgress, theme: string): DojoProgress {
   return theme === DEFAULT_THEME || p.ownedItems.includes(theme) ? { ...p, activeTheme: theme } : p;
 }
 
+export function setBack(p: DojoProgress, back: string): DojoProgress {
+  return back === DEFAULT_BACK || p.ownedItems.includes(back) ? { ...p, activeBack: back } : p;
+}
+
 /** The dojo options of CreateGame (the engine's DojoOptions) for what is owned. */
-export function dojoOptions(p: DojoProgress): { yaku: string[]; peek: boolean; redraws_per_round: number } {
+export function dojoOptions(p: DojoProgress): {
+  yaku: string[];
+  peek: boolean;
+  redraws_per_round: number;
+  ura_peek: boolean;
+  riichi_waits: boolean;
+  wall_peek: number;
+  summons_per_round: number;
+} {
+  const has = (id: string) => p.ownedItems.includes(id);
   return {
     yaku: [...p.ownedYaku],
-    peek: p.ownedItems.includes('cheat:peek'),
-    redraws_per_round: p.ownedItems.includes('cheat:redraw') ? 1 : 0,
+    peek: has('cheat:peek'),
+    redraws_per_round: has('cheat:redraw') ? 1 : 0,
+    ura_peek: has('cheat:ura'),
+    riichi_waits: has('cheat:riichiwaits'),
+    wall_peek: has('cheat:wallpeek') ? 3 : 0,
+    summons_per_round: has('cheat:summon') ? 1 : 0,
   };
 }
 
@@ -202,15 +283,23 @@ export function parseProgress(text: string): DojoProgress | null {
   if (o.version !== 1 || !isCount(o.xp) || !isCount(o.coins)) return null;
   if (!isStrings(o.ownedYaku) || !isStrings(o.ownedItems) || !isStrings(o.settled)) return null;
   if (typeof o.activeTheme !== 'string' || typeof o.firstGameBonus !== 'boolean') return null;
+  // activeBack and paidRounds came later: a progress without them has the default back and none paid.
+  if (o.activeBack !== undefined && typeof o.activeBack !== 'string') return null;
+  const paidRounds = o.paidRounds ?? {};
+  if (typeof paidRounds !== 'object' || paidRounds === null || Array.isArray(paidRounds)) return null;
+  if (!Object.values(paidRounds).every(isCount)) return null;
   return {
     version: 1,
     xp: o.xp,
     coins: o.coins,
-    ownedYaku: o.ownedYaku,
+    // The yaku a new dojo owns are always owned (門前清自摸和 joined them later).
+    ownedYaku: [...o.ownedYaku, ...INITIAL_YAKU.filter((k) => !(o.ownedYaku as string[]).includes(k))],
     ownedItems: o.ownedItems,
     activeTheme: o.activeTheme,
+    activeBack: o.activeBack ?? DEFAULT_BACK,
     settled: o.settled,
     firstGameBonus: o.firstGameBonus,
+    paidRounds: paidRounds as Record<string, number>,
   };
 }
 

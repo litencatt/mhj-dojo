@@ -1,13 +1,15 @@
 // The dojo's shop and the economy's constants. Every number that tunes the
 // economy lives here; progress.ts and the tests read them from here.
 //
-// Economy targets (economy.test.ts checks them):
+// Economy targets (economy.test.ts checks them). "The core" is the yaku, the
+// assists and the tile themes; the cheats and the tile backs are left out.
 // - A game is worth about 65 XP and 50 coins: the average rank's base (XP 50,
 //   coins 35) plus about 1.5 han of won hands x 10.
 // - 立直 is affordable within 1-2 games: the first-game bonus alone covers it.
 // - Lv10 (4500 XP) comes after about 70 games, by which time 80% or more of
-//   the shop's coin cost (the yakuman pack aside) has been bought.
-// - The yakuman pack costs about 30 more games after Lv10.
+//   the core's coin cost (the yakuman pack aside) has been bought.
+// - The yakuman pack costs at most 40 more games after Lv10, the core bought first.
+// - The cheats and the tile backs too: the whole shop is bought in about 175 games.
 
 /** XP and coins by final rank (1st to 4th). */
 export const RANK_XP = [100, 60, 30, 10] as const;
@@ -17,12 +19,14 @@ export const XP_PER_HAN = 10;
 export const COINS_PER_HAN = 10;
 /** The coins one redraw (引き直し) costs, settled at the end of the game. */
 export const REDRAW_COST = 20;
+/** The coins one summon (牌寄せ) costs, settled at the end of the game like a redraw. */
+export const SUMMON_COST = 50;
 /** Coins for the first finished game. */
 export const FIRST_GAME_BONUS = 40;
 
-/** The yaku a new dojo owns: 断么九 and 平和. 役牌 is bought. */
+/** The yaku a new dojo owns: 断么九, 平和 and 門前清自摸和. 役牌 is bought. */
 export const WIND_KEYS = ['ton', 'nan', 'shaa', 'pei'] as const; // internal/yaku WindKeys
-export const INITIAL_YAKU: readonly string[] = ['tanyao', 'pinfu'];
+export const INITIAL_YAKU: readonly string[] = ['tanyao', 'pinfu', 'tsumo'];
 
 /** The keys the 役牌 item grants: the dragons and the value winds. */
 export const YAKUHAI_KEYS: readonly string[] = ['haku', 'hatsu', 'chun', ...WIND_KEYS];
@@ -35,11 +39,12 @@ export const YAKUMAN_KEYS: readonly string[] = [
 
 export const YAKUMAN_PACK = 'yakuman-pack';
 export const DEFAULT_THEME = 'default';
+export const DEFAULT_BACK = 'default';
 
-export type ItemKind = 'yaku' | 'theme' | 'assist' | 'cheat' | 'pack';
+export type ItemKind = 'yaku' | 'theme' | 'back' | 'assist' | 'cheat' | 'pack';
 
 export interface ShopItem {
-  /** A yaku's key, or 'theme:*', 'assist:*', 'cheat:*', 'yakuman-pack'. */
+  /** A yaku's key, or 'theme:*', 'back:*', 'assist:*', 'cheat:*', 'yakuman-pack'. */
   id: string;
   kind: ItemKind;
   name: string;
@@ -58,8 +63,8 @@ function yaku(id: string, name: string, level: number, price: number, requires?:
 export const CATALOG: readonly ShopItem[] = [
   yaku('riichi', '立直', 1, 40),
   { id: 'yakuhai', kind: 'yaku', name: '役牌（白・發・中・場風・自風）', price: 40, level: 1, grants: YAKUHAI_KEYS },
-  yaku('tsumo', '門前清自摸和', 1, 40),
   yaku('iipeikou', '一盃口', 1, 40),
+  { id: 'assist:noyaku', kind: 'assist', name: '補助: 役なし警告', price: 40, level: 1 },
 
   yaku('ippatsu', '一発', 2, 30, ['riichi']),
   yaku('haitei', '海底摸月', 2, 30),
@@ -68,6 +73,8 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('chankan', '槍槓', 2, 30),
   { id: 'theme:wafuu', kind: 'theme', name: '牌テーマ: 和風', price: 50, level: 2 },
   { id: 'theme:mono', kind: 'theme', name: '牌テーマ: モノクロ', price: 50, level: 2 },
+  { id: 'back:shima', kind: 'back', name: '裏柄: 縞', price: 40, level: 2 },
+  { id: 'assist:waits', kind: 'assist', name: '補助: 待ち牌表示', price: 60, level: 2 },
 
   yaku('sanshoku', '三色同順', 3, 80),
   yaku('ittsu', '一気通貫', 3, 80),
@@ -80,6 +87,9 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('shousangen', '小三元', 3, 80),
   yaku('honroutou', '混老頭', 3, 80),
   yaku('double_riichi', 'ダブル立直', 3, 80, ['riichi']),
+  { id: 'theme:sakura', kind: 'theme', name: '牌テーマ: 桜', price: 80, level: 3 },
+  { id: 'back:ichimatsu', kind: 'back', name: '裏柄: 市松', price: 60, level: 3 },
+  { id: 'assist:preview', kind: 'assist', name: '補助: 打牌プレビュー・複合役', price: 100, level: 3 },
 
   { id: 'assist:advice', kind: 'assist', name: '補助: アドバイスパネル', price: 120, level: 4 },
   { id: 'assist:danger', kind: 'assist', name: '補助: 危険牌の印', price: 120, level: 4 },
@@ -88,11 +98,22 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('honitsu', '混一色', 5, 200),
   yaku('junchan', '純全帯么九', 5, 200),
   yaku('ryanpeikou', '二盃口', 5, 200),
+  { id: 'theme:hisui', kind: 'theme', name: '牌テーマ: 翡翠', price: 120, level: 5 },
+  { id: 'back:asanoha', kind: 'back', name: '裏柄: 麻の葉', price: 100, level: 5 },
+  { id: 'assist:ukeire', kind: 'assist', name: '補助: 有効牌ハイライト', price: 150, level: 5 },
+
+  { id: 'cheat:ura', kind: 'cheat', name: 'イカサマ: 裏ドラ透視', price: 400, level: 6 },
 
   yaku('chinitsu', '清一色', 7, 400),
+  { id: 'theme:kogane', kind: 'theme', name: '牌テーマ: 黄金', price: 200, level: 7 },
+  { id: 'cheat:riichiwaits', kind: 'cheat', name: 'イカサマ: リーチ者の待ち透視', price: 500, level: 7 },
 
   { id: 'cheat:peek', kind: 'cheat', name: 'イカサマ: 透視', price: 600, level: 8 },
   { id: 'cheat:redraw', kind: 'cheat', name: 'イカサマ: 引き直し', price: 400, level: 8 },
+
+  { id: 'cheat:wallpeek', kind: 'cheat', name: 'イカサマ: 山読み（次のツモ3枚）', price: 800, level: 9 },
+
+  { id: 'cheat:summon', kind: 'cheat', name: 'イカサマ: 牌寄せ（指定牌を手牌に、1局1回・50雀銭/回）', price: 1000, level: 10 },
 
   // 七対子 first: a 字一色 seven pairs would be thrown out with its 七対子 reading.
   { id: YAKUMAN_PACK, kind: 'pack', name: '役満パック', price: 1500, level: 10, requires: ['chiitoitsu'], grants: YAKUMAN_KEYS },
@@ -103,7 +124,7 @@ export function findItem(id: string): ShopItem | undefined {
 }
 
 const BASE_NAMES: Record<string, string> = {
-  tanyao: '断么九', pinfu: '平和', haku: '役牌 白', hatsu: '役牌 發', chun: '役牌 中',
+  tanyao: '断么九', pinfu: '平和', tsumo: '門前清自摸和', haku: '役牌 白', hatsu: '役牌 發', chun: '役牌 中',
   ton: '役牌 東', nan: '役牌 南', shaa: '役牌 西', pei: '役牌 北',
   kokushi: '国士無双', suuankou: '四暗刻', daisangen: '大三元', tsuuiisou: '字一色',
   shousuushii: '小四喜', daisuushii: '大四喜', ryuuiisou: '緑一色', chinroutou: '清老頭',

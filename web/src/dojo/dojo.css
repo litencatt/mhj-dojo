@@ -184,15 +184,6 @@
   margin-right: 6px;
   color: var(--muted);
 }
-.dojo-resume {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 
 .shop-tabs {
   display: flex;
@@ -223,11 +214,126 @@
   scrollbar-gutter: stable;
   padding-right: 4px;
 }
-.dojo-resume a {
-  display: inline-block;
-  padding: 2px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+.dojo-restart {
   font-size: 0.85rem;
-  white-space: nowrap;
+}
+
+/* The hub's settings (a modal <dialog>): the theme, the back and the backup. */
+.dojo-settings {
+  width: min(28rem, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  color: var(--fg);
+}
+.dojo-settings::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.dojo-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dojo-settings h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.dojo-settings h3 {
+  margin: 14px 0 4px;
+  font-size: 0.9rem;
+}
+.dojo-settings p {
+  margin: 4px 0 8px;
+}
+.dojo-settings-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.dojo-settings-group legend {
+  padding: 0 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+.dojo-settings-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.dojo-settings-sample {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+/* A dojo game's aids and cheats (GameApp). */
+.dojo-aid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+.dojo-aid-label {
+  color: var(--muted);
+}
+.dojo-aid-warn {
+  padding: 1px 8px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: bold;
+}
+.dojo-aid-ok {
+  padding: 1px 8px;
+  border: 1px solid var(--success-border);
+  border-radius: 6px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-weight: bold;
+}
+.dojo-aid-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dojo-aid-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.seat-waits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+}
+.seat-waits > span:first-child {
+  margin-right: 4px;
+  color: var(--danger);
+  font-weight: bold;
+}
+.summon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.summon-picker button.tile {
+  cursor: pointer;
+}
+.dojo-round-reward {
+  margin: 4px 0 8px;
+  color: var(--success);
+  font-weight: bold;
 }

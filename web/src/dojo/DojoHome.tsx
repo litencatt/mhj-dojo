@@ -8,13 +8,17 @@ import {
   loadProgress,
   parseProgress,
   saveProgress,
+  setBack,
+  setTheme,
   STORAGE_KEY,
   xpForLevel,
   type DojoProgress,
 } from './progress';
 import { roundName } from '../components/GameTable';
-import { savedGames } from '../wasm';
+import { discardUnfinishedDojoGames, savedGames } from '../wasm';
 import { Shop } from './Shop';
+import { Tile } from '../components/Tile';
+import { TILE_BACKS, TILE_THEMES, applyTileBack, applyTileTheme } from '../tileThemes';
 import './dojo.css';
 
 /** ?mode=dojo&play=1[&seed=]: the page that starts a dojo game (the seed of this page's URL kept). */
@@ -25,7 +29,7 @@ function playHref(): string {
   return `?${params}`;
 }
 
-/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop and the backup. */
+/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (theme, back, backup). */
 export function DojoHome() {
   const [loaded] = useState(() => loadProgress());
   const [progress, setProgress] = useState<DojoProgress>(loaded.progress);
@@ -33,8 +37,11 @@ export function DojoHome() {
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
   const fileRef = useRef<HTMLInputElement>(null);
+  const settingsRef = useRef<HTMLDialogElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // The dojo's own unfinished games (the CPU game's list never has them).
-  const [resumable] = useState(() => savedGames('dojo').filter((g) => g.round && !g.round.over));
+  // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
+  const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
 
   useEffect(() => {
     document.title = 'mhj-dojo - 道場';
@@ -45,6 +52,21 @@ export function DojoHome() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  // The theme and the back chosen show on the settings' sample tiles (and in the dojo's games).
+  useEffect(() => {
+    applyTileTheme(TILE_THEMES.find((t) => t.item === progress.activeTheme)?.id ?? 'default');
+    applyTileBack(TILE_BACKS.find((t) => t.item === progress.activeBack)?.id ?? 'default');
+    return () => {
+      applyTileTheme('default');
+      applyTileBack('default');
+    };
+  }, [progress.activeTheme, progress.activeBack]);
+
+  function openSettings() {
+    settingsRef.current?.showModal();
+    setSettingsOpen(true);
+  }
 
   // Another tab may have changed the progress (paid a game): apply to what is stored now.
   function change(apply: (current: DojoProgress) => DojoProgress) {
@@ -91,11 +113,14 @@ export function DojoHome() {
           <a class="mode-link" href="?mode=game">CPU対戦へ</a>
         </h1>
         <div class="header-meta">
+          <button type="button" class="dojo-settings-button" aria-haspopup="dialog" onClick={openSettings}>
+            設定
+          </button>
           <VersionTag />
         </div>
       </header>
 
-      {notice && (
+      {notice && !settingsOpen && (
         <p class="dojo-notice" role="status">
           {notice}
         </p>
@@ -119,29 +144,23 @@ export function DojoHome() {
             {progress.xp} / {next}
           </small>
           <span class="dojo-coin-count">
-            <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> コイン
+            <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 雀銭
           </span>
         </div>
         <div class="dojo-play">
-          <a class="dojo-start" href={playHref()} title="東風戦、CPU は弱い">
-            対局開始
-          </a>
-          {resumable.length > 0 && (
-            <ul class="dojo-resume" aria-label="続きから">
-              <li class="dojo-muted" aria-hidden="true">
-                続きから
-              </li>
-              {resumable.map((g) => {
-                const at = g.round ? roundName(g.round.wind, g.round.number, g.round.honba) : '対局';
-                return (
-                  <li key={g.id}>
-                    <a href={`?mode=dojo&game=${encodeURIComponent(g.id)}`} aria-label={`続きから（${at}）`}>
-                      {at}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+          {resume ? (
+            <>
+              <a class="dojo-start" href={`?mode=dojo&game=${encodeURIComponent(resume.id)}`}>
+                続きから（{resume.round ? roundName(resume.round.wind, resume.round.number, resume.round.honba) : '対局'}）
+              </a>
+              <a class="dojo-restart" href={playHref()} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
+                新しく始める
+              </a>
+            </>
+          ) : (
+            <a class="dojo-start" href={playHref()} title="東風戦、CPU は弱い">
+              対局開始
+            </a>
           )}
         </div>
       </section>
@@ -157,15 +176,62 @@ export function DojoHome() {
 
       <Shop progress={progress} onChange={change} />
 
-      <section class="dojo-panel" aria-labelledby="dojo-backup-heading">
-        <h2 id="dojo-backup-heading">データの書き出しと読み込み</h2>
+      {/* Esc (the dialog's cancel) and 閉じる close it; showModal makes the page behind inert. */}
+      <dialog ref={settingsRef} class="dojo-settings" aria-labelledby="dojo-settings-heading" onClose={() => setSettingsOpen(false)}>
+        <div class="dojo-settings-head">
+          <h2 id="dojo-settings-heading">設定</h2>
+          <button type="button" onClick={() => settingsRef.current?.close()}>
+            閉じる
+          </button>
+        </div>
+        {notice && settingsOpen && (
+          <p class="dojo-notice" role="status">
+            {notice}
+          </p>
+        )}
+        <fieldset class="dojo-settings-group">
+          <legend>牌テーマ</legend>
+          {TILE_THEMES.filter((t) => t.item === null || progress.ownedItems.includes(t.item)).map((t) => (
+            <label key={t.id}>
+              <input
+                type="radio"
+                name="dojo-theme"
+                checked={(t.item ?? 'default') === progress.activeTheme}
+                onChange={() => change((cur) => setTheme(cur, t.item ?? 'default'))}
+              />
+              {t.label}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset class="dojo-settings-group">
+          <legend>裏柄</legend>
+          {TILE_BACKS.filter((t) => t.item === null || progress.ownedItems.includes(t.item)).map((t) => (
+            <label key={t.id}>
+              <input
+                type="radio"
+                name="dojo-back"
+                checked={(t.item ?? 'default') === progress.activeBack}
+                onChange={() => change((cur) => setBack(cur, t.item ?? 'default'))}
+              />
+              {t.label}
+            </label>
+          ))}
+        </fieldset>
+        <div class="dojo-settings-sample" aria-label="見本">
+          <Tile tile="5m" size="sm" />
+          <Tile tile="5p" size="sm" />
+          <Tile tile="5s" size="sm" />
+          <Tile tile="7z" size="sm" />
+          <Tile tile="" size="sm" faceDown />
+        </div>
+        <h3>データの書き出しと読み込み</h3>
         <p class="dojo-muted">道場のデータはこのブラウザにだけ保存されます。バックアップや引っ越しに使えます。</p>
         <div class="dojo-actions">
           <button type="button" onClick={download}>書き出す</button>
           <button type="button" onClick={() => fileRef.current?.click()}>読み込む</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={upload} />
         </div>
-      </section>
+      </dialog>
     </div>
   );
 }

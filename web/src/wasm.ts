@@ -285,6 +285,13 @@ function saveGame(publicId: string, save: string, st: GameState) {
   storeGames(key, games, publicId);
 }
 
+/** Drops the dojo's unfinished games: the dojo plays one game at a time, and a new one abandons the old (unpaid). */
+export function discardUnfinishedDojoGames() {
+  const games = loadGames(DOJO_GAMES_KEY);
+  const left = Object.fromEntries(Object.entries(games).filter(([, g]) => g.round?.over));
+  if (Object.keys(left).length !== Object.keys(games).length) storeGames(DOJO_GAMES_KEY, left);
+}
+
 function forgetGame(publicId: string) {
   for (const key of [GAMES_KEY, DOJO_GAMES_KEY]) {
     const games = loadGames(key);

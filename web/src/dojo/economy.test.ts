@@ -1,13 +1,19 @@
 // The economy's targets (catalog.ts's header), played out on average games:
 // ranks cycle 1st to 4th (XP 50 and 35 coins on average) and the won han
 // alternate 1 and 2 (1.5 on average), so a game pays 65 XP and 50 coins.
+// The targets count the core of the shop: the yaku, the assists and the tile
+// themes. The cheats and the tile backs are extras for the long run, bought
+// apart (the last test).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATALOG, YAKUMAN_PACK } from './catalog.ts';
+import { CATALOG, YAKUMAN_PACK, type ShopItem } from './catalog.ts';
 import { initialProgress, level, purchase, settle, type DojoProgress } from './progress.ts';
 
-/** One average game, then buys the cheapest thing it can. */
-function play(p: DojoProgress, n: number): DojoProgress {
+const CORE_KINDS: ShopItem['kind'][] = ['yaku', 'assist', 'theme', 'pack'];
+const core = CATALOG.filter((it) => CORE_KINDS.includes(it.kind));
+
+/** One average game, then buys the cheapest thing it can of `shop` (the core by default). */
+function play(p: DojoProgress, n: number, shop: readonly ShopItem[] = core): DojoProgress {
   const g = {
     seed: n,
     you: 0,
@@ -16,14 +22,14 @@ function play(p: DojoProgress, n: number): DojoProgress {
     rounds: [{ han: n % 2 === 1 ? 1 : 2 }],
   };
   p = settle(p, g).progress;
-  for (const it of [...CATALOG].sort((a, b) => a.price - b.price)) {
+  for (const it of [...shop].sort((a, b) => a.price - b.price)) {
     const r = purchase(p, it.id);
     if (r.ok) p = r.progress;
   }
   return p;
 }
 
-const packless = CATALOG.filter((it) => it.id !== YAKUMAN_PACK);
+const packless = core.filter((it) => it.id !== YAKUMAN_PACK);
 const packlessCost = packless.reduce((n, it) => n + it.price, 0);
 const spent = (p: DojoProgress) => packless.filter((it) => p.ownedItems.includes(it.id)).reduce((n, it) => n + it.price, 0);
 
@@ -41,7 +47,7 @@ test('立直 is bought within 2 average games', () => {
   assert.ok(games <= 2, `${games} games`);
 });
 
-test('Lv10 comes after 60 to 80 average games, with 80% of the shop bought', () => {
+test('Lv10 comes after 60 to 80 average games, with 80% of the core shop (yakuman pack aside) bought', () => {
   let p = initialProgress();
   let games = 0;
   while (level(p.xp) < 10) p = play(p, ++games);
@@ -49,11 +55,18 @@ test('Lv10 comes after 60 to 80 average games, with 80% of the shop bought', () 
   assert.ok(spent(p) / packlessCost >= 0.8, `${spent(p)} of ${packlessCost} coins`);
 });
 
-test('the yakuman pack is bought within 40 games of Lv10', () => {
+test('the yakuman pack is bought within 40 games of Lv10, the core shop bought first', () => {
   let p = initialProgress();
   let games = 0;
   while (level(p.xp) < 10) p = play(p, ++games);
   const atTen = games;
   while (!p.ownedItems.includes(YAKUMAN_PACK) && games < 200) p = play(p, ++games);
   assert.ok(games - atTen <= 40, `${games - atTen} games after Lv10`);
+});
+
+test('the whole shop, cheats and tile backs included, is bought in about 175 games', () => {
+  let p = initialProgress();
+  let games = 0;
+  while (!CATALOG.every((it) => p.ownedItems.includes(it.id)) && games < 400) p = play(p, ++games, CATALOG);
+  assert.ok(games >= 160 && games <= 190, `${games} games`);
 });

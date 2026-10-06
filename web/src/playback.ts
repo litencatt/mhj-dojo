@@ -310,6 +310,7 @@ export function playbackState(state: GameState, build: PlaybackBuild, step: numb
     s.hand_count = restingHandCount(s) + (heldAfterCall(build, events, step, s.seat) ? 1 : 0);
     delete s.hand;
     delete s.drawn;
+    if (!s.riichi) delete s.waits; // the dojo's riichi waits, once the riichi has played
   }
   const shown = state.dora_indicators.length - hiddenDora;
   return {

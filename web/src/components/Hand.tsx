@@ -27,6 +27,8 @@ export interface HandProps {
   // Game mode: a mark per tile (exact string), e.g. its danger against a
   // riichi: a class for the badge and the text it stands for.
   marks?: Record<string, { className: string; text: string }>;
+  // The dojo's 有効牌ハイライト: a count under each tile (exact string), and its text; best is marked.
+  badges?: Record<string, { count: number; text: string; best: boolean }>;
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
@@ -82,9 +84,13 @@ type Pick = number | 'drawn';
  * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
-  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, marks, onDiscard, onPreview } = props;
-  const mark = (t: string) => classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className);
-  const label = (t: string) => (marks?.[t] ? `${tileName(t)}、${marks[t].text}` : undefined);
+  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, marks, badges, onDiscard, onPreview } = props;
+  const mark = (t: string) =>
+    classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className, badges?.[t]?.best ? 'tile-ukeire-best' : undefined);
+  const label = (t: string) => {
+    const notes = [marks?.[t]?.text, badges?.[t]?.text].filter(Boolean);
+    return notes.length > 0 ? `${tileName(t)}、${notes.join('、')}` : undefined;
+  };
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
   const [showGroups, setShowGroups] = useHandGroupsToggle();
   const layout = useMemo(() => (showGroups ? validGroups(hand, groups) : null), [showGroups, hand, groups]);
@@ -196,6 +202,7 @@ export function Hand(props: HandProps) {
         className={classes(mark(t), pickClass(pos, t))}
         label={label(t)}
         title={marks?.[t]?.text}
+        badge={badges?.[t] && String(badges[t].count)}
         onClick={(e) => {
           if (!tapToDiscard(e, pos, t)) return;
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
@@ -264,6 +271,7 @@ export function Hand(props: HandProps) {
               className={classes(mark(drawn), pickClass('drawn', drawn))}
               label={label(drawn)}
               title={marks?.[drawn]?.text}
+              badge={badges?.[drawn] && String(badges[drawn].count)}
               onClick={(e) => {
                 if (!tapToDiscard(e, 'drawn', drawn)) return;
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');
