@@ -1806,6 +1806,13 @@ section {
   gap: 1px;
   font-weight: normal;
 }
+.cpu-summary {
+  margin: 0;
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--danger);
+}
 .action-hint {
   display: inline-flex;
   align-items: center;

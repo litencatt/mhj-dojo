@@ -50,10 +50,10 @@ test('a CPU riichi marks the danger of every tile you hold', async ({ page }) =>
   await expect(marked).toHaveCount(0);
 });
 
-test('after the CPU replay, the live region sums up the riichi', async ({ page }) => {
+test('after the CPU replay, a visible summary sums up the riichi', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`./?mode=game&seed=${RIICHI_SEED}&length=tonpuu`);
-  const status = page.locator('[role="status"].visually-hidden:has(+ .action-area)');
+  const status = page.getByTestId('cpu-summary');
   await waitForPlayback(page);
   await expect(status).toHaveText('');
   for (let i = 0; i < 3; i++) {
@@ -62,4 +62,5 @@ test('after the CPU replay, the live region sums up the riichi', async ({ page }
     if (/がリーチ/.test(await status.innerText())) break;
   }
   await expect(status).toHaveText(/(下家|対面|上家)がリーチ.*。$/);
+  await expect(status).toBeVisible();
 });
