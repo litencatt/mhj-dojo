@@ -1848,6 +1848,14 @@ section {
   gap: 1px;
   font-weight: normal;
 }
+.cpu-summary {
+  margin: 0;
+  padding: 2px 4px;
+  min-height: 1.4em; /* held while empty, so the action bar never jumps */
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fg);
+}
 .action-hint {
   display: inline-flex;
   align-items: center;

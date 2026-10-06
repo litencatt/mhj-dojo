@@ -35,6 +35,7 @@ import {
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
+import { summarizeMoves } from './summary';
 import { savedGames, type GameSummary } from './wasm';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -222,6 +223,7 @@ export function GameApp() {
   // the dora as they stood at the current step.
   const table = playback.view;
   const earlierEvents = useRoundLog(state);
+  const summary = !playback.playing && state && state !== reopened.current ? summarizeMoves(state, (seat) => seatLabel(seat, state.you)) : '';
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
@@ -476,8 +478,10 @@ export function GameApp() {
               />
               {/* Persistent (not conditionally mounted) so a screen reader
                   reliably announces the text change either way. */}
-              <p class="visually-hidden" role="status" aria-live="polite">
-                {playback.playing ? 'CPUの動きを再生中…' : ''}
+              {/* While playing, the action bar shows the same text; afterwards
+                  the summary stays in view until the next move. */}
+              <p class="cpu-summary" data-testid="cpu-summary" role="status" aria-live="polite">
+                {playback.playing ? <span class="visually-hidden">CPUの動きを再生中…</span> : summary}
               </p>
               <div ref={actionAreaRef} class="action-area" tabIndex={-1}>
                 {playback.playing ? (
