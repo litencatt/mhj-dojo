@@ -3,6 +3,7 @@ import { VersionTag } from '../components/VersionTag';
 import { yakuName } from './catalog';
 import {
   exportProgress,
+  importProgress,
   level,
   levelProgress,
   loadProgress,
@@ -96,7 +97,7 @@ export function DojoHome() {
       return;
     }
     if (!window.confirm('今の道場のデータを、読み込んだデータで置き換えますか？')) return;
-    change(() => next);
+    change((cur) => importProgress(cur, next));
     setNotice('道場のデータを読み込みました。');
   }
 

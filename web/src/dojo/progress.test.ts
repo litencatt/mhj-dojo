@@ -9,6 +9,7 @@ import {
   canAffordSummon,
   dojoOptions,
   exportProgress,
+  importProgress,
   initialProgress,
   level,
   loadProgress,
@@ -62,12 +63,12 @@ test('a progress from before 門前清自摸和 was given owns it once loaded', 
   assert.deepEqual(parseProgress(JSON.stringify(old))?.ownedYaku, ['tanyao', 'pinfu', 'riichi', 'tsumo']);
 });
 
-test('a won round pays its han at once, and only once', () => {
+test('a won round pays its han and its 和了祝儀 at once, and only once', () => {
   const p = withFirstBonus({ coins: 5, xp: 90 });
   const first = payRounds(p, 'g1', [{ han: 3 }]);
   assert.ok(first);
-  assert.deepEqual([first.coins, first.xp], [30, 30]);
-  assert.equal(first.progress.coins, 35);
+  assert.deepEqual([first.coins, first.xp], [40, 30]); // 3 han x 10 and the 和了祝儀's 10; no XP for the 祝儀
+  assert.equal(first.progress.coins, 45);
   assert.equal(level(first.progress.xp), 2); // a level-up mid-game
   assert.deepEqual(first.progress.paidRounds, { g1: 1 });
   // The same rounds again (a reload): nothing more.
@@ -77,29 +78,30 @@ test('a won round pays its han at once, and only once', () => {
   assert.ok(lost);
   assert.equal(lost.coins, 0);
   const won = payRounds(lost.progress, 'g1', [{ han: 3 }, {}, { han: 2 }]);
-  assert.equal(won?.progress.coins, 35 + 20);
+  assert.equal(won?.progress.coins, 45 + 30);
   // Another game counts apart.
   assert.equal(payRounds(won!.progress, 'g2', [{ han: 1 }])?.progress.paidRounds.g2, 1);
 });
 
 test('settling a game does not pay again the rounds paid as they ended', () => {
-  // 1st with two wins (3 and 2 han) and one redraw: 150 XP and 90 coins in all, as when nothing was paid before.
+  // 1st with two wins (3 and 2 han) and one redraw: 150 XP and 110 coins (和了祝儀 included) in all, as when nothing was paid before.
   const rounds = [{ han: 3 }, { han: 2, redraws: 1 }, {}];
   const paid = payRounds(payRounds(withFirstBonus(), 'g', rounds.slice(0, 1))!.progress, 'g', rounds.slice(0, 2))!.progress;
-  assert.equal(paid.coins, 50);
+  assert.equal(paid.coins, 70);
   const { progress, reward } = settle(paid, game(1, 1, rounds), 'g');
   assert.equal(reward?.xp, 150);
-  assert.equal(reward?.coins, 90);
-  assert.equal(reward?.paidCoins, 50);
+  assert.equal(reward?.coins, 110);
+  assert.equal(reward?.paidCoins, 70);
   assert.equal(reward?.hanCoins, 50);
+  assert.deepEqual([reward?.wins, reward?.winBonusCoins], [2, 20]);
   assert.equal(reward?.rankCoins, 60);
-  assert.equal(progress.coins, 90);
+  assert.equal(progress.coins, 110);
   assert.equal(progress.xp, 150);
   assert.deepEqual(progress.paidRounds, {});
   assert.equal(reward?.levelBefore, 1);
   // A round paid but not the last: settle pays the last one.
   const part = settle(payRounds(withFirstBonus(), 'h', rounds.slice(0, 1))!.progress, game(2, 1, rounds), 'h');
-  assert.equal(part.progress.coins, 90);
+  assert.equal(part.progress.coins, 110);
 });
 
 test('a progress from before the rounds were paid loads with none paid', () => {
@@ -109,12 +111,28 @@ test('a progress from before the rounds were paid loads with none paid', () => {
   assert.equal(parseProgress(JSON.stringify({ ...old, paidRounds: [] })), null);
 });
 
-test('reward: 1st with two wins (3 and 2 han) and one redraw is 150 XP and 90 coins', () => {
+test('importing an older backup keeps what was paid since: a settled game and its rounds are not paid again', () => {
+  const rounds = [{ han: 2 }, { han: 1 }];
+  const backup = payRounds(withFirstBonus({ settled: ['1'] }), 'g', rounds.slice(0, 1))!.progress;
+  // Since the backup: the game g (seed 7) was settled and another, h, paid 2 rounds.
+  const settledG = settle(backup, game(7, 2, rounds), 'g').progress;
+  const current = payRounds(settledG, 'h', [{ han: 1 }, {}])!.progress;
+  const merged = importProgress(current, { ...backup, firstGameBonus: false, paidRounds: { ...backup.paidRounds, h: 1, k: 3 } });
+  assert.equal(merged.coins, backup.coins);
+  assert.equal(merged.xp, backup.xp);
+  assert.deepEqual(merged.settled, ['1', '7']);
+  assert.deepEqual(merged.paidRounds, { g: 1, h: 2, k: 3 });
+  assert.equal(merged.firstGameBonus, true);
+  assert.equal(settle(merged, game(7, 1, rounds), 'g').reward, null);
+  assert.equal(payRounds(merged, 'h', [{ han: 1 }, {}]), null);
+});
+
+test('reward: 1st with two wins (3 and 2 han) and one redraw is 150 XP and 110 coins, 和了祝儀 (10 a win) included', () => {
   const { progress, reward } = settle(withFirstBonus(), game(1, 1, [{ han: 3 }, { han: 2, redraws: 1 }, {}]));
   assert.equal(reward?.xp, 150);
-  assert.equal(reward?.coins, 90);
+  assert.equal(reward?.coins, 110); // rank 60 + han 50 + 和了祝儀 20 - redraw 20
   assert.equal(progress.xp, 150);
-  assert.equal(progress.coins, 90);
+  assert.equal(progress.coins, 110);
 });
 
 test('reward: the first finished game adds the bonus once', () => {
@@ -189,7 +207,7 @@ test('the yakuman pack needs 七対子 and grants every yakuman', () => {
   const pack = purchase(seven.progress, 'yakuman-pack');
   assert.ok(pack.ok);
   for (const k of YAKUMAN_KEYS) assert.ok(pack.progress.ownedYaku.includes(k), k);
-  assert.equal(pack.progress.coins, 5000 - 80 - 1500);
+  assert.equal(pack.progress.coins, 5000 - 80 - 2000);
 });
 
 test('役牌 is bought as one item that grants the dragons and the winds', () => {

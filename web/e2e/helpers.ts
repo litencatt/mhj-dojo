@@ -102,12 +102,13 @@ export async function watchEngine(page: Page) {
     watch.delivered.delete(key);
   });
   await page.addInitScript(() => {
-    type Message = { id?: number; fn?: string; args?: string[]; status?: number; body?: string };
+    type Message = { id?: number; fn?: string; args?: string[]; status?: number; body?: string; save?: string };
     const w = window as unknown as {
       Worker: typeof Worker;
       __mhjEngineReply: (call: object, reply: { status: number; data: unknown }) => Promise<{ status: number; data: unknown }>;
       __mhjEngineDelivered: (worker: number, id: number) => void;
       __mhjAsk?: (method: string, path: string) => Promise<unknown>;
+      __mhjCall?: (fn: string, args: string[]) => Promise<Message>;
       __mhjSession?: string;
     };
     const Native = w.Worker;
@@ -118,18 +119,23 @@ export async function watchEngine(page: Page) {
         super(url, options);
         const worker = ++workers;
         const calls = new Map<number, Message>();
-        const asks = new Map<number, { resolve: (body: unknown) => void; reject: (err: Error) => void }>();
+        const asks = new Map<number, (reply: Message) => void>();
         const post = this.postMessage.bind(this) as (m: Message) => void;
         this.postMessage = ((m: Message) => {
           if (typeof m?.id === 'number') calls.set(m.id, m);
           post(m);
         }) as typeof this.postMessage;
-        w.__mhjAsk = (method, path) =>
-          new Promise((resolve, reject) => {
+        w.__mhjCall = (fn, args) =>
+          new Promise((resolve) => {
             const id = asked++;
-            asks.set(id, { resolve, reject });
-            post({ id, fn: 'request', args: [method, path, ''] });
+            asks.set(id, resolve);
+            post({ id, fn, args });
           });
+        w.__mhjAsk = async (method, path) => {
+          const data = await w.__mhjCall!('request', [method, path, '']);
+          if (data.status !== 200) throw new Error(`the engine answered ${data.status}: ${data.body}`);
+          return JSON.parse(data.body!);
+        };
         // The page's onmessage gets each message once the test has seen it,
         // in the order the engine sent them.
         let handler: ((e: MessageEvent) => void) | null = null;
@@ -140,10 +146,8 @@ export async function watchEngine(page: Page) {
             let data = e.data as Message;
             const id = data?.id;
             if (typeof id === 'number' && asks.has(id)) {
-              const ask = asks.get(id)!;
+              asks.get(id)!(data);
               asks.delete(id);
-              if (data.status === 200) ask.resolve(JSON.parse(data.body!));
-              else ask.reject(new Error(`the engine answered ${data.status}: ${data.body}`));
               return;
             }
             const call = typeof id === 'number' ? calls.get(id) : undefined;
@@ -294,6 +298,9 @@ export const SEED = 12;
 export const DOJO_RIICHI_SEED = 162;
 export const DOJO_REDRAW_SEED = 1;
 export const DOJO_SUMMON_SEED = 1; // a summon offered within 3 tsumogiri moves (e2e_seeds_test.go)
+export const DOJO_NOYAKU_SEED = 16379; // a new dojo's hand is tenpai without a learned yaku's row (e2e_seeds_test.go)
+export const DOJO_RIICHIWAITS_SEED = 221; // a CPU riichi's waits show within 3 tsumogiri moves (e2e_seeds_test.go)
+export const DOJO_WIN_SEED = 11896; // a new dojo wins the first round by tsumogiri, with han (e2e_seeds_test.go)
 
 /**
  * Opens a dojo game (?mode=dojo&play=1) on a seed. The dojo's progress is
@@ -318,20 +325,51 @@ export function dojoProgress(page: Page) {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null') as DojoProgress | null, DOJO_STORAGE_KEY);
 }
 
-/** Plays a CPU game to its 最終結果: generic steps, and 次の局へ after each round's result. */
-export async function playToFinal(page: Page, maxSteps = 1500) {
-  const result = page.getByRole('region', { name: '結果' });
-  const final = page.getByRole('region', { name: '最終結果' });
-  for (let i = 0; i < maxSteps; i++) {
-    await waitForPlayback(page);
-    if (await final.isVisible()) return;
-    if (await result.isVisible()) {
-      await clickAndWait(page, result.getByRole('button', { name: '次の局へ' }));
-      continue;
-    }
-    await playOneStep(page);
-  }
-  throw new Error(`the game did not reach its final result within ${maxSteps} steps`);
+/**
+ * Plays the page's dojo game (?game=) to its end at once, then reloads the
+ * page on it at its 最終結果: the engine replays the game's save and plays on
+ * as nextMove does (tsumo or ron when offered, skip a call offer, discard the
+ * drawn tile or else the last one; 次の局へ between the rounds), and the
+ * finished game's save replaces the page's. The page sees only the reload,
+ * as after a game ended in another tab. Needs watchEngine.
+ */
+export async function finishDojoGame(page: Page) {
+  watching(page);
+  const id = new URL(page.url()).searchParams.get('game');
+  if (!id) throw new Error('the page has no game yet');
+  await waitForPlayback(page);
+  await page.evaluate(
+    async ([key, id]) => {
+      type Reply = { status?: number; body?: string; save?: string };
+      const w = window as unknown as { __mhjCall: (fn: string, args: string[]) => Promise<Reply> };
+      const saved = JSON.parse(localStorage.getItem(key)!);
+      let reply = await w.__mhjCall('restoreGame', [saved.games[id].save, '']);
+      for (let i = 0; ; i++) {
+        if (reply.status !== 200 || i > 1500) throw new Error(`the game did not play to its end: ${reply.status} ${reply.body}`);
+        const st = JSON.parse(reply.body!);
+        if (st.game_over) {
+          const round = { wind: st.round_wind, number: st.round_number, honba: st.honba, over: true };
+          saved.games[id] = { save: reply.save, used: Date.now(), round };
+          localStorage.setItem(key, JSON.stringify(saved));
+          return;
+        }
+        const l = st.legal;
+        const move = st.can_next
+          ? { type: 'next' }
+          : l.tsumo
+            ? { type: 'tsumo' }
+            : l.ron
+              ? { type: 'ron' }
+              : l.skip
+                ? { type: 'skip' }
+                : { type: 'discard', tile: st.seats[st.you].drawn ?? l.discards[l.discards.length - 1] };
+        reply = await w.__mhjCall('request', ['POST', `/api/games/${st.game_id}/action`, JSON.stringify(move)]);
+      }
+    },
+    ['mhj-dojo.site.dojo-games', id],
+  );
+  await page.reload();
+  await expect(page.getByRole('region', { name: '最終結果' })).toBeVisible();
 }
 
 /** Waits until the CPU moves have finished replaying: while they replay,
@@ -362,7 +400,7 @@ export function gameSnapshot(page: Page) {
 export async function clickAndWait(page: Page, locator: Locator) {
   const before = await gameSnapshot(page);
   await locator.click();
-  await expect.poll(() => gameSnapshot(page), { timeout: 30_000 }).not.toBe(before);
+  await expect.poll(() => gameSnapshot(page), { timeout: 30_000, intervals: [10, 20, 50, 100] }).not.toBe(before);
 }
 
 /** The control for one generic step: tsumo or ron when offered, otherwise

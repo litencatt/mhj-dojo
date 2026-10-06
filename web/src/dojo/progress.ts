@@ -11,6 +11,7 @@ import {
   RANK_XP,
   REDRAW_COST,
   SUMMON_COST,
+  WIN_BONUS_COINS,
   XP_PER_HAN,
   findItem,
 } from './catalog.ts';
@@ -87,7 +88,9 @@ export interface Reward {
   coins: number; // the game's whole coins, before the floor at 0: may be negative
   rankCoins: number;
   hanCoins: number; // the won han's, all rounds
-  paidCoins: number; // of hanCoins, paid as the rounds ended (paidXp likewise)
+  wins: number; // the rounds won with a counted yaku (han > 0)
+  winBonusCoins: number; // 和了祝儀: WIN_BONUS_COINS per win
+  paidCoins: number; // of hanCoins and winBonusCoins, paid as the rounds ended (paidXp likewise)
   paidXp: number;
   han: number;
   redraws: number;
@@ -104,6 +107,16 @@ export function sumHan(rounds: RoundLite[]): number {
   return rounds.reduce((n, r) => n + (r.han ?? 0), 0);
 }
 
+/** The rounds won with a counted yaku (han above 0). */
+export function sumWins(rounds: RoundLite[]): number {
+  return rounds.filter((r) => (r.han ?? 0) > 0).length;
+}
+
+/** The coins won rounds pay: their han's and the 和了祝儀. */
+function winCoins(rounds: RoundLite[]): number {
+  return sumHan(rounds) * COINS_PER_HAN + sumWins(rounds) * WIN_BONUS_COINS;
+}
+
 export function sumRedraws(rounds: RoundLite[]): number {
   return rounds.reduce((n, r) => n + (r.redraws ?? 0), 0);
 }
@@ -118,7 +131,7 @@ function unpaid(rounds: RoundLite[]): number {
 }
 
 /**
- * Pays the won han of the rounds of an unfinished game that have ended since
+ * Pays the won han (and the 和了祝儀) of the rounds of an unfinished game that have ended since
  * last paid (paidRounds keeps the count by the game's public id, which a
  * reload keeps). Null when there is nothing new to pay.
  */
@@ -129,9 +142,8 @@ export function payRounds(
 ): { progress: DojoProgress; xp: number; coins: number } | null {
   const paid = p.paidRounds[gameId] ?? 0;
   if (rounds.length <= paid) return null;
-  const han = sumHan(rounds.slice(paid));
-  const xp = han * XP_PER_HAN;
-  const coins = han * COINS_PER_HAN;
+  const xp = sumHan(rounds.slice(paid)) * XP_PER_HAN;
+  const coins = winCoins(rounds.slice(paid));
   return {
     progress: { ...p, xp: p.xp + xp, coins: p.coins + coins, paidRounds: { ...p.paidRounds, [gameId]: rounds.length } },
     xp,
@@ -155,7 +167,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   if (rank === undefined || rank < 1 || rank > 4) return { progress: p, reward: null };
 
   const han = sumHan(g.rounds);
-  const paidHan = gameId === undefined ? 0 : sumHan(g.rounds.slice(0, p.paidRounds[gameId] ?? 0));
+  const alreadyPaid = gameId === undefined ? [] : g.rounds.slice(0, p.paidRounds[gameId] ?? 0);
   const redraws = sumRedraws(g.rounds);
   const redrawCost = redraws * REDRAW_COST;
   const summons = sumSummons(g.rounds);
@@ -164,9 +176,11 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   const xp = RANK_XP[rank - 1] + han * XP_PER_HAN;
   const rankCoins = RANK_COINS[rank - 1];
   const hanCoins = han * COINS_PER_HAN;
-  const coins = rankCoins + hanCoins - redrawCost - summonCost + bonus;
-  const paidXp = paidHan * XP_PER_HAN;
-  const paidCoins = paidHan * COINS_PER_HAN;
+  const wins = sumWins(g.rounds);
+  const winBonusCoins = wins * WIN_BONUS_COINS;
+  const coins = rankCoins + hanCoins + winBonusCoins - redrawCost - summonCost + bonus;
+  const paidXp = sumHan(alreadyPaid) * XP_PER_HAN;
+  const paidCoins = winCoins(alreadyPaid);
   const coinsAfter = Math.max(0, p.coins + coins - paidCoins);
   const paidRounds = { ...p.paidRounds };
   if (gameId !== undefined) delete paidRounds[gameId];
@@ -181,7 +195,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   return {
     progress,
     reward: {
-      rank, xp, coins, rankCoins, hanCoins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
+      rank, xp, coins, rankCoins, hanCoins, wins, winBonusCoins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
       firstGameBonus: bonus, coinsAfter,
       levelBefore: level(p.xp - paidXp), levelAfter: level(progress.xp),
     },
@@ -300,6 +314,22 @@ export function parseProgress(text: string): DojoProgress | null {
     settled: o.settled,
     firstGameBonus: o.firstGameBonus,
     paidRounds: paidRounds as Record<string, number>,
+  };
+}
+
+/**
+ * A loaded progress (a backup) to replace the current one, keeping what the
+ * current one paid: the settled games (both), the rounds paid (the larger count
+ * by game) and the first-game bonus, so an older backup cannot pay them again.
+ */
+export function importProgress(current: DojoProgress, loaded: DojoProgress): DojoProgress {
+  const paidRounds = { ...loaded.paidRounds };
+  for (const [id, n] of Object.entries(current.paidRounds)) paidRounds[id] = Math.max(n, paidRounds[id] ?? 0);
+  return {
+    ...loaded,
+    settled: [...loaded.settled, ...current.settled.filter((s) => !loaded.settled.includes(s))],
+    firstGameBonus: loaded.firstGameBonus || current.firstGameBonus,
+    paidRounds,
   };
 }
 

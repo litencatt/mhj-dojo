@@ -3,8 +3,14 @@
 //
 // Economy targets (economy.test.ts checks them). "The core" is the yaku, the
 // assists and the tile themes; the cheats and the tile backs are left out.
-// - A game is worth about 65 XP and 50 coins: the average rank's base (XP 50,
-//   coins 35) plus about 1.5 han of won hands x 10.
+// - What a game is worth goes up as the yaku are bought. The engine measured
+//   it (docs/dojo-economy.md: seat 0 played by the weak CPU, 400 東風戦 a stage):
+//     S0 the initial yaku    1st-4th 8.0/25.5/29.0/37.5%, 0.74 han, 0.58 wins: about 43 XP, 41 coins
+//     S1 + 立直・役牌          22.2/22.8/26.0/29.0%,         1.66 han, 1.02 wins: about 63 XP, 60 coins
+//     S2 + every 2-han yaku  24.5/24.5/24.2/26.8%,         2.0 han,  1.11 wins: about 69 XP, 66 coins
+//     S3 every yaku          27.8/23.5/23.5/25.2%,         2.37 han, 1.11 wins: about 75 XP, 71 coins
+//   (the rank's base, the won han x 10 and the 和了祝儀's 10 coins a win).
+//   The 和了祝儀 makes a win worth more than playing safe for a rank.
 // - 立直 is affordable within 1-2 games: the first-game bonus alone covers it.
 // - Lv10 (4500 XP) comes after about 70 games, by which time 80% or more of
 //   the core's coin cost (the yakuman pack aside) has been bought.
@@ -17,6 +23,8 @@ export const RANK_COINS = [60, 40, 25, 15] as const;
 /** XP and coins per han of the counted yaku (dora not included). */
 export const XP_PER_HAN = 10;
 export const COINS_PER_HAN = 10;
+/** Coins per won round (和了祝儀), whatever its han; no XP. */
+export const WIN_BONUS_COINS = 10;
 /** The coins one redraw (引き直し) costs, settled at the end of the game. */
 export const REDRAW_COST = 20;
 /** The coins one summon (牌寄せ) costs, settled at the end of the game like a redraw. */
@@ -102,21 +110,21 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'back:asanoha', kind: 'back', name: '裏柄: 麻の葉', price: 100, level: 5 },
   { id: 'assist:ukeire', kind: 'assist', name: '補助: 有効牌ハイライト', price: 150, level: 5 },
 
-  { id: 'cheat:ura', kind: 'cheat', name: 'イカサマ: 裏ドラ透視', price: 400, level: 6 },
+  { id: 'cheat:ura', kind: 'cheat', name: 'イカサマ: 裏ドラ透視', price: 600, level: 6 },
 
   yaku('chinitsu', '清一色', 7, 400),
   { id: 'theme:kogane', kind: 'theme', name: '牌テーマ: 黄金', price: 200, level: 7 },
-  { id: 'cheat:riichiwaits', kind: 'cheat', name: 'イカサマ: リーチ者の待ち透視', price: 500, level: 7 },
+  { id: 'cheat:riichiwaits', kind: 'cheat', name: 'イカサマ: リーチ者の待ち透視', price: 800, level: 7 },
 
-  { id: 'cheat:peek', kind: 'cheat', name: 'イカサマ: 透視', price: 600, level: 8 },
-  { id: 'cheat:redraw', kind: 'cheat', name: 'イカサマ: 引き直し', price: 400, level: 8 },
+  { id: 'cheat:peek', kind: 'cheat', name: 'イカサマ: 透視', price: 1000, level: 8 },
+  { id: 'cheat:redraw', kind: 'cheat', name: 'イカサマ: 引き直し', price: 600, level: 8 },
 
-  { id: 'cheat:wallpeek', kind: 'cheat', name: 'イカサマ: 山読み（次のツモ3枚）', price: 800, level: 9 },
+  { id: 'cheat:wallpeek', kind: 'cheat', name: 'イカサマ: 山読み（次のツモ3枚）', price: 1200, level: 9 },
 
-  { id: 'cheat:summon', kind: 'cheat', name: 'イカサマ: 牌寄せ（指定牌を手牌に、1局1回・50雀銭/回）', price: 1000, level: 10 },
+  { id: 'cheat:summon', kind: 'cheat', name: 'イカサマ: 牌寄せ（指定牌を手牌に、1局1回・50雀銭/回）', price: 1500, level: 10 },
 
   // 七対子 first: a 字一色 seven pairs would be thrown out with its 七対子 reading.
-  { id: YAKUMAN_PACK, kind: 'pack', name: '役満パック', price: 1500, level: 10, requires: ['chiitoitsu'], grants: YAKUMAN_KEYS },
+  { id: YAKUMAN_PACK, kind: 'pack', name: '役満パック', price: 2000, level: 10, requires: ['chiitoitsu'], grants: YAKUMAN_KEYS },
 ];
 
 export function findItem(id: string): ShopItem | undefined {

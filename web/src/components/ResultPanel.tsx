@@ -4,7 +4,7 @@ import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { yakuHanText, yakumanName } from '../yakumanLabel';
-import { COINS_PER_HAN, XP_PER_HAN, yakuName } from '../dojo/catalog';
+import { COINS_PER_HAN, WIN_BONUS_COINS, XP_PER_HAN, yakuName } from '../dojo/catalog';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -79,7 +79,7 @@ export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPane
       </div>
       {!!dojoHan && (
         <p class="dojo-round-reward" data-testid="dojo-round-reward">
-          道場の報酬 +{dojoHan * COINS_PER_HAN} 雀銭・経験値 +{dojoHan * XP_PER_HAN}
+          道場の報酬 +{dojoHan * COINS_PER_HAN + WIN_BONUS_COINS} 雀銭（和了 +{dojoHan * COINS_PER_HAN}、和了祝儀 +{WIN_BONUS_COINS}）・経験値 +{dojoHan * XP_PER_HAN}
         </p>
       )}
       {winner && result.win_tile && (

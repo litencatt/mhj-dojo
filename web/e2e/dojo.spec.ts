@@ -3,14 +3,19 @@ import { readFile } from 'node:fs/promises';
 import {
   DOJO_REDRAW_SEED,
   DOJO_RIICHI_SEED,
+  DOJO_NOYAKU_SEED,
+  DOJO_RIICHIWAITS_SEED,
   DOJO_SUMMON_SEED,
+  DOJO_WIN_SEED,
   SEED,
+  clickAndWait,
   dojoProgress,
+  finishDojoGame,
   handPanel,
+  isRequest,
   newDojoGame,
-  onEngineReply,
+  nextEngineReply,
   playOneStep,
-  playToFinal,
   playToResult,
   slowEngine,
   tableState,
@@ -31,7 +36,7 @@ const LEARNED = ['tanyao', 'pinfu', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa
 
 test('a first game pays its reward once, and the 立直 it buys is offered in the next game', async ({ page }) => {
   slowEngine();
-  test.setTimeout(600_000);
+  await watchEngine(page);
   await page.goto(`./?mode=dojo&seed=${SEED}`);
   await expect(page.getByTestId('dojo-level')).toHaveText('Lv 1');
   await expect(page.getByTestId('dojo-coins')).toHaveText('0');
@@ -42,7 +47,11 @@ test('a first game pays its reward once, and the 立直 it buys is offered in th
   await expect(page).toHaveURL(/[?&]game=/);
   await expect(page).not.toHaveURL(/play=/);
 
-  await playToFinal(page);
+  // The first round and 次の局へ on the page, the rest at once.
+  await playToResult(page);
+  const result = page.getByRole('region', { name: '結果' });
+  await clickAndWait(page, result.getByRole('button', { name: '次の局へ' }));
+  await finishDojoGame(page);
   const reward = page.getByTestId('dojo-reward');
   await expect(reward).toContainText('経験値 +');
   const paid = await dojoProgress(page);
@@ -69,8 +78,8 @@ test('a first game pays its reward once, and the 立直 it buys is offered in th
 });
 
 test('a redraw is restored by a reload and costs its coins once, when the game ends', async ({ page }) => {
-  slowEngine();
-  test.setTimeout(600_000);
+  test.setTimeout(90_000);
+  await watchEngine(page);
   await newDojoGame(page, DOJO_REDRAW_SEED, {
     ownedYaku: LEARNED,
     ownedItems: ['riichi', 'cheat:redraw'],
@@ -93,7 +102,7 @@ test('a redraw is restored by a reload and costs its coins once, when the game e
   await expect(page).toHaveURL(/mode=dojo/);
   expect((await dojoProgress(page))?.coins).toBe(200); // nothing is charged before the game ends
 
-  await playToFinal(page);
+  await finishDojoGame(page);
   const reward = page.getByTestId('dojo-reward');
   await expect(reward).toContainText('引き直し 1回 -20');
   const delta = Number(/雀銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
@@ -351,37 +360,36 @@ test('the aids show only once bought: the ukeire per discard, the preview and th
   await expect(page.locator('.preview-note')).toContainText('打牌した場合のプレビュー');
 });
 
-// The engine's state is patched to tenpai with no learned yaku (役なし) on 3m-6m.
-async function tenpaiWithoutYaku(page: Page) {
+// DOJO_NOYAKU_SEED deals a closed hand tenpai in the general form at once,
+// with no row of the initial yaku at shanten 0: no yaku for a ron, but a tsumo
+// wins with 門前清自摸和.
+
+/** Opens a dojo game on DOJO_NOYAKU_SEED and returns the waits the engine sends (the normal row's ukeire). */
+async function noYakuGame(page: Page, progress: Partial<DojoProgress> = {}) {
   await watchEngine(page);
-  onEngineReply(page, (call, reply) => {
-    const g = reply.data;
-    if (call.fn !== 'request' || !g?.analysis?.length) return;
-    for (const r of g.analysis) {
-      if (r.key === 'normal') Object.assign(r, { shanten: 0, ukeire: ['3m', '6m'], ukeire_total: 6 });
-      else r.shanten = r.shanten === null ? null : Math.max(1, r.shanten);
-    }
-  });
+  const created = nextEngineReply(page, (call) => isRequest(call, 'POST', /^\/api\/games$/));
+  await newDojoGame(page, DOJO_NOYAKU_SEED, progress);
+  const g = (await created).data;
+  await waitForPlayback(page);
+  const normal = g.analysis.find((r: { key: string }) => r.key === 'normal');
+  expect(normal.shanten).toBe(0);
+  return normal.ukeire as string[];
 }
 
-test('役なし警告 and 待ち牌表示: tenpai without a learned yaku', async ({ page }) => {
+test('役なし警告 and 待ち牌表示: a closed tenpai with no learned yaku row wins by tsumo only', async ({ page }) => {
   test.setTimeout(90_000);
-  await tenpaiWithoutYaku(page);
-  await newDojoGame(page, SEED, { ownedItems: ['assist:noyaku', 'assist:waits'] });
-  await waitForPlayback(page);
+  const waits = await noYakuGame(page, { ownedItems: ['assist:noyaku', 'assist:waits'] });
   const aid = page.getByTestId('dojo-waits');
-  await expect(aid).toContainText('役なし');
-  await expect(aid).not.toContainText('立直で和了れます');
+  await expect(aid).toContainText('ロンでは和了れません（ツモなら門前清自摸和）');
+  await expect(aid).not.toContainText('役なし');
   await expect(aid).toContainText('待ち');
-  await expect(aid.locator('.tile[aria-label^="3萬 残り"]')).toHaveCount(1);
-  await expect(aid.locator('.tile')).toHaveCount(2);
+  await expect(aid.locator('.tile')).toHaveCount(waits.length);
+  await expect(aid.locator('.tile').first()).toHaveAttribute('aria-label', / 残り\d+枚$/);
 });
 
 test('役なし警告 with 立直 learned: 立直で和了れます', async ({ page }) => {
   test.setTimeout(90_000);
-  await tenpaiWithoutYaku(page);
-  await newDojoGame(page, SEED, { ownedItems: ['assist:noyaku', 'riichi'], ownedYaku: ['tanyao', 'pinfu', 'riichi'] });
-  await waitForPlayback(page);
+  await noYakuGame(page, { ownedItems: ['assist:noyaku', 'riichi'], ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi'] });
   const aid = page.getByTestId('dojo-waits');
   await expect(aid).toContainText('立直で和了れます');
   await expect(aid.locator('.tile')).toHaveCount(0); // no 待ち牌表示 bought
@@ -389,25 +397,19 @@ test('役なし警告 with 立直 learned: 立直で和了れます', async ({ p
 
 test('without the aids, a tenpai without yaku shows nothing', async ({ page }) => {
   test.setTimeout(90_000);
-  await tenpaiWithoutYaku(page);
-  await newDojoGame(page, SEED);
-  await waitForPlayback(page);
+  await noYakuGame(page);
   await expect(page.getByTestId('dojo-waits')).toHaveCount(0);
 });
 
-test('リーチ者の待ち透視: a riichi seat shows the waits the engine sends', async ({ page }) => {
+test('リーチ者の待ち透視: a CPU in riichi shows its waits', async ({ page }) => {
   test.setTimeout(90_000);
-  await watchEngine(page);
-  onEngineReply(page, (call, reply) => {
-    const g = reply.data;
-    if (call.fn !== 'request' || !g?.seats) return;
-    const s = g.seats[(g.you + 1) % 4];
-    Object.assign(s, { riichi: true, waits: ['1p', '4p'] });
-  });
-  await newDojoGame(page, SEED, { ownedItems: ['cheat:riichiwaits'] });
+  // DOJO_RIICHIWAITS_SEED: the seat across is in riichi at once, waiting on 4m and 西 (3z).
+  await newDojoGame(page, DOJO_RIICHIWAITS_SEED, { ownedItems: ['cheat:riichiwaits'] });
   await waitForPlayback(page);
-  const waits = page.locator('.seat-right').getByTestId('seat-waits');
+  const waits = page.locator('.seat-top').getByTestId('seat-waits');
   await expect(waits.locator('.tile')).toHaveCount(2);
+  await expect(waits.locator('.tile').nth(0)).toHaveAttribute('aria-label', /^4萬/);
+  await expect(waits.locator('.tile').nth(1)).toHaveAttribute('aria-label', /^西/);
   await expect(page.getByTestId('seat-waits')).toHaveCount(1);
 });
 
@@ -438,8 +440,8 @@ test('山読み shows the next three draws', async ({ page }) => {
 });
 
 test('牌寄せ fetches a chosen kind into the drawn tile once a round, and costs 50 coins when the game ends', async ({ page }) => {
-  slowEngine();
-  test.setTimeout(600_000);
+  test.setTimeout(90_000);
+  await watchEngine(page);
   await newDojoGame(page, DOJO_SUMMON_SEED, {
     ownedYaku: LEARNED,
     ownedItems: ['riichi', 'cheat:summon'],
@@ -466,7 +468,7 @@ test('牌寄せ fetches a chosen kind into the drawn tile once a round, and cost
   expect(await tableState(page)).toEqual(before);
   expect((await dojoProgress(page))?.coins).toBe(200);
 
-  await playToFinal(page);
+  await finishDojoGame(page);
   const reward = page.getByTestId('dojo-reward');
   await expect(reward).toContainText('牌寄せ 1回 -50');
   const delta = Number(/雀銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
@@ -474,19 +476,12 @@ test('牌寄せ fetches a chosen kind into the drawn tile once a round, and cost
 });
 
 test('a won round pays its 雀銭 as it ends, once, even after a reload', async ({ page }) => {
-  slowEngine();
-  test.setTimeout(300_000);
-  // The engine's state is patched so that the first round counts 2 han for you once it ends.
-  await watchEngine(page);
-  onEngineReply(page, (_call, reply) => {
-    const g = reply.data;
-    // Every answer, a reload's restore included.
-    if (!Array.isArray(g?.rounds) || g.rounds.length === 0) return;
-    g.rounds[0].han = 2;
-  });
-  await newDojoGame(page, SEED, { coins: 100, firstGameBonus: true });
+  test.setTimeout(90_000);
+  // DOJO_WIN_SEED: tsumogiri wins the first round by tsumo, 門前清自摸和 (1 han).
+  await newDojoGame(page, DOJO_WIN_SEED, { coins: 100, firstGameBonus: true });
   await playToResult(page);
-  await expect(page.getByTestId('dojo-round-reward')).toHaveText('道場の報酬 +20 雀銭・経験値 +20');
+  await expect(page.getByRole('region', { name: '結果' })).toContainText('自分のツモ和了');
+  await expect(page.getByTestId('dojo-round-reward')).toHaveText('道場の報酬 +20 雀銭（和了 +10、和了祝儀 +10）・経験値 +10');
   await expect.poll(async () => (await dojoProgress(page))?.coins).toBe(120);
   const paid = await dojoProgress(page);
   expect(Object.values(paid!.paidRounds)).toEqual([1]);

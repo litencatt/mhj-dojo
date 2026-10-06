@@ -25,7 +25,7 @@ function DojoReward({ reward }: { reward: Reward | null }) {
         <li>経験値 +{reward.xp}</li>
         <li>
           雀銭 {signed(reward.coins)}（順位 +{reward.rankCoins}
-          {reward.hanCoins > 0 && `、和了 +${reward.hanCoins}${paidNote(reward)}`}
+          {reward.wins > 0 && `、和了 +${reward.hanCoins}、和了祝儀 +${reward.winBonusCoins}${paidNote(reward)}`}
           {reward.firstGameBonus > 0 && `、初回ボーナス +${reward.firstGameBonus}`}
           {reward.redraws > 0 && `、引き直し ${reward.redraws}回 -${reward.redrawCost}`}
           {reward.summons > 0 && `、牌寄せ ${reward.summons}回 -${reward.summonCost}`}）
@@ -39,10 +39,10 @@ function DojoReward({ reward }: { reward: Reward | null }) {
   );
 }
 
-/** The part of the won han's coins paid as the rounds ended, if any. */
+/** The part of the wins' coins (han and 和了祝儀) paid as the rounds ended, if any. */
 function paidNote(r: Reward): string {
   if (r.paidCoins === 0) return '';
-  return r.paidCoins === r.hanCoins ? '（局ごとに受け取り済み）' : `（うち ${r.paidCoins} は局ごとに受け取り済み）`;
+  return r.paidCoins === r.hanCoins + r.winBonusCoins ? '（局ごとに受け取り済み）' : `（うち ${r.paidCoins} は局ごとに受け取り済み）`;
 }
 
 /** "+12.3" / "-4.0": the final score with its sign and one decimal. */

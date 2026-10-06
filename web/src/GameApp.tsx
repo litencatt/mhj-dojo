@@ -885,11 +885,12 @@ interface DojoAidsProps {
   nextDraws?: TileT[]; // イカサマ: 山読み
 }
 
-/** The dojo's aids above the hand: 役なし (or 立直 to win), the waits with their copies left, and the next draws. */
+/** The dojo's aids above the hand: 役なし (or 立直, or a tsumo, to win), the waits with their copies left, and the next draws. */
 function DojoAids({ analysis, learned, closed, riichi, remaining, noyaku, riichiOwned, waits, nextDraws }: DojoAidsProps) {
   const normal = analysis.find((r) => r.key === 'normal');
   const tenpai = normal?.shanten === 0;
-  // Tenpai in the general form, but no learned yaku's row is: a win would have no yaku (立直 has no row).
+  // Tenpai in the general form, but no learned yaku's row is: a win would have no yaku (立直 and
+  // 門前清自摸和 have no row; a closed hand that owns 門前清自摸和 still wins by tsumo).
   const noYaku = tenpai && !riichi && !analysis.some((r) => r.key !== 'normal' && learned.has(r.key) && r.shanten !== null && r.shanten <= 0);
   const warn = noyaku && noYaku;
   const showWaits = waits && tenpai && normal.ukeire.length > 0;
@@ -901,6 +902,8 @@ function DojoAids({ analysis, learned, closed, riichi, remaining, noyaku, riichi
           {warn &&
             (closed && riichiOwned ? (
               <span class="dojo-aid-ok">役なし：立直で和了れます</span>
+            ) : closed && learned.has('tsumo') ? (
+              <span class="dojo-aid-warn">ロンでは和了れません（ツモなら門前清自摸和）</span>
             ) : (
               <span class="dojo-aid-warn">役なし</span>
             ))}
