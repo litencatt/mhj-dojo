@@ -66,8 +66,9 @@
   background: var(--accent);
 }
 .dojo-start,
+.dojo-restart,
 .dojo-home button {
-  padding: 6px 14px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
@@ -214,9 +215,6 @@
   scrollbar-gutter: stable;
   padding-right: 4px;
 }
-.dojo-restart {
-  font-size: 0.85rem;
-}
 
 /* The hub's settings (a modal <dialog>): the theme, the back and the backup. */
 .dojo-settings {
@@ -356,4 +354,48 @@
 .dojo-cheated {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+/* 設定 matches the CPU game's 設定 (style.css .options-toggle). */
+.dojo-home .dojo-settings-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+/* Phones (style.css's breakpoint): the buttons as tall as the CPU game's
+   (new game 40px, 設定 32px), and the game's choices without their frames,
+   so the hub's first screen stays short. */
+@media (width <= 760px), (height <= 500px) and (pointer: coarse) {
+  .dojo-home .dojo-settings-button {
+    min-height: 32px;
+  }
+  .dojo-start,
+  .dojo-restart {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    font-size: 0.9rem;
+  }
+  .dojo-game-options {
+    gap: 0 16px;
+  }
+  .dojo-game-options .dojo-settings-group {
+    gap: 2px 10px;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    font-size: 0.85rem;
+  }
+  .dojo-game-options .dojo-settings-group legend {
+    float: left;
+    margin-right: 6px;
+    padding: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .dojo-game-options .dojo-settings-group small {
+    font-size: 0.75rem;
+  }
 }
