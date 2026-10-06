@@ -29,25 +29,34 @@
   color: var(--muted);
   font-size: 0.85rem;
 }
-.dojo-status {
+.dojo-status,
+.dojo-play {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
+  gap: 6px 12px;
+}
+.dojo-play {
+  margin-top: 8px;
 }
 .dojo-level {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: bold;
+  white-space: nowrap;
+}
+.dojo-coin-count {
+  margin-left: auto;
+  white-space: nowrap;
 }
 .dojo-coins {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: bold;
 }
 .dojo-xpbar {
-  width: 220px;
-  max-width: 100%;
+  flex: 1 1 80px;
+  min-width: 80px;
+  max-width: 260px;
   height: 8px;
-  margin: 4px 0;
   border-radius: 4px;
   background: var(--chart-grid);
   overflow: hidden;
@@ -68,7 +77,6 @@
   cursor: pointer;
 }
 .dojo-start {
-  margin-left: auto;
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-fg);
@@ -178,9 +186,9 @@
 }
 .dojo-resume {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -214,4 +222,12 @@
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding-right: 4px;
+}
+.dojo-resume a {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }

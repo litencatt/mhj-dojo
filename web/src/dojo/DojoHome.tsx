@@ -104,41 +104,46 @@ export function DojoHome() {
       <section class="dojo-panel" aria-labelledby="dojo-status-heading">
         <h2 id="dojo-status-heading">修行の記録</h2>
         <div class="dojo-status">
-          <div>
-            <span class="dojo-level" data-testid="dojo-level">Lv {lv}</span>
-            <div
-              class="dojo-xpbar"
-              role="progressbar"
-              aria-label="次のレベルまでの経験値"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={bar}
-            >
-              <div style={{ width: `${bar}%` }} />
-            </div>
-            <small class="dojo-muted" data-testid="dojo-xp">
-              経験値 {progress.xp} / {next}
-            </small>
+          <span class="dojo-level" data-testid="dojo-level">Lv {lv}</span>
+          <div
+            class="dojo-xpbar"
+            role="progressbar"
+            aria-label="次のレベルまでの経験値"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={bar}
+          >
+            <div style={{ width: `${bar}%` }} />
           </div>
-          <div>
+          <small class="dojo-muted" data-testid="dojo-xp" title="経験値">
+            {progress.xp} / {next}
+          </small>
+          <span class="dojo-coin-count">
             <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> コイン
-          </div>
-          <a class="dojo-start" href={playHref()}>
+          </span>
+        </div>
+        <div class="dojo-play">
+          <a class="dojo-start" href={playHref()} title="東風戦、CPU は弱い">
             対局開始
           </a>
-        </div>
-        {resumable.length > 0 && (
-          <ul class="dojo-resume" aria-label="続きから">
-            {resumable.map((g) => (
-              <li key={g.id}>
-                <a href={`?mode=dojo&game=${encodeURIComponent(g.id)}`}>
-                  続きから{g.round && `（${roundName(g.round.wind, g.round.number, g.round.honba)}）`}
-                </a>
+          {resumable.length > 0 && (
+            <ul class="dojo-resume" aria-label="続きから">
+              <li class="dojo-muted" aria-hidden="true">
+                続きから
               </li>
-            ))}
-          </ul>
-        )}
-        <p class="dojo-muted">東風戦、CPU は弱い。使える役は下の所持役だけで、持たない役は翻に数えません。</p>
+              {resumable.map((g) => {
+                const at = g.round ? roundName(g.round.wind, g.round.number, g.round.honba) : '対局';
+                return (
+                  <li key={g.id}>
+                    <a href={`?mode=dojo&game=${encodeURIComponent(g.id)}`} aria-label={`続きから（${at}）`}>
+                      {at}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
