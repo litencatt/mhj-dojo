@@ -23,10 +23,15 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // The default (half the cores) is one worker on a 2-vCPU runner, which
-  // leaves the tests waiting on the CPU game's playback one after another.
-  // Every test starts its own game or session, so two can share the server.
-  workers: process.env.CI ? 2 : undefined,
+  // The default (half the cores) is two workers on a 4-vCPU runner (the
+  // public repository's ubuntu-latest), which leaves the tests waiting on the
+  // CPU game's playback. Every test starts its own game or session, so four
+  // can share the server.
+  workers: process.env.CI ? 4 : undefined,
+  // A hung run (a stuck browser or server) fails after this many ms, rather
+  // than at the job's timeout. Opt-in: ci.yml and build-site-release.yml set
+  // it to suit their runs; the nightly's repeated run is much longer.
+  globalTimeout: Number(process.env.E2E_GLOBAL_TIMEOUT_MS) || undefined,
   // The json report lets CI list the tests that passed only on a retry
   // (flaky) as warnings; see ci.yml.
   reporter: process.env.CI
