@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
+import type { ActionType, Advice, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
 import { AdvicePanel } from './components/AdvicePanel';
+import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
-import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
@@ -12,28 +12,24 @@ import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seat
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
-import { Help } from './components/Help';
-import { EngineLoading } from './components/EngineLoading';
-import { TabStopped } from './components/TabStopped';
-import { VersionTag } from './components/VersionTag';
-import { ResumePanel, type ResumeItem } from './components/ResumePanel';
-import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
-import { PANELS, focusGlossary, optionalInt, useGameAdvice, useMinimized, type PanelKey } from './panels';
+import { AppShell } from './components/AppShell';
+import type { ResumeItem } from './components/ResumePanel';
+import { PANELS, focusGlossary, optionalInt, useGameAdvice, useMinimized } from './panels';
 import {
-  bareUrl,
   useLastAnalysis,
   useMediaQuery,
+  useOffered,
   usePlayback,
   useRoundLog,
   useRowNames,
   useSerialRequest,
   useSingleTab,
   useUrlResume,
-  useYakuTop,
 } from './hooks';
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
+import { summarizeMoves } from './summary';
 import { savedGames, type GameSummary } from './wasm';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -45,30 +41,13 @@ const NO_TILES: TileT[] = [];
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // On a phone, upright or on its side (style.css), the game leaves the chart
-// and the glossary (and the advice; the danger marks stay) to practice mode,
-// giving their room to the yaku table. A
+// and the glossary (and the advice panel: the best discard is a chip in the
+// action bar; the danger marks stay) to practice mode, giving their room to
+// the yaku table. A
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
-
-// The badge's letter, also used in its text.
-const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
-
-/** Each held tile's danger mark: its highest level over the riichi seats,
- * and a text naming the seats (each with its own level when there are two
- * or more). */
-function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
-  const out: Record<TileT, { className: string; text: string }> = {};
-  for (const t of Object.keys(danger[0]?.tiles ?? {})) {
-    const level = Math.max(...danger.map((d) => d.tiles[t] ?? 3)) as DangerLevel;
-    const each = danger
-      .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
-      .join('・');
-    out[t] = { className: `tile-danger tile-danger-${level}`, text: `危険度 ${DANGER_NAMES[level]}（${each}）` };
-  }
-  return out;
-}
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
@@ -128,9 +107,7 @@ export function GameApp() {
   const phone = useMediaQuery(PHONE);
   // Opened with no game, seed or options in the URL: the saved games, if
   // any, are offered instead of a new one.
-  const [offered] = useState<ResumeItem[]>(() =>
-    bareUrl() ? savedGames().map(savedItem) : [],
-  );
+  const offered = useOffered(() => savedGames().map(savedItem));
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   // The state last reopened from a save: shown as it stands, not replayed.
@@ -153,8 +130,19 @@ export function GameApp() {
   );
   const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
+  // The advice and the danger are asked for only while they are shown
+  // (docs/api.md "View options"); a state that came with them is noted.
+  const withAdvice = useRef(new WeakSet<GameState>());
+  const asked = (p: Promise<GameState>) => {
+    const on = adviceOn;
+    return p.then((g) => {
+      if (on) withAdvice.current.add(g);
+      return g;
+    });
+  };
+
   function startGame(options: GameOptions, seed?: number) {
-    return request(() => api.createGame({ seed, ...options }));
+    return request(() => asked(api.createGame({ seed, ...options }, adviceOn)));
   }
 
   // One select of the new-game form changed.
@@ -175,10 +163,10 @@ export function GameApp() {
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
       claim(api.gameKey(id));
-      return api.getGame(id).then((game) => (reopened.current = game));
+      return asked(api.getGame(id, adviceOn)).then((game) => (reopened.current = game));
     },
     create: (params) =>
-      api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
+      asked(api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }, adviceOn)),
     // A random seed is hidden until the end: drop any seed of a previous game.
     sync: state && {
       mode: 'game',
@@ -196,7 +184,7 @@ export function GameApp() {
 
   function act(type: ActionType, tile?: TileT, tiles?: TileT[]) {
     if (!state) return;
-    void request(() => api.gameAction(state.game_id, type, tile, tiles));
+    void request(() => asked(api.gameAction(state.game_id, type, tile, tiles, adviceOn)));
   }
 
   // The options stay open until the new game is on (a failed request keeps
@@ -227,14 +215,15 @@ export function GameApp() {
   // the dora as they stood at the current step.
   const table = playback.view;
   const earlierEvents = useRoundLog(state);
+  const summary = !playback.playing && state && state !== reopened.current ? summarizeMoves(state, (seat) => seatLabel(seat, state.you)) : '';
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
-  // Once the replay ends (naturally or via スキップ) the action bar it was
-  // standing in for swaps back in, unmounting the スキップ button: without
-  // this the focus that was on it would drop to <body>. Move it into
-  // whatever now controls the turn instead - but only if focus was already
-  // in here (or nowhere in particular), so it never steals focus from
+  // The action bar is swapped for the playback hint when a replay starts and
+  // back when it ends, unmounting whatever button had the focus (the move
+  // just clicked, ...): the focus would drop to <body>. Once the replay ends,
+  // move it into whatever now controls the turn - but only if focus was
+  // already in here (or nowhere in particular), so it never steals focus from
   // something else on the page (the yaku table, the seed field, ...).
   useEffect(() => {
     if (wasPlaying.current && !playback.playing) {
@@ -250,16 +239,38 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
+  // The advice and the danger of a state shown while they were off, asked
+  // for once they are on (apart from the serial requests: nothing else waits
+  // on them, and the playback stays). The answer is kept beside the state,
+  // which stays the same object, only if it is still the one shown.
+  const [late, setLate] = useState<{ of: GameState; advice: Advice | null; danger: SeatDanger[] } | null>(null);
+  const shown = useRef(state);
+  shown.current = state;
+  const lateAsked = useRef<GameState | null>(null);
+  useEffect(() => {
+    if (!state || !adviceOn || stopped || withAdvice.current.has(state) || lateAsked.current === state) return;
+    if (state.phase !== 'discard' || state.actor !== state.you) return;
+    const of = state;
+    lateAsked.current = of;
+    api.getGame(of.game_id, true).then(
+      (got) => {
+        if (shown.current === of && got.wall_remaining === of.wall_remaining && got.phase === of.phase) {
+          setLate({ of, advice: got.advice ?? null, danger: got.danger ?? [] });
+        }
+      },
+      () => {
+        // Stopped by another tab, or failed: the next state asks again.
+      },
+    );
+  }, [state, adviceOn, stopped]);
+  const lateOf = late && late.of === state ? late : null;
+  const advice = state?.advice ?? lateOf?.advice ?? null;
   // The tree may be minimized from practice mode, but game mode has none.
   const panels = phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS;
   const docked = panels.filter((p) => minimized.includes(p.key));
-  const danger = adviceOn && myTurn ? state?.danger : undefined;
+  const danger = adviceOn && myTurn ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
   const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
   const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
-  const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
-  // On a phone the yaku panel scrolls on its own in the height left under the
-  // header, the table and the hand (style.css), as in practice.
-  const appRef = useYakuTop(!!state);
 
   const speedOption = (
     <label class="speed-option">
@@ -283,144 +294,137 @@ export function GameApp() {
   const adviceOption = (
     <label class="speed-option">
       <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
-      {/* A phone has no advice panel: the option only shows the danger marks there. */}
-      {phone ? '危険度' : 'アドバイス・危険度'}
+      {/* A phone has no advice panel: the advice is the action bar's chip there. */}
+      {phone ? 'おすすめ・危険度' : 'アドバイス・危険度'}
     </label>
   );
   return (
-    <div ref={appRef} class={appClass}>
-      <div class="area-main">
-        <div class="area-header">
-          <header class="app-header">
-            <h1>
-              mhj-dojo <span class="app-subtitle">CPU対戦</span>
-              <a class="mode-link" href="?">練習へ</a>
-            </h1>
-            <div class="header-meta">
-              <VersionTag />
-              <Help
-                onShowGlossary={
-                  phone
-                    ? undefined
-                    : () => {
-                        restore('gloss');
-                        focusGlossary();
-                      }
-                }
+    <AppShell
+      mode="game"
+      started={!!state}
+      docked={docked}
+      onRestore={restore}
+      onShowGlossary={
+        phone
+          ? undefined
+          : () => {
+              restore('gloss');
+              focusGlossary();
+            }
+      }
+      offered={offered}
+      onOpen={(s) => open(s.id, s.params)}
+      busy={busy}
+      error={error}
+      onRetry={retryable ? () => retry(resume) : undefined}
+      stopped={stopped}
+      onContinue={resume}
+      header={
+        <>
+          {state && table && (
+            <div class="header-status">
+              <dl class="game-status">
+                {/* A random seed is hidden until the game ends: nothing to show before then. */}
+                {state.seed !== null && (
+                  <div>
+                    <dt>シード</dt>
+                    <dd>{state.seed}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt class="status-dt-obvious">対局</dt>
+                  <dd>{LENGTH_NAMES[state.length]}</dd>
+                </div>
+                <div>
+                  <dt>CPU</dt>
+                  <dd>{CPU_NAMES[state.cpu]}</dd>
+                </div>
+                <div>
+                  <dt class="status-dt-obvious">局</dt>
+                  <dd>
+                    {WIND_NAMES[state.round_wind]}
+                    {state.round_number}局 {state.honba}本場
+                  </dd>
+                </div>
+                <div>
+                  <dt>自風</dt>
+                  <dd>{me && WIND_NAMES[me.wind]}</dd>
+                </div>
+              </dl>
+              <DoraStatus
+                doraIndicators={table.dora_indicators}
+                dora={table.dora}
+                uraDoraIndicators={table.ura_dora_indicators}
+                uraDora={table.ura_dora}
               />
+              {!phone && speedOption}
+              {!phone && adviceOption}
+              <button
+                ref={toggleRef}
+                type="button"
+                class="options-toggle"
+                aria-expanded={optionsOpen}
+                aria-controls="new-game-options"
+                onClick={() => setOptionsOpen((open) => !open)}
+              >
+                設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
+              </button>
             </div>
-            {state && table && (
-              <div class="header-status">
-                <dl class="game-status">
-                  {/* A random seed is hidden until the game ends: nothing to show before then. */}
-                  {state.seed !== null && (
-                    <div>
-                      <dt>シード</dt>
-                      <dd>{state.seed}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt class="status-dt-obvious">対局</dt>
-                    <dd>{LENGTH_NAMES[state.length]}</dd>
-                  </div>
-                  <div>
-                    <dt>CPU</dt>
-                    <dd>{CPU_NAMES[state.cpu]}</dd>
-                  </div>
-                  <div>
-                    <dt class="status-dt-obvious">局</dt>
-                    <dd>
-                      {WIND_NAMES[state.round_wind]}
-                      {state.round_number}局 {state.honba}本場
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>自風</dt>
-                    <dd>{me && WIND_NAMES[me.wind]}</dd>
-                  </div>
-                </dl>
-                <DoraStatus
-                  doraIndicators={table.dora_indicators}
-                  dora={table.dora}
-                  uraDoraIndicators={table.ura_dora_indicators}
-                  uraDora={table.ura_dora}
-                />
-                {!phone && speedOption}
-                {!phone && adviceOption}
-                <button
-                  ref={toggleRef}
-                  type="button"
-                  class="options-toggle"
-                  aria-expanded={optionsOpen}
-                  aria-controls="new-game-options"
-                  onClick={() => setOptionsOpen((open) => !open)}
-                >
-                  設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
-                </button>
-              </div>
-            )}
-            {/* After the status, so that on a phone Tab goes from 設定 into
-                the options it opens; a desktop shows them on the first row
-                (style.css). */}
-            <form
-              id="new-game-options"
-              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
-              ref={formRef}
-              onSubmit={handleNewGame}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && state && optionsOpen) {
-                  e.preventDefault();
-                  setOptionsOpen(false);
-                  toggleRef.current?.focus();
-                }
-              }}
-            >
-              <label>
-                対局
-                <select value={optionsInput.length} onChange={setOption('length')}>
-                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-                </select>
-              </label>
-              <label>
-                起家
-                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-                  <option value="random">{DEALER_NAMES.random}</option>
-                  <option value="you">{DEALER_NAMES.you}</option>
-                </select>
-              </label>
-              <label>
-                CPU
-                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-                  <option value="weak">{CPU_NAMES.weak}</option>
-                  <option value="normal">{CPU_NAMES.normal}</option>
-                </select>
-              </label>
-              <label>
-                シード
-                <input
-                  type="number"
-                  value={seedInput}
-                  placeholder="ランダム"
-                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              {phone && speedOption}
-              {phone && adviceOption}
-              <button type="submit" disabled={busy}>新規対局</button>
-            </form>
-          </header>
-          {/* 再試行 only for an engine failure: a refused request would fail again. */}
-          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
-          <SaveFailedNotice />
-          {!state && offered.length > 0 && (
-            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
-          {!state && !error && offered.length === 0 && (
-            <EngineLoading />
-          )}
-        </div>
-        {state && me && table && (
+          {/* After the status, so that on a phone Tab goes from 設定 into
+              the options it opens; a desktop shows them on the first row
+              (style.css). */}
+          <form
+            id="new-game-options"
+            class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
+            ref={formRef}
+            onSubmit={handleNewGame}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && state && optionsOpen) {
+                e.preventDefault();
+                setOptionsOpen(false);
+                toggleRef.current?.focus();
+              }
+            }}
+          >
+            <label>
+              対局
+              <select value={optionsInput.length} onChange={setOption('length')}>
+                <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+                <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+              </select>
+            </label>
+            <label>
+              起家
+              <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+                <option value="random">{DEALER_NAMES.random}</option>
+                <option value="you">{DEALER_NAMES.you}</option>
+              </select>
+            </label>
+            <label>
+              CPU
+              <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+                <option value="weak">{CPU_NAMES.weak}</option>
+                <option value="normal">{CPU_NAMES.normal}</option>
+              </select>
+            </label>
+            <label>
+              シード
+              <input
+                type="number"
+                value={seedInput}
+                placeholder="ランダム"
+                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+              />
+            </label>
+            {phone && speedOption}
+            {phone && adviceOption}
+            <button type="submit" disabled={busy}>新規対局</button>
+          </form>
+        </>
+      }
+      main={
+        state && me && table && (
           <>
             <div class="area-hand">
               <GameTable
@@ -455,8 +459,10 @@ export function GameApp() {
               />
               {/* Persistent (not conditionally mounted) so a screen reader
                   reliably announces the text change either way. */}
-              <p class="visually-hidden" role="status" aria-live="polite">
-                {playback.playing ? 'CPUの動きを再生中…' : ''}
+              {/* While playing, the action bar shows the same text; afterwards
+                  the summary stays in view until the next move. */}
+              <p class="cpu-summary" data-testid="cpu-summary" role="status" aria-live="polite">
+                {playback.playing ? <span class="visually-hidden">CPUの動きを再生中…</span> : summary}
               </p>
               <div ref={actionAreaRef} class="action-area" tabIndex={-1}>
                 {playback.playing ? (
@@ -464,9 +470,6 @@ export function GameApp() {
                     <span class="action-hint" aria-hidden="true">
                       CPUの動きを再生中…
                     </span>
-                    <button type="button" onClick={playback.skip}>
-                      スキップ
-                    </button>
                   </div>
                 ) : (
                   <ActionBar
@@ -476,6 +479,9 @@ export function GameApp() {
                     riichiMode={riichiMode}
                     onRiichiMode={setRiichiMode}
                     onAction={act}
+                    advice={phone && adviceOn ? advice : null}
+                    highlight={highlightTile}
+                    onHighlight={setHighlightTile}
                   />
                 )}
               </div>
@@ -501,8 +507,9 @@ export function GameApp() {
               </div>
             )}
           </>
-        )}
-      </div>
+        )
+      }
+    >
       {state && (
         <SidePanels
           analysis={state.analysis}
@@ -518,26 +525,19 @@ export function GameApp() {
           advice={
             adviceOn && !phone && (
               <AdvicePanel
-                advice={state.advice ?? null}
+                advice={advice}
                 review={null}
                 onHighlight={setHighlightTile}
                 minimized={isMin('advice')}
                 onMinimize={minimizeAdvice}
                 game
+                danger={danger}
               />
             )
           }
         />
       )}
-      {state && (
-        <Dock
-          items={docked}
-          onRestore={(k) => restore(k as PanelKey)}
-        />
-      )}
-      {/* 「このタブで続ける」 takes the game back, from where the other tab left it. */}
-      {stopped && <TabStopped busy={busy} onContinue={resume} />}
-    </div>
+    </AppShell>
   );
 }
 
@@ -548,11 +548,15 @@ interface ActionBarProps {
   riichiMode: boolean;
   onRiichiMode: (on: boolean) => void;
   onAction: (type: ActionType, tile?: TileT, tiles?: TileT[]) => void;
+  /** On a phone, the advice to offer as a chip (no advice panel there). */
+  advice: Advice | null;
+  highlight: string | null; // the hand's marked tile
+  onHighlight: (tile: string | null) => void;
 }
 
 /** Your options right now: ron / pon / kan / chii / skip on a discard, or on
  * your turn tsumo, kan, riichi, 九種九牌, or a hint. */
-function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: ActionBarProps) {
+function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, advice, highlight, onHighlight }: ActionBarProps) {
   const { legal } = state;
   if (state.phase === 'ended') return null;
   if (state.phase === 'call' && legal.skip) {
@@ -608,8 +612,20 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
   }
   if (!myTurn) return null;
   const riichiAllowed = legal.riichi.length > 0;
+  const best = advice?.candidates[0]?.tile;
   return (
     <div class="action-bar" role="group" aria-label="操作">
+      {best && (
+        // The best discard of the advice; a tap marks it in the hand (again, unmarks).
+        <button
+          type="button"
+          class="action-advice"
+          aria-pressed={highlight === best}
+          onClick={() => onHighlight(highlight === best ? null : best)}
+        >
+          おすすめ: {tileName(best)}
+        </button>
+      )}
       {legal.tsumo && (
         <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('tsumo')}>
           ツモ

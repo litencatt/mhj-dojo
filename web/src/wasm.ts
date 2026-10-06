@@ -491,8 +491,8 @@ async function restore(kind: Kind, publicId: string, query: string, stopped: () 
   await Promise.all([settled(`${kind.base}/${encodeURIComponent(publicId)}`), start()]);
   const saved = kind.saved(publicId);
   if (saved === null) return null;
-  // A session's rebuilt state answers with the request's view options.
-  const res = await (kind.restoreFn === 'restore' ? call('restore', saved, query) : call('restoreGame', saved));
+  // The rebuilt state answers with the request's view options.
+  const res = await (kind.restoreFn === 'restore' ? call('restore', saved, query) : call('restoreGame', saved, query));
   if (stopped()) return stoppedResponse();
   if (res.status === 200) {
     const id = kind.idOf(res.data);
