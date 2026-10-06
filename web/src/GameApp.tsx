@@ -261,8 +261,18 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (fromForm && (active === document.body || formRef.current?.contains(active))) toggle.focus();
   }
 
+  // The dojo's yaku table and chart have the rows of the yaku learned only.
+  const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
+  const keepRow = useCallback((key: string) => !dojo || key === 'normal' || learned.has(key), [dojo, learned]);
+  const chartHistory = useMemo(
+    () =>
+      dojo && state
+        ? state.history.map((h) => ({ ...h, shanten: Object.fromEntries(Object.entries(h.shanten).filter(([k]) => keepRow(k))) }))
+        : state?.history,
+    [state, dojo, keepRow],
+  );
   // After a call the analysis is empty; the chart keeps the rows from before.
-  const chartAnalysis = useLastAnalysis(state?.analysis);
+  const chartAnalysis = useLastAnalysis(useMemo(() => state?.analysis.filter((r: YakuRow) => keepRow(r.key)), [state, keepRow]));
   const rowNames = useRowNames(chartAnalysis);
   const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
@@ -331,23 +341,22 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const lateOf = late && late.of === state ? late : null;
   const advice = state?.advice ?? lateOf?.advice ?? null;
   // The tree may be minimized from practice mode, but game mode has none.
-  // The dojo shows what has been bought: the yaku table and the chart, the advice.
-  const bought = (k: PanelKey) => !dojo || (k === 'yaku' || k === 'chart' ? has('assist:shanten') : k === 'advice' ? has('assist:advice') : true);
+  // The dojo always shows the yaku table and the chart (of the learned yaku
+  // only, above); the advice panel is bought.
+  const bought = (k: PanelKey) => !dojo || k !== 'advice' || has('assist:advice');
   const isMinOrLocked = (k: PanelKey) => isMin(k) || !bought(k);
   const panels = (phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS).filter((p) => bought(p.key));
   const docked = panels.filter((p) => minimized.includes(p.key));
-  // The dojo's yaku table has the rows of the yaku learned only.
-  const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
   const sideAnalysis = useMemo(
-    () => (dojo && state ? state.analysis.filter((r: YakuRow) => r.key === 'normal' || learned.has(r.key)) : state?.analysis),
-    [state, learned],
+    () => (dojo && state ? state.analysis.filter((r: YakuRow) => keepRow(r.key)) : state?.analysis),
+    [state, dojo, keepRow],
   );
   const sideByDiscard = useMemo(
     () =>
       dojo && state
-        ? Object.fromEntries(Object.entries(state.by_discard).map(([t, rows]) => [t, rows.filter((r) => r.key === 'normal' || learned.has(r.key))]))
+        ? Object.fromEntries(Object.entries(state.by_discard).map(([t, rows]) => [t, rows.filter((r) => keepRow(r.key))]))
         : state?.by_discard,
-    [state, learned],
+    [state, dojo, keepRow],
   );
   const canRedraw = dojo && !!state?.legal.redraw && canAffordRedraw(progress, state.rounds);
   const danger = adviceOn && myTurn && (!dojo || has('assist:danger')) ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
@@ -595,7 +604,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
               <div class="area-chart" hidden={isMinOrLocked('chart')}>
                 <ShantenChart
                   sessionId={state.game_id}
-                  history={state.history}
+                  history={chartHistory ?? state.history}
                   currentAnalysis={chartAnalysis}
                   rowNames={rowNames}
                   minimized={isMinOrLocked('chart')}

@@ -1,7 +1,7 @@
 // The dojo's progress (progress.ts), run by `npm test` in plain Node.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATALOG, INITIAL_YAKU, YAKUMAN_KEYS } from './catalog.ts';
+import { CATALOG, INITIAL_YAKU, YAKUHAI_KEYS, YAKUMAN_KEYS } from './catalog.ts';
 import {
   CORRUPT_KEY,
   STORAGE_KEY,
@@ -50,7 +50,7 @@ test('level is computed from the total XP', () => {
 
 test('a new dojo owns 断么九, 平和, the dragons and the winds only', () => {
   assert.deepEqual(initialProgress().ownedYaku, INITIAL_YAKU);
-  assert.deepEqual([...INITIAL_YAKU].sort(), ['chun', 'haku', 'hatsu', 'nan', 'pei', 'pinfu', 'shaa', 'tanyao', 'ton']);
+  assert.deepEqual([...INITIAL_YAKU].sort(), ['pinfu', 'tanyao']);
 });
 
 test('reward: 1st with two wins (3 and 2 han) and one redraw is 150 XP and 90 coins', () => {
@@ -134,6 +134,16 @@ test('the yakuman pack needs 七対子 and grants every yakuman', () => {
   assert.ok(pack.ok);
   for (const k of YAKUMAN_KEYS) assert.ok(pack.progress.ownedYaku.includes(k), k);
   assert.equal(pack.progress.coins, 5000 - 80 - 1500);
+});
+
+test('役牌 is bought as one item that grants the dragons and the winds', () => {
+  const p = withFirstBonus({ coins: 40 });
+  assert.ok(!p.ownedYaku.includes('haku'));
+  const r = purchase(p, 'yakuhai');
+  assert.ok(r.ok);
+  for (const k of YAKUHAI_KEYS) assert.ok(r.progress.ownedYaku.includes(k), k);
+  assert.equal(r.progress.coins, 0);
+  assert.deepEqual(dojoOptions(r.progress).yaku.sort(), [...INITIAL_YAKU, ...YAKUHAI_KEYS].sort());
 });
 
 test('the catalog has unique ids and its prerequisites are in it', () => {

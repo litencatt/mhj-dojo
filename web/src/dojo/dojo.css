@@ -185,3 +185,33 @@
   padding: 0;
   list-style: none;
 }
+
+.shop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.shop-tabs [role='tab'] {
+  margin-bottom: -1px;
+  padding: 4px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.shop-tabs [role='tab'][aria-selected='true'] {
+  border-color: var(--border);
+  border-bottom-color: var(--panel-bg);
+  color: var(--fg);
+  font-weight: bold;
+}
+/* The items scroll inside the shop so the tabs stay in view. */
+.shop-tabpanel {
+  max-height: min(60vh, 32rem);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}

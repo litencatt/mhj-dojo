@@ -20,9 +20,12 @@ export const REDRAW_COST = 20;
 /** Coins for the first finished game. */
 export const FIRST_GAME_BONUS = 40;
 
-/** The yaku a new dojo owns: 断么九, 平和, the dragons and the winds. */
+/** The yaku a new dojo owns: 断么九 and 平和. 役牌 is bought. */
 export const WIND_KEYS = ['ton', 'nan', 'shaa', 'pei'] as const; // internal/yaku WindKeys
-export const INITIAL_YAKU: readonly string[] = ['tanyao', 'pinfu', 'haku', 'hatsu', 'chun', ...WIND_KEYS];
+export const INITIAL_YAKU: readonly string[] = ['tanyao', 'pinfu'];
+
+/** The keys the 役牌 item grants: the dragons and the value winds. */
+export const YAKUHAI_KEYS: readonly string[] = ['haku', 'hatsu', 'chun', ...WIND_KEYS];
 
 /** The yakuman an owned 役満パック grants: all of them. */
 export const YAKUMAN_KEYS: readonly string[] = [
@@ -44,7 +47,7 @@ export interface ShopItem {
   level: number;
   /** Ids (a yaku key or an item id) that must be owned first. */
   requires?: string[];
-  /** The yaku keys an owned item adds: the item's own key, or the pack's yakuman. */
+  /** The yaku keys an owned item adds: the item's own key, or a group's (役牌, the pack's yakuman). */
   grants?: readonly string[];
 }
 
@@ -54,6 +57,7 @@ function yaku(id: string, name: string, level: number, price: number, requires?:
 
 export const CATALOG: readonly ShopItem[] = [
   yaku('riichi', '立直', 1, 40),
+  { id: 'yakuhai', kind: 'yaku', name: '役牌（白・發・中・場風・自風）', price: 40, level: 1, grants: YAKUHAI_KEYS },
   yaku('tsumo', '門前清自摸和', 1, 40),
   yaku('iipeikou', '一盃口', 1, 40),
 
@@ -64,7 +68,6 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('chankan', '槍槓', 2, 30),
   { id: 'theme:wafuu', kind: 'theme', name: '牌テーマ: 和風', price: 50, level: 2 },
   { id: 'theme:mono', kind: 'theme', name: '牌テーマ: モノクロ', price: 50, level: 2 },
-  { id: 'assist:shanten', kind: 'assist', name: '補助: 役別向聴パネル', price: 60, level: 2 },
 
   yaku('sanshoku', '三色同順', 3, 80),
   yaku('ittsu', '一気通貫', 3, 80),

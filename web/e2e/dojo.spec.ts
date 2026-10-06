@@ -176,3 +176,28 @@ test('the hub follows what another tab has stored, and buys on top of it', async
   await expect(page.getByTestId('dojo-coins')).toHaveText('460');
   expect((await dojoProgress(page))?.xp).toBe(100);
 });
+
+test('the shop shows one kind of item per tab, in a list that scrolls', async ({ page }) => {
+  await page.goto('./?mode=dojo');
+  const tabs = page.getByRole('tablist', { name: '商品の種類' });
+  await expect(tabs.getByRole('tab')).toHaveText(['役', '牌テーマ', '補助', 'イカサマ']);
+  const panel = page.getByRole('tabpanel');
+  await expect(tabs.getByRole('tab', { name: '役' })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.locator('[data-item="yakuhai"]')).toBeVisible();
+  await expect(panel.locator('[data-item^="theme:"]')).toHaveCount(0);
+
+  await tabs.getByRole('tab', { name: '牌テーマ' }).click();
+  await expect(panel.locator('[data-item^="theme:"]')).toHaveCount(3);
+  await expect(panel.locator('[data-item="riichi"]')).toHaveCount(0);
+  // Arrow keys move between the tabs.
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: '補助' })).toBeFocused();
+  await expect(panel.locator('[data-item^="assist:"]')).toHaveCount(2);
+  await page.keyboard.press('ArrowRight');
+  await expect(panel.locator('[data-item^="cheat:"]')).toHaveCount(2);
+
+  // The yaku tab is longer than the list's height: it scrolls inside the shop.
+  await tabs.getByRole('tab', { name: '役' }).click();
+  const scrolls = await panel.evaluate((el) => getComputedStyle(el).overflowY === 'auto' && el.scrollHeight > el.clientHeight);
+  expect(scrolls).toBe(true);
+});
