@@ -8,6 +8,7 @@ export interface ResumeItem {
 
 interface ResumePanelProps {
   noun: string; // 練習 or 対局
+  newLabel: string; // the header's button that starts a new one
   items: ResumeItem[]; // the most recently used first
   busy: boolean;
   onOpen: (item: ResumeItem) => void;
@@ -30,10 +31,10 @@ function describe(item: ResumeItem): string {
 /**
  * Shown instead of a new session or game when the page opens without one in
  * the URL and some are saved: 「続きから」 resumes the most recently used
- * one not over, and the list the others; the header's 新規対局 starts a new
- * one.
+ * one not over, and the list the others; the header's button (newLabel)
+ * starts a new one.
  */
-export function ResumePanel({ noun, items, busy, onOpen }: ResumePanelProps) {
+export function ResumePanel({ noun, newLabel, items, busy, onOpen }: ResumePanelProps) {
   const last = items.find((s) => !s.over);
   const others = items.filter((s) => s !== last).slice(0, MAX_OTHERS);
   return (
@@ -66,7 +67,7 @@ export function ResumePanel({ noun, items, busy, onOpen }: ResumePanelProps) {
           </ul>
         </>
       )}
-      <p class="muted">新しく始めるときは「新規対局」</p>
+      <p class="muted">新しく始めるときは「{newLabel}」</p>
     </section>
   );
 }
