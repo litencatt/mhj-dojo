@@ -5,25 +5,18 @@ import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
-import { Dock } from './components/Dock';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
-import { Help } from './components/Help';
-import { EngineLoading } from './components/EngineLoading';
-import { TabStopped } from './components/TabStopped';
-import { VersionTag } from './components/VersionTag';
-import { ResumePanel, type ResumeItem } from './components/ResumePanel';
-import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
-import { PANELS, focusGlossary, optionalInt, useMinimized, type PanelKey } from './panels';
+import { AppShell } from './components/AppShell';
+import { PANELS, focusGlossary, optionalInt, useMinimized } from './panels';
 import {
-  bareUrl,
+  useOffered,
   useRowNames,
   useSerialRequest,
   useSingleTab,
   useStableCallback,
   useUrlResume,
-  useYakuTop,
 } from './hooks';
 import { claim } from './singleTab';
 import { savedSessions } from './wasm';
@@ -37,15 +30,13 @@ export function App() {
   const { minimized, isMin, minimize, restore } = useMinimized();
   // Opened with no session or seed in the URL: the saved sessions, if any,
   // are offered instead of a new one.
-  const [offered] = useState<ResumeItem[]>(() =>
-    bareUrl()
-      ? savedSessions().map((s) => ({
-          id: s.id,
-          label: `シード ${s.seed}`,
-          used: s.used,
-          params: { seed: String(s.seed), turns: String(s.maxTurns) },
-        }))
-      : [],
+  const offered = useOffered(() =>
+    savedSessions().map((s) => ({
+      id: s.id,
+      label: `シード ${s.seed}`,
+      used: s.used,
+      params: { seed: String(s.seed), turns: String(s.maxTurns) },
+    })),
   );
   const adviceOpen = !isMin('advice');
   // The states that came with the advice (see load).
@@ -164,91 +155,76 @@ export function App() {
   // their own state, such as the chart's legend selection and the glossary
   // search.
   const docked = PANELS.filter((p) => minimized.includes(p.key));
-  const appClass = state && docked.length > 0 ? 'app app-practice has-dock' : 'app app-practice';
-
-  // On a phone the yaku panel scrolls on its own in the height left under the
-  // header and the hand (style.css).
-  const appRef = useYakuTop(!!state);
 
   return (
-    <div ref={appRef} class={appClass}>
-      <div class="area-main">
-        <div class="area-header">
-          <header class="app-header">
-            <h1>
-              mhj-dojo <span class="app-subtitle">麻雀道場</span>
-              <a class="mode-link" href="?mode=game">CPU対戦へ</a>
-            </h1>
-            <div class="header-meta">
-              <VersionTag />
-              <Help
-                onShowGlossary={() => {
-                  restore('gloss');
-                  focusGlossary();
-                }}
+    <AppShell
+      mode="practice"
+      started={!!state}
+      docked={docked}
+      onRestore={restore}
+      onShowGlossary={() => {
+        restore('gloss');
+        focusGlossary();
+      }}
+      offered={offered}
+      onOpen={(s) => open(s.id, s.params)}
+      busy={busy}
+      error={error}
+      onRetry={retryable ? () => retry(resume) : undefined}
+      stopped={stopped}
+      onContinue={resume}
+      header={
+        <>
+          <form class="new-game-form" onSubmit={handleNewGame}>
+            <label>
+              シード
+              <input
+                type="number"
+                value={seedInput}
+                placeholder="ランダム"
+                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+              />
+            </label>
+            <label>
+              最大巡目
+              <input
+                type="number"
+                class="input-narrow"
+                min={1}
+                value={maxTurnsInput}
+                onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
+              />
+            </label>
+            <button type="submit" disabled={busy}>新しい練習</button>
+          </form>
+          {state && (
+            <div class="header-status">
+              <dl class="game-status">
+                <div>
+                  <dt>シード</dt>
+                  <dd>{state.seed}</dd>
+                </div>
+                <div>
+                  <dt>巡目</dt>
+                  <dd>{state.turn} / {state.max_turns}</dd>
+                </div>
+                <div>
+                  <dt>残り牌</dt>
+                  <dd>{state.wall_remaining}</dd>
+                </div>
+              </dl>
+              <DoraStatus
+                doraIndicators={state.dora_indicators}
+                dora={state.dora}
+                uraDoraIndicators={state.ura_dora_indicators}
+                uraDora={state.ura_dora}
               />
             </div>
-            <form class="new-game-form" onSubmit={handleNewGame}>
-              <label>
-                シード
-                <input
-                  type="number"
-                  value={seedInput}
-                  placeholder="ランダム"
-                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              <label>
-                最大巡目
-                <input
-                  type="number"
-                  class="input-narrow"
-                  min={1}
-                  value={maxTurnsInput}
-                  onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              <button type="submit" disabled={busy}>新しい練習</button>
-            </form>
-            {state && (
-              <div class="header-status">
-                <dl class="game-status">
-                  <div>
-                    <dt>シード</dt>
-                    <dd>{state.seed}</dd>
-                  </div>
-                  <div>
-                    <dt>巡目</dt>
-                    <dd>{state.turn} / {state.max_turns}</dd>
-                  </div>
-                  <div>
-                    <dt>残り牌</dt>
-                    <dd>{state.wall_remaining}</dd>
-                  </div>
-                </dl>
-                <DoraStatus
-                  doraIndicators={state.dora_indicators}
-                  dora={state.dora}
-                  uraDoraIndicators={state.ura_dora_indicators}
-                  uraDora={state.ura_dora}
-                />
-              </div>
-            )}
-          </header>
-
-          {/* 再試行 only for an engine failure: a refused request would fail again. */}
-          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
-          <SaveFailedNotice />
-
-          {!state && offered.length > 0 && (
-            <ResumePanel noun="練習" newLabel="新しい練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
-
-          {!state && !error && offered.length === 0 && (
-            <EngineLoading />
-          )}
-        </div>
-        {state && (
+        </>
+      }
+      main={
+        state && (
           <>
             <div class="area-hand">
               <Hand
@@ -280,8 +256,9 @@ export function App() {
               />
             </div>
           </>
-        )}
-      </div>
+        )
+      }
+    >
       {state && (
         <div class="area-tree" hidden={isMin('tree')}>
           <HistoryTree
@@ -316,14 +293,6 @@ export function App() {
           }
         />
       )}
-      {state && (
-        <Dock
-          items={docked}
-          onRestore={(k) => restore(k as PanelKey)}
-        />
-      )}
-      {/* 「このタブで続ける」 takes the session back, from where the other tab left it. */}
-      {stopped && <TabStopped busy={busy} onContinue={resume} />}
-    </div>
+    </AppShell>
   );
 }
