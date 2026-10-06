@@ -68,6 +68,9 @@ const (
 	// seat's own turn a concealed kan (ankan) or an added kan (kakan) of
 	// the kind of Tile.
 	Kan ActionType = "kan"
+	// Redraw sends the drawn tile to the end of the live wall and draws the
+	// next one instead (a dojo cheat; see SeatConfig.RedrawsPerRound).
+	Redraw ActionType = "redraw"
 )
 
 // Abortive draw reasons (Result.Reason when Kind is "abort").
@@ -174,6 +177,18 @@ type RoundConfig struct {
 	Honba     int
 	Deposit   int
 	Points    [4]int
+	SeatConfig
+}
+
+// SeatConfig holds the per-seat house rules of the dojo; the zero value is
+// the standard rules.
+type SeatConfig struct {
+	// Restrict is the yaku each seat may count (nil: all of them); riichi
+	// needs "riichi" in it.
+	Restrict [4]*yaku.KeySet
+	// RedrawsPerRound is how many Redraw moves each seat may make in a
+	// round (0: none).
+	RedrawsPerRound [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.
@@ -202,6 +217,9 @@ type Round struct {
 	pendingRiichi bool          // the last discard declared riichi, not yet accepted
 	kanSeats      []int         // who made each kan (四開槓)
 
+	seats   SeatConfig
+	redraws [4]int // Redraw moves made this round
+
 	log    []Action    // every applied action, for replay
 	events []Action    // the moves that happened, without skips and unused claims
 	marks  []EventMark // the table right after each event
@@ -211,7 +229,7 @@ type Round struct {
 // New deals a single-round game from seed: the dealer is seed mod 4, the
 // round is East, and everyone starts with StartPoints.
 func New(seed int64) *Round {
-	return NewWithWall(wall.New(seed), int(((seed%4)+4)%4))
+	return NewWithWall(wall.New(seed), DefaultFirstDealer(seed))
 }
 
 // NewWithWall is New with a given wall and dealer (used by tests).
@@ -226,7 +244,7 @@ func NewWithWall(w *wall.Wall, dealer int) *Round {
 func NewRound(cfg RoundConfig) *Round {
 	r := &Round{
 		wall: cfg.Wall, dealer: cfg.Dealer, roundWind: cfg.RoundWind, turn: cfg.Dealer,
-		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points,
+		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points, seats: cfg.SeatConfig,
 	}
 	for s := range r.players {
 		r.players[s].hand = cfg.Wall.HandOf(s)
@@ -383,6 +401,14 @@ func (r *Round) Apply(a Action) error {
 			r.log = r.log[:len(r.log)-1]
 		}
 		return err
+	case r.phase == PhaseDiscard && a.Type == Redraw:
+		if !r.canRedraw(a.Seat) {
+			err = fmt.Errorf("%w: redraw needs a live-wall draw after the first go-around, no riichi, a draw left and a redraw left this round", ErrConflict)
+			break
+		}
+		a = Action{Seat: a.Seat, Type: Redraw}
+		r.redraw(a.Seat)
+		r.logEvent(a)
 	case r.phase == PhaseDiscard && a.Type == Kyuushu:
 		if !r.canKyuushu(a.Seat) {
 			err = fmt.Errorf("%w: kyuushu needs the first uninterrupted turn and nine different terminals and honors", ErrConflict)
@@ -553,7 +579,7 @@ func (p *player) open() bool {
 // ronWin evaluates seat's hand plus the last discard.
 func (r *Round) ronWin(seat int) (yaku.Win, bool) {
 	ts := append(slices.Clone(r.players[seat].hand), r.lastDiscard)
-	w, ok := yaku.Evaluate(ts, r.ctx(seat, r.lastDiscard.Kind, true))
+	w, ok := yaku.EvaluateWith(ts, r.ctx(seat, r.lastDiscard.Kind, true), r.seats.Restrict[seat])
 	return w, ok && w.HasYaku()
 }
 
@@ -563,7 +589,7 @@ func (r *Round) tsumoWin(seat int) (yaku.Win, bool) {
 	if p.drawn == nil {
 		return yaku.Win{}, false
 	}
-	w, ok := yaku.Evaluate(p.concealed(), r.ctx(seat, p.drawn.Kind, false))
+	w, ok := yaku.EvaluateWith(p.concealed(), r.ctx(seat, p.drawn.Kind, false), r.seats.Restrict[seat])
 	return w, ok && w.HasYaku()
 }
 
@@ -632,10 +658,10 @@ func WaitsWith(c tile.Counts, called []yaku.Meld) []tile.Kind {
 
 // riichiDiscards returns the tiles seat may discard while declaring riichi:
 // closed, not yet in riichi, enough points and draws, and tenpai after the
-// discard. Empty when riichi is not allowed.
+// discard. Empty when riichi is not allowed, or not among the seat's yaku.
 func (r *Round) riichiDiscards(seat int) []string {
 	p := &r.players[seat]
-	if p.riichi || p.open() || p.drawn == nil || p.points < RiichiStick || r.DrawsLeft() < minDrawsForRiichi {
+	if !r.seats.Restrict[seat].Has("riichi") || p.riichi || p.open() || p.drawn == nil || p.points < RiichiStick || r.DrawsLeft() < minDrawsForRiichi {
 		return nil
 	}
 	tiles := p.concealed()
@@ -835,6 +861,38 @@ func (r *Round) firstGoAround(seat int) bool {
 		}
 	}
 	return len(r.players[seat].river) == 0
+}
+
+// canRedraw reports whether seat may redraw: its own turn on a live-wall
+// draw (not a kan replacement) after the first go-around, not in riichi, with
+// a draw left to take and a redraw left this round.
+func (r *Round) canRedraw(seat int) bool {
+	p := &r.players[seat]
+	return seat == r.turn && r.phase == PhaseDiscard && p.drawn != nil && !p.rinshan && !p.riichi &&
+		!r.firstGoAround(seat) && r.DrawsLeft() >= 1 && r.redraws[seat] < r.seats.RedrawsPerRound[seat]
+}
+
+// redraw rotates the drawn tile to the end of the live wall and gives seat
+// the next draw instead: the draws taken and left do not change.
+func (r *Round) redraw(seat int) {
+	r.wall = r.wall.Redrawn(r.draws-1, wall.LiveDraws4-r.kans-1)
+	t, _ := r.wall.Draw4(r.draws - 1)
+	r.players[seat].drawn = &t
+	r.redraws[seat]++
+}
+
+// Redraws returns how many times seat has redrawn this round.
+func (r *Round) Redraws(seat int) int { return r.redraws[seat] }
+
+// Concealed returns a copy of seat's concealed tiles and drawn tile, which
+// only the dojo's peek shows before the round ends.
+func (r *Round) Concealed(seat int) (hand []tile.Tile, drawn *tile.Tile) {
+	p := &r.players[seat]
+	if p.drawn != nil {
+		d := *p.drawn
+		drawn = &d
+	}
+	return slices.Clone(p.hand), drawn
 }
 
 // canKyuushu reports whether seat may declare 九種九牌: its first

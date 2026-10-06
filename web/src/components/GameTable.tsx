@@ -28,6 +28,7 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
   pon: 'ポン',
   chii: 'チー',
   kan: 'カン',
+  redraw: '引き直し',
 };
 
 export interface GameTableProps {

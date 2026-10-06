@@ -140,3 +140,46 @@ func TestE2ESeedCPUDeals(t *testing.T) {
 		t.Errorf("seed %d (CPU_DEALS): want a CPU dealer, got events %+v; see the comment above tsConst", seed, st.Events)
 	}
 }
+
+// dojoE2EYaku are the yaku of the dojo seeds' games: the dojo's first set
+// plus riichi, bought after the first game.
+const dojoE2EYaku = `["tanyao","pinfu","haku","hatsu","chun","ton","nan","shaa","pei","riichi"]`
+
+// newDojoGame creates a game as the dojo does (tonpuu, the weak CPU, a
+// random first dealer) with dojoE2EYaku and one redraw a round.
+func newDojoGame(c *client, seed int) (match.State, string) {
+	st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+
+		`,"length":"tonpuu","cpu":"weak","dojo":{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1}}`)
+	return st, "/api/games/" + st.GameID + "/action"
+}
+
+// DOJO_RIICHI_SEED: a dojo game offers you riichi within 3 tsumogiri moves
+// (dojo.spec.ts: the riichi bought shows in the next game).
+func TestE2ESeedDojoRiichi(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_RIICHI_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGame(c, seed)
+	for i := 0; i < 3 && st.Result == nil && len(st.Legal.Riichi) == 0; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if !st.Dojo || len(st.Legal.Riichi) == 0 {
+		t.Errorf("seed %d (DOJO_RIICHI_SEED): no riichi offered within 3 moves; see the comment above tsConst", seed)
+	}
+}
+
+// DOJO_REDRAW_SEED: a dojo game offers you a redraw within 3 tsumogiri
+// moves, and the redraw is taken.
+func TestE2ESeedDojoRedraw(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_REDRAW_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGame(c, seed)
+	for i := 0; i < 3 && st.Result == nil && !st.Legal.Redraw; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if !st.Legal.Redraw {
+		t.Fatalf("seed %d (DOJO_REDRAW_SEED): no redraw offered within 3 moves; see the comment above tsConst", seed)
+	}
+	if st, _ = c.game("POST", path, `{"type":"redraw"}`); st.Legal.Redraw || st.Seats[0].Drawn == nil {
+		t.Errorf("seed %d (DOJO_REDRAW_SEED): after the redraw: redraw %v, drawn %v", seed, st.Legal.Redraw, st.Seats[0].Drawn)
+	}
+}

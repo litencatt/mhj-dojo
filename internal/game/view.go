@@ -117,6 +117,8 @@ type Legal struct {
 	// Kan lists the kinds of a kan: in the call phase the discard's kind
 	// (open kan); on the seat's turn a concealed or added kan.
 	Kan []string `json:"kan"`
+	// Redraw: may send the drawn tile back and draw again (dojo only).
+	Redraw bool `json:"redraw,omitempty"`
 }
 
 // Any reports whether seat has any move.
@@ -152,6 +154,7 @@ func (r *Round) LegalFor(seat int) Legal {
 	}
 	_, l.Tsumo = r.tsumoWin(seat)
 	l.Kyuushu = r.canKyuushu(seat)
+	l.Redraw = r.canRedraw(seat)
 	l.Kan = append(l.Kan, r.selfKans(seat)...)
 	return l
 }

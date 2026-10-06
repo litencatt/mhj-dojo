@@ -154,6 +154,21 @@ func (w *Wall) Draw4(k int) (tile.Tile, bool) {
 	return w.tiles[Seats*HandSize+k], true
 }
 
+// Redrawn returns a copy of the wall whose four-player draws k..last are
+// rotated left by one: draw k moves to last and every draw after it comes one
+// earlier. The tile set is unchanged, so the copy is still a full wall.
+func (w *Wall) Redrawn(k, last int) *Wall {
+	if k < 0 || last >= LiveDraws4 || k >= last {
+		panic(fmt.Sprintf("wall: redraw %d..%d out of range", k, last))
+	}
+	out := *w
+	live := out.tiles[Seats*HandSize+k : Seats*HandSize+last+1]
+	first := live[0]
+	copy(live, live[1:])
+	live[len(live)-1] = first
+	return &out
+}
+
 // DoraIndicators returns the first dora indicator, the only one without kans.
 func (w *Wall) DoraIndicators() []tile.Tile { return w.DoraIndicatorsN(1) }
 

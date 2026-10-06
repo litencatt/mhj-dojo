@@ -179,15 +179,16 @@ func Goto(s *session.Session, v session.View, body io.Reader) (session.State, er
 // CreateGame is Route's POST /api/games.
 func CreateGame(games *match.Store, v match.View, body io.Reader) (match.State, error) {
 	var req struct {
-		Seed        *int64 `json:"seed"`
-		Length      string `json:"length"`
-		FirstDealer string `json:"first_dealer"`
-		CPU         string `json:"cpu"`
+		Seed        *int64             `json:"seed"`
+		Length      string             `json:"length"`
+		FirstDealer string             `json:"first_dealer"`
+		CPU         string             `json:"cpu"`
+		Dojo        *match.DojoOptions `json:"dojo"`
 	}
 	if err := Decode(body, &req, false); err != nil {
 		return match.State{}, err
 	}
-	m, err := games.Create(req.Seed, match.Options{Length: req.Length, FirstDealer: req.FirstDealer, CPU: req.CPU})
+	m, err := games.Create(req.Seed, match.Options{Length: req.Length, FirstDealer: req.FirstDealer, CPU: req.CPU, Dojo: req.Dojo})
 	if err != nil {
 		return match.State{}, err
 	}
@@ -214,11 +215,11 @@ func GameAction(m *match.Match, v match.View, body io.Reader) (match.State, erro
 		if len(req.Tiles) != 2 {
 			return match.State{}, Invalid("tiles (two) are required for chii")
 		}
-	case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
+	case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan, game.Redraw:
 	case match.ActionNext:
 		return m.NextView(v)
 	default:
-		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
+		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu, redraw or next")
 	}
 	return m.ActView(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles}, v)
 }

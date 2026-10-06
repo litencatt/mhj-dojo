@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { initialProgress, STORAGE_KEY as DOJO_STORAGE_KEY, type DojoProgress } from '../src/dojo/progress.ts';
 
 // What the specs share. The site's build runs its engine as WebAssembly in
 // a Web Worker; the specs run on it as mhj-dojo serves it
@@ -287,6 +288,50 @@ export function pageOverflowX(page: Page) {
 // Guarded by TestE2ESeedOffersPon in internal/apicall/e2e_seeds_test.go: if game
 // logic changes and it fails, pick a new seed as its message says.
 export const SEED = 12;
+
+// Dojo seeds (DOJO_RIICHI_SEED: riichi offered; DOJO_REDRAW_SEED: redraw
+// offered), guarded by internal/apicall/e2e_seeds_test.go.
+export const DOJO_RIICHI_SEED = 162;
+export const DOJO_REDRAW_SEED = 1;
+
+/**
+ * Opens a dojo game (?mode=dojo&play=1) on a seed. The dojo's progress is
+ * set first (`progress` over the initial one), but only while the browser has
+ * none yet, so that a reload keeps what the page has stored since. Call it
+ * once per page, before anything else loads.
+ */
+export async function newDojoGame(page: Page, seed: number, progress: Partial<DojoProgress> = {}) {
+  const stored = JSON.stringify({ ...initialProgress(), ...progress });
+  await page.addInitScript(
+    ([key, value]) => {
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
+    },
+    [DOJO_STORAGE_KEY, stored],
+  );
+  await page.goto(`./?mode=dojo&play=1&seed=${seed}`);
+  await expect(handPanel(page)).toBeVisible();
+}
+
+/** The dojo's progress as the page has it stored. */
+export function dojoProgress(page: Page) {
+  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null') as DojoProgress | null, DOJO_STORAGE_KEY);
+}
+
+/** Plays a CPU game to its 最終結果: generic steps, and 次の局へ after each round's result. */
+export async function playToFinal(page: Page, maxSteps = 1500) {
+  const result = page.getByRole('region', { name: '結果' });
+  const final = page.getByRole('region', { name: '最終結果' });
+  for (let i = 0; i < maxSteps; i++) {
+    await waitForPlayback(page);
+    if (await final.isVisible()) return;
+    if (await result.isVisible()) {
+      await clickAndWait(page, result.getByRole('button', { name: '次の局へ' }));
+      continue;
+    }
+    await playOneStep(page);
+  }
+  throw new Error(`the game did not reach its final result within ${maxSteps} steps`);
+}
 
 /** Waits until the CPU moves have finished replaying: while they replay,
  * the action bar shows only a hint. */

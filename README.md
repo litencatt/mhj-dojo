@@ -49,6 +49,17 @@ Open **CPU対戦へ** in the header (or `/?mode=game`, `/?mode=game&seed=42`) to
 
 For a 13-tile hand H and a yaku Y, shanten is the minimum number of tiles of H that must be replaced to reach a complete 14-tile hand satisfying Y, minus one (tenpai = 0, win = −1). A tile is an effective tile for Y if drawing it lowers that value. Pinfu is exact at tenpai (it requires a two-sided wait); at 1-shanten and above it is an approximation, marked "近似" (approximate) in the UI. See [docs/api.md](docs/api.md) for details.
 
+## Dojo mode
+
+Open `/?mode=dojo` for CPU games in which you learn yaku one at a time (東風戦 against **CPU: 弱い**). The table and the moves are those of a CPU game; the rules change as follows.
+
+- **Learned yaku only** — only the yaku you have learned count. A yaku you haven't learned scores no han, and a hand with no learned yaku can't win (dora alone never win). Seven pairs and thirteen orphans can't win in that shape unless learned; a yakuman reading wins only with a learned yakuman (else the hand counts its best other reading); double riichi not learned counts as riichi (1 han) if riichi is learned. This holds for 天和 / 地和 too: a seven pairs or thirteen orphans shape not learned can't win even on the first draw. **リーチ** is offered only once riichi is learned. Only you are restricted: the CPU players play by the standard rules. Passing a winning tile you can't win on for lack of a learned yaku makes you furiten, as for any hand without yaku.
+- **Starting yaku** — tanyao, pinfu and the value tiles (白 發 中 東 南 西 北); no riichi.
+- **Levels and coins** — a finished game pays XP and coins: a base by rank (XP 100 / 60 / 30 / 10, coins 60 / 40 / 25 / 15) plus 10 per han of the yaku you won with (dora not counted), and 40 bonus coins for the first game. XP never goes down; level n takes 50 × n × (n − 1) XP in total. An abandoned game pays nothing.
+- **Shop** — spend coins on yaku and items, unlocked by level; 一発 and ダブル立直 need riichi first, and the yakuman pack (every yakuman) needs seven pairs. Besides yaku it sells tile themes (和風, モノクロ, 四色牌) and assists (the per-yaku shanten panel, showing only your learned yaku; the advice panel; danger marks).
+- **Cheats** (from Lv8) — **透視** (peek) shows the CPU hands during the round (the advice and danger marks still ignore them). **引き直し** (redraw) sends your drawn tile to the end of the live wall and draws the next one: once a round, not on your first go-around, in riichi or on a kan replacement tile, and 20 coins each, settled when the game ends. Your hand size and the draws left stay the same, but every later draw shifts by one tile.
+- **Results** — a win greys out the yaku it didn't count, marked 「未修得」.
+
 ## Requirements
 
 - Go 1.27+
@@ -76,7 +87,7 @@ The server only answers requests whose `Host` header names localhost or a loopba
 
 ### Saves
 
-Practice sessions and CPU games are saved in the browser's localStorage: the 10 most recently used sessions and the 5 most recently used games. A reload, or restarting `mhj-dojo`, continues from the save; if a save can't be used, a seed in the URL deals the same wall again. localStorage is per origin (host and port), so another `--port`, or `localhost` instead of `127.0.0.1`, shows other saves.
+Practice sessions and CPU games are saved in the browser's localStorage: the 10 most recently used sessions and the 5 most recently used games. A reload, or restarting `mhj-dojo`, continues from the save; if a save can't be used, a seed in the URL deals the same wall again. Dojo progress (XP, coins, what you own) is kept under `mhj-dojo.dojo.v1`, and dojo games apart from the CPU games (the 5 most recently used), so the CPU game's list of saves doesn't offer them. The dojo page exports the progress to a JSON file and imports it back, for a backup or to move to another browser; progress that can't be read is kept aside under `mhj-dojo.dojo.v1.corrupt` and the dojo starts over. localStorage is per origin (host and port), so another `--port`, or `localhost` instead of `127.0.0.1`, shows other saves.
 
 ## Development
 

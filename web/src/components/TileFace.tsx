@@ -3,10 +3,17 @@ import { parseTile } from '../tiles';
 // Tile faces drawn as SVG in a 30x40 box, following the usual Japanese set
 // layouts. Red fives (0m/0p/0s) are drawn with all-red numerals/pips/sticks.
 
-const BLUE = '#1f4fbf';
-const GREEN = '#15803d';
-const RED = '#c8201f';
-const INK = '#1c1917';
+// Colours are CSS variables (defaults in tokens.css, per-theme overrides under
+// [data-tile-theme]); a <use> instance inherits them from its own ancestors.
+const BLUE = 'var(--tile-pin)';
+const GREEN = 'var(--tile-sou)';
+const RED = 'var(--tile-red)';
+const INK = 'var(--tile-ink)';
+const MAN_NUM = 'var(--tile-man-num)';
+const MAN_MARK = 'var(--tile-man-mark)';
+const WIND = 'var(--tile-wind)';
+const HATSU = 'var(--tile-hatsu)';
+const CHUN = 'var(--tile-chun)';
 const FONT = '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
 
 type Pin = [x: number, y: number, color: string];
@@ -111,10 +118,10 @@ const NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
 function Manzu({ rank, red }: { rank: number; red: boolean }) {
   return (
     <g font-family={FONT} font-weight={700} text-anchor="middle">
-      <text x={15} y={17} font-size={15} fill={red ? RED : INK}>
+      <text x={15} y={17} font-size={15} fill={red ? RED : MAN_NUM}>
         {NUMERALS[rank - 1]}
       </text>
-      <text x={15} y={36} font-size={15} fill={RED}>
+      <text x={15} y={36} font-size={15} fill={MAN_MARK}>
         萬
       </text>
     </g>
@@ -122,13 +129,13 @@ function Manzu({ rank, red }: { rank: number; red: boolean }) {
 }
 
 const HONORS: Array<[string, string]> = [
-  ['東', INK],
-  ['南', INK],
-  ['西', INK],
-  ['北', INK],
+  ['東', WIND],
+  ['南', WIND],
+  ['西', WIND],
+  ['北', WIND],
   ['', INK], // 白 is a blank face
-  ['發', GREEN],
-  ['中', RED],
+  ['發', HATSU],
+  ['中', CHUN],
 ];
 
 function Jihai({ rank }: { rank: number }) {

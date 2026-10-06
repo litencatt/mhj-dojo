@@ -54,6 +54,30 @@ type Options struct {
 	Length      string // Tonpuu or Hanchan
 	FirstDealer string // DealerRandom or DealerYou
 	CPU         string // cpu.Normal or cpu.Weak
+	Dojo        *DojoOptions
+}
+
+// DojoOptions make a game a dojo game: the human counts only the yaku it
+// has learned, and may have the cheats bought in the dojo. The CPUs play by
+// the standard rules.
+type DojoOptions struct {
+	// Yaku are the keys of the yaku the human may count (yaku.IsKey).
+	Yaku []string `json:"yaku"`
+	// Peek shows the other seats' hands during a round.
+	Peek bool `json:"peek,omitempty"`
+	// RedrawsPerRound is how many redraw moves the human may make in a
+	// round; 0 allows none.
+	RedrawsPerRound int `json:"redraws_per_round,omitempty"`
+}
+
+// clone copies d, its yaku included (nil stays nil).
+func (d *DojoOptions) clone() *DojoOptions {
+	if d == nil {
+		return nil
+	}
+	c := *d
+	c.Yaku = slices.Clone(d.Yaku)
+	return &c
 }
 
 // Create deals a game with the given options. A nil seed picks a random
@@ -98,21 +122,44 @@ func (o Options) normalize() (Options, game.Rules, error) {
 	default:
 		return o, rules, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
 	}
+	if d := o.Dojo; d != nil {
+		for _, k := range d.Yaku {
+			if !yaku.IsKey(k) {
+				return o, rules, fmt.Errorf("%w: dojo.yaku: unknown yaku %q", game.ErrInvalid, k)
+			}
+		}
+		if d.RedrawsPerRound < 0 {
+			return o, rules, fmt.Errorf("%w: dojo.redraws_per_round must not be negative", game.ErrInvalid)
+		}
+		o.Dojo = &DojoOptions{Yaku: slices.Clone(d.Yaku), Peek: d.Peek, RedrawsPerRound: d.RedrawsPerRound}
+		if o.Dojo.Yaku == nil {
+			o.Dojo.Yaku = []string{}
+		}
+	}
 	return o, rules, nil
 }
 
 // deal sets up the rounds of a game from its seed and filled-in options.
 func deal(seed int64, rules game.Rules, o Options) *game.Hanchan {
+	first := game.DefaultFirstDealer(seed)
 	if o.FirstDealer == DealerYou {
-		return game.NewHanchanFrom(seed, rules, Human)
+		first = Human
 	}
-	return game.NewHanchan(seed, rules)
+	var seats game.SeatConfig // the standard rules outside the dojo
+	if d := o.Dojo; d != nil {
+		seats.Restrict[Human] = yaku.NewKeySet(d.Yaku...)
+		seats.RedrawsPerRound[Human] = d.RedrawsPerRound
+	}
+	return game.NewHanchanWith(seed, rules, first, seats)
 }
 
 // newMatch starts a match and plays the CPUs up to the human's first
 // decision. The options must be filled in (see Create).
 func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 	m := &Match{opts: o, seedKnown: seedKnown}
+	if o.Dojo != nil {
+		m.learned = yaku.NewKeySet(o.Dojo.Yaku...)
+	}
 	p := cpu.New()
 	if o.CPU == cpu.Weak {
 		p = cpu.NewWeak()
@@ -132,6 +179,9 @@ func (m *Match) startRound() {
 	}
 	if w := m.game.Round.Winds(Human); m.analyzer == nil {
 		m.analyzer = yakushanten.NewAnalyzerFor(w)
+		if m.learned != nil {
+			m.analyzer.SetHan(m.learnedHan)
+		}
 	} else {
 		m.analyzer = m.analyzer.ForWinds(w)
 	}
@@ -168,6 +218,8 @@ type Match struct {
 	// revealed only when the game ends: it rebuilds every wall.
 	seedKnown bool
 	opts      Options
+	// learned is the dojo's yaku (opts.Dojo.Yaku); nil outside the dojo.
+	learned *yaku.KeySet
 	// rounds sums up the finished rounds.
 	rounds []RoundSummary
 	// actions are the human's moves and Nexts that succeeded, in order: with
@@ -259,9 +311,20 @@ func (m *Match) combos(c tile.Counts, melds []yaku.Meld, res []yakushanten.Resul
 }
 
 // hanFor returns the rows' han for the human's winds, lowered for an open
-// hand (kuisagari).
+// hand (kuisagari); in the dojo a yaku not learned is 0.
 func (m *Match) hanFor(melds []yaku.Meld) func(key string) int {
 	w := m.game.Round.Winds(Human)
 	open := slices.ContainsFunc(melds, func(x yaku.Meld) bool { return x.Open })
+	if m.learned != nil {
+		return func(key string) int { return m.learnedHan(key, w, open) }
+	}
 	return func(key string) int { return yaku.HanOpenFor(key, w, open) }
+}
+
+// learnedHan is yaku.HanOpenFor for a dojo game: 0 for a yaku not learned.
+func (m *Match) learnedHan(key string, w yaku.Winds, open bool) int {
+	if !m.learned.Has(key) {
+		return 0
+	}
+	return yaku.HanOpenFor(key, w, open)
 }

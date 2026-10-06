@@ -195,7 +195,7 @@ h2 {
 }
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
-  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
   border-color: var(--tile-back);
 }
 
@@ -1698,7 +1698,7 @@ section {
   padding: 0 1px;
   border: 1px solid var(--tile-back);
   border-radius: 3px;
-  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
   color: #fff;
   font-size: 0.65rem;
   font-weight: bold;

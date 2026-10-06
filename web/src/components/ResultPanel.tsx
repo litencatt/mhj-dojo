@@ -4,6 +4,7 @@ import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { yakuHanText, yakumanName } from '../yakumanLabel';
+import { yakuName } from '../dojo/catalog';
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -92,6 +93,13 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
                 <tr key={y.key}>
                   <td>{y.name}</td>
                   <td>{yakuHanText(y.han)}</td>
+                </tr>
+              ))}
+              {/* Dojo: the yaku the hand had but the player has not learned count for nothing. */}
+              {result.excluded?.map((k) => (
+                <tr key={`excluded-${k}`} class="yaku-excluded">
+                  <td>{yakuName(k)}</td>
+                  <td>未修得</td>
                 </tr>
               ))}
               {!yakuman && result.dora > 0 && (

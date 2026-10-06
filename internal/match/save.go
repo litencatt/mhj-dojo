@@ -23,6 +23,9 @@ type Save struct {
 	FirstDealer string        `json:"first_dealer"`
 	CPU         string        `json:"cpu"`
 	Actions     []SavedAction `json:"actions"`
+	// Dojo is set for a dojo game; a save without it restores a standard
+	// game.
+	Dojo *DojoOptions `json:"dojo,omitempty"`
 	// Check is a digest of every round's moves once the actions are played
 	// (Match.check): a save replayed by an engine whose CPU plays another
 	// way does not match it. A save without one is not checked.
@@ -50,6 +53,7 @@ func (m *Match) Save() Save {
 		FirstDealer: m.opts.FirstDealer,
 		CPU:         m.opts.CPU,
 		Actions:     actions,
+		Dojo:        m.opts.Dojo.clone(),
 		Check:       m.check(),
 	}
 }
@@ -103,7 +107,7 @@ func (h *fnv1a) writeLog(log []game.Action) {
 // seed stays hidden in its state as in the original unless s.SeedKnown.
 // Errors wrap game.ErrInvalid or game.ErrConflict; nothing is stored then.
 func (st *Store) Restore(s Save) (*Match, error) {
-	o, rules, err := Options{Length: s.Length, FirstDealer: s.FirstDealer, CPU: s.CPU}.normalize()
+	o, rules, err := Options{Length: s.Length, FirstDealer: s.FirstDealer, CPU: s.CPU, Dojo: s.Dojo}.normalize()
 	if err != nil {
 		return nil, err
 	}

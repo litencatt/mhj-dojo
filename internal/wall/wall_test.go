@@ -189,3 +189,38 @@ func TestRoundSeed(t *testing.T) {
 		}
 	}
 }
+
+func TestRedrawn(t *testing.T) {
+	w := New(7)
+	r := w.Redrawn(10, 60)
+	if w.Tiles() == r.Tiles() {
+		t.Fatal("no rotation")
+	}
+	if _, err := FromTiles(7, r.Tiles()); err != nil {
+		t.Fatalf("the tile set changed: %v", err)
+	}
+	draw := func(w *Wall, k int) tile.Tile { d, _ := w.Draw4(k); return d }
+	for k := range LiveDraws4 {
+		want := draw(w, k)
+		switch {
+		case k >= 10 && k < 60:
+			want = draw(w, k+1)
+		case k == 60:
+			want = draw(w, 10)
+		}
+		if got := draw(r, k); got != want {
+			t.Errorf("draw %d: %s, want %s", k, got, want)
+		}
+	}
+	for s := range Seats {
+		if !slices.Equal(w.HandOf(s), r.HandOf(s)) {
+			t.Errorf("seat %d's hand changed", s)
+		}
+	}
+	if !slices.Equal(w.DoraIndicatorsN(5), r.DoraIndicatorsN(5)) || r.Seed() != 7 {
+		t.Error("the dead wall or seed changed")
+	}
+	if w.Tiles() != New(7).Tiles() {
+		t.Error("the original wall changed")
+	}
+}

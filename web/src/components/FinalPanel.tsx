@@ -1,11 +1,39 @@
 import type { GameState, RoundSummary } from '../api';
 import { ABORT_NAMES, LENGTH_NAMES, roundName, seatLabel, WIND_NAMES } from './GameTable';
 import { deltaClass, signed } from './ResultPanel';
+import { CATALOG } from '../dojo/catalog';
+import type { Reward } from '../dojo/progress';
 
 export interface FinalPanelProps {
   state: GameState;
   busy: boolean;
   onNewGame: () => void;
+  /** A dojo game: the reward just paid (null: it was paid before) and the button's label. */
+  dojo?: { reward: Reward | null; newLabel: string; saveFailed?: boolean };
+}
+
+/** 道場の報酬: XP, coins, the redraws' cost, the level-up and what it unlocked. */
+function DojoReward({ reward }: { reward: Reward | null }) {
+  if (!reward) return <p class="muted dojo-reward">この対局の報酬は受け取り済みです。</p>;
+  const unlocked = reward.levelAfter > reward.levelBefore
+    ? CATALOG.filter((it) => it.level > reward.levelBefore && it.level <= reward.levelAfter)
+    : [];
+  return (
+    <div class="dojo-reward" data-testid="dojo-reward">
+      <h3>道場の報酬</h3>
+      <ul>
+        <li>経験値 +{reward.xp}</li>
+        <li>
+          コイン {signed(reward.coins)}（順位と翻の分{reward.firstGameBonus > 0 ? `、初回ボーナス ${reward.firstGameBonus}` : ''}
+          {reward.redraws > 0 ? `、引き直し ${reward.redraws}回 -${reward.redrawCost}` : ''}）
+        </li>
+        {reward.levelAfter > reward.levelBefore && (
+          <li class="dojo-levelup">レベルアップ！ Lv {reward.levelBefore} → Lv {reward.levelAfter}</li>
+        )}
+        {unlocked.length > 0 && <li>ショップに解禁: {unlocked.map((it) => it.name).join('、')}</li>}
+      </ul>
+    </div>
+  );
 }
 
 /** "+12.3" / "-4.0": the final score with its sign and one decimal. */
@@ -30,7 +58,7 @@ function roundOutcome(r: RoundSummary, you: number): string {
 }
 
 /** 最終結果: the ranking with points and scores, and every round's outcome. */
-export function FinalPanel({ state, busy, onNewGame }: FinalPanelProps) {
+export function FinalPanel({ state, busy, onNewGame, dojo }: FinalPanelProps) {
   const ranking = [...state.standings].sort((a, b) => a.rank - b.rank);
   // Seats in table order from you: 自分, 下家, 対面, 上家.
   const order = [0, 1, 2, 3].map((rel) => (state.you + rel) % 4);
@@ -39,9 +67,15 @@ export function FinalPanel({ state, busy, onNewGame }: FinalPanelProps) {
       <div class="result-heading">
         <h2>最終結果（{LENGTH_NAMES[state.length]}）</h2>
         <button type="button" class="next-round-button" disabled={busy} onClick={onNewGame}>
-          新しい対局
+          {dojo ? dojo.newLabel : '新しい対局'}
         </button>
       </div>
+      {dojo && <DojoReward reward={dojo.reward} />}
+      {dojo?.saveFailed && (
+        <p class="dojo-notice" role="alert">
+          報酬を保存できませんでした（ブラウザの保存領域を確認してください）。
+        </p>
+      )}
       <table class="result-deltas final-ranking">
         <thead>
           <tr>

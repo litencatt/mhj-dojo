@@ -20,6 +20,7 @@ type State struct {
 	Length            string                          `json:"length"`
 	FirstDealerMode   string                          `json:"first_dealer_mode"` // the first_dealer asked for: random or you
 	CPU               string                          `json:"cpu"`               // weak or normal
+	Dojo              bool                            `json:"dojo,omitempty"`    // a dojo game (Options.Dojo)
 	You               int                             `json:"you"`
 	FirstDealer       int                             `json:"first_dealer"` // the seat
 	Dealer            int                             `json:"dealer"`
@@ -133,6 +134,10 @@ type RoundSummary struct {
 	Winner      int    `json:"winner"`
 	From        int    `json:"from"`
 	Deltas      [4]int `json:"deltas"`
+	// Dojo games only: Han is the han of your win's yaku (no dora; 0 if you
+	// did not win), Redraws the redraws you made in the round.
+	Han     int `json:"han,omitempty"`
+	Redraws int `json:"redraws,omitempty"`
 }
 
 // Result is how the round ended.
@@ -158,6 +163,9 @@ type Result struct {
 	Deposit     int     `json:"deposit"`
 	// Pao are the seats responsible (包) for yakuman of the win.
 	Pao []game.Pao `json:"pao"`
+	// Excluded are the keys of the yaku your win did not count: not
+	// learned in the dojo (dojo games only).
+	Excluded []string `json:"excluded,omitempty"`
 }
 
 func (m *Match) state(view View) State {
@@ -168,6 +176,7 @@ func (m *Match) state(view View) State {
 		Length:            m.opts.Length,
 		FirstDealerMode:   m.opts.FirstDealer,
 		CPU:               m.opts.CPU,
+		Dojo:              m.opts.Dojo != nil,
 		You:               Human,
 		FirstDealer:       h.FirstDealer(),
 		Dealer:            v.Dealer,
@@ -235,6 +244,16 @@ func (m *Match) state(view View) State {
 			d := sv.Drawn.String()
 			seat.Drawn = &d
 		}
+		if s != Human && v.Phase != game.PhaseEnded && m.opts.Dojo != nil && m.opts.Dojo.Peek {
+			// The dojo's peek shows the hands; what the analysis counts as
+			// seen (remaining, danger) still comes from v alone.
+			hand, drawn := r.Concealed(s)
+			seat.Hand = tile.Strings(hand)
+			if drawn != nil {
+				d := drawn.String()
+				seat.Drawn = &d
+			}
+		}
 		st.Seats[s] = seat
 	}
 	events, marks := m.game.Events(m.since), m.game.Round.EventMarks()
@@ -299,6 +318,11 @@ func (m *Match) state(view View) State {
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
+	if res := v.Result; m.opts.Dojo != nil && res != nil && res.Win != nil && res.Winner == Human {
+		for _, y := range res.Win.Excluded {
+			st.Result.Excluded = append(st.Result.Excluded, y.Key)
+		}
+	}
 	return st
 }
 
@@ -323,8 +347,17 @@ func (m *Match) advice(v game.View, all []tile.Tile, byKind map[tile.Kind][]yaku
 	turn := len(v.Seats[Human].River)
 	return advice.Compute(advice.Input{
 		Tiles: all, Visible: *visible, Dora: dora, Turn: turn, MaxTurns: turn + 1 + v.DrawsLeft/4,
-		ByDiscard: byKind, Han: han, Analyzer: m.analyzer,
+		ByDiscard: byKind, Han: han, Allowed: m.allowed(), Analyzer: m.analyzer,
 	})
+}
+
+// allowed is the advice's filter of the yaku: the learned ones in the dojo,
+// nil (every yaku) outside it.
+func (m *Match) allowed() func(string) bool {
+	if m.learned == nil {
+		return nil
+	}
+	return m.learned.Has
 }
 
 // danger rates the tiles all against every other seat in riichi.
@@ -467,10 +500,19 @@ func (m *Match) summary() *RoundSummary {
 	if res == nil {
 		return nil
 	}
-	return &RoundSummary{
+	s := &RoundSummary{
 		RoundWind: h.RoundWind().String(), RoundNumber: h.Number(), Honba: h.Honba(),
 		Kind: res.Kind, Reason: res.Reason, Winner: res.Winner, From: res.From, Deltas: res.Deltas,
 	}
+	if m.opts.Dojo != nil {
+		s.Redraws = m.game.Round.Redraws(Human)
+		if res.Winner == Human && res.Win != nil {
+			for _, y := range res.Win.Yaku {
+				s.Han += y.Han
+			}
+		}
+	}
+	return s
 }
 
 func result(res *game.Result) *Result {
