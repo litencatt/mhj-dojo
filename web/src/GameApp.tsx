@@ -35,6 +35,7 @@ import {
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
+import { summarizeMoves } from './summary';
 import { savedGames, type GameSummary } from './wasm';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -67,28 +68,6 @@ function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { classNa
     out[t] = { className: `tile-danger tile-danger-${level}`, text: `危険度 ${DANGER_NAMES[level]}（${each}）` };
   }
   return out;
-}
-
-const CALL_NAMES = { pon: 'ポン', chii: 'チー', kan: 'カン' } as const;
-
-/** One sentence on what the CPUs did (riichi, calls, kans) and whether you may
- * ron, for a screen reader once the replay is over; '' when nothing of note. */
-function summarizeMoves(state: GameState): string {
-  const riichi: string[] = [];
-  const calls: string[] = [];
-  for (const e of state.events) {
-    if (e.seat === state.you) continue;
-    const who = seatLabel(e.seat, state.you);
-    if (e.type === 'riichi') riichi.push(`${who}がリーチ`);
-    else if (e.type === 'pon' || e.type === 'chii' || e.type === 'kan') calls.push(`${who}が${CALL_NAMES[e.type]}`);
-  }
-  const last = state.events[state.events.length - 1];
-  const ron = state.legal.ron
-    ? [last && last.seat !== state.you && state.last_discard ? `${seatLabel(last.seat, state.you)}の${tileName(state.last_discard)}でロンできます` : 'ロンできます']
-    : [];
-  // At most 3 items: riichi and the ron chance first, the latest calls fill the rest.
-  const parts = [...riichi.slice(0, 2), ...calls.slice(-Math.max(0, 3 - ron.length - Math.min(riichi.length, 2))), ...ron];
-  return parts.length > 0 ? `${parts.join('、')}。` : '';
 }
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -259,7 +238,7 @@ export function GameApp() {
   // the dora as they stood at the current step.
   const table = playback.view;
   const earlierEvents = useRoundLog(state);
-  const summary = !playback.playing && state && state !== reopened.current ? summarizeMoves(state) : '';
+  const summary = !playback.playing && state && state !== reopened.current ? summarizeMoves(state, (seat) => seatLabel(seat, state.you)) : '';
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
@@ -516,8 +495,8 @@ export function GameApp() {
                   reliably announces the text change either way. */}
               {/* While playing, the action bar shows the same text; afterwards
                   the summary stays in view until the next move. */}
-              <p class={summary ? 'cpu-summary' : 'visually-hidden'} data-testid="cpu-summary" role="status" aria-live="polite">
-                {playback.playing ? 'CPUの動きを再生中…' : summary}
+              <p class="cpu-summary" data-testid="cpu-summary" role="status" aria-live="polite">
+                {playback.playing ? <span class="visually-hidden">CPUの動きを再生中…</span> : summary}
               </p>
               <div ref={actionAreaRef} class="action-area" tabIndex={-1}>
                 {playback.playing ? (
