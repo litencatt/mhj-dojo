@@ -63,6 +63,7 @@ test('after the CPU replay, a visible summary sums up the riichi', async ({ page
   }
   await expect(status).toHaveText(/(下家|対面|上家)がリーチ.*。$/);
   await expect(status).toBeVisible();
+});
 
 // On a phone the advice panel has no room: the best discard is a chip in the
 // action bar, and a tap marks its tile in the hand (issue #230). With the
