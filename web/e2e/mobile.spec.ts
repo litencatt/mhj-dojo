@@ -116,7 +116,8 @@ for (const width of [320, 360, 390]) {
       const panel = await box(yaku);
       // A phone has no 複合役 and no name search, but keeps the rest of the filter bar.
       await expect(yaku.locator('.combo-table')).toHaveCount(0);
-      await expect(yaku.locator('.yaku-filter')).toBeVisible();
+      await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toBeVisible();
+      await expect(yaku.locator('.yaku-filter-count')).toBeVisible();
       await expect(yaku.locator('.yaku-filter-search')).toHaveCount(0);
       const t = yaku.locator('.yaku-table');
       await expect(t.locator('tbody tr').first()).toBeVisible();
@@ -336,7 +337,7 @@ for (const [label, viewport] of [
 
 // The filter bar folds away behind 絞り込み: folded on a phone, upright or on
 // its side, open on a wider screen (practice.spec.ts), and the player's
-// choice is kept. Folded, the count (and 条件をクリア) stays above the table.
+// choice is kept. Folded, the count (and 条件をクリア) sits in the heading row.
 test.describe('the yaku filter bar on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -350,7 +351,13 @@ test.describe('the yaku filter bar on a phone', () => {
     await expect(yaku.getByRole('combobox')).toHaveCount(0);
     await expect(yaku.getByRole('button', { name: '役満' })).toHaveCount(0);
     await expect(count).toBeVisible();
-    await expect(count).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    // Folded, the count shares the heading row with 絞り込み (read in full).
+    await expect(count.locator('[aria-hidden="true"]')).toHaveText(/^(\d+)\/\1$/);
+    await expect(count.locator('.visually-hidden')).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    const heading = await box(yaku.locator('.panel-heading'));
+    const countBox = await box(count);
+    expect(countBox.y).toBeGreaterThanOrEqual(heading.y - 1);
+    expect(countBox.y + countBox.height).toBeLessThanOrEqual(heading.y + heading.height + 1);
     await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
     const folded = (await box(firstRow)).y;
 
@@ -379,8 +386,8 @@ test.describe('the yaku filter bar on a phone', () => {
     // Folding keeps the filter.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(count).toHaveText(/^\d+ \/ \d+役を表示中$/);
-    await expect(count).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(count.locator('.visually-hidden')).toHaveText(/^\d+ \/ \d+役を表示中$/);
+    await expect(count.locator('.visually-hidden')).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
     await page.reload();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(yaku.getByRole('combobox')).toHaveCount(0);
@@ -397,11 +404,21 @@ test.describe('the yaku filter bar on a phone', () => {
     const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
     await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');
     const count = yaku.locator('.yaku-filter-count');
-    await expect(count).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(count.locator('.visually-hidden')).not.toHaveText(/^(\d+) \/ \1役を表示中$/);
     const rows = await yaku.locator('.yaku-table tbody tr').count();
 
+    // The folded group is gone; at 320px the ✕ and – stay inside the panel.
+    await expect(yaku.getByRole('group', { name: '役の絞り込み' })).toHaveCount(0);
+    await page.setViewportSize({ width: 320, height: 640 });
+    const panelBox = await box(yaku);
+    for (const b of [yaku.getByRole('button', { name: '条件をクリア' }), yaku.getByRole('button', { name: '役別向聴を最小化' })]) {
+      const bb = await box(b);
+      expect(bb.x).toBeGreaterThanOrEqual(panelBox.x - 1);
+      expect(bb.x + bb.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1);
+    }
+
     await yaku.getByRole('button', { name: '条件をクリア' }).click();
-    await expect(count).toHaveText(/^(\d+) \/ \1役を表示中$/);
+    await expect(count.locator('.visually-hidden')).toHaveText(/^(\d+) \/ \1役を表示中$/);
     await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
     expect(await yaku.locator('.yaku-table tbody tr').count()).toBeGreaterThan(rows);
     await expect(yaku.getByRole('button', { name: '絞り込み', exact: true })).toHaveAttribute('aria-expanded', 'false');

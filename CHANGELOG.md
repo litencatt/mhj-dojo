@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2026.1005.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.3...v2026.1005.0) - 2026-10-05
+
+### 新機能
+- 一度開いたあとはオフラインでも使えるように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/213
+### パフォーマンス
+- エンジン読み込み中の表示とアプリのアイコン・ショートカットを改善 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/214
+
 ## [v2026.1004.3](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.2...v2026.1004.3) - 2026-10-04
 
 ### 新機能
