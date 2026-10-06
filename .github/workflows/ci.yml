@@ -251,10 +251,10 @@ jobs:
       - name: Report flaky tests
         if: always()
         run: scripts/report-flaky.sh
-      # The version tests on the release build (shard 3, which runs the short specs, runs them).
+      # The version tests on the release build (shard 2, currently the shortest, runs them).
       - name: Site version tests on a release build
         id: release
-        if: matrix.shard == 3
+        if: matrix.shard == 2
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
           MHJDOJO_EXPECT_RELEASE: v2000.0101.0
