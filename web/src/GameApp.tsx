@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
+import type { ActionType, Advice, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
 import { AdvicePanel } from './components/AdvicePanel';
+import { DANGER_NAMES, dangerLevel } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -45,15 +46,13 @@ const NO_TILES: TileT[] = [];
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // On a phone, upright or on its side (style.css), the game leaves the chart
-// and the glossary (and the advice; the danger marks stay) to practice mode,
-// giving their room to the yaku table. A
+// and the glossary (and the advice panel: the best discard is a chip in the
+// action bar; the danger marks stay) to practice mode, giving their room to
+// the yaku table. A
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
-
-// The badge's letter, also used in its text.
-const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
 
 /** Each held tile's danger mark: its highest level over the riichi seats,
  * and a text naming the seats (each with its own level when there are two
@@ -61,7 +60,7 @@ const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中'
 function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
   const out: Record<TileT, { className: string; text: string }> = {};
   for (const t of Object.keys(danger[0]?.tiles ?? {})) {
-    const level = Math.max(...danger.map((d) => d.tiles[t] ?? 3)) as DangerLevel;
+    const level = dangerLevel(danger, t) as DangerLevel;
     const each = danger
       .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
       .join('・');
@@ -175,8 +174,19 @@ export function GameApp() {
   );
   const stopped = useSingleTab(state ? api.gameKey(state.game_id) : null);
 
+  // The advice and the danger are asked for only while they are shown
+  // (docs/api.md "View options"); a state that came with them is noted.
+  const withAdvice = useRef(new WeakSet<GameState>());
+  const asked = (p: Promise<GameState>) => {
+    const on = adviceOn;
+    return p.then((g) => {
+      if (on) withAdvice.current.add(g);
+      return g;
+    });
+  };
+
   function startGame(options: GameOptions, seed?: number) {
-    return request(() => api.createGame({ seed, ...options }));
+    return request(() => asked(api.createGame({ seed, ...options }, adviceOn)));
   }
 
   // One select of the new-game form changed.
@@ -197,10 +207,10 @@ export function GameApp() {
     get: (id) => {
       // Before asking for it, so that another tab stops saving it first.
       claim(api.gameKey(id));
-      return api.getGame(id).then((game) => (reopened.current = game));
+      return asked(api.getGame(id, adviceOn)).then((game) => (reopened.current = game));
     },
     create: (params) =>
-      api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }),
+      asked(api.createGame({ seed: optionalInt(params.get('seed')), ...parseOptions((k) => params.get(k)) }, adviceOn)),
     // A random seed is hidden until the end: drop any seed of a previous game.
     sync: state && {
       mode: 'game',
@@ -218,7 +228,7 @@ export function GameApp() {
 
   function act(type: ActionType, tile?: TileT, tiles?: TileT[]) {
     if (!state) return;
-    void request(() => api.gameAction(state.game_id, type, tile, tiles));
+    void request(() => asked(api.gameAction(state.game_id, type, tile, tiles, adviceOn)));
   }
 
   // The options stay open until the new game is on (a failed request keeps
@@ -273,10 +283,36 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
+  // The advice and the danger of a state shown while they were off, asked
+  // for once they are on (apart from the serial requests: nothing else waits
+  // on them, and the playback stays). The answer is kept beside the state,
+  // which stays the same object, only if it is still the one shown.
+  const [late, setLate] = useState<{ of: GameState; advice: Advice | null; danger: SeatDanger[] } | null>(null);
+  const shown = useRef(state);
+  shown.current = state;
+  const lateAsked = useRef<GameState | null>(null);
+  useEffect(() => {
+    if (!state || !adviceOn || stopped || withAdvice.current.has(state) || lateAsked.current === state) return;
+    if (state.phase !== 'discard' || state.actor !== state.you) return;
+    const of = state;
+    lateAsked.current = of;
+    api.getGame(of.game_id, true).then(
+      (got) => {
+        if (shown.current === of && got.wall_remaining === of.wall_remaining && got.phase === of.phase) {
+          setLate({ of, advice: got.advice ?? null, danger: got.danger ?? [] });
+        }
+      },
+      () => {
+        // Stopped by another tab, or failed: the next state asks again.
+      },
+    );
+  }, [state, adviceOn, stopped]);
+  const lateOf = late && late.of === state ? late : null;
+  const advice = state?.advice ?? lateOf?.advice ?? null;
   // The tree may be minimized from practice mode, but game mode has none.
   const panels = phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS;
   const docked = panels.filter((p) => minimized.includes(p.key));
-  const danger = adviceOn && myTurn ? state?.danger : undefined;
+  const danger = adviceOn && myTurn ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
   const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
   const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
   const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
@@ -306,8 +342,8 @@ export function GameApp() {
   const adviceOption = (
     <label class="speed-option">
       <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
-      {/* A phone has no advice panel: the option only shows the danger marks there. */}
-      {phone ? '危険度' : 'アドバイス・危険度'}
+      {/* A phone has no advice panel: the advice is the action bar's chip there. */}
+      {phone ? 'おすすめ・危険度' : 'アドバイス・危険度'}
     </label>
   );
   return (
@@ -437,7 +473,7 @@ export function GameApp() {
           {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
           <SaveFailedNotice />
           {!state && offered.length > 0 && (
-            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
+            <ResumePanel noun="対局" newLabel="新規対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
           {!state && !error && offered.length === 0 && (
             <EngineLoading />
@@ -501,6 +537,9 @@ export function GameApp() {
                     riichiMode={riichiMode}
                     onRiichiMode={setRiichiMode}
                     onAction={act}
+                    advice={phone && adviceOn ? advice : null}
+                    highlight={highlightTile}
+                    onHighlight={setHighlightTile}
                   />
                 )}
               </div>
@@ -543,12 +582,13 @@ export function GameApp() {
           advice={
             adviceOn && !phone && (
               <AdvicePanel
-                advice={state.advice ?? null}
+                advice={advice}
                 review={null}
                 onHighlight={setHighlightTile}
                 minimized={isMin('advice')}
                 onMinimize={minimizeAdvice}
                 game
+                danger={danger}
               />
             )
           }
@@ -573,11 +613,15 @@ interface ActionBarProps {
   riichiMode: boolean;
   onRiichiMode: (on: boolean) => void;
   onAction: (type: ActionType, tile?: TileT, tiles?: TileT[]) => void;
+  /** On a phone, the advice to offer as a chip (no advice panel there). */
+  advice: Advice | null;
+  highlight: string | null; // the hand's marked tile
+  onHighlight: (tile: string | null) => void;
 }
 
 /** Your options right now: ron / pon / kan / chii / skip on a discard, or on
  * your turn tsumo, kan, riichi, 九種九牌, or a hint. */
-function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: ActionBarProps) {
+function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, advice, highlight, onHighlight }: ActionBarProps) {
   const { legal } = state;
   if (state.phase === 'ended') return null;
   if (state.phase === 'call' && legal.skip) {
@@ -633,8 +677,20 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction }: 
   }
   if (!myTurn) return null;
   const riichiAllowed = legal.riichi.length > 0;
+  const best = advice?.candidates[0]?.tile;
   return (
     <div class="action-bar" role="group" aria-label="操作">
+      {best && (
+        // The best discard of the advice; a tap marks it in the hand (again, unmarks).
+        <button
+          type="button"
+          class="action-advice"
+          aria-pressed={highlight === best}
+          onClick={() => onHighlight(highlight === best ? null : best)}
+        >
+          おすすめ: {tileName(best)}
+        </button>
+      )}
       {legal.tsumo && (
         <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('tsumo')}>
           ツモ

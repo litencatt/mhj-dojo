@@ -441,7 +441,7 @@ test('an engine that fails to load shows an error, and a new game retries', asyn
   await page.goto('./?seed=1&turns=18');
   await expect(page.locator('.error-banner')).toContainText('計算エンジン');
   await page.unroute('**/mhj-dojo.wasm*');
-  await page.getByRole('button', { name: '新規対局' }).click();
+  await page.getByRole('button', { name: '新しい練習' }).click();
   await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-tiles .tile')).toHaveCount(13);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

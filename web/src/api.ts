@@ -434,19 +434,23 @@ export interface GameOptions {
   cpu: CpuLevel;
 }
 
-export function createGame(opts: Partial<GameOptions> & { seed?: number } = {}): Promise<GameState> {
-  return request<GameState>('/api/games', {
+// A game request's path: with the advice and the danger left out (docs/api.md
+// "View options") when the page doesn't show them.
+const gamePath = (path: string, advice: boolean) => (advice ? path : `${path}?advice=0`);
+
+export function createGame(opts: Partial<GameOptions> & { seed?: number } = {}, advice = true): Promise<GameState> {
+  return request<GameState>(gamePath('/api/games', advice), {
     method: 'POST',
     body: JSON.stringify(opts),
   });
 }
 
-export function getGame(id: string): Promise<GameState> {
-  return request<GameState>(`/api/games/${encodeURIComponent(id)}`);
+export function getGame(id: string, advice = true): Promise<GameState> {
+  return request<GameState>(gamePath(`/api/games/${encodeURIComponent(id)}`, advice));
 }
 
-export function gameAction(id: string, type: ActionType, tile?: Tile, tiles?: Tile[]): Promise<GameState> {
-  return request<GameState>(`/api/games/${encodeURIComponent(id)}/action`, {
+export function gameAction(id: string, type: ActionType, tile?: Tile, tiles?: Tile[], advice = true): Promise<GameState> {
+  return request<GameState>(gamePath(`/api/games/${encodeURIComponent(id)}/action`, advice), {
     method: 'POST',
     body: JSON.stringify({ type, ...(tile ? { tile } : {}), ...(tiles ? { tiles } : {}) }),
   });

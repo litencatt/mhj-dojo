@@ -49,13 +49,13 @@ test('a bare open offers the saved sessions: 続きから and the list', async (
   expect(param(page, 'seed')).toBe('5');
 });
 
-test('a bare open with a saved session still starts a new one on 新規対局', async ({ page }) => {
+test('a bare open with a saved session still starts a new one on 新しい練習', async ({ page }) => {
   await page.goto('./?seed=5&turns=18');
   await discardDrawn(page);
   const first = param(page, 'session');
   await page.goto('./');
   await expect(resumePanel(page, '練習')).toBeVisible();
-  await page.getByRole('button', { name: '新規対局' }).click();
+  await page.getByRole('button', { name: '新しい練習' }).click();
   await expect(handPanel(page).locator('.discard-river .tile')).toHaveCount(0);
   await expect(resumePanel(page, '練習')).toHaveCount(0);
   await expect(page).toHaveURL(/[?&]session=/);

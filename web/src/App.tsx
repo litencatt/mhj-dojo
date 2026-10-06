@@ -208,7 +208,7 @@ export function App() {
                   onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
                 />
               </label>
-              <button type="submit" disabled={busy}>新規対局</button>
+              <button type="submit" disabled={busy}>新しい練習</button>
             </form>
             {state && (
               <div class="header-status">
@@ -241,7 +241,7 @@ export function App() {
           <SaveFailedNotice />
 
           {!state && offered.length > 0 && (
-            <ResumePanel noun="練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
+            <ResumePanel noun="練習" newLabel="新しい練習" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
 
           {!state && !error && offered.length === 0 && (
