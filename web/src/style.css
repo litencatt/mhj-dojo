@@ -2379,6 +2379,10 @@ section {
   .action-area:focus {
     outline: none;
   }
+  /* The playback bar has no button now: hold the height the buttons give. */
+  .action-bar-playback {
+    min-height: 44px;
+  }
   .action-bar button {
     min-height: 44px;
     min-width: 64px;
