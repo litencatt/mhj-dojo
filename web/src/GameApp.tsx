@@ -5,7 +5,6 @@ import { AdvicePanel } from './components/AdvicePanel';
 import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
-import { Dock } from './components/Dock';
 import { Tile } from './components/Tile';
 import { DoraStatus } from './components/DoraStatus';
 import { SidePanels } from './components/SidePanels';
@@ -13,24 +12,19 @@ import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seat
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
-import { Help } from './components/Help';
-import { EngineLoading } from './components/EngineLoading';
-import { TabStopped } from './components/TabStopped';
-import { VersionTag } from './components/VersionTag';
-import { ResumePanel, type ResumeItem } from './components/ResumePanel';
-import { ErrorBanner, SaveFailedNotice } from './components/ErrorBanner';
-import { PANELS, focusGlossary, optionalInt, useGameAdvice, useMinimized, type PanelKey } from './panels';
+import { AppShell } from './components/AppShell';
+import type { ResumeItem } from './components/ResumePanel';
+import { PANELS, focusGlossary, optionalInt, useGameAdvice, useMinimized } from './panels';
 import {
-  bareUrl,
   useLastAnalysis,
   useMediaQuery,
+  useOffered,
   usePlayback,
   useRoundLog,
   useRowNames,
   useSerialRequest,
   useSingleTab,
   useUrlResume,
-  useYakuTop,
 } from './hooks';
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
@@ -113,9 +107,7 @@ export function GameApp() {
   const phone = useMediaQuery(PHONE);
   // Opened with no game, seed or options in the URL: the saved games, if
   // any, are offered instead of a new one.
-  const [offered] = useState<ResumeItem[]>(() =>
-    bareUrl() ? savedGames().map(savedItem) : [],
-  );
+  const offered = useOffered(() => savedGames().map(savedItem));
   // The first state may be a resumed game: its options fill the selects.
   const optionsSynced = useRef(false);
   // The state last reopened from a save: shown as it stands, not replayed.
@@ -279,10 +271,6 @@ export function GameApp() {
   const danger = adviceOn && myTurn ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
   const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
   const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
-  const appClass = state && docked.length > 0 ? 'app app-game has-dock' : 'app app-game';
-  // On a phone the yaku panel scrolls on its own in the height left under the
-  // header, the table and the hand (style.css), as in practice.
-  const appRef = useYakuTop(!!state);
 
   const speedOption = (
     <label class="speed-option">
@@ -311,139 +299,132 @@ export function GameApp() {
     </label>
   );
   return (
-    <div ref={appRef} class={appClass}>
-      <div class="area-main">
-        <div class="area-header">
-          <header class="app-header">
-            <h1>
-              mhj-dojo <span class="app-subtitle">CPU対戦</span>
-              <a class="mode-link" href="?">練習へ</a>
-            </h1>
-            <div class="header-meta">
-              <VersionTag />
-              <Help
-                onShowGlossary={
-                  phone
-                    ? undefined
-                    : () => {
-                        restore('gloss');
-                        focusGlossary();
-                      }
-                }
+    <AppShell
+      mode="game"
+      started={!!state}
+      docked={docked}
+      onRestore={restore}
+      onShowGlossary={
+        phone
+          ? undefined
+          : () => {
+              restore('gloss');
+              focusGlossary();
+            }
+      }
+      offered={offered}
+      onOpen={(s) => open(s.id, s.params)}
+      busy={busy}
+      error={error}
+      onRetry={retryable ? () => retry(resume) : undefined}
+      stopped={stopped}
+      onContinue={resume}
+      header={
+        <>
+          {state && table && (
+            <div class="header-status">
+              <dl class="game-status">
+                {/* A random seed is hidden until the game ends: nothing to show before then. */}
+                {state.seed !== null && (
+                  <div>
+                    <dt>シード</dt>
+                    <dd>{state.seed}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt class="status-dt-obvious">対局</dt>
+                  <dd>{LENGTH_NAMES[state.length]}</dd>
+                </div>
+                <div>
+                  <dt>CPU</dt>
+                  <dd>{CPU_NAMES[state.cpu]}</dd>
+                </div>
+                <div>
+                  <dt class="status-dt-obvious">局</dt>
+                  <dd>
+                    {WIND_NAMES[state.round_wind]}
+                    {state.round_number}局 {state.honba}本場
+                  </dd>
+                </div>
+                <div>
+                  <dt>自風</dt>
+                  <dd>{me && WIND_NAMES[me.wind]}</dd>
+                </div>
+              </dl>
+              <DoraStatus
+                doraIndicators={table.dora_indicators}
+                dora={table.dora}
+                uraDoraIndicators={table.ura_dora_indicators}
+                uraDora={table.ura_dora}
               />
+              {!phone && speedOption}
+              {!phone && adviceOption}
+              <button
+                ref={toggleRef}
+                type="button"
+                class="options-toggle"
+                aria-expanded={optionsOpen}
+                aria-controls="new-game-options"
+                onClick={() => setOptionsOpen((open) => !open)}
+              >
+                設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
+              </button>
             </div>
-            {state && table && (
-              <div class="header-status">
-                <dl class="game-status">
-                  {/* A random seed is hidden until the game ends: nothing to show before then. */}
-                  {state.seed !== null && (
-                    <div>
-                      <dt>シード</dt>
-                      <dd>{state.seed}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt class="status-dt-obvious">対局</dt>
-                    <dd>{LENGTH_NAMES[state.length]}</dd>
-                  </div>
-                  <div>
-                    <dt>CPU</dt>
-                    <dd>{CPU_NAMES[state.cpu]}</dd>
-                  </div>
-                  <div>
-                    <dt class="status-dt-obvious">局</dt>
-                    <dd>
-                      {WIND_NAMES[state.round_wind]}
-                      {state.round_number}局 {state.honba}本場
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>自風</dt>
-                    <dd>{me && WIND_NAMES[me.wind]}</dd>
-                  </div>
-                </dl>
-                <DoraStatus
-                  doraIndicators={table.dora_indicators}
-                  dora={table.dora}
-                  uraDoraIndicators={table.ura_dora_indicators}
-                  uraDora={table.ura_dora}
-                />
-                {!phone && speedOption}
-                {!phone && adviceOption}
-                <button
-                  ref={toggleRef}
-                  type="button"
-                  class="options-toggle"
-                  aria-expanded={optionsOpen}
-                  aria-controls="new-game-options"
-                  onClick={() => setOptionsOpen((open) => !open)}
-                >
-                  設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
-                </button>
-              </div>
-            )}
-            {/* After the status, so that on a phone Tab goes from 設定 into
-                the options it opens; a desktop shows them on the first row
-                (style.css). */}
-            <form
-              id="new-game-options"
-              class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
-              ref={formRef}
-              onSubmit={handleNewGame}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && state && optionsOpen) {
-                  e.preventDefault();
-                  setOptionsOpen(false);
-                  toggleRef.current?.focus();
-                }
-              }}
-            >
-              <label>
-                対局
-                <select value={optionsInput.length} onChange={setOption('length')}>
-                  <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-                  <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-                </select>
-              </label>
-              <label>
-                起家
-                <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-                  <option value="random">{DEALER_NAMES.random}</option>
-                  <option value="you">{DEALER_NAMES.you}</option>
-                </select>
-              </label>
-              <label>
-                CPU
-                <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-                  <option value="weak">{CPU_NAMES.weak}</option>
-                  <option value="normal">{CPU_NAMES.normal}</option>
-                </select>
-              </label>
-              <label>
-                シード
-                <input
-                  type="number"
-                  value={seedInput}
-                  placeholder="ランダム"
-                  onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-                />
-              </label>
-              {phone && speedOption}
-              {phone && adviceOption}
-              <button type="submit" disabled={busy}>新規対局</button>
-            </form>
-          </header>
-          {/* 再試行 only for an engine failure: a refused request would fail again. */}
-          {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
-          <SaveFailedNotice />
-          {!state && offered.length > 0 && (
-            <ResumePanel noun="対局" newLabel="新規対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
-          {!state && !error && offered.length === 0 && (
-            <EngineLoading />
-          )}
-        </div>
-        {state && me && table && (
+          {/* After the status, so that on a phone Tab goes from 設定 into
+              the options it opens; a desktop shows them on the first row
+              (style.css). */}
+          <form
+            id="new-game-options"
+            class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
+            ref={formRef}
+            onSubmit={handleNewGame}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && state && optionsOpen) {
+                e.preventDefault();
+                setOptionsOpen(false);
+                toggleRef.current?.focus();
+              }
+            }}
+          >
+            <label>
+              対局
+              <select value={optionsInput.length} onChange={setOption('length')}>
+                <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+                <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+              </select>
+            </label>
+            <label>
+              起家
+              <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+                <option value="random">{DEALER_NAMES.random}</option>
+                <option value="you">{DEALER_NAMES.you}</option>
+              </select>
+            </label>
+            <label>
+              CPU
+              <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+                <option value="weak">{CPU_NAMES.weak}</option>
+                <option value="normal">{CPU_NAMES.normal}</option>
+              </select>
+            </label>
+            <label>
+              シード
+              <input
+                type="number"
+                value={seedInput}
+                placeholder="ランダム"
+                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+              />
+            </label>
+            {phone && speedOption}
+            {phone && adviceOption}
+            <button type="submit" disabled={busy}>新規対局</button>
+          </form>
+        </>
+      }
+      main={
+        state && me && table && (
           <>
             <div class="area-hand">
               <GameTable
@@ -526,8 +507,9 @@ export function GameApp() {
               </div>
             )}
           </>
-        )}
-      </div>
+        )
+      }
+    >
       {state && (
         <SidePanels
           analysis={state.analysis}
@@ -555,15 +537,7 @@ export function GameApp() {
           }
         />
       )}
-      {state && (
-        <Dock
-          items={docked}
-          onRestore={(k) => restore(k as PanelKey)}
-        />
-      )}
-      {/* 「このタブで続ける」 takes the game back, from where the other tab left it. */}
-      {stopped && <TabStopped busy={busy} onContinue={resume} />}
-    </div>
+    </AppShell>
   );
 }
 
