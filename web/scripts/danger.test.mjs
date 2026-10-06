@@ -38,6 +38,8 @@ test('dangerMarks with several seats shows the highest level and each seat\'s ow
   assert.equal(marks['1m'].className, 'tile-danger tile-danger-1');
   assert.equal(marks['1m'].text, '危険度 低（下家 安・対面 低）');
   assert.equal(marks['2m'].text, '危険度 中（下家 中・対面 安）');
+  // A seat with no level for a tile counts as high danger.
+  assert.equal(marks['3m'].text, '危険度 危（下家 危・対面 危）');
   // Keys follow the first seat's tiles; labels follow you.
   assert.equal(dangerMarks(two, 1)['1m'].text, '危険度 低（自分 安・下家 低）');
 });

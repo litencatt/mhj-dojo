@@ -60,16 +60,32 @@ test('query matches name, key and reading; hiragana matches katakana', () => {
   assert.deepEqual(keys({ query: 'たんやお' }), ['tanyao']);
   assert.deepEqual(keys({ query: 'PINFU' }), ['pinfu']);
   assert.deepEqual(keys({ query: '三色' }), ['sanshoku']);
+  // Readings only: neither the name nor the key contains these.
+  assert.deepEqual(keys({ query: 'こくし' }), ['kokushi']);
+  assert.deepEqual(keys({ query: 'さんしょく' }), ['sanshoku']);
   assert.deepEqual(keys({ query: 'ちーといつ' }), []);
   assert.deepEqual(keys({ query: '  ' }), keys({}));
 });
 
-test('sort by shanten puts impossible last and breaks ties by ukeire', () => {
+// Listed in the default order: a/b tie on shanten, b/c/d on ukeire, c/d on both, e/f on shanten.
+const tieRows = [
+  row('a', 'A', 1, 1, 10),
+  row('b', 'B', 1, 1, 20),
+  row('c', 'C', 1, 2, 20),
+  row('d', 'D', 1, 2, 20),
+  row('e', 'E', 1, null, 0),
+  row('f', 'F', 1, null, 5),
+];
+const sorted = (sort) => applyYakuFilter(tieRows, { ...DEFAULT_FILTER, sort }).keys;
+
+test('sort by shanten puts impossible last, then ukeire, then the default order', () => {
   assert.deepEqual(keys({ sort: 'shanten' }), ['tanyao', 'pinfu', 'sanshoku', 'kokushi', 'chinitsu']);
+  assert.deepEqual(sorted('shanten'), ['b', 'a', 'c', 'd', 'f', 'e']);
 });
 
-test('sort by ukeire breaks ties by shanten', () => {
+test('sort by ukeire puts the most tiles first, then shanten, then the default order', () => {
   assert.deepEqual(keys({ sort: 'ukeire' }), ['pinfu', 'tanyao', 'sanshoku', 'kokushi', 'chinitsu']);
+  assert.deepEqual(sorted('ukeire'), ['b', 'c', 'd', 'a', 'f', 'e']);
 });
 
 test('isDefaultFilter ignores blank queries and category order', () => {

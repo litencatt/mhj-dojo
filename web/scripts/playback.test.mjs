@@ -113,6 +113,8 @@ test('playbackState: at the end it is the state itself; before, the table is rew
   finalSeats[1].points = 24000;
   finalSeats[1].riichi = true;
   finalSeats[1].river[0].riichi = true;
+  finalSeats[3].hand = ['1p'];
+  finalSeats[3].drawn = '2p';
   const riichiEvents = [ev(1, 'riichi', { tile: '5p', wall_remaining: 41 }), ...events.slice(1)];
   const b = buildPlayback(finalSeats, riichiEvents);
   const state = {
@@ -141,6 +143,8 @@ test('playbackState: at the end it is the state itself; before, the table is rew
   assert.equal(s0.seats[2].hand_count, 13);
   assert.deepEqual(s0.seats[0].hand, ['1m']); // yours stays
   assert.equal('hand' in s0.seats[3], false);
+  assert.equal('drawn' in s0.seats[3], false);
+  assert.deepEqual(finalSeats[3].hand, ['1p']); // input untouched
   const s2 = playbackState(state, b, 2);
   assert.equal(s2.wall_remaining, 40); // the second event's
   assert.equal(s2.seats[2].hand_count, 10 + 1); // 13 - 3 for the pon, +1 just called
@@ -158,13 +162,14 @@ test('playbackState hides kan dora not yet turned and holds back a round result'
     you: 0, first_dealer: 0, seats: finalSeats, events, events_wall_remaining: 60, wall_remaining: 50, deposit: 0,
     dora_indicators: ['1m', '9p'], dora: ['2m', '1p'], ura_dora_indicators: [], ura_dora: [],
     standings: standings(),
-    result: { winner: 0, deltas: [3000, -3000, 0, 0], stick_deltas: [0, 0, 0, 0] },
+    result: { winner: 0, deltas: [3000, -3000, 0, 0], stick_deltas: [1000, 0, 0, 0] },
   };
   const s1 = playbackState(state, build, 1);
   assert.deepEqual(s1.dora_indicators, ['1m']);
   assert.deepEqual(s1.dora, ['2m']);
   assert.equal(s1.seats[0].points, 25000);
   assert.equal(s1.seats[1].points, 25000);
+  assert.equal(s1.deposit, 1000); // the sticks the winner takes are still on the table
 });
 
 afterEach(() => {

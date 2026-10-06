@@ -3,6 +3,9 @@
 // when it loads, so they are stubbed first and it is imported after. The
 // BroadcastChannel is a fake (a real one would keep Node alive) that records
 // what the module posts and lets a test deliver another tab's message.
+// The module's state (the held key, the record) carries from one test to the
+// next, so the tests depend on running in this order; each starts with a claim
+// of a key of its own.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -48,7 +51,7 @@ test('claiming a key records it, announces it and notifies listeners', () => {
   off();
 });
 
-test('lease: 0 for a key not held, a token for the held key, null once stopped', async () => {
+test('lease: 0 for a key not held, a token for the held key, 0 once released', async () => {
   claim('/api/b');
   assert.equal(lease('/api/other'), 0);
   const l = lease('/api/b');
@@ -89,17 +92,21 @@ test('claiming again after being stopped takes the key back and invalidates old 
 test('an older claim of the held key is answered with this tab\'s own claim', () => {
   claim('/api/f');
   const mine = posted.at(-1);
+  const n = posted.length;
   receive({ key: '/api/f', tab: 'older-tab', at: mine.at - 5 });
   assert.equal(isStopped(), false);
+  assert.equal(posted.length, n + 1);
   assert.deepEqual(posted.at(-1), { key: '/api/f', tab: mine.tab, at: mine.at });
 });
 
 test('claims for other keys, and echoes of this tab\'s own, are ignored', () => {
   claim('/api/g');
   const mine = posted.at(-1);
+  const n = posted.length;
   receive({ key: '/api/else', tab: 'other-tab', at: mine.at + 10 });
   receive({ key: '/api/g', tab: mine.tab, at: mine.at + 10 });
   assert.equal(isStopped(), false);
+  assert.equal(posted.length, n); // neither stopped this tab nor was answered
 });
 
 test('a newer record in localStorage stops a tab that missed the message', () => {
@@ -132,7 +139,7 @@ test('an ack of a stopped tab settles the claim at once', async () => {
   const done = settled('/api/j');
   receive({ key: '/api/j', tab: 'other-tab', at: 1, stopped: true });
   await done;
-  assert.ok(Date.now() - started < 90);
+  assert.ok(Date.now() - started < 50);
   assert.equal(await settled('/api/unclaimed'), undefined);
 });
 
