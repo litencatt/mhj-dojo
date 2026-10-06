@@ -59,6 +59,7 @@ test('the advice lists each candidate with its danger against a riichi', async (
     await playOneStep(page);
     await waitForPlayback(page);
   }
+  expect(await hand.locator('.tile-danger').count()).toBeGreaterThan(0);
   await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
   const panel = page.getByRole('region', { name: 'アドバイス' });
   const candidates = panel.getByRole('list', { name: 'おすすめの打牌' }).getByRole('listitem');

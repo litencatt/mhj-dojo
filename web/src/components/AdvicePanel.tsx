@@ -3,6 +3,7 @@ import type { Advice, AdviceCandidate, AdvicePhase, DangerLevel, DiscardReview, 
 import { PanelHeading } from './PanelHeading';
 import { Tile, mouseOnly } from './Tile';
 import { tileName } from '../tiles';
+import { DANGER_NAMES, dangerLevel } from '../danger';
 
 export interface AdvicePanelProps {
   advice: Advice | null; // null unless a discard is pending
@@ -12,15 +13,6 @@ export interface AdvicePanelProps {
   minimized?: boolean; // in the dock: nothing is drawn
   game?: boolean; // a CPU game: advice for a concealed hand only, and no defense
   danger?: SeatDanger[]; // a CPU game, on your turn against a riichi: shown beside each candidate
-}
-
-// The badge's letter, also used in its text.
-export const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
-
-/** A tile's highest danger level over the riichi seats, or null with none. */
-function dangerLevel(danger: SeatDanger[] | undefined, tile: string): DangerLevel | null {
-  if (!danger?.length) return null;
-  return Math.max(...danger.map((d) => d.tiles[tile] ?? 3)) as DangerLevel;
 }
 
 const PHASE_LABELS: Record<AdvicePhase, string> = { early: '序盤', middle: '中盤', late: '終盤' };
@@ -101,7 +93,9 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
               })}
             </ol>
             {bestLevel !== null && bestLevel >= 2 && (
-              <p class="advice-danger-note">最善の打牌は危険度「{DANGER_NAMES[bestLevel]}」です。リーチ者に通りにくい牌です。</p>
+              <p class="advice-danger-note">
+                {bestLevel === 3 ? '最善の打牌はリーチ者に危険な牌です。押すかどうか考えましょう。' : '最善の打牌はリーチ者に通るとは限りません。'}
+              </p>
             )}
             <dl class="advice-outlook">
               <div>
@@ -144,7 +138,7 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
               </div>
             )}
             <p class="advice-caveat">
-              確率はツモ数と見えていない牌からの目安です。{game && '順位は他家の手（危険度）を考えません。危険度はリーチ者に対する目安です。'}
+              確率はツモ数と見えていない牌からの目安です。{game && `順位は他家の手（危険度）を考えません。${danger?.length ? '危険度はリーチ者に対する目安です。' : ''}`}
             </p>
           </>
         ) : (

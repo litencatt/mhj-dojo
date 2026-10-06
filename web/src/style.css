@@ -559,7 +559,7 @@ h2 {
   border: 1px solid var(--border);
 }
 .advice-danger-2 {
-  background: var(--row-best-bg);
+  background: var(--panel-bg);
   color: var(--group-taatsu);
   border: 1px solid var(--group-taatsu);
 }

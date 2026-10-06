@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
-import { AdvicePanel, DANGER_NAMES } from './components/AdvicePanel';
+import { AdvicePanel } from './components/AdvicePanel';
+import { DANGER_NAMES, dangerLevel } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -58,7 +59,7 @@ const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
   const out: Record<TileT, { className: string; text: string }> = {};
   for (const t of Object.keys(danger[0]?.tiles ?? {})) {
-    const level = Math.max(...danger.map((d) => d.tiles[t] ?? 3)) as DangerLevel;
+    const level = dangerLevel(danger, t) as DangerLevel;
     const each = danger
       .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
       .join('・');
