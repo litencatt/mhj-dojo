@@ -24,6 +24,9 @@ export interface HandProps {
   river?: ComponentChildren;
   acting?: boolean; // game mode: your turn, marked as your seat's box marks it
   highlight?: string | null; // tiles to mark (exact string), e.g. a hovered advice candidate
+  // Game mode: a mark per tile (exact string), e.g. its danger against a
+  // riichi: a class for the badge and the text it stands for.
+  marks?: Record<string, { className: string; text: string }>;
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
@@ -79,8 +82,9 @@ type Pick = number | 'drawn';
  * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
-  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, onDiscard, onPreview } = props;
-  const mark = (t: string) => (highlight && t === highlight ? 'tile-advice' : undefined);
+  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, marks, onDiscard, onPreview } = props;
+  const mark = (t: string) => classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className);
+  const label = (t: string) => (marks?.[t] ? `${tileName(t)}、${marks[t].text}` : undefined);
   const can = (t: string, isDrawn: boolean) => !disabled && (isDrawn || !onlyDrawn) && (!allowed || allowed.includes(t));
   const [showGroups, setShowGroups] = useHandGroupsToggle();
   const layout = useMemo(() => (showGroups ? validGroups(hand, groups) : null), [showGroups, hand, groups]);
@@ -190,6 +194,8 @@ export function Hand(props: HandProps) {
         interactive={ok}
         dimmed={!disabled && !ok}
         className={classes(mark(t), pickClass(pos, t))}
+        label={label(t)}
+        title={marks?.[t]?.text}
         onClick={(e) => {
           if (!tapToDiscard(e, pos, t)) return;
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
@@ -256,6 +262,8 @@ export function Hand(props: HandProps) {
               interactive={can(drawn, true)}
               dimmed={!disabled && !can(drawn, true)}
               className={classes(mark(drawn), pickClass('drawn', drawn))}
+              label={label(drawn)}
+              title={marks?.[drawn]?.text}
               onClick={(e) => {
                 if (!tapToDiscard(e, 'drawn', drawn)) return;
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');

@@ -645,6 +645,23 @@ func withMelds(ts []shanten.Target, melds []yaku.Meld) []shanten.Target {
 	return out
 }
 
+// TargetsWith returns the target family of the 4-meld row key with melds as
+// fixed groups, as AnalyzeWith uses it, for a caller with its own engine
+// (the computer player): a hand's distance to it is that of its concealed
+// tiles plus WithMeldTiles. It is nil for a row that is not a target family
+// or that no hand with these melds satisfies.
+func TargetsWith(key string, melds []yaku.Meld) []shanten.Target {
+	return withMelds(targets[key], melds)
+}
+
+// WithMeldTiles returns c with the tiles of melds added.
+func WithMeldTiles(c tile.Counts, melds []yaku.Meld) tile.Counts {
+	for _, m := range melds {
+		addMeld(&c, m)
+	}
+	return c
+}
+
 // Row computes a single row by key (for tests and tools).
 func (a *Analyzer) Row(c tile.Counts, key string) Result {
 	for _, r := range a.Analyze(c) {
@@ -670,10 +687,11 @@ func fromShanten(s shanten.Result) Result {
 	return Result{Possible: true, Shanten: s.Shanten, Ukeire: s.Ukeire}
 }
 
-// dist returns the minimum distance over a target family and the evals
-// achieving it. The distances come from the shared fold cache (comboDist);
-// only the members at the minimum get a full Eval, for their ukeire.
-func (a *Analyzer) dist(c *tile.Counts, ts []shanten.Target) (int, []*shanten.Eval) {
+// dist returns the minimum distance over a target family and the indexes of
+// the members achieving it. The distances come from the shared fold cache
+// (comboDist); only the members at the minimum get a full Eval, for their
+// ukeire.
+func (a *Analyzer) dist(c *tile.Counts, ts []shanten.Target) (int, []int) {
 	dd := a.comboDist(c)
 	best := shanten.Inf
 	var idx []int
@@ -686,11 +704,7 @@ func (a *Analyzer) dist(c *tile.Counts, ts []shanten.Target) (int, []*shanten.Ev
 			idx = append(idx, i)
 		}
 	}
-	at := make([]*shanten.Eval, len(idx))
-	for j, i := range idx {
-		at[j] = a.eng.Evaluate(c, &ts[i])
-	}
-	return best, at
+	return best, idx
 }
 
 // target evaluates a family of targets.
@@ -709,14 +723,16 @@ func (a *Analyzer) family(c tile.Counts, ts []shanten.Target, hands [][]kindCoun
 	}
 	var set [tile.NumKinds]bool
 	if best <= hbest {
-		for _, ev := range at {
+		var ev shanten.Eval
+		for _, i := range at {
+			a.eng.EvaluateInto(&ev, &c, &ts[i])
 			ev.Ukeire(&set)
 		}
 	}
 	if hbest <= best {
 		// For an explicit hand W, the kinds lowering |W \ H| are W \ H itself.
 		for _, w := range hands {
-			if missing(&c, w) == hbest {
+			if missing(&c, w, hbest+1) == hbest {
 				for _, e := range w {
 					if e.n > c[e.k] {
 						set[e.k] = true
@@ -728,11 +744,14 @@ func (a *Analyzer) family(c tile.Counts, ts []shanten.Target, hands [][]kindCoun
 	return Result{Possible: true, Shanten: min(best, hbest) - 1, Ukeire: kindsOf(&set)}
 }
 
-// missing returns |W \ H| for an explicit hand W.
-func missing(c *tile.Counts, w []kindCount) int {
+// missing returns |W \ H| for an explicit hand W if it is below limit, and
+// limit or more otherwise (it stops counting there).
+func missing(c *tile.Counts, w []kindCount, limit int) int {
 	d := 0
 	for _, e := range w {
-		d += max(e.n-c[e.k], 0)
+		if d += max(e.n-c[e.k], 0); d >= limit {
+			break
+		}
 	}
 	return d
 }
@@ -740,7 +759,7 @@ func missing(c *tile.Counts, w []kindCount) int {
 func explicitDist(c *tile.Counts, hands [][]kindCount) int {
 	best := shanten.Inf
 	for _, w := range hands {
-		best = min(best, missing(c, w))
+		best = min(best, missing(c, w, best))
 	}
 	return best
 }

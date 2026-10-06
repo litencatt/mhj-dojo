@@ -101,6 +101,33 @@ export function useRiversShown() {
   return { shown, toggle };
 }
 
+const GAME_ADVICE_KEY = 'mhj-dojo.game-advice.v1';
+
+function loadGameAdvice(): boolean {
+  try {
+    return localStorage.getItem(GAME_ADVICE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Whether the CPU game offers the advice panel and marks the danger of your
+ * tiles against a riichi, kept in localStorage; on by default.
+ */
+export function useGameAdvice(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(loadGameAdvice);
+  const set = useCallback((next: boolean) => {
+    setOn(next);
+    try {
+      localStorage.setItem(GAME_ADVICE_KEY, next ? 'on' : 'off');
+    } catch {
+      // Storage unavailable: the choice just won't persist.
+    }
+  }, []);
+  return [on, set];
+}
+
 /**
  * In the one-column layout (up to 1100px wide, e.g. a phone) a restored panel
  * lands somewhere down the page: scroll it into view once it has rendered.

@@ -14,7 +14,8 @@ import (
 // alters what they deal, these fail here, quickly, instead of as a confusing
 // browser failure. The seeds are read from the specs, so they cannot drift.
 // To pick a new seed, loop the checks below over seeds until one passes, then
-// set SEED in web/e2e/helpers.ts (or CPU_DEALS in web/e2e/table.spec.ts).
+// set SEED in web/e2e/helpers.ts (or CPU_DEALS in web/e2e/table.spec.ts,
+// WON_ROUND in web/e2e/game.spec.ts).
 
 // tsConst reads `NAME = <int>` from a file under web/e2e.
 func tsConst(t *testing.T, file, name string) int {
@@ -79,6 +80,40 @@ func TestE2ESeedRound(t *testing.T) {
 	}
 	if st.Result == nil {
 		t.Errorf("seed %d (SEED): round not over after 150 moves; see the comment above tsConst", seed)
+	}
+}
+
+// WON_ROUND: the first round ends in a win within 150 moves, with more than
+// six tiles in the top seat's river (game.spec.ts, a phone fits the
+// revealed hands).
+func TestE2ESeedWonRound(t *testing.T) {
+	seed := tsConst(t, "game.spec.ts", "WON_ROUND")
+	c := newClient(t, session.NewStore(256))
+	st, path := newE2EGame(c, seed, "random")
+	for i := 0; i < 150 && st.Result == nil; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	switch {
+	case st.Result == nil:
+		t.Errorf("seed %d (WON_ROUND): round not over after 150 moves; see the comment above tsConst", seed)
+	case st.Result.Kind != "tsumo" && st.Result.Kind != "ron":
+		t.Errorf("seed %d (WON_ROUND): round ended in %s, want a win; see the comment above tsConst", seed, st.Result.Kind)
+	case len(st.Seats[2].River) <= 6:
+		t.Errorf("seed %d (WON_ROUND): %d tiles in the top seat's river, want more than 6; see the comment above tsConst", seed, len(st.Seats[2].River))
+	}
+}
+
+// RIICHI_SEED: a CPU declares riichi within 3 of your tsumogiri moves, so
+// the danger marks show on your turn (game-advice.spec.ts).
+func TestE2ESeedCPURiichi(t *testing.T) {
+	seed := tsConst(t, "game-advice.spec.ts", "RIICHI_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newE2EGame(c, seed, "random")
+	for i := 0; i < 3 && st.Result == nil && len(st.Danger) == 0; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if len(st.Danger) == 0 {
+		t.Errorf("seed %d (RIICHI_SEED): no CPU riichi on your turn within 3 moves; see the comment above tsConst", seed)
 	}
 }
 

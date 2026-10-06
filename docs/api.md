@@ -456,7 +456,7 @@ These clarify points the contract above leaves open; none changes the JSON shape
   (an exhausted node has one); both are `null` with `advice=0`. Like `by_discard`, the full advice and the combos are kept only for the current node (see Memory);
   each node keeps just its small review. Computing the advice takes ~2 ms per discard along the advice's
   best line (`internal/session/advice_test.go`'s `TestPracticeActionP95` plays whole games along the advice:
-  discard p95 ~20 ms including the rest of the state), which `advice=0` saves.
+  discard p95 ~10 ms including the rest of the state), which `advice=0` saves.
 - **A session's tree** holds at most 2000 nodes; a discard that would add another returns `422`.
 - **`win`** lists the reading with the most han, then the most fu. The fu tie-break can pick, for
   example, 三暗刻 (40 fu) over 平和+一盃口 (20 fu) when both are the same han; `han_total` is the same.
@@ -613,10 +613,17 @@ dealer); the score is (points − 30000) / 1000 + uma (+20 / +10 / −10 / −20
 + oka (+20 to first), and sticks left at the end go to first place.
 
 CPU players (`cpu`): `"normal"` (普通) takes every win, declares riichi when
-tenpai, calls when the hand keeps a yaku (a value triplet, or tanyao), makes
-a concealed or added kan when it does not set the hand back, discards for tile
-efficiency (lowest shanten, then most unseen accepting tiles) and folds
-against a riichi when two or more steps from tenpai. `"weak"` (弱い) also
+tenpai unless every tile of its wait is in sight (it then breaks the wait
+for a one-step-back hand with tiles left, if any), calls when the hand keeps a
+yaku (a value triplet, tanyao, or within two steps of tenpai honitsu, toitoi
+or a value pair made a triplet later), makes a concealed or added kan when it
+does not set the hand back, discards for tile efficiency (lowest shanten,
+then most unseen accepting tiles; an open hand first toward its yaku) and
+folds against a riichi when two or more steps from tenpai, or one step
+against two riichi or with a cheap hand (no dora, not the dealer). Folding,
+it discards the safest tile: tiles the riichi seat discarded or let pass
+after its riichi, then suji and kabe (no-chance) tiles and seen honors.
+`"weak"` (弱い) also
 takes every win and declares riichi when tenpai, but never calls or declares
 a kan, never folds, and on about every other discard picks any discard that
 keeps the lowest shanten instead of the most efficient one. That pick is a
@@ -765,6 +772,9 @@ under the 64 KiB body limit.
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
   "remaining": { "1m": 3, "...": 4 },  // unseen copies of every tile kind, for the ukeire lists (see YakuRow)
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
+  "advice": Advice,             // on your turn with a drawn tile and a concealed hand (no calls or kans), not in riichi, no tsumo offered; else null
+  "danger": [ {"seat": 2, "tiles": {"5p": 3, "1z": 0}} ],  // on your turn: each other seat in riichi, rating every tile you hold
+                                // (hand and drawn): 0 safe, 1 low, 2 medium, 3 high; [] otherwise
   "result": null                // Result once ended
 }
 ```
@@ -772,6 +782,21 @@ under the 64 KiB body limit.
 The wind rows of `analysis` are `役牌 東（場風・自風）` (2 han) when you are
 East, otherwise the round wind row then your seat wind row (1 han each).
 `remaining` counts every river and the dora indicators as visible.
+
+`advice` is the practice [Advice](#advice) for the discard: it ranks the
+14 concealed tiles for speed only (no defense), so it is left out once you
+have called or declared a kan, whose hands it does not model, in riichi, and
+when you can tsumo.
+`junme` is your discards so far + 1, and `draws_left` your draws left: a
+quarter of `wall_remaining`, rounded down (ignoring calls). `danger` is the
+CPU's own folding judgment (`cpu.DangerLevel`) against that seat: 0 for
+genbutsu (a kind in that seat's own river, or one any seat discarded after its
+riichi) or an honor with all 4 visible, 1 for a number tile with no two-sided
+wait left on it (suji, or no-chance: all 4 of a tile of that wait in sight)
+or an honor with 2–3 visible, 2 for one of two two-sided waits ruled out or
+another honor, 3 for other terminals, 2/8 and middle tiles (the CPU's 0–9
+score `cpu.Danger`: 0, 1–3, 5–6, 7–9). Both are derived from the table, so saves and replays are
+unaffected.
 
 `Result`:
 
@@ -950,6 +975,15 @@ engine's memo), under the tables' ~8.8 MiB bound. At a turnover the dropped
 generation stays on the heap until the next GC, so for that moment a memo
 briefly holds three generations (~3.5 MiB more for the analyzer's tables):
 ordinary GC slack, not a lasting cost.
+
+A table that ukeire is read from also carries its rank masks (issue #197):
+32 more bytes, 112 for a table tracking triplets (sanankou). Filled from
+random hands, ~45% of the tables have them, and the analyzer's measured
+peak went from ~8.1 to ~8.6 MiB (with every table masked, the tables'
+bound would be ~1.7 MiB higher). Ukeire no longer builds a table per tile
+kind, so real play keeps fewer tables: `BenchmarkSessionMemory` went from
+~5.5 to ~3.5 MiB per session and `BenchmarkGameMemory` from ~8.3 to ~7.4
+MiB per game.
 
 The sizes come from counting cache misses (computed tables and folds) on
 real play, which unlike timings is deterministic: 8 practice sessions of
