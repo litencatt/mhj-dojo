@@ -1587,7 +1587,6 @@ section {
   font-weight: bold;
 }
 .table-remaining {
-  margin-left: 8px;
   font-weight: normal;
   color: var(--muted);
 }

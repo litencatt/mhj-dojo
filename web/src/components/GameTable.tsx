@@ -97,8 +97,8 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
       <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} riverId="river-top" />
       <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} riverId="river-left" />
       <div class="table-center">
+        {/* The round's name is in the header's status line, not repeated here. */}
         <div class="table-round">
-          {roundName(state.round_wind, state.round_number, state.honba)}
           <span class="table-remaining">残り {state.wall_remaining}</span>
           {/* Phones only (style.css): the other seats' rivers fold away. */}
           <button
