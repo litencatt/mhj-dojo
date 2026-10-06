@@ -119,6 +119,8 @@ type Legal struct {
 	Kan []string `json:"kan"`
 	// Redraw: may send the drawn tile back and draw again (dojo only).
 	Redraw bool `json:"redraw,omitempty"`
+	// Summon lists the kinds a summon may fetch from the live wall (dojo only).
+	Summon []string `json:"summon,omitempty"`
 }
 
 // Any reports whether seat has any move.
@@ -155,6 +157,7 @@ func (r *Round) LegalFor(seat int) Legal {
 	_, l.Tsumo = r.tsumoWin(seat)
 	l.Kyuushu = r.canKyuushu(seat)
 	l.Redraw = r.canRedraw(seat)
+	l.Summon = r.summonable(seat)
 	l.Kan = append(l.Kan, r.selfKans(seat)...)
 	return l
 }

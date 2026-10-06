@@ -207,7 +207,7 @@ func GameAction(m *match.Match, v match.View, body io.Reader) (match.State, erro
 		return match.State{}, err
 	}
 	switch req.Type {
-	case game.Discard, game.Riichi:
+	case game.Discard, game.Riichi, game.Summon:
 		if req.Tile == "" {
 			return match.State{}, Invalid("tile is required for " + string(req.Type))
 		}
@@ -219,7 +219,7 @@ func GameAction(m *match.Match, v match.View, body io.Reader) (match.State, erro
 	case match.ActionNext:
 		return m.NextView(v)
 	default:
-		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu, redraw or next")
+		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu, redraw, summon or next")
 	}
 	return m.ActView(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles}, v)
 }

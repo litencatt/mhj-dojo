@@ -4,6 +4,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/litencatt/mhj-dojo/internal/match"
@@ -146,10 +147,10 @@ func TestE2ESeedCPUDeals(t *testing.T) {
 const dojoE2EYaku = `["tanyao","pinfu","haku","hatsu","chun","ton","nan","shaa","pei","riichi"]`
 
 // newDojoGame creates a game as the dojo does (tonpuu, the weak CPU, a
-// random first dealer) with dojoE2EYaku and one redraw a round.
+// random first dealer) with dojoE2EYaku, one redraw and one summon a round.
 func newDojoGame(c *client, seed int) (match.State, string) {
 	st, _ := c.game("POST", "/api/games", `{"seed":`+strconv.Itoa(seed)+
-		`,"length":"tonpuu","cpu":"weak","dojo":{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1}}`)
+		`,"length":"tonpuu","cpu":"weak","dojo":{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1,"summons_per_round":1}}`)
 	return st, "/api/games/" + st.GameID + "/action"
 }
 
@@ -181,5 +182,24 @@ func TestE2ESeedDojoRedraw(t *testing.T) {
 	}
 	if st, _ = c.game("POST", path, `{"type":"redraw"}`); st.Legal.Redraw || st.Seats[0].Drawn == nil {
 		t.Errorf("seed %d (DOJO_REDRAW_SEED): after the redraw: redraw %v, drawn %v", seed, st.Legal.Redraw, st.Seats[0].Drawn)
+	}
+}
+
+// DOJO_SUMMON_SEED: a dojo game offers you a summon within 3 tsumogiri
+// moves, and the summon draws the kind asked for.
+func TestE2ESeedDojoSummon(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_SUMMON_SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newDojoGame(c, seed)
+	for i := 0; i < 3 && st.Result == nil && len(st.Legal.Summon) == 0; i++ {
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+	if len(st.Legal.Summon) == 0 {
+		t.Fatalf("seed %d (DOJO_SUMMON_SEED): no summon offered within 3 moves; see the comment above tsConst", seed)
+	}
+	kind := st.Legal.Summon[0]
+	st, _ = c.game("POST", path, `{"type":"summon","tile":"`+kind+`"}`)
+	if d := st.Seats[0].Drawn; len(st.Legal.Summon) > 0 || d == nil || strings.Replace(*d, "0", "5", 1) != kind {
+		t.Errorf("seed %d (DOJO_SUMMON_SEED): after summoning %s: summon %v, drawn %v", seed, kind, st.Legal.Summon, d)
 	}
 }

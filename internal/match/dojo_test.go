@@ -42,7 +42,7 @@ func dojoGame(t *testing.T, st *Store, seed int64, d DojoOptions) *Match {
 
 func TestDojoOptionsAreChecked(t *testing.T) {
 	st := NewStore(16)
-	for _, d := range []DojoOptions{{Yaku: []string{"riichi", "nope"}}, {RedrawsPerRound: -1}} {
+	for _, d := range []DojoOptions{{Yaku: []string{"riichi", "nope"}}, {RedrawsPerRound: -1}, {WallPeek: -1}, {SummonsPerRound: -1}} {
 		if _, err := st.Create(nil, Options{Dojo: &d}); !errors.Is(err, game.ErrInvalid) {
 			t.Errorf("%+v: %v", d, err)
 		}
@@ -63,10 +63,14 @@ func TestDojoFieldsOnlyInTheDojo(t *testing.T) {
 	}
 	_ = json.Unmarshal(b, &raw)
 	if strings.Contains(string(b), `"dojo"`) || strings.Contains(string(sv), `"dojo"`) ||
-		raw.Rounds[0]["han"] != nil || raw.Rounds[0]["redraws"] != nil || raw.Result["excluded"] != nil {
+		raw.Rounds[0]["han"] != nil || raw.Rounds[0]["redraws"] != nil || raw.Rounds[0]["summons"] != nil || raw.Result["excluded"] != nil {
 		t.Errorf("dojo fields in a standard game: %s", b)
 	}
 	d := dojoGame(t, st, seed, DojoOptions{Yaku: starter})
+	b, _ = json.Marshal(d.State())
+	if strings.Contains(string(b), `"my_next_draws"`) || strings.Contains(string(b), `"waits"`) || strings.Contains(string(b), `"summon"`) {
+		t.Errorf("cheats bought in a dojo game without them: %s", b)
+	}
 	if !d.State().Dojo || d.Save().Dojo == nil {
 		t.Error("a dojo game does not say so")
 	}
@@ -272,4 +276,177 @@ func TestDojoResultExcluded(t *testing.T) {
 		}
 	}
 	t.Fatal("no human win left a yaku out")
+}
+
+// The ura peek shows the ura-dora indicators during a round, the ones the
+// round's end reveals, and changes nothing else.
+func TestDojoUraPeek(t *testing.T) {
+	st := NewStore(16)
+	for seed := range int64(4) {
+		plain := dojoGame(t, st, seed, DojoOptions{Yaku: starter})
+		peek := dojoGame(t, st, seed, DojoOptions{Yaku: starter, UraPeek: true})
+		a, b := plain.State(), peek.State()
+		if len(a.UraDoraIndicators) != 0 || len(b.UraDoraIndicators) != 1 || len(b.UraDora) != 1 {
+			t.Fatalf("seed %d: ura %v without peek, %v %v with it", seed, a.UraDoraIndicators, b.UraDoraIndicators, b.UraDora)
+		}
+		if !reflect.DeepEqual(a.Remaining, b.Remaining) || !reflect.DeepEqual(a.Analysis, b.Analysis) {
+			t.Fatalf("seed %d: the ura peek changed what counts as seen", seed)
+		}
+		end := playOut(t, plain)
+		if len(end.UraDoraIndicators) == 0 || end.UraDoraIndicators[0] != b.UraDoraIndicators[0] {
+			t.Fatalf("seed %d: peeked %v, revealed %v", seed, b.UraDoraIndicators, end.UraDoraIndicators)
+		}
+	}
+}
+
+// The riichi waits peek shows the waits of each other seat in riichi, and
+// only theirs.
+func TestDojoRiichiWaits(t *testing.T) {
+	st := NewStore(64)
+	seen := 0
+	for seed := int64(0); seed < 20 && seen == 0; seed++ {
+		m := dojoGame(t, st, seed, DojoOptions{Yaku: starter, RiichiWaits: true})
+		plain := dojoGame(t, st, seed, DojoOptions{Yaku: starter})
+		s, riichi := m.State(), false
+		for steps := 0; s.Result == nil; steps++ {
+			if steps > 100 {
+				t.Fatal("round does not end")
+			}
+			for i, seat := range s.Seats {
+				var want []string
+				if i != Human && seat.Riichi {
+					for _, k := range m.game.Round.WaitsOf(i) {
+						want = append(want, k.String())
+					}
+					seen++
+					if len(want) == 0 {
+						t.Fatalf("seed %d: seat %d in riichi with no waits", seed, i)
+					}
+				}
+				if !slices.Equal(seat.Waits, want) {
+					t.Fatalf("seed %d: seat %d waits %v, want %v", seed, i, seat.Waits, want)
+				}
+			}
+			a := move(s, &riichi)
+			var err error
+			if s, err = m.Act(a); err != nil {
+				t.Fatal(err)
+			}
+			p, err := plain.Act(a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, seat := range p.Seats {
+				if seat.Waits != nil {
+					t.Fatalf("seed %d: waits %v without the peek", seed, seat.Waits)
+				}
+			}
+		}
+		for _, seat := range s.Seats {
+			if seat.Waits != nil {
+				t.Fatalf("seed %d: waits %v after the round", seed, seat.Waits)
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no CPU seat declared riichi")
+	}
+}
+
+// melds counts the called melds on the table.
+func melds(s State) int {
+	n := 0
+	for _, seat := range s.Seats {
+		n += len(seat.Melds)
+	}
+	return n
+}
+
+// The wall peek foretells your next draws: with no call or kan in between,
+// your next draw is the first of them.
+func TestDojoWallPeek(t *testing.T) {
+	st := NewStore(64)
+	checked := 0
+	for seed := range int64(6) {
+		m := dojoGame(t, st, seed, DojoOptions{Yaku: starter, WallPeek: 3})
+		s := m.State()
+		var foretold []string
+		calls := 0
+		for steps := 0; s.Result == nil; steps++ {
+			if steps > 100 {
+				t.Fatal("round does not end")
+			}
+			if len(s.MyNextDraws) > 3 || (s.WallRemaining >= 12 && len(s.MyNextDraws) != 3) {
+				t.Fatalf("seed %d: next draws %v with %d left", seed, s.MyNextDraws, s.WallRemaining)
+			}
+			if s.Phase == game.PhaseDiscard && s.Actor == Human && s.Seats[Human].Drawn != nil {
+				if foretold != nil && melds(s) == calls {
+					if *s.Seats[Human].Drawn != foretold[0] {
+						t.Fatalf("seed %d: drew %s, foretold %v", seed, *s.Seats[Human].Drawn, foretold)
+					}
+					checked++
+				}
+				foretold, calls = s.MyNextDraws, melds(s)
+			}
+			var err error
+			if s, err = m.Act(move(s, new(bool))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if s.MyNextDraws != nil {
+			t.Fatalf("seed %d: next draws %v after the round", seed, s.MyNextDraws)
+		}
+	}
+	if checked < 10 {
+		t.Fatalf("only %d draws checked", checked)
+	}
+}
+
+// A dojo game with summons: the summoned kind is drawn, the summary counts
+// the summons, CPUs are never offered one and the save restores the game.
+func TestDojoSummon(t *testing.T) {
+	st := NewStore(64)
+	summoned := 0
+	for seed := range int64(4) {
+		m := dojoGame(t, st, seed, DojoOptions{Yaku: starter, SummonsPerRound: 1})
+		s, riichi, n := m.State(), false, 0
+		for steps := 0; s.Result == nil; steps++ {
+			if steps > 100 {
+				t.Fatal("round does not end")
+			}
+			a := move(s, &riichi)
+			if len(s.Legal.Summon) > 0 {
+				kind := s.Legal.Summon[len(s.Legal.Summon)/2]
+				a = game.Action{Type: game.Summon, Tile: kind}
+				var err error
+				if s, err = m.Act(a); err != nil {
+					t.Fatal(err)
+				}
+				n++
+				if d := s.Seats[Human].Drawn; d == nil || strings.Replace(*d, "0", "5", 1) != kind {
+					t.Fatalf("seed %d: summoned %s, drew %v", seed, kind, d)
+				}
+				if s.Legal.Summon != nil {
+					t.Fatal("a second summon offered")
+				}
+				if e := s.Events[len(s.Events)-1]; e.Type != game.Summon || e.Tile != "" {
+					t.Fatalf("seed %d: event %+v", seed, e)
+				}
+				restored(t, st, m)
+				continue
+			}
+			var err error
+			if s, err = m.Act(a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if sum := s.Rounds[len(s.Rounds)-1]; sum.Summons != n {
+			t.Fatalf("seed %d: summary summons %d, made %d", seed, sum.Summons, n)
+		}
+		summoned += n
+		restored(t, st, m)
+	}
+	if summoned == 0 {
+		t.Fatal("no summon made")
+	}
 }

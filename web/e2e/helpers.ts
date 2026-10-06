@@ -293,6 +293,7 @@ export const SEED = 12;
 // offered), guarded by internal/apicall/e2e_seeds_test.go.
 export const DOJO_RIICHI_SEED = 162;
 export const DOJO_REDRAW_SEED = 1;
+export const DOJO_SUMMON_SEED = 1; // a summon offered within 3 tsumogiri moves (e2e_seeds_test.go)
 
 /**
  * Opens a dojo game (?mode=dojo&play=1) on a seed. The dojo's progress is

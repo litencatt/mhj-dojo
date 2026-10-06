@@ -169,6 +169,17 @@ func (w *Wall) Redrawn(k, last int) *Wall {
 	return &out
 }
 
+// Swapped returns a copy of the wall with four-player draws i and j
+// exchanged. The tile set is unchanged, so the copy is still a full wall.
+func (w *Wall) Swapped(i, j int) *Wall {
+	if i < 0 || j < 0 || i >= LiveDraws4 || j >= LiveDraws4 {
+		panic(fmt.Sprintf("wall: swap %d and %d out of range", i, j))
+	}
+	out := *w
+	out.tiles[Seats*HandSize+i], out.tiles[Seats*HandSize+j] = out.tiles[Seats*HandSize+j], out.tiles[Seats*HandSize+i]
+	return &out
+}
+
 // DoraIndicators returns the first dora indicator, the only one without kans.
 func (w *Wall) DoraIndicators() []tile.Tile { return w.DoraIndicatorsN(1) }
 

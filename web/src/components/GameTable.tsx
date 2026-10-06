@@ -29,6 +29,7 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
   chii: 'チー',
   kan: 'カン',
   redraw: '引き直し',
+  summon: '牌寄せ',
 };
 
 export interface GameTableProps {
@@ -175,6 +176,15 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
       {!you && seat.hand && (
         <div class="seat-hand" aria-label="手牌">
           {[...seat.hand, ...(seat.drawn ? [seat.drawn] : [])].map((t, i) => <Tile key={`${t}-${i}`} tile={t} size="xs" />)}
+        </div>
+      )}
+      {/* The dojo's リーチ者の待ち透視: the engine sends a riichi seat's waits only then. */}
+      {!you && !!seat.waits?.length && (
+        <div class="seat-waits" aria-label="待ち" data-testid="seat-waits">
+          <span aria-hidden="true">待ち</span>
+          {seat.waits.map((t) => (
+            <Tile key={t} tile={t} size="xs" />
+          ))}
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />

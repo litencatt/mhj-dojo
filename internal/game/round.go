@@ -71,6 +71,9 @@ const (
 	// Redraw sends the drawn tile to the end of the live wall and draws the
 	// next one instead (a dojo cheat; see SeatConfig.RedrawsPerRound).
 	Redraw ActionType = "redraw"
+	// Summon swaps the drawn tile with the next live-wall tile of the kind
+	// of Tile (a dojo cheat; see SeatConfig.SummonsPerRound).
+	Summon ActionType = "summon"
 )
 
 // Abortive draw reasons (Result.Reason when Kind is "abort").
@@ -189,6 +192,9 @@ type SeatConfig struct {
 	// RedrawsPerRound is how many Redraw moves each seat may make in a
 	// round (0: none).
 	RedrawsPerRound [4]int
+	// SummonsPerRound is how many Summon moves each seat may make in a
+	// round (0: none).
+	SummonsPerRound [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.
@@ -219,6 +225,7 @@ type Round struct {
 
 	seats   SeatConfig
 	redraws [4]int // Redraw moves made this round
+	summons [4]int // Summon moves made this round
 
 	log    []Action    // every applied action, for replay
 	events []Action    // the moves that happened, without skips and unused claims
@@ -409,6 +416,14 @@ func (r *Round) Apply(a Action) error {
 		a = Action{Seat: a.Seat, Type: Redraw}
 		r.redraw(a.Seat)
 		r.logEvent(a)
+	case r.phase == PhaseDiscard && a.Type == Summon:
+		if !slices.Contains(r.summonable(a.Seat), a.Tile) {
+			err = fmt.Errorf("%w: summon needs a live-wall draw after the first go-around, no riichi, a draw left, a summon left this round and a %q left in the live wall", ErrConflict, a.Tile)
+			break
+		}
+		a = Action{Seat: a.Seat, Type: Summon, Tile: a.Tile}
+		r.summon(a.Seat, a.Tile)
+		r.logEvent(Action{Seat: a.Seat, Type: Summon}) // the events do not tell the tile
 	case r.phase == PhaseDiscard && a.Type == Kyuushu:
 		if !r.canKyuushu(a.Seat) {
 			err = fmt.Errorf("%w: kyuushu needs the first uninterrupted turn and nine different terminals and honors", ErrConflict)
@@ -863,13 +878,81 @@ func (r *Round) firstGoAround(seat int) bool {
 	return len(r.players[seat].river) == 0
 }
 
-// canRedraw reports whether seat may redraw: its own turn on a live-wall
-// draw (not a kan replacement) after the first go-around, not in riichi, with
-// a draw left to take and a redraw left this round.
-func (r *Round) canRedraw(seat int) bool {
+// canCheat reports whether seat may redraw or summon, uses left aside: its
+// own turn on a live-wall draw (not a kan replacement) after the first
+// go-around, not in riichi, with a draw left to take.
+func (r *Round) canCheat(seat int) bool {
 	p := &r.players[seat]
 	return seat == r.turn && r.phase == PhaseDiscard && p.drawn != nil && !p.rinshan && !p.riichi &&
-		!r.firstGoAround(seat) && r.DrawsLeft() >= 1 && r.redraws[seat] < r.seats.RedrawsPerRound[seat]
+		!r.firstGoAround(seat) && r.DrawsLeft() >= 1
+}
+
+// canRedraw reports whether seat may redraw: canCheat with a redraw left
+// this round.
+func (r *Round) canRedraw(seat int) bool {
+	return r.canCheat(seat) && r.redraws[seat] < r.seats.RedrawsPerRound[seat]
+}
+
+// summonable returns the kinds seat may summon, in kind order: when
+// canCheat with a summon left this round, the kinds left in the live wall
+// after the next draw's position.
+func (r *Round) summonable(seat int) []string {
+	if !r.canCheat(seat) || r.summons[seat] >= r.seats.SummonsPerRound[seat] {
+		return nil
+	}
+	var in [tile.NumKinds]bool
+	for k := r.draws; k < wall.LiveDraws4-r.kans; k++ {
+		t, _ := r.wall.Draw4(k)
+		in[t.Kind] = true
+	}
+	var out []string
+	for k := tile.Kind(0); k < tile.NumKinds; k++ {
+		if in[k] {
+			out = append(out, k.String())
+		}
+	}
+	return out
+}
+
+// summon swaps seat's drawn tile with the first tile of kind s in the live
+// wall from the next draw on: the draws taken and left do not change.
+func (r *Round) summon(seat int, s string) {
+	k := r.draws
+	for ; ; k++ {
+		if t, _ := r.wall.Draw4(k); t.Kind.String() == s {
+			break
+		}
+	}
+	r.wall = r.wall.Swapped(r.draws-1, k)
+	t, _ := r.wall.Draw4(r.draws - 1)
+	r.players[seat].drawn = &t
+	r.summons[seat]++
+}
+
+// Summons returns how many times seat has summoned this round.
+func (r *Round) Summons(seat int) int { return r.summons[seat] }
+
+// UraIndicators returns the ura-dora indicators under the revealed dora
+// indicators, which only the dojo's ura peek shows before the round ends.
+func (r *Round) UraIndicators() []tile.Tile { return r.uraIndicators() }
+
+// WaitsOf returns the kinds that complete seat's hand, which only the dojo
+// shows for another seat (in riichi) before the round ends.
+func (r *Round) WaitsOf(seat int) []tile.Kind { return r.waits(seat) }
+
+// NextDraws returns up to n of seat's next live-wall draws, assuming no
+// calls or kans from now on: the next draw goes to the seat after the one
+// whose turn it is.
+func (r *Round) NextDraws(seat, n int) []tile.Tile {
+	var out []tile.Tile
+	if r.phase == PhaseEnded {
+		return out
+	}
+	for k := r.draws + (seat-r.turn+3)%4; k < wall.LiveDraws4-r.kans && len(out) < n; k += 4 {
+		t, _ := r.wall.Draw4(k)
+		out = append(out, t)
+	}
+	return out
 }
 
 // redraw rotates the drawn tile to the end of the live wall and gives seat

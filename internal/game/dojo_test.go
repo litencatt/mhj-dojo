@@ -283,3 +283,142 @@ func TestDojoRedrawAfterKan(t *testing.T) {
 		t.Fatalf("haitei drawn %v, want %s (draws left %d)", r.players[r.turn].drawn, old, r.DrawsLeft())
 	}
 }
+
+// liveKind returns the first kind in the live wall after the next draw
+// that differs from the drawn tile's, and its position.
+func liveKind(t *testing.T, r *Round) (string, int) {
+	t.Helper()
+	for k := r.draws; k < wall.LiveDraws4-r.kans; k++ {
+		if w, _ := r.wall.Draw4(k); w.Kind != r.players[r.turn].drawn.Kind {
+			return w.Kind.String(), k
+		}
+	}
+	t.Fatal("the live wall holds only the drawn kind")
+	return "", 0
+}
+
+func TestDojoSummon(t *testing.T) {
+	seats := SeatConfig{SummonsPerRound: [4]int{1}}
+	r := dojoRound(3, seats)
+	if r.LegalFor(0).Summon != nil || !errors.Is(r.Apply(Action{Seat: 0, Type: Summon, Tile: "1m"}), ErrConflict) {
+		t.Fatal("summon on the first go-around")
+	}
+	toSeat0Turn(t, r)
+	kind, at := liveKind(t, r)
+	if l := r.LegalFor(0); !slices.Contains(l.Summon, kind) || l.Redraw {
+		t.Fatalf("legal %+v, want a summon of %s and no redraw", l, kind)
+	}
+	// The summon takes the first tile of the kind from the next draw on.
+	first := at
+	for k := r.draws; k < at; k++ {
+		if w, _ := r.wall.Draw4(k); w.Kind.String() == kind {
+			first = k
+			break
+		}
+	}
+	p := &r.players[0]
+	old, hand, left, draws := *p.drawn, len(p.hand), r.DrawsLeft(), r.draws
+	want, _ := r.wall.Draw4(first)
+	logged, events := len(r.log), len(r.events)
+	mustApply(t, r, Action{Seat: 0, Type: Summon, Tile: kind})
+
+	if *p.drawn != want || len(p.hand) != hand || r.DrawsLeft() != left || r.draws != draws {
+		t.Fatalf("drawn %s (want %s), hand %d, draws left %d", p.drawn, want, len(p.hand), r.DrawsLeft())
+	}
+	if w, _ := r.wall.Draw4(first); w != old {
+		t.Fatalf("the drawn tile did not take the summoned one's place: %s", w)
+	}
+	if _, err := wall.FromTiles(r.Seed(), r.wall.Tiles()); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := inPlay(r), dealt(r); !mapsEqual(got, want) {
+		t.Fatalf("tiles in play %v, dealt %v", got, want)
+	}
+	if r.Summons(0) != 1 || !reflect.DeepEqual(r.log[logged:], []Action{{Seat: 0, Type: Summon, Tile: kind}}) ||
+		!reflect.DeepEqual(r.events[events:], []Action{{Seat: 0, Type: Summon}}) {
+		t.Fatalf("log %v, events %v", r.log[logged:], r.events[events:])
+	}
+	if r.LegalFor(0).Summon != nil || !errors.Is(r.Apply(Action{Seat: 0, Type: Summon, Tile: kind}), ErrConflict) {
+		t.Fatal("a second summon in the round")
+	}
+	// The summoned round replays from its log.
+	again := dojoRound(3, seats)
+	for _, a := range r.Log() {
+		mustApply(t, again, a)
+	}
+	if again.wall.Tiles() != r.wall.Tiles() || *again.players[0].drawn != *p.drawn {
+		t.Fatal("replay differs")
+	}
+}
+
+func TestDojoSummonConditions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  func(r *Round)
+	}{
+		{"riichi", func(r *Round) { r.players[0].riichi = true }},
+		{"rinshan", func(r *Round) { r.players[0].rinshan = true }},
+		{"no draw left", func(r *Round) { r.draws = wall.LiveDraws4 }},
+		{"no summons", func(r *Round) { r.seats.SummonsPerRound[0] = 0 }},
+	} {
+		r := dojoRound(3, SeatConfig{SummonsPerRound: [4]int{1}})
+		toSeat0Turn(t, r)
+		kind, _ := liveKind(t, r)
+		tc.set(r)
+		if r.LegalFor(0).Summon != nil || !errors.Is(r.Apply(Action{Seat: 0, Type: Summon, Tile: kind}), ErrConflict) {
+			t.Errorf("%s: summon allowed", tc.name)
+		}
+	}
+	// A kind no longer in the live wall cannot be summoned.
+	r := dojoRound(3, SeatConfig{SummonsPerRound: [4]int{1}})
+	toSeat0Turn(t, r)
+	gone := tile.Kind(0)
+	for ; gone < tile.NumKinds && slices.Contains(r.LegalFor(0).Summon, gone.String()); gone++ {
+	}
+	if gone == tile.NumKinds {
+		// Every kind is left: take one kind out of reach of the live wall.
+		r.kans, r.draws = 0, wall.LiveDraws4-1
+		w, _ := r.wall.Draw4(r.draws)
+		for gone = 0; gone == w.Kind; gone++ {
+		}
+	}
+	if slices.Contains(r.LegalFor(0).Summon, gone.String()) || !errors.Is(r.Apply(Action{Seat: 0, Type: Summon, Tile: gone.String()}), ErrConflict) {
+		t.Errorf("summoned %s, not in the live wall", gone)
+	}
+	if !errors.Is(r.Apply(Action{Seat: 0, Type: Summon, Tile: "x"}), ErrConflict) {
+		t.Error("summoned a malformed kind")
+	}
+}
+
+// NextDraws foretells seat 0's draws when nobody calls or makes a kan.
+func TestNextDraws(t *testing.T) {
+	for seed := range int64(4) {
+		r := dojoRound(seed, SeatConfig{})
+		var want, got []tile.Tile
+		from := -1 // the next draw when foretold
+		for steps := 0; r.Actor() >= 0; steps++ {
+			if steps == 9 {
+				want, from = r.NextDraws(0, 100), r.draws
+			}
+			seat := r.Actor()
+			a := Action{Seat: seat, Type: Skip}
+			if r.phase == PhaseDiscard {
+				if from >= 0 && seat == 0 && r.draws > from {
+					got = append(got, *r.players[0].drawn)
+				}
+				a = Action{Seat: seat, Type: Discard, Tile: r.players[seat].drawn.String()}
+			}
+			mustApply(t, r, a)
+		}
+		if len(got) == 0 || !slices.Equal(got, want[:len(got)]) || (r.Result().Kind == "draw" && len(got) != len(want)) {
+			t.Fatalf("seed %d: drew %v, foretold %v", seed, got, want)
+		}
+		if n := r.NextDraws(0, 3); len(n) != 0 {
+			t.Fatalf("seed %d: next draws %v after the round", seed, n)
+		}
+	}
+	r := dojoRound(1, SeatConfig{})
+	if n := r.NextDraws(0, 3); len(n) != 3 {
+		t.Fatalf("next draws %v, want 3", n)
+	}
+}

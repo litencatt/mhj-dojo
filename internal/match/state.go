@@ -37,10 +37,11 @@ type State struct {
 	Deposit           int                             `json:"deposit"`
 	DoraIndicators    []string                        `json:"dora_indicators"`
 	Dora              []string                        `json:"dora"`
-	UraDoraIndicators []string                        `json:"ura_dora_indicators"` // empty until the end
+	UraDoraIndicators []string                        `json:"ura_dora_indicators"` // empty until the end, unless the dojo's ura peek
 	UraDora           []string                        `json:"ura_dora"`
 	Seats             [4]Seat                         `json:"seats"`
-	LastDiscard       *string                         `json:"last_discard"` // the tile you may ron
+	MyNextDraws       []string                        `json:"my_next_draws,omitempty"` // dojo wall peek only: your next draws (at most DojoOptions.WallPeek) if nobody calls or makes a kan
+	LastDiscard       *string                         `json:"last_discard"`            // the tile you may ron
 	Legal             game.Legal                      `json:"legal"`
 	Events            []Event                         `json:"events"`
 	EventsFrom        int                             `json:"events_from"`           // the round's index of events[0]
@@ -75,6 +76,9 @@ type Seat struct {
 	// HandGroups are the blocks of hand, for your seat only (docs/api.md).
 	HandGroups []apiview.HandGroup `json:"hand_groups,omitempty"`
 	Drawn      *string             `json:"drawn,omitempty"`
+	// Waits are the kinds a seat in riichi waits on: another seat during a
+	// dojo game with the riichi waits peek only.
+	Waits []string `json:"waits,omitempty"`
 }
 
 // SeatDanger is how dangerous each tile you hold is against one riichi:
@@ -135,9 +139,11 @@ type RoundSummary struct {
 	From        int    `json:"from"`
 	Deltas      [4]int `json:"deltas"`
 	// Dojo games only: Han is the han of your win's yaku (no dora; 0 if you
-	// did not win), Redraws the redraws you made in the round.
+	// did not win), Redraws and Summons the redraws and summons you made in
+	// the round.
 	Han     int `json:"han,omitempty"`
 	Redraws int `json:"redraws,omitempty"`
+	Summons int `json:"summons,omitempty"`
 }
 
 // Result is how the round ended.
@@ -214,9 +220,18 @@ func (m *Match) state(view View) State {
 	for s, sd := range h.Standings() {
 		st.Standings[s] = Standing{Seat: sd.Seat, Rank: sd.Rank, Points: sd.Points, Score: sd.Score}
 	}
-	if v.UraIndicators != nil {
-		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
-		st.UraDora = apiview.DoraKinds(v.UraIndicators)
+	dojo := m.opts.Dojo
+	if ura := v.UraIndicators; ura != nil || (dojo != nil && dojo.UraPeek) {
+		if ura == nil {
+			ura = r.UraIndicators()
+		}
+		st.UraDoraIndicators = tile.Strings(ura)
+		st.UraDora = apiview.DoraKinds(ura)
+	}
+	if dojo != nil && dojo.WallPeek > 0 {
+		if next := r.NextDraws(Human, dojo.WallPeek); len(next) > 0 {
+			st.MyNextDraws = tile.Strings(next)
+		}
 	}
 	l := st.Legal
 	if v.LastDiscard != nil && (l.Ron || l.Pon || len(l.Chii) > 0 || len(l.Kan) > 0) {
@@ -244,7 +259,12 @@ func (m *Match) state(view View) State {
 			d := sv.Drawn.String()
 			seat.Drawn = &d
 		}
-		if s != Human && v.Phase != game.PhaseEnded && m.opts.Dojo != nil && m.opts.Dojo.Peek {
+		if s != Human && v.Phase != game.PhaseEnded && dojo != nil && dojo.RiichiWaits && sv.Riichi {
+			for _, k := range r.WaitsOf(s) {
+				seat.Waits = append(seat.Waits, k.String())
+			}
+		}
+		if s != Human && v.Phase != game.PhaseEnded && dojo != nil && dojo.Peek {
 			// The dojo's peek shows the hands; what the analysis counts as
 			// seen (remaining, danger) still comes from v alone.
 			hand, drawn := r.Concealed(s)
@@ -506,6 +526,7 @@ func (m *Match) summary() *RoundSummary {
 	}
 	if m.opts.Dojo != nil {
 		s.Redraws = m.game.Round.Redraws(Human)
+		s.Summons = m.game.Round.Summons(Human)
 		if res.Winner == Human && res.Win != nil {
 			for _, y := range res.Win.Yaku {
 				s.Han += y.Han

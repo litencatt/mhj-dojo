@@ -68,6 +68,15 @@ type DojoOptions struct {
 	// RedrawsPerRound is how many redraw moves the human may make in a
 	// round; 0 allows none.
 	RedrawsPerRound int `json:"redraws_per_round,omitempty"`
+	// UraPeek shows the ura-dora indicators during a round.
+	UraPeek bool `json:"ura_peek,omitempty"`
+	// RiichiWaits shows the waits of the other seats in riichi.
+	RiichiWaits bool `json:"riichi_waits,omitempty"`
+	// WallPeek is how many of the human's next draws to show; 0 shows none.
+	WallPeek int `json:"wall_peek,omitempty"`
+	// SummonsPerRound is how many summon moves the human may make in a
+	// round; 0 allows none.
+	SummonsPerRound int `json:"summons_per_round,omitempty"`
 }
 
 // clone copies d, its yaku included (nil stays nil).
@@ -131,7 +140,13 @@ func (o Options) normalize() (Options, game.Rules, error) {
 		if d.RedrawsPerRound < 0 {
 			return o, rules, fmt.Errorf("%w: dojo.redraws_per_round must not be negative", game.ErrInvalid)
 		}
-		o.Dojo = &DojoOptions{Yaku: slices.Clone(d.Yaku), Peek: d.Peek, RedrawsPerRound: d.RedrawsPerRound}
+		if d.WallPeek < 0 {
+			return o, rules, fmt.Errorf("%w: dojo.wall_peek must not be negative", game.ErrInvalid)
+		}
+		if d.SummonsPerRound < 0 {
+			return o, rules, fmt.Errorf("%w: dojo.summons_per_round must not be negative", game.ErrInvalid)
+		}
+		o.Dojo = d.clone()
 		if o.Dojo.Yaku == nil {
 			o.Dojo.Yaku = []string{}
 		}
@@ -149,6 +164,7 @@ func deal(seed int64, rules game.Rules, o Options) *game.Hanchan {
 	if d := o.Dojo; d != nil {
 		seats.Restrict[Human] = yaku.NewKeySet(d.Yaku...)
 		seats.RedrawsPerRound[Human] = d.RedrawsPerRound
+		seats.SummonsPerRound[Human] = d.SummonsPerRound
 	}
 	return game.NewHanchanWith(seed, rules, first, seats)
 }
