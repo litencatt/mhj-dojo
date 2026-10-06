@@ -105,6 +105,8 @@ test('a redraw is restored by a reload and costs its coins once, when the game e
   await finishDojoGame(page);
   const reward = page.getByTestId('dojo-reward');
   await expect(reward).toContainText('引き直し 1回 -20');
+  // The round of the redraw is marked: its win, if any, paid no 和了祝儀.
+  await expect(page.locator('.final-rounds tbody tr').first()).toContainText('イカサマ使用');
   const delta = Number(/雀銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
   const paid = await dojoProgress(page);
   expect(paid?.coins).toBe(200 + delta);
@@ -233,7 +235,7 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: '補助' })).toBeFocused();
-  await expect(panel.locator('[data-item^="assist:"]')).toHaveCount(6);
+  await expect(panel.locator('[data-item^="assist:"]')).toHaveCount(8);
   await page.keyboard.press('ArrowRight');
   await expect(panel.locator('[data-item^="cheat:"]')).toHaveCount(6);
 
@@ -490,4 +492,52 @@ test('a won round pays its 雀銭 as it ends, once, even after a reload', async 
   await waitForPlayback(page);
   await expect(page.getByTestId('dojo-round-reward')).toBeVisible();
   expect(await dojoProgress(page)).toEqual(paid);
+});
+
+test('半荘戦 and the normal CPU unlock with the level, and their game pays the rank x3', async ({ page }) => {
+  test.setTimeout(120_000);
+  await watchEngine(page);
+  const stored = (p: Partial<DojoProgress>) => JSON.stringify({ ...initialProgress(), firstGameBonus: true, ...p });
+  await page.addInitScript(
+    ([key, value]) => {
+      if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
+    },
+    [STORAGE_KEY, stored({ xp: 1000 })], // Lv5
+  );
+  await page.goto(`./?mode=dojo&seed=${SEED}`);
+  const hanchan = page.getByRole('radio', { name: /半荘戦/ });
+  const normal = page.getByRole('radio', { name: /普通/ });
+  await expect(page.getByRole('radio', { name: '東風戦' })).toBeChecked();
+  await expect(hanchan).toBeEnabled();
+  await expect(normal).toBeDisabled();
+  await expect(page.locator('label', { has: normal })).toContainText('Lv 7 で解禁');
+  await expect(page.getByTestId('dojo-multiplier')).toBeHidden();
+  await hanchan.check();
+  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘 ×2');
+  expect((await dojoProgress(page))?.gameLength).toBe('hanchan');
+
+  // Lv7: the normal CPU too; both pay the rank x3.
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, stored({ xp: 2100, gameLength: 'hanchan' })]);
+  await page.reload();
+  await expect(hanchan).toBeChecked();
+  await normal.check();
+  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×3');
+  expect((await dojoProgress(page))?.gameCpu).toBe('normal');
+
+  await page.getByRole('link', { name: '対局開始' }).click();
+  await expect(handPanel(page)).toBeVisible();
+  await finishDojoGame(page);
+  await expect(page.getByRole('heading', { name: '最終結果（半荘戦）' })).toBeVisible();
+  await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×3）/);
+});
+
+test('a backup without the game choice plays 東風戦 against weak CPUs, and 半荘戦 is locked below Lv5', async ({ page }) => {
+  const { gameLength: _l, gameCpu: _c, ...old } = initialProgress();
+  await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, JSON.stringify(old)]);
+  await page.goto('./?mode=dojo');
+  await expect(page.getByRole('radio', { name: '東風戦' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: /半荘戦/ })).toBeDisabled();
+  await expect(page.locator('label', { has: page.getByRole('radio', { name: /半荘戦/ }) })).toContainText('Lv 5 で解禁');
+  await expect(page.getByRole('radio', { name: '弱い' })).toBeChecked();
+  await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('title', '東風戦、CPU は弱い');
 });

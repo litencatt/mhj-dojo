@@ -15,6 +15,8 @@ import {
   XP_PER_HAN,
   findItem,
 } from './catalog.ts';
+import type { CpuLevel, GameLength } from '../api.ts';
+import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH, HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplier } from './rules.ts';
 
 export interface DojoProgress {
   version: 1;
@@ -29,6 +31,9 @@ export interface DojoProgress {
   // The rounds of an unfinished game (by its public id, the URL's game) whose won han were paid
   // as they ended; dropped when the game is settled. Data from before had none: {}.
   paidRounds: Record<string, number>;
+  // The game the hub starts, once unlocked (rules.ts). Data from before had neither: tonpuu, weak.
+  gameLength: GameLength;
+  gameCpu: CpuLevel;
 }
 
 export function initialProgress(): DojoProgress {
@@ -43,6 +48,8 @@ export function initialProgress(): DojoProgress {
     settled: [],
     firstGameBonus: false,
     paidRounds: {},
+    gameLength: DEFAULT_GAME_LENGTH,
+    gameCpu: DEFAULT_GAME_CPU,
   };
 }
 
@@ -80,16 +87,21 @@ export interface FinishedGame {
   game_over: boolean;
   standings: { seat: number; rank: number }[];
   rounds: RoundLite[];
+  length?: GameLength; // a game without them is a 東風戦 against weak CPUs
+  cpu?: CpuLevel;
 }
 
 export interface Reward {
   rank: number;
+  rankMultiplier: number; // of the rank's XP and coins: 半荘戦 x2, CPU 普通 x1.5 (rules.ts)
+  rankXp: number;
   xp: number; // the game's whole XP, the rounds' won han paid before included
   coins: number; // the game's whole coins, before the floor at 0: may be negative
   rankCoins: number;
   hanCoins: number; // the won han's, all rounds
   wins: number; // the rounds won with a counted yaku (han > 0)
-  winBonusCoins: number; // 和了祝儀: WIN_BONUS_COINS per win
+  winBonusCoins: number; // 和了祝儀: WIN_BONUS_COINS per win, but for the cheated wins
+  cheatedWins: number; // the wins of rounds with a redraw or a summon: no 和了祝儀
   paidCoins: number; // of hanCoins and winBonusCoins, paid as the rounds ended (paidXp likewise)
   paidXp: number;
   han: number;
@@ -112,9 +124,19 @@ export function sumWins(rounds: RoundLite[]): number {
   return rounds.filter((r) => (r.han ?? 0) > 0).length;
 }
 
+/** Whether the round had a redraw or a summon: its win pays no 和了祝儀. */
+export function cheated(r: RoundLite): boolean {
+  return (r.redraws ?? 0) > 0 || (r.summons ?? 0) > 0;
+}
+
+/** The wins that pay the 和了祝儀: those of rounds without a redraw or a summon. */
+function bonusWins(rounds: RoundLite[]): number {
+  return sumWins(rounds.filter((r) => !cheated(r)));
+}
+
 /** The coins won rounds pay: their han's and the 和了祝儀. */
 function winCoins(rounds: RoundLite[]): number {
-  return sumHan(rounds) * COINS_PER_HAN + sumWins(rounds) * WIN_BONUS_COINS;
+  return sumHan(rounds) * COINS_PER_HAN + bonusWins(rounds) * WIN_BONUS_COINS;
 }
 
 export function sumRedraws(rounds: RoundLite[]): number {
@@ -173,11 +195,14 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   const summons = sumSummons(g.rounds);
   const summonCost = summons * SUMMON_COST;
   const bonus = p.firstGameBonus ? 0 : FIRST_GAME_BONUS;
-  const xp = RANK_XP[rank - 1] + han * XP_PER_HAN;
-  const rankCoins = RANK_COINS[rank - 1];
+  const multiplier = rankMultiplier(g.length ?? DEFAULT_GAME_LENGTH, g.cpu ?? DEFAULT_GAME_CPU);
+  const rankXp = Math.round(RANK_XP[rank - 1] * multiplier);
+  const xp = rankXp + han * XP_PER_HAN;
+  const rankCoins = Math.round(RANK_COINS[rank - 1] * multiplier);
   const hanCoins = han * COINS_PER_HAN;
   const wins = sumWins(g.rounds);
-  const winBonusCoins = wins * WIN_BONUS_COINS;
+  const winBonusCoins = bonusWins(g.rounds) * WIN_BONUS_COINS;
+  const cheatedWins = wins - bonusWins(g.rounds);
   const coins = rankCoins + hanCoins + winBonusCoins - redrawCost - summonCost + bonus;
   const paidXp = sumHan(alreadyPaid) * XP_PER_HAN;
   const paidCoins = winCoins(alreadyPaid);
@@ -195,7 +220,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   return {
     progress,
     reward: {
-      rank, xp, coins, rankCoins, hanCoins, wins, winBonusCoins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
+      rank, rankMultiplier: multiplier, rankXp, xp, coins, rankCoins, hanCoins, wins, winBonusCoins, cheatedWins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
       firstGameBonus: bonus, coinsAfter,
       levelBefore: level(p.xp - paidXp), levelAfter: level(progress.xp),
     },
@@ -254,6 +279,32 @@ export function setBack(p: DojoProgress, back: string): DojoProgress {
   return back === DEFAULT_BACK || p.ownedItems.includes(back) ? { ...p, activeBack: back } : p;
 }
 
+/** Whether the game length is unlocked at the progress's level. */
+export function lengthUnlocked(p: DojoProgress, length: GameLength): boolean {
+  return length === DEFAULT_GAME_LENGTH || level(p.xp) >= HANCHAN_LEVEL;
+}
+
+/** Whether the CPU level is unlocked at the progress's level. */
+export function cpuUnlocked(p: DojoProgress, cpu: CpuLevel): boolean {
+  return cpu === DEFAULT_GAME_CPU || level(p.xp) >= NORMAL_CPU_LEVEL;
+}
+
+export function setGameLength(p: DojoProgress, length: GameLength): DojoProgress {
+  return lengthUnlocked(p, length) ? { ...p, gameLength: length } : p;
+}
+
+export function setGameCpu(p: DojoProgress, cpu: CpuLevel): DojoProgress {
+  return cpuUnlocked(p, cpu) ? { ...p, gameCpu: cpu } : p;
+}
+
+/** The length and CPU of the game the hub starts: the ones chosen, as defaults when not unlocked (a loaded backup's). */
+export function dojoGame(p: DojoProgress): { length: GameLength; cpu: CpuLevel } {
+  return {
+    length: lengthUnlocked(p, p.gameLength) ? p.gameLength : DEFAULT_GAME_LENGTH,
+    cpu: cpuUnlocked(p, p.gameCpu) ? p.gameCpu : DEFAULT_GAME_CPU,
+  };
+}
+
 /** The dojo options of CreateGame (the engine's DojoOptions) for what is owned. */
 export function dojoOptions(p: DojoProgress): {
   yaku: string[];
@@ -302,6 +353,11 @@ export function parseProgress(text: string): DojoProgress | null {
   const paidRounds = o.paidRounds ?? {};
   if (typeof paidRounds !== 'object' || paidRounds === null || Array.isArray(paidRounds)) return null;
   if (!Object.values(paidRounds).every(isCount)) return null;
+  // gameLength and gameCpu came later still: a progress without them plays the first game.
+  const gameLength = o.gameLength ?? DEFAULT_GAME_LENGTH;
+  const gameCpu = o.gameCpu ?? DEFAULT_GAME_CPU;
+  if (gameLength !== 'tonpuu' && gameLength !== 'hanchan') return null;
+  if (gameCpu !== 'weak' && gameCpu !== 'normal') return null;
   return {
     version: 1,
     xp: o.xp,
@@ -314,6 +370,8 @@ export function parseProgress(text: string): DojoProgress | null {
     settled: o.settled,
     firstGameBonus: o.firstGameBonus,
     paidRounds: paidRounds as Record<string, number>,
+    gameLength,
+    gameCpu,
   };
 }
 

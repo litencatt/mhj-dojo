@@ -14,10 +14,13 @@ import {
   level,
   loadProgress,
   parseProgress,
+  dojoGame,
   payRounds,
   purchase,
   saveProgress,
   setBack,
+  setGameCpu,
+  setGameLength,
   setTheme,
   settle,
   type DojoProgress,
@@ -85,7 +88,7 @@ test('a won round pays its han and its 和了祝儀 at once, and only once', () 
 
 test('settling a game does not pay again the rounds paid as they ended', () => {
   // 1st with two wins (3 and 2 han) and one redraw: 150 XP and 110 coins (和了祝儀 included) in all, as when nothing was paid before.
-  const rounds = [{ han: 3 }, { han: 2, redraws: 1 }, {}];
+  const rounds = [{ han: 3 }, { han: 2 }, { redraws: 1 }];
   const paid = payRounds(payRounds(withFirstBonus(), 'g', rounds.slice(0, 1))!.progress, 'g', rounds.slice(0, 2))!.progress;
   assert.equal(paid.coins, 70);
   const { progress, reward } = settle(paid, game(1, 1, rounds), 'g');
@@ -128,7 +131,7 @@ test('importing an older backup keeps what was paid since: a settled game and it
 });
 
 test('reward: 1st with two wins (3 and 2 han) and one redraw is 150 XP and 110 coins, 和了祝儀 (10 a win) included', () => {
-  const { progress, reward } = settle(withFirstBonus(), game(1, 1, [{ han: 3 }, { han: 2, redraws: 1 }, {}]));
+  const { progress, reward } = settle(withFirstBonus(), game(1, 1, [{ han: 3 }, { han: 2 }, { redraws: 1 }]));
   assert.equal(reward?.xp, 150);
   assert.equal(reward?.coins, 110); // rank 60 + han 50 + 和了祝儀 20 - redraw 20
   assert.equal(progress.xp, 150);
@@ -323,4 +326,61 @@ test('an import with a wrong shape is refused', () => {
 
 test('saving without a store reports failure', () => {
   assert.equal(saveProgress(initialProgress(), null), false);
+});
+
+test('a won round with a redraw or a summon pays its han but no 和了祝儀', () => {
+  const p = withFirstBonus();
+  assert.equal(payRounds(p, 'g', [{ han: 2, redraws: 1 }])?.coins, 20);
+  assert.equal(payRounds(p, 'g', [{ han: 2, summons: 1 }])?.coins, 20);
+  assert.equal(payRounds(p, 'g', [{ han: 2, redraws: 1 }])?.xp, 20);
+  // 1st: rank 60, han 50, one 和了祝儀 (the other win had a summon), the summon -50.
+  const rounds = [{ han: 3 }, { han: 2, summons: 1 }];
+  const { reward } = settle(p, game(1, 1, rounds));
+  assert.deepEqual([reward?.wins, reward?.cheatedWins, reward?.winBonusCoins], [2, 1, 10]);
+  assert.equal(reward?.coins, 60 + 50 + 10 - 50);
+  // Paid round by round, the same in all.
+  const paid = payRounds(payRounds(p, 'h', rounds.slice(0, 1))!.progress, 'h', rounds)!.progress;
+  assert.equal(paid.coins, 30 + 10 + 20);
+  assert.equal(settle(paid, game(2, 1, rounds), 'h').progress.coins, 60 + 50 + 10 - 50);
+});
+
+test('the rank pays x2 in 半荘戦, x1.5 against the normal CPU and x3 with both; the han and the bonuses do not', () => {
+  const rounds = [{ han: 2 }];
+  const at = (length: FinishedGame['length'], cpu: FinishedGame['cpu'], rank = 1) =>
+    settle(initialProgress(), { ...game(1, rank, rounds), length, cpu }).reward!;
+  const plain = at('tonpuu', 'weak');
+  assert.deepEqual([plain.rankMultiplier, plain.rankXp, plain.rankCoins, plain.xp, plain.coins], [1, 100, 60, 120, 60 + 20 + 10 + 40]);
+  const hanchan = at('hanchan', 'weak');
+  assert.deepEqual([hanchan.rankMultiplier, hanchan.rankXp, hanchan.rankCoins, hanchan.xp, hanchan.coins], [2, 200, 120, 220, 120 + 20 + 10 + 40]);
+  const normal = at('tonpuu', 'normal', 4);
+  assert.deepEqual([normal.rankMultiplier, normal.rankXp, normal.rankCoins], [1.5, 15, 23]); // 10 x 1.5, 15 x 1.5 rounded
+  const both = at('hanchan', 'normal', 2);
+  assert.deepEqual([both.rankMultiplier, both.rankXp, both.rankCoins], [3, 180, 120]);
+  // A game without them (from before) is the plain game.
+  assert.equal(settle(initialProgress(), game(1, 1, rounds)).reward?.rankMultiplier, 1);
+});
+
+test('半荘戦 is chosen from Lv5 and the normal CPU from Lv7', () => {
+  const lv4 = withFirstBonus({ xp: 999 });
+  assert.equal(setGameLength(lv4, 'hanchan').gameLength, 'tonpuu');
+  const lv5 = withFirstBonus({ xp: 1000 });
+  assert.equal(setGameLength(lv5, 'hanchan').gameLength, 'hanchan');
+  assert.equal(setGameCpu(lv5, 'normal').gameCpu, 'weak');
+  const lv7 = withFirstBonus({ xp: 2100 });
+  assert.equal(setGameCpu(lv7, 'normal').gameCpu, 'normal');
+  assert.equal(setGameCpu(setGameCpu(lv7, 'normal'), 'weak').gameCpu, 'weak');
+  assert.deepEqual(dojoGame(setGameCpu(setGameLength(lv7, 'hanchan'), 'normal')), { length: 'hanchan', cpu: 'normal' });
+  // A loaded backup's choice above its level plays the first game.
+  assert.deepEqual(dojoGame({ ...lv4, gameLength: 'hanchan', gameCpu: 'normal' }), { length: 'tonpuu', cpu: 'weak' });
+});
+
+test('a progress from before the game choice loads with 東風戦 against weak CPUs, and an import takes the loaded choice', () => {
+  const { gameLength: _l, gameCpu: _c, ...old } = withFirstBonus({ xp: 2100 });
+  const parsed = parseProgress(JSON.stringify(old));
+  assert.deepEqual([parsed?.gameLength, parsed?.gameCpu], ['tonpuu', 'weak']);
+  assert.equal(parseProgress(JSON.stringify({ ...old, gameLength: 'south' })), null);
+  assert.equal(parseProgress(JSON.stringify({ ...old, gameCpu: 3 })), null);
+  const loaded = parseProgress(JSON.stringify({ ...old, gameLength: 'hanchan', gameCpu: 'normal' }))!;
+  const merged = importProgress(withFirstBonus({ xp: 2100 }), loaded);
+  assert.deepEqual([merged.gameLength, merged.gameCpu], ['hanchan', 'normal']);
 });

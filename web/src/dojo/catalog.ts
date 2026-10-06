@@ -73,6 +73,7 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'yakuhai', kind: 'yaku', name: '役牌（白・發・中・場風・自風）', price: 40, level: 1, grants: YAKUHAI_KEYS },
   yaku('iipeikou', '一盃口', 1, 40),
   { id: 'assist:noyaku', kind: 'assist', name: '補助: 役なし警告', price: 40, level: 1 },
+  { id: 'assist:speed-fast', kind: 'assist', name: '補助: 再生速度「速い」', price: 40, level: 1 },
 
   yaku('ippatsu', '一発', 2, 30, ['riichi']),
   yaku('haitei', '海底摸月', 2, 30),
@@ -98,6 +99,7 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'theme:sakura', kind: 'theme', name: '牌テーマ: 桜', price: 80, level: 3 },
   { id: 'back:ichimatsu', kind: 'back', name: '裏柄: 市松', price: 60, level: 3 },
   { id: 'assist:preview', kind: 'assist', name: '補助: 打牌プレビュー・複合役', price: 100, level: 3 },
+  { id: 'assist:speed-instant', kind: 'assist', name: '補助: 再生速度「なし」（一括表示）', price: 80, level: 3, requires: ['assist:speed-fast'] },
 
   { id: 'assist:advice', kind: 'assist', name: '補助: アドバイスパネル', price: 120, level: 4 },
   { id: 'assist:danger', kind: 'assist', name: '補助: 危険牌の印', price: 120, level: 4 },

@@ -28,11 +28,20 @@ export const PLAYBACK_SPEEDS = {
 export type PlaybackSpeed = keyof typeof PLAYBACK_SPEEDS;
 
 const SPEED_KEY = 'mhj-dojo.playback-speed.v1';
+// The dojo keeps its own choice, limited to the speeds it owns (setDojoSpeeds).
+const DOJO_SPEED_KEY = 'mhj-dojo.dojo.playback-speed.v1';
+
+let dojoSpeeds: readonly PlaybackSpeed[] | null = null;
+
+/** Scopes the speed to the dojo and its owned speeds, or (null) to the CPU game's own setting. */
+export function setDojoSpeeds(owned: readonly PlaybackSpeed[] | null) {
+  dojoSpeeds = owned;
+}
 
 export function loadPlaybackSpeed(): PlaybackSpeed {
   try {
-    const v = localStorage.getItem(SPEED_KEY);
-    if (v && Object.hasOwn(PLAYBACK_SPEEDS, v)) return v as PlaybackSpeed;
+    const v = localStorage.getItem(dojoSpeeds ? DOJO_SPEED_KEY : SPEED_KEY);
+    if (v && Object.hasOwn(PLAYBACK_SPEEDS, v) && (!dojoSpeeds || dojoSpeeds.includes(v as PlaybackSpeed))) return v as PlaybackSpeed;
   } catch {
     // Storage unavailable: use the default.
   }
@@ -41,7 +50,7 @@ export function loadPlaybackSpeed(): PlaybackSpeed {
 
 export function savePlaybackSpeed(speed: PlaybackSpeed) {
   try {
-    localStorage.setItem(SPEED_KEY, speed);
+    localStorage.setItem(dojoSpeeds ? DOJO_SPEED_KEY : SPEED_KEY, speed);
   } catch {
     // Storage unavailable: the choice just won't persist.
   }

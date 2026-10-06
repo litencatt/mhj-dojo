@@ -26,13 +26,13 @@ import {
   useSingleTab,
   useUrlResume,
 } from './hooks';
-import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, type PlaybackSpeed } from './playback';
+import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, setDojoSpeeds, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { tileName } from './tiles';
 import { summarizeMoves } from './summary';
 import { savedGames, type GameSummary } from './wasm';
 import { REDRAW_COST, SUMMON_COST } from './dojo/catalog';
-import { canAffordRedraw, canAffordSummon, dojoOptions, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './dojo/progress';
+import { canAffordRedraw, canAffordSummon, dojoGame, dojoOptions, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './dojo/progress';
 import { TILE_BACKS, TILE_THEMES, applyTileBack, applyTileTheme } from './tileThemes';
 import './dojo/dojo.css';
 
@@ -91,9 +91,9 @@ function urlOptions(): GameOptions {
   return parseOptions((k) => params.get(k));
 }
 
-/** The game a dojo plays: 東風戦 against weak CPUs, with what the dojo has bought. */
+/** The game a dojo plays: the length and CPU chosen in the hub, with what the dojo has bought. */
 function dojoGameOptions(p: DojoProgress): GameOptions {
-  return { length: 'tonpuu', first_dealer: 'random', cpu: 'weak', dojo: dojoOptions(p) };
+  return { ...dojoGame(p), first_dealer: 'random', dojo: dojoOptions(p) };
 }
 
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game), or a dojo game (?mode=dojo). */
@@ -113,6 +113,11 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const adviceOn = dojo ? has('assist:advice') || has('assist:danger') : adviceSetting;
   const [riichiMode, setRiichiMode] = useState(false);
   const [seedInput, setSeedInput] = useState('');
+  // The dojo's speeds: 遅い and 普通 at the start, 速い and なし once bought. Set before the first read below.
+  const speeds = (Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).filter(
+    (k) => !dojo || (k !== 'fast' || has('assist:speed-fast')) && (k !== 'none' || has('assist:speed-instant')),
+  );
+  setDojoSpeeds(dojo ? speeds : null);
   const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
   // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
@@ -394,7 +399,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
           savePlaybackSpeed(v);
         }}
       >
-        {(Object.keys(PLAYBACK_SPEEDS) as PlaybackSpeed[]).map((k) => (
+        {speeds.map((k) => (
           <option key={k} value={k}>
             {PLAYBACK_SPEEDS[k].label}
           </option>

@@ -337,3 +337,23 @@
   color: var(--success);
   font-weight: bold;
 }
+
+/* The hub's game choice (length and CPU), under 対局開始. */
+.dojo-game-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+}
+.dojo-game-options .dojo-settings-group label:has(input:disabled) {
+  color: var(--muted);
+  cursor: default;
+}
+.dojo-game-options p {
+  margin: 10px 0 0;
+}
+/* 最終結果's rounds: a round with a redraw or a summon (no 和了祝儀). */
+.dojo-cheated {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

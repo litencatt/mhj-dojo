@@ -2,20 +2,27 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { VersionTag } from '../components/VersionTag';
 import { yakuName } from './catalog';
 import {
+  cpuUnlocked,
+  dojoGame,
   exportProgress,
   importProgress,
   level,
   levelProgress,
   loadProgress,
   parseProgress,
+  lengthUnlocked,
   saveProgress,
   setBack,
+  setGameCpu,
+  setGameLength,
   setTheme,
   STORAGE_KEY,
   xpForLevel,
   type DojoProgress,
 } from './progress';
-import { roundName } from '../components/GameTable';
+import { LENGTH_NAMES, roundName } from '../components/GameTable';
+import type { CpuLevel, GameLength } from '../api';
+import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel } from './rules';
 import { discardUnfinishedDojoGames, savedGames } from '../wasm';
 import { Shop } from './Shop';
 import { Tile } from '../components/Tile';
@@ -29,6 +36,16 @@ function playHref(): string {
   if (seed) params.set('seed', seed);
   return `?${params}`;
 }
+
+const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通' };
+const LENGTHS: { value: GameLength; level: number }[] = [
+  { value: 'tonpuu', level: 1 },
+  { value: 'hanchan', level: HANCHAN_LEVEL },
+];
+const CPUS: { value: CpuLevel; level: number }[] = [
+  { value: 'weak', level: 1 },
+  { value: 'normal', level: NORMAL_CPU_LEVEL },
+];
 
 /** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (theme, back, backup). */
 export function DojoHome() {
@@ -104,6 +121,8 @@ export function DojoHome() {
   const lv = level(progress.xp);
   const next = xpForLevel(lv + 1);
   const bar = Math.round(levelProgress(progress.xp) * 100);
+  const game = dojoGame(progress);
+  const multiplier = rankMultiplierLabel(game.length, game.cpu);
 
   return (
     <div class="dojo-home">
@@ -159,9 +178,49 @@ export function DojoHome() {
               </a>
             </>
           ) : (
-            <a class="dojo-start" href={playHref()} title="東風戦、CPU は弱い">
+            <a class="dojo-start" href={playHref()} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_NAMES[game.cpu]}`}>
               対局開始
             </a>
+          )}
+        </div>
+        {/* The game a new start plays: the choices unlock with the level (no purchase). */}
+        <div class="dojo-game-options">
+          <fieldset class="dojo-settings-group">
+            <legend>長さ</legend>
+            {LENGTHS.map((o) => (
+              <label key={o.value}>
+                <input
+                  type="radio"
+                  name="dojo-length"
+                  checked={game.length === o.value}
+                  disabled={!lengthUnlocked(progress, o.value)}
+                  onChange={() => change((cur) => setGameLength(cur, o.value))}
+                />
+                {LENGTH_NAMES[o.value]}
+                {!lengthUnlocked(progress, o.value) && <small class="dojo-muted">（Lv {o.level} で解禁）</small>}
+              </label>
+            ))}
+          </fieldset>
+          <fieldset class="dojo-settings-group">
+            <legend>CPU</legend>
+            {CPUS.map((o) => (
+              <label key={o.value}>
+                <input
+                  type="radio"
+                  name="dojo-cpu"
+                  checked={game.cpu === o.value}
+                  disabled={!cpuUnlocked(progress, o.value)}
+                  onChange={() => change((cur) => setGameCpu(cur, o.value))}
+                />
+                {CPU_NAMES[o.value]}
+                {!cpuUnlocked(progress, o.value) && <small class="dojo-muted">（Lv {o.level} で解禁）</small>}
+              </label>
+            ))}
+          </fieldset>
+          {multiplier && (
+            <p class="dojo-muted" data-testid="dojo-multiplier">
+              順位の報酬 {multiplier}
+            </p>
           )}
         </div>
       </section>
