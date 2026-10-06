@@ -31,8 +31,8 @@ function describe(item: ResumeItem): string {
 /**
  * Shown instead of a new session or game when the page opens without one in
  * the URL and some are saved: 「続きから」 resumes the most recently used
- * one not over, and the list the others; the header's button (newLabel) starts a new
- * one.
+ * one not over, and the list the others; the header's button (newLabel)
+ * starts a new one.
  */
 export function ResumePanel({ noun, newLabel, items, busy, onOpen }: ResumePanelProps) {
   const last = items.find((s) => !s.over);
