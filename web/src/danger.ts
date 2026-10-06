@@ -1,4 +1,5 @@
 import type { DangerLevel, SeatDanger, Tile } from './api';
+// The .ts extension is needed for `node --test` (npm test), which strips types but resolves no extensions.
 import { seatLabel } from './seats.ts';
 
 // The badge's letter, also used in its text.
