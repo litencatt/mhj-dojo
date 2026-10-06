@@ -105,7 +105,7 @@ func TestRestoreGame(t *testing.T) {
 	}
 	save, _ := json.Marshal(m.Save())
 
-	status, v := RestoreGame(games, strings.NewReader(string(save)))
+	status, v := RestoreGame(games, "", strings.NewReader(string(save)))
 	if status != statusOK {
 		t.Fatalf("restore: %d %v", status, v)
 	}
@@ -129,7 +129,7 @@ func TestRestoreGame(t *testing.T) {
 	}
 	tampered["check"] = "0"
 	b, _ = json.Marshal(tampered)
-	if status, v := RestoreGame(games, strings.NewReader(string(b))); status != statusConflict {
+	if status, v := RestoreGame(games, "", strings.NewReader(string(b))); status != statusConflict {
 		t.Errorf("RestoreGame with a wrong check = %d %v, want %d", status, v, statusConflict)
 	}
 
@@ -141,8 +141,82 @@ func TestRestoreGame(t *testing.T) {
 		`{"seed":4,"first_dealer":"you","actions":[{"type":"ron"}]}`:                 statusConflict,
 		`{"seed":4,"first_dealer":"you","actions":[{"type":"discard","tile":"9z"}]}`: statusBadRequest,
 	} {
-		if status, v := RestoreGame(games, strings.NewReader(body)); status != want {
+		if status, v := RestoreGame(games, "", strings.NewReader(body)); status != want {
 			t.Errorf("RestoreGame(%s) = %d %v, want %d", body, status, v, want)
 		}
 	}
+}
+
+// TestGameView reads the view options from a game request's query.
+func TestGameView(t *testing.T) {
+	for query, want := range map[string]match.View{
+		"":                     {},
+		"advice=1":             {},
+		"advice=0":             {NoAdvice: true},
+		"advice=0&tree_from=x": {NoAdvice: true}, // other keys are ignored
+		"advice=0&advice=1":    {},
+	} {
+		if got, err := GameView(query); err != nil || got != want {
+			t.Errorf("GameView(%q) = %+v, %v; want %+v", query, got, err, want)
+		}
+	}
+	for _, query := range []string{"advice=", "advice=true"} {
+		if _, err := GameView(query); Status(err) != statusBadRequest {
+			t.Errorf("GameView(%q): %v, want a 400", query, err)
+		}
+	}
+}
+
+// TestGameAdviceOff plays two games on one seed, one asked for the advice
+// and the danger and the other not (advice=0): the second leaves both out
+// but is otherwise the same state at every move, and both save the same
+// game (the view option reaches nothing the game is played or saved by).
+func TestGameAdviceOff(t *testing.T) {
+	games := match.NewStore(256)
+	const body = `{"seed":4,"first_dealer":"you"}`
+	on := gameState(t, games, "POST", "/api/games", body)
+	off := gameState(t, games, "POST", "/api/games?advice=0", body)
+	onID, offID := on.GameID, off.GameID
+	sawAdvice := false
+	for i := 0; i < 40 && on.Result == nil; i++ {
+		if off.Advice != nil || len(off.Danger) != 0 {
+			t.Fatalf("move %d: advice=0 has advice %v danger %v", i, off.Advice != nil, off.Danger)
+		}
+		sawAdvice = sawAdvice || on.Advice != nil
+		on.Advice, on.Danger, on.GameID, off.GameID = nil, []match.SeatDanger{}, "", ""
+		a, _ := json.Marshal(on)
+		b, _ := json.Marshal(off)
+		if string(a) != string(b) {
+			t.Fatalf("move %d: states differ apart from the advice\n%s\n%s", i, a, b)
+		}
+		move := tsumogiriMove(on)
+		on = gameState(t, games, "POST", "/api/games/"+onID+"/action", move)
+		off = gameState(t, games, "POST", "/api/games/"+offID+"/action?advice=0", move)
+	}
+	if !sawAdvice {
+		t.Fatal("the game with the advice never had any")
+	}
+	mOn, _ := games.Get(onID)
+	mOff, _ := games.Get(offID)
+	if a, b := mustJSON(t, mOn.Save()), mustJSON(t, mOff.Save()); a != b {
+		t.Fatalf("saves differ:\n%s\n%s", a, b)
+	}
+	// A bad value is a 400, and a restore takes the option too.
+	if status, _ := gameCall(t, games, "GET", "/api/games/"+onID+"?advice=x", ""); status != statusBadRequest {
+		t.Errorf("advice=x: status %d, want 400", status)
+	}
+	save, _ := json.Marshal(mOn.Save())
+	status, v := RestoreGame(games, "advice=0", strings.NewReader(string(save)))
+	if st, ok := v.(match.State); !ok || status != statusOK || st.Advice != nil || len(st.Danger) != 0 {
+		t.Errorf("RestoreGame with advice=0 = %d %v", status, v)
+	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

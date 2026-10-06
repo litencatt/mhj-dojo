@@ -10,7 +10,7 @@ There is no HTTP server behind it: `mhj-dojo` only serves the page's files. The 
 two calls that are not requests: `mhjDojoRestore(body, query)`, which rebuilds a session from its
 moves in one call after a page reload (`body` is `{"seed", "max_turns", "moves", "current"}`;
 `query`, which may be left out, holds view options as a request's query does, see "View options"),
-and `mhjDojoRestoreGame(save)`, which rebuilds a game from its save (see "Game saves").
+and `mhjDojoRestoreGame(save, query)`, which rebuilds a game from its save (see "Game saves").
 
 The TypeScript types for these shapes are in `web/src/api.ts`.
 
@@ -90,6 +90,14 @@ unknown parameters are ignored, and of a parameter given twice the last value co
 advice panel is minimized (opening it asks for the state shown again, with the advice), and
 `tree_from` on every request but those that load a session afresh (a new one, the first of a page),
 which take the whole tree.
+
+Game requests (`POST /api/games`, `GET /api/games/{id}` and `POST /api/games/{id}/action`, and the
+`query` of `mhjDojoRestoreGame`) take one: `advice=0` (`advice=1` is the default; any other value is a
+`400`) – `advice` is `null` and `danger` is `[]`, and neither is computed. It is the one switch for
+the page's advice and danger display: a page with the display off sends `advice=0`, and turning it
+on asks for the state shown again without it. It changes nothing the game is played or saved by (the
+CPU players, the wall, the save and its `check`), so a game goes on across requests with and without
+it. Unknown parameters are ignored, and of a parameter given twice the last value counts.
 
 ## `State`
 
@@ -674,7 +682,7 @@ the human's moves on the same seed and options.
   `GET /api/games/{id}` and `POST /api/games/{id}/action` with status `200`),
   and `""` for any other response (practice, errors). Take each new
   save as the game's latest.
-- `mhjDojoRestoreGame(save)` takes such a save string and returns
+- `mhjDojoRestoreGame(save, query)` takes such a save string (and optional view options, "View options") and returns
   `{status, body, save}` like a request: `200` with the rebuilt game's
   `GameState` and its save, or an error (`400` a malformed save or an invalid
   option or move, `409` a move that is not legal where it is replayed, or a

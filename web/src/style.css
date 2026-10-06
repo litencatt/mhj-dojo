@@ -1790,6 +1790,11 @@ section {
   border-color: var(--accent);
   color: var(--accent-fg);
 }
+.action-bar .action-advice[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .action-riichi.active {
   background: var(--danger-bg);
   border-color: var(--danger);

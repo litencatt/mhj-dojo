@@ -187,17 +187,30 @@ type Match struct {
 func (m *Match) ID() string { return m.id }
 
 // State returns the human's view of the game.
-func (m *Match) State() State {
-	return m.state()
+func (m *Match) State() State { return m.StateView(View{}) }
+
+// View picks parts of a State to leave out (docs/api.md "View options").
+type View struct {
+	// NoAdvice leaves advice and danger out (null and []): they are not
+	// computed. It touches nothing the game is played or saved by.
+	NoAdvice bool
+}
+
+// StateView is State shown as v.
+func (m *Match) StateView(v View) State {
+	return m.state(v)
 }
 
 // Act applies the human's move and plays the CPUs up to the human's next
 // decision. Errors wrap game.ErrInvalid or game.ErrConflict.
-func (m *Match) Act(a game.Action) (State, error) {
+func (m *Match) Act(a game.Action) (State, error) { return m.ActView(a, View{}) }
+
+// ActView is Act with the state shown as v.
+func (m *Match) ActView(a game.Action, v View) (State, error) {
 	if err := m.act(a); err != nil {
 		return State{}, err
 	}
-	return m.state(), nil
+	return m.state(v), nil
 }
 
 // act is Act without the state, which a replay (Store.Restore) needs only
@@ -214,11 +227,14 @@ func (m *Match) act(a game.Action) error {
 
 // Next deals the next round once the current one has ended and plays the
 // CPUs up to the human's first decision in it.
-func (m *Match) Next() (State, error) {
+func (m *Match) Next() (State, error) { return m.NextView(View{}) }
+
+// NextView is Next with the state shown as v.
+func (m *Match) NextView(v View) (State, error) {
 	if err := m.next(); err != nil {
 		return State{}, err
 	}
-	return m.state(), nil
+	return m.state(v), nil
 }
 
 // next is Next without the state.

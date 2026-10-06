@@ -52,10 +52,10 @@ type State struct {
 	History           []apiview.HistoryEntry          `json:"history"`
 	// Advice is the practice advice for your discard: only on your turn
 	// with a drawn tile and a concealed hand, not in riichi and with no
-	// tsumo to declare.
+	// tsumo to declare. Null with View.NoAdvice.
 	Advice *advice.Advice `json:"advice"`
 	// Danger is, on your turn, each other seat in riichi with the danger
-	// level of every tile you hold (cpu.DangerLevel).
+	// level of every tile you hold (cpu.DangerLevel); empty with View.NoAdvice.
 	Danger []SeatDanger `json:"danger"`
 	Result *Result      `json:"result"`
 }
@@ -160,7 +160,7 @@ type Result struct {
 	Pao []game.Pao `json:"pao"`
 }
 
-func (m *Match) state() State {
+func (m *Match) state(view View) State {
 	r, h := m.game.Round, m.game.H
 	v := r.ViewFor(Human)
 	st := State{
@@ -290,10 +290,12 @@ func (m *Match) state() State {
 			st.Analysis = bestRows(byDiscard, st.Legal.Discards)
 			st.Combos = bestCombos(st.CombosByDiscard, st.Legal.Discards)
 		}
-		if me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi && !st.Legal.Tsumo {
+		if !view.NoAdvice && me.Drawn != nil && len(me.Melds) == 0 && !me.Riichi && !st.Legal.Tsumo {
 			st.Advice = m.advice(v, all, byKind, &visible, han)
 		}
-		st.Danger = danger(v, all)
+		if !view.NoAdvice {
+			st.Danger = danger(v, all)
+		}
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)

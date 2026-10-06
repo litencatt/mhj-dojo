@@ -21,9 +21,10 @@
 // view options in query (a request's URL query, such as "advice=0"; may be
 // left out) pick it; and
 //
-//	mhjDojoRestoreGame(save) -> {status, body, save}
+//	mhjDojoRestoreGame(save, query) -> {status, body, save}
 //
-// rebuilds a game from a save (apicall.RestoreGame; not a request).
+// rebuilds a game from a save (apicall.RestoreGame; not a request), with the
+// view options in query as for mhjDojoRestore (may be left out).
 // Both rebuild under a new id: the page maps its own ids to the engine's.
 package main
 
@@ -79,11 +80,15 @@ func main() {
 		})
 	}))
 	js.Global().Set("mhjDojoRestoreGame", js.FuncOf(func(_ js.Value, args []js.Value) any {
-		if len(args) != 1 {
-			return response(games, 400, apicall.ErrorBody("mhjDojoRestoreGame takes a save"))
+		if len(args) != 1 && len(args) != 2 {
+			return response(games, 400, apicall.ErrorBody("mhjDojoRestoreGame takes a save and a query"))
+		}
+		query := ""
+		if len(args) == 2 {
+			query = args[1].String()
 		}
 		return safely(games, func() (int, any) {
-			return apicall.RestoreGame(games, strings.NewReader(args[0].String()))
+			return apicall.RestoreGame(games, query, strings.NewReader(args[0].String()))
 		})
 	}))
 	select {} // keep the function callable
