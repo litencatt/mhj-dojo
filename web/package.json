@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",
-    "test": "node --test scripts/changelog.test.mjs scripts/sw.test.mjs scripts/summary.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "e2e": "playwright test",
     "build:site": "npm run build",
     "e2e:live": "playwright test -c playwright.live.config.ts",
