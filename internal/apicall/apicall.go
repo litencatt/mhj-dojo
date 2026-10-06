@@ -104,6 +104,22 @@ func SessionView(query string) (session.View, error) {
 	return v, nil
 }
 
+// GameView reads the view options of a game request from its URL query
+// (docs/api.md "View options"): advice=0 leaves the advice and the danger
+// out. Other keys are ignored; of a key given twice, the last one counts.
+func GameView(query string) (match.View, error) {
+	var v match.View
+	for _, kv := range strings.Split(query, "&") {
+		if k, val, _ := strings.Cut(kv, "="); k == "advice" {
+			if val != "0" && val != "1" {
+				return v, Invalid("advice must be 0 or 1")
+			}
+			v.NoAdvice = val == "0"
+		}
+	}
+	return v, nil
+}
+
 // CreateSession is Route's POST /api/sessions.
 func CreateSession(store *session.Store, v session.View, body io.Reader) (session.State, error) {
 	var req struct {
@@ -161,7 +177,7 @@ func Goto(s *session.Session, v session.View, body io.Reader) (session.State, er
 }
 
 // CreateGame is Route's POST /api/games.
-func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
+func CreateGame(games *match.Store, v match.View, body io.Reader) (match.State, error) {
 	var req struct {
 		Seed        *int64 `json:"seed"`
 		Length      string `json:"length"`
@@ -175,12 +191,12 @@ func CreateGame(games *match.Store, body io.Reader) (match.State, error) {
 	if err != nil {
 		return match.State{}, err
 	}
-	return m.State(), nil
+	return m.StateView(v), nil
 }
 
 // GameAction is Route's POST /api/games/{id}/action: one of the human's
 // moves, or "next".
-func GameAction(m *match.Match, body io.Reader) (match.State, error) {
+func GameAction(m *match.Match, v match.View, body io.Reader) (match.State, error) {
 	var req struct {
 		Type  game.ActionType `json:"type"`
 		Tile  string          `json:"tile"`
@@ -200,11 +216,11 @@ func GameAction(m *match.Match, body io.Reader) (match.State, error) {
 		}
 	case game.Tsumo, game.Ron, game.Skip, game.Kyuushu, game.Pon, game.Kan:
 	case match.ActionNext:
-		return m.Next()
+		return m.NextView(v)
 	default:
 		return match.State{}, Invalid("type must be discard, riichi, tsumo, ron, skip, pon, chii, kan, kyuushu or next")
 	}
-	return m.Act(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles})
+	return m.ActView(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles}, v)
 }
 
 // Route runs one request given as its method and path, with any query (such
@@ -255,16 +271,20 @@ func Restore(store *session.Store, query string, body io.Reader) (int, any) {
 // body) and returns the status and response value of its state. Like
 // Restore it is not a request (Route does not answer it): the WebAssembly
 // build uses it to bring a game back after a page reload.
-func RestoreGame(games *match.Store, body io.Reader) (int, any) {
+func RestoreGame(games *match.Store, query string, body io.Reader) (int, any) {
 	var req match.Save
 	if err := Decode(body, &req, true); err != nil {
+		return result(match.State{}, err)
+	}
+	v, err := GameView(query)
+	if err != nil {
 		return result(match.State{}, err)
 	}
 	m, err := games.Restore(req)
 	if err != nil {
 		return result(match.State{}, err)
 	}
-	return result(m.State(), nil)
+	return result(m.StateView(v), nil)
 }
 
 func result(v any, err error) (int, any) {
@@ -316,16 +336,20 @@ func route(store *session.Store, games *match.Store, method, path, query string,
 			if method != methodPost {
 				return nil, noEndpoint
 			}
-			return CreateGame(games, body)
+			v, err := GameView(query)
+			if err != nil {
+				return nil, err
+			}
+			return CreateGame(games, v, body)
 		}
 		id, op, ok := resource(rest)
 		if !ok {
 			return nil, noEndpoint
 		}
-		var f func(*match.Match, io.Reader) (match.State, error)
+		var f func(*match.Match, match.View, io.Reader) (match.State, error)
 		switch {
 		case method == methodGet && op == "":
-			f = func(m *match.Match, _ io.Reader) (match.State, error) { return m.State(), nil }
+			f = func(m *match.Match, v match.View, _ io.Reader) (match.State, error) { return m.StateView(v), nil }
 		case method == methodPost && op == "action":
 			f = GameAction
 		default:
@@ -335,7 +359,11 @@ func route(store *session.Store, games *match.Store, method, path, query string,
 		if err != nil {
 			return nil, err
 		}
-		return f(m, body)
+		v, err := GameView(query)
+		if err != nil {
+			return nil, err
+		}
+		return f(m, v, body)
 	}
 	return nil, noEndpoint
 }
