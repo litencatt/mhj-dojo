@@ -82,8 +82,8 @@ func TestFoldsAgainstRiichi(t *testing.T) {
 	if a := New().Decide(v2, legal(v2)); a.Tile == "5s" {
 		t.Errorf("tenpai hand folded: %+v", a)
 	}
-	// One step from tenpai (below foldShanten) it pushes too: it keeps 123m
-	// although 2m is genbutsu.
+	// One step from tenpai against one riichi the dealer pushes too: it
+	// keeps 123m although 2m is genbutsu (see TestFoldsOneShanten).
 	v3 := view("123m456m789m23p5s1z", "9s")
 	v3.Seats[1].Riichi = true
 	x, _ := tile.Parse("2m")
@@ -142,17 +142,21 @@ func TestKeepsRedFive(t *testing.T) {
 }
 
 func TestDanger(t *testing.T) {
-	river := map[tile.Kind]bool{}
+	var safe [tile.NumKinds]bool
 	for _, s := range []string{"4m", "1p", "7p"} {
 		x, _ := tile.Parse(s)
-		river[x.Kind] = true
+		safe[x.Kind] = true
 	}
 	var vis tile.Counts
 	k := func(s string) tile.Kind { x, _ := tile.Parse(s); return x.Kind }
 	vis[k("1z")] = 3
 	vis[k("3z")] = 4
-	for s, want := range map[string]int{"4m": 0, "3z": 0, "1z": 1, "1m": 2, "7m": 2, "4p": 2, "5m": 9, "5p": 9, "2z": 6, "9s": 7, "7s": 9} {
-		if got := danger(k(s), river, &vis); got != want {
+	// Kabe: with all four 7s in sight, no two-sided wait on 8s or 9s needs
+	// no 7s, and 5s and 6s keep only their lower one.
+	vis[k("7s")] = 4
+	for s, want := range map[string]int{"4m": 0, "3z": 0, "1z": 1, "1m": 2, "7m": 2, "4p": 2, "5m": 9, "5p": 9, "2z": 6,
+		"9s": 2, "8s": 2, "5s": 5, "6s": 5, "1s": 7, "2s": 8} {
+		if got := danger(k(s), &safe, &vis); got != want {
 			t.Errorf("danger(%s) = %d, want %d", s, got, want)
 		}
 	}
@@ -522,4 +526,179 @@ func TestSelfPlayCalls(t *testing.T) {
 		t.Fatalf("%d calls, %d open wins", calls, openWins)
 	}
 	t.Logf("%d calls, %d wins with melds in %d rounds", calls, openWins, n)
+}
+
+func mustTile(s string) tile.Tile { x, _ := tile.Parse(s); return x }
+
+// A tile any seat discarded after a riichi is safe against it: seat 1
+// declared on discard 5, and seat 2 then passed 5p.
+func TestGenbutsuAfterRiichi(t *testing.T) {
+	v := view("147m258p369s1357z", "5p")
+	v.Dealer = 1
+	v.Seats[1].Riichi = true
+	v.Seats[1].River = []game.RiverTile{{Tile: mustTile("9m"), Order: 1}, {Tile: mustTile("1s"), Riichi: true, Order: 5}}
+	v.Seats[2].River = []game.RiverTile{{Tile: mustTile("4m"), Order: 2}, {Tile: mustTile("5p"), Order: 6}}
+	if a := New().Decide(v, legal(v)); a.Tile != "5p" {
+		t.Errorf("got %+v, want 5p (passed after the riichi)", a)
+	}
+	if d := Danger(v, 1, mustTile("5p").Kind); d != 0 {
+		t.Errorf("Danger(5p) = %d, want 0", d)
+	}
+	// 4m went before the declaration: not safe.
+	if d := Danger(v, 1, mustTile("4m").Kind); d == 0 {
+		t.Error("Danger(4m) = 0, want > 0")
+	}
+}
+
+// One step from tenpai the player folds against two riichi, or against one
+// with a cheap hand (no dora, not the dealer), and pushes otherwise.
+func TestFoldsOneShanten(t *testing.T) {
+	cases := []struct {
+		riichis, dealer int
+		fold            bool
+	}{{1, 0, false}, {1, 2, true}, {2, 0, true}}
+	for _, tc := range cases {
+		v := view("123m456m789m23p5s1z", "9s")
+		v.Dealer = tc.dealer
+		v.DoraIndicators = []tile.Tile{mustTile("7z")}
+		for s := 1; s <= tc.riichis; s++ {
+			v.Seats[s].Riichi = true
+			v.Seats[s].River = []game.RiverTile{{Tile: mustTile("2m"), Riichi: true, Order: s}}
+		}
+		if a := New().Decide(v, legal(v)); (a.Tile == "2m") != tc.fold {
+			t.Errorf("%d riichi, dealer %d: got %+v, want fold %v", tc.riichis, tc.dealer, a, tc.fold)
+		}
+	}
+}
+
+// No riichi on a wait whose tiles are all in sight: 23p waits on 1p and 4p,
+// all eight seen, so the player breaks it for a 1-shanten hand instead.
+func TestNoRiichiOnDeadWait(t *testing.T) {
+	v := view("123m456m789m23p55s", "1z")
+	for _, s := range []string{"1p", "4p"} {
+		for range 4 {
+			v.Seats[2].River = append(v.Seats[2].River, game.RiverTile{Tile: mustTile(s)})
+		}
+	}
+	l := legal(v)
+	l.Riichi = []string{"1z"}
+	if a := New().Decide(v, l); a.Type != game.Discard || a.Tile == "1z" {
+		t.Errorf("got %+v, want a discard other than 1z, without riichi", a)
+	}
+}
+
+// Calls toward honitsu, toitoi and a value pair (atozuke), whose meld is
+// no yaku itself, and the open hand then discards toward its yaku.
+func TestRouteCalls(t *testing.T) {
+	cases := []struct {
+		name, hand, discard string
+		legal               game.Legal
+		want                game.ActionType
+	}{
+		{"honitsu pon", "1m1m3m4m6m7m8m9m2z2z3z9p5s", "1m", game.Legal{Pon: true, Skip: true}, game.Pon},
+		{"toitoi pon", "9m9m6m6m3p3p8p8p8p4s4s4s1z", "9m", game.Legal{Pon: true, Skip: true}, game.Pon},
+		{"value pair chii", "5z5z23m678m456p2s5s9s1z", "4m", game.Legal{Chii: [][]string{{"2m", "3m"}}, Skip: true}, game.Chii},
+	}
+	for _, tc := range cases {
+		v := callView(tc.hand, tc.discard)
+		if a := New().Decide(v, tc.legal); a.Type != tc.want {
+			t.Errorf("%s: got %+v, want %s", tc.name, a, tc.want)
+		}
+	}
+	// After a honitsu pon of 1m the hand drops 4p or 5p, which plain efficiency keeps.
+	v := callView("3m4m6m7m8m9m9m2z2z4p5p", "1m")
+	v.LastDiscard = nil
+	m := mustTile("1m")
+	v.Seats[0].Melds = []game.Called{{Meld: yaku.Meld{Type: yaku.Trip, Kind: m.Kind, Open: true}, Tiles: []tile.Tile{m, m, m}, From: 3}}
+	var l game.Legal
+	for _, x := range v.Seats[0].Hand {
+		if !slices.Contains(l.Discards, x.String()) {
+			l.Discards = append(l.Discards, x.String())
+		}
+	}
+	if a := New().Decide(v, l); a.Tile != "4p" && a.Tile != "5p" {
+		t.Errorf("after a honitsu pon: got %+v, want 4p or 5p", a)
+	}
+}
+
+// A concealed kan keeps the hand closed: tenpai after it, the player
+// declares riichi instead of discarding toward an open-hand yaku.
+func TestRiichiAfterAnkan(t *testing.T) {
+	v := view("345m678p789s4s", "9p")
+	m := mustTile("2m")
+	v.Seats[0].Melds = []game.Called{{Meld: yaku.Meld{Type: yaku.Trip, Kind: m.Kind, Kan: true}, Tiles: []tile.Tile{m, m, m, m}, From: -1}}
+	l := legal(v)
+	l.Riichi = []string{"4s", "9p"}
+	if a := New().Decide(v, l); a.Type != game.Riichi || a.Tile != "4s" {
+		t.Errorf("got %+v, want riichi 4s (waits 6p 9p)", a)
+	}
+}
+
+// A tenpai whose wait is all in sight is dropped for a 1-shanten hand with
+// tiles left: 23m waits on 1m 4m, all eight seen, so 7z stays.
+func TestLeavesDeadTenpai(t *testing.T) {
+	v := view("23m456m789m55s123p", "9z")
+	v.Seats[0].Drawn = nil
+	v.Seats[0].Hand = tile.MustParseHand("23m678m789p55s123p7z")
+	for _, s := range []string{"1m", "4m"} {
+		for range 4 {
+			v.Seats[2].River = append(v.Seats[2].River, game.RiverTile{Tile: mustTile(s)})
+		}
+	}
+	var l game.Legal
+	for _, x := range v.Seats[0].Hand {
+		if !slices.Contains(l.Discards, x.String()) {
+			l.Discards = append(l.Discards, x.String())
+		}
+	}
+	if a := New().Decide(v, l); a.Tile == "7z" {
+		t.Errorf("got %+v, kept the dead wait", a)
+	}
+}
+
+// RiverTile.Order numbers every seat's discards in the order they were
+// made, called tiles and riichi declaration tiles included.
+func TestRiverOrder(t *testing.T) {
+	p := New()
+	called, riichi := false, false
+	for seed := int64(0); seed < 40 && (!called || !riichi); seed++ {
+		r := game.New(seed)
+		for r.Actor() >= 0 {
+			seat := r.Actor()
+			a := p.Decide(r.ViewFor(seat), r.LegalFor(seat))
+			a.Seat = seat
+			if err := r.Apply(a); err != nil {
+				t.Fatal(err)
+			}
+		}
+		byOrder := map[int]game.RiverTile{}
+		seatOf := map[int]int{}
+		for _, s := range r.ViewFor(0).Seats {
+			for _, rt := range s.River {
+				if _, dup := byOrder[rt.Order]; dup {
+					t.Fatalf("seed %d: order %d twice", seed, rt.Order)
+				}
+				byOrder[rt.Order], seatOf[rt.Order] = rt, s.Seat
+				called = called || rt.Called
+				riichi = riichi || rt.Riichi
+			}
+		}
+		i := 0
+		for _, a := range r.Log() {
+			if a.Type != game.Discard && a.Type != game.Riichi {
+				continue
+			}
+			rt, ok := byOrder[i]
+			if !ok || seatOf[i] != a.Seat || rt.Tile.String() != a.Tile {
+				t.Fatalf("seed %d: discard %d %+v, river has %+v (seat %d)", seed, i, a, rt, seatOf[i])
+			}
+			i++
+		}
+		if i != len(byOrder) {
+			t.Fatalf("seed %d: %d discards logged, %d in the rivers", seed, i, len(byOrder))
+		}
+	}
+	if !called || !riichi {
+		t.Fatalf("no called tile (%v) or riichi tile (%v) seen", called, riichi)
+	}
 }

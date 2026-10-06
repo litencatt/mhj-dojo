@@ -311,23 +311,23 @@ test.describe('a phone game', () => {
 });
 
 // A desktop window made short (no touch screen) is no phone on its side:
-// the chart and the glossary stay, in the dock.
+// the chart, the advice and the glossary stay, in the dock.
 test('a short desktop window keeps the chart and the glossary', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 450 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  await expect(dock.getByRole('button')).toHaveText([/チャート/, /用語表/]);
+  await expect(dock.getByRole('button')).toHaveText([/チャート/, /アドバイス/, /用語表/]);
 });
 
-// With the chart and the glossary minimized (the default), a desktop game
-// keeps both in the dock.
+// With the chart, the advice and the glossary minimized (the default), a
+// desktop game keeps them in the dock.
 test('a desktop game keeps the chart and the glossary in the dock', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /アドバイス/, /用語表/]);
   await dock.getByRole('button', { name: '用語表' }).click();
   await expect(page.getByRole('region', { name: '用語表' })).toBeVisible();
 });
@@ -621,12 +621,17 @@ test('the log of moves stays where a player scrolled it', async ({ page }) => {
 // width (more than six to a row) in 15px tiles. The log of moves (upright
 // only with the rivers folded away) stays one row with the newest (the win)
 // in sight, its word shown where a plain discard's 打 is only read out.
+// A seed whose first round, played by the generic steps, ends in a win with
+// more than six tiles in the top seat's river. Guarded by TestE2ESeedWonRound
+// in internal/apicall/e2e_seeds_test.go.
+const WON_ROUND = 8;
+
 test('a phone fits the revealed hands and the rivers in their seats', async ({ page }) => {
   // It plays a whole round.
   test.setTimeout(60_000);
   slowEngine();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(`./?mode=game&seed=${WON_ROUND}&length=tonpuu`);
   await playToResult(page);
   const seats = ['.seat-top', '.seat-left', '.seat-right', '.seat-bottom'];
   for (const [width, height] of [[390, 844], [360, 800], [320, 640], [844, 390]]) {

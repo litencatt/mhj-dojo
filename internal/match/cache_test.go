@@ -169,7 +169,9 @@ func checkRedPreviews(t *testing.T, m *Match, st State) int {
 
 // TestCheckValue pins the check of a whole game and of a round just dealt,
 // as computed before check kept the finished rounds' hash: saves made then
-// must still restore.
+// must still restore. Re-pinned when the normal CPU's defence and calls
+// changed (#193): the CPU moves, and so the logs hashed, differ; the hash
+// itself is unchanged (fullCheck still matches it).
 func TestCheckValue(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays a whole game on one goroutine; run without -short")
@@ -179,11 +181,11 @@ func TestCheckValue(t *testing.T) {
 	if _, err := m.Next(); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := m.Save().Check, "e213a24685951823"; got != want {
+	if got, want := m.Save().Check, "d07c80b6f1773021"; got != want {
 		t.Fatalf("after the first round: check %s, want %s", got, want)
 	}
 	playGame(t, m)
-	if got, want := m.Save().Check, "343c900b865a8c06"; got != want {
+	if got, want := m.Save().Check, "753151bbfa35be21"; got != want {
 		t.Fatalf("whole game: check %s, want %s", got, want)
 	}
 }

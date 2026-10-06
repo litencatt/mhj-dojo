@@ -16,7 +16,7 @@ export interface SidePanelsProps {
   glossary?: boolean; // false leaves the glossary out (a CPU game on a phone)
   isMin: (k: PanelKey) => boolean;
   onMinimize: (k: PanelKey) => void; // keeps its identity across renders (useMinimized)
-  advice?: ComponentChildren; // the advice panel (practice), above the glossary
+  advice?: ComponentChildren; // the advice panel (practice, and a game on a desktop), above the glossary
 }
 
 /** The right column: the yaku table (previewing a hovered discard), the advice and the glossary. */
