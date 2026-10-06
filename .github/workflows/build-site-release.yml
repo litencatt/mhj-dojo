@@ -40,7 +40,7 @@ jobs:
   build:
     name: Build, test and package the site
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     concurrency:
       group: build-site-release
       cancel-in-progress: false

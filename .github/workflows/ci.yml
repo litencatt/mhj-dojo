@@ -193,7 +193,7 @@ jobs:
     name: E2E (shard ${{ matrix.shard }}/3)
     needs: site
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
