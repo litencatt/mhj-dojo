@@ -5,9 +5,9 @@ import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { useRiversShown } from '../panels';
+import { seatLabel } from '../seats';
 
 export const WIND_NAMES: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
-const RELATIVE = ['自分', '下家', '対面', '上家'];
 export const LENGTH_NAMES: Record<GameLength, string> = { tonpuu: '東風戦', hanchan: '半荘戦' };
 export const ABORT_NAMES: Record<AbortReason, string> = { kyuushu: '九種九牌', suufon: '四風連打', suucha: '四家立直', suukaikan: '四開槓' };
 
@@ -16,10 +16,7 @@ export function roundName(wind: TileT, number: number, honba: number): string {
   return `${WIND_NAMES[wind]}${number}局${honba > 0 ? ` ${honba}本場` : ''}`;
 }
 
-/** 自分 / 下家 / 対面 / 上家 for a seat, relative to you. */
-export function seatLabel(seat: number, you: number): string {
-  return RELATIVE[(seat - you + 4) % 4];
-}
+export { seatLabel };
 
 const EVENT_VERB: Record<GameEvent['type'], string> = {
   discard: '打',
