@@ -1,5 +1,19 @@
 # Changelog
 
+## [v2026.1006.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1005.0...v2026.1006.0) - 2026-10-06
+
+### 新機能
+- 普通の CPU の守備と鳴きを強くした by @litencatt in https://github.com/litencatt/mhj-dojo/pull/222
+- CPU対戦でアドバイスとリーチへの危険度を表示 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/221
+### 修正
+- スマホの役別向聴で、件数を見出しの行にまとめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/218
+### パフォーマンス
+- 練習の分析を約2倍速く by @litencatt in https://github.com/litencatt/mhj-dojo/pull/223
+### ドキュメント
+- Service Worker の停止手順の説明を正確に by @litencatt in https://github.com/litencatt/mhj-dojo/pull/219
+### CI・リポジトリ
+- 同じコミットにリリースタグを二重に付けないように by @litencatt in https://github.com/litencatt/mhj-dojo/pull/220
+
 ## [v2026.1005.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1004.3...v2026.1005.0) - 2026-10-05
 
 ### 新機能
