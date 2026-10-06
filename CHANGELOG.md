@@ -1,5 +1,22 @@
 # Changelog
 
+## [v2026.1006.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1006.0...v2026.1006.1) - 2026-10-06
+
+### 新機能
+- CPU対戦のアドバイスに危険度を並べて表示 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/251
+- スマホの対局でおすすめの打牌を表示し、非表示時は計算を省く by @litencatt in https://github.com/litencatt/mhj-dojo/pull/254
+- CPUの動きの再生後、リーチ・鳴き・ロンの機会を1文で表示 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/253
+- CPUの動きの再生中のスキップボタンを削除 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/256
+### ドキュメント
+- 練習画面の文言を「新しい練習」にし、READMEを最近の機能に合わせる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/252
+### CI・リポジトリ
+- 公開用 PR で CI と Formal model を起動しない by @litencatt in https://github.com/litencatt/mhj-dojo/pull/250
+- 画面側ロジックの単体テストを追加 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/255
+### 依存関係
+- Build(deps): Bump source-map-js from 1.2.1 to 1.2.2 in /web by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/225
+### その他
+- 練習画面と対局画面の共通部分を整理 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/257
+
 ## [v2026.1006.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1005.0...v2026.1006.0) - 2026-10-06
 
 ### 新機能
