@@ -364,19 +364,17 @@
   font-size: 0.85rem;
   white-space: nowrap;
 }
-/* Phones (style.css's breakpoint): the buttons as tall as the CPU game's
-   (new game 40px, 設定 32px), and the game's choices without their frames,
-   so the hub's first screen stays short. */
+/* Phones (style.css's breakpoint): compact buttons, and the game's choices
+   without their frames, so the hub's first screen stays short. */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   .dojo-home .dojo-settings-button {
-    min-height: 32px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
   }
   .dojo-start,
   .dojo-restart {
-    display: inline-flex;
-    align-items: center;
-    min-height: 40px;
-    font-size: 0.9rem;
+    padding: 4px 10px;
+    font-size: 0.85rem;
   }
   .dojo-game-options {
     gap: 0 16px;
