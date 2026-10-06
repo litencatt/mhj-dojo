@@ -16,7 +16,7 @@ on:
       - internal/score/testdata/lean_*.json
       - .github/workflows/formal.yml
   pull_request:
-    branches: [main]
+    branches: [main] # deploy PRs into lolipop-deploy-now are covered by main's runs
     paths:
       - formal/**
       - internal/score/**
