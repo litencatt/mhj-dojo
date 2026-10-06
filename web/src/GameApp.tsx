@@ -414,7 +414,7 @@ export function GameApp() {
           {error && <ErrorBanner message={error} busy={busy} onRetry={retryable ? () => retry(resume) : undefined} />}
           <SaveFailedNotice />
           {!state && offered.length > 0 && (
-            <ResumePanel noun="対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
+            <ResumePanel noun="対局" newLabel="新規対局" items={offered} busy={busy} onOpen={(s) => open(s.id, s.params)} />
           )}
           {!state && !error && offered.length === 0 && (
             <EngineLoading />
