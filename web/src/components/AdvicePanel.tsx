@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import type { Advice, AdviceCandidate, AdvicePhase, DiscardReview } from '../api';
+import type { Advice, AdviceCandidate, AdvicePhase, DangerLevel, DiscardReview, SeatDanger } from '../api';
 import { PanelHeading } from './PanelHeading';
 import { Tile, mouseOnly } from './Tile';
 import { tileName } from '../tiles';
@@ -11,6 +11,16 @@ export interface AdvicePanelProps {
   onMinimize: () => void; // send the panel to the dock
   minimized?: boolean; // in the dock: nothing is drawn
   game?: boolean; // a CPU game: advice for a concealed hand only, and no defense
+  danger?: SeatDanger[]; // a CPU game, on your turn against a riichi: shown beside each candidate
+}
+
+// The badge's letter, also used in its text.
+export const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
+
+/** A tile's highest danger level over the riichi seats, or null with none. */
+function dangerLevel(danger: SeatDanger[] | undefined, tile: string): DangerLevel | null {
+  if (!danger?.length) return null;
+  return Math.max(...danger.map((d) => d.tiles[tile] ?? 3)) as DangerLevel;
 }
 
 const PHASE_LABELS: Record<AdvicePhase, string> = { early: '序盤', middle: '中盤', late: '終盤' };
@@ -20,9 +30,10 @@ function shantenLabel(s: number): string {
 }
 
 /** A candidate read as one line; focusing it marks the tile in the hand. */
-function candidateLabel(c: AdviceCandidate): string {
+function candidateLabel(c: AdviceCandidate, level: DangerLevel | null): string {
   const parts = [`打 ${tileName(c.tile)}`, shantenLabel(c.shanten), `${c.shanten === 0 ? '待ち' : '有効牌'} ${c.ukeire_kinds}種${c.ukeire}枚`];
   if (c.wait !== null && c.shanten > 0) parts.push(`聴牌時の待ち 平均${c.wait.toFixed(1)}枚`);
+  if (level !== null) parts.push(`危険度 ${DANGER_NAMES[level]}`);
   return `${parts.join('、')}（手牌で表示）`;
 }
 
@@ -36,8 +47,9 @@ function percent(p: number): string {
  * It starts minimized in the right-edge dock like the other panels, so the
  * answer is not shown before the player has thought about the hand.
  */
-export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlight, onMinimize, minimized, game }: AdvicePanelProps) {
+export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlight, onMinimize, minimized, game, danger }: AdvicePanelProps) {
   if (minimized) return null;
+  const bestLevel = advice?.candidates[0] ? dangerLevel(danger, advice.candidates[0].tile) : null;
   return (
     <section class="advice-panel" aria-label="アドバイス">
       <PanelHeading
@@ -57,12 +69,14 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
         {advice ? (
           <>
             <ol class="advice-candidates" aria-label="おすすめの打牌">
-              {advice.candidates.map((c, i) => (
+              {advice.candidates.map((c, i) => {
+                const level = dangerLevel(danger, c.tile);
+                return (
                 <li
                   key={c.tile}
                   class="advice-candidate"
                   tabIndex={0}
-                  aria-label={candidateLabel(c)}
+                  aria-label={candidateLabel(c, level)}
                   onPointerEnter={mouseOnly(() => onHighlight(c.tile))}
                   onPointerLeave={mouseOnly(() => onHighlight(null))}
                   onFocus={() => onHighlight(c.tile)}
@@ -77,9 +91,18 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
                     </span>
                     {c.wait !== null && c.shanten > 0 && <span>聴牌時の待ち 平均{c.wait.toFixed(1)}枚</span>}
                   </span>
+                  {level !== null && (
+                    <span class={`advice-danger advice-danger-${level}`} title={`危険度 ${DANGER_NAMES[level]}`} aria-hidden="true">
+                      {DANGER_NAMES[level]}
+                    </span>
+                  )}
                 </li>
-              ))}
+                );
+              })}
             </ol>
+            {bestLevel !== null && bestLevel >= 2 && (
+              <p class="advice-danger-note">最善の打牌は危険度「{DANGER_NAMES[bestLevel]}」です。リーチ者に通りにくい牌です。</p>
+            )}
             <dl class="advice-outlook">
               <div>
                 <dt>巡目</dt>
@@ -121,7 +144,7 @@ export const AdvicePanel = memo(function AdvicePanel({ advice, review, onHighlig
               </div>
             )}
             <p class="advice-caveat">
-              確率はツモ数と見えていない牌からの目安です。{game && '他家の手（危険度）は考えません。'}
+              確率はツモ数と見えていない牌からの目安です。{game && '順位は他家の手（危険度）を考えません。危険度はリーチ者に対する目安です。'}
             </p>
           </>
         ) : (

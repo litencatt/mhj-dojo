@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { ActionType, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
-import { AdvicePanel } from './components/AdvicePanel';
+import { AdvicePanel, DANGER_NAMES } from './components/AdvicePanel';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -51,9 +51,6 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
-
-// The badge's letter, also used in its text.
-const DANGER_NAMES: Record<DangerLevel, string> = { 0: '安', 1: '低', 2: '中', 3: '危' };
 
 /** Each held tile's danger mark: its highest level over the riichi seats,
  * and a text naming the seats (each with its own level when there are two
@@ -524,6 +521,7 @@ export function GameApp() {
                 minimized={isMin('advice')}
                 onMinimize={minimizeAdvice}
                 game
+                danger={danger}
               />
             )
           }
