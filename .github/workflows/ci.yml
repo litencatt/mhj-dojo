@@ -198,6 +198,19 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
+        # Playwright's --shard splits the tests by count in file order, which
+        # left the slow game.spec.ts tests in one shard (2m25s against 40s
+        # and 1m11s). The groups split them by duration instead: game.spec.ts
+        # alone, the save/table specs, and every other spec (the negative
+        # lookahead excludes the first two groups, so a new spec file runs
+        # there).
+        include:
+          - shard: 1
+            files: 'e2e/game\.spec'
+          - shard: 2
+            files: 'e2e/game-saves e2e/practice-saves e2e/table'
+          - shard: 3
+            files: 'e2e/(?!game\.spec|game-saves|practice-saves|table)'
     defaults:
       run:
         working-directory: web
@@ -231,14 +244,17 @@ jobs:
       - name: E2E tests
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
-        run: npm run e2e -- --shard=${{ matrix.shard }}/3
+          E2E_FILES: ${{ matrix.files }}
+        # Unquoted on purpose: the file filters are split into words; set -f
+        # keeps the shell from globbing the regular expressions.
+        run: set -f; npm run e2e -- $E2E_FILES
       - name: Report flaky tests
         if: always()
         run: scripts/report-flaky.sh
-      # The version tests on the release build (shard 2, currently the shortest, runs them).
+      # The version tests on the release build (shard 3, which runs the short specs, runs them).
       - name: Site version tests on a release build
         id: release
-        if: matrix.shard == 2
+        if: matrix.shard == 3
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
           MHJDOJO_EXPECT_RELEASE: v2000.0101.0
