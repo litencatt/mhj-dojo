@@ -54,6 +54,7 @@ test('a CPU riichi marks the danger of every tile you hold', async ({ page }) =>
 // action bar, and a tap marks its tile in the hand (issue #230). With the
 // advice off the page asks the engine to leave it out (advice=0), and turning
 // it on asks again for the state shown.
+// SEED is guarded by TestE2ESeedPhoneAdvice (internal/apicall/e2e_seeds_test.go).
 test.describe('a phone game', () => {
   test.use({ hasTouch: true });
 

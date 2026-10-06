@@ -95,7 +95,7 @@ Game requests (`POST /api/games`, `GET /api/games/{id}` and `POST /api/games/{id
 `query` of `mhjDojoRestoreGame`) take one: `advice=0` (`advice=1` is the default; any other value is a
 `400`) – `advice` is `null` and `danger` is `[]`, and neither is computed. It is the one switch for
 the page's advice and danger display: a page with the display off sends `advice=0`, and turning it
-on asks for the state shown again without it. It changes nothing the game is played or saved by (the
+on asks for the state shown again without `advice=0`. It changes nothing the game is played or saved by (the
 CPU players, the wall, the save and its `check`), so a game goes on across requests with and without
 it. Unknown parameters are ignored, and of a parameter given twice the last value counts.
 
@@ -780,9 +780,9 @@ under the 64 KiB body limit.
   "combos_by_discard": { "1m": [ComboRow] },  // on your turn: combos after each legal discard
   "remaining": { "1m": 3, "...": 4 },  // unseen copies of every tile kind, for the ukeire lists (see YakuRow)
   "history": [HistoryEntry],    // this round: your rows at the start and after each of your discards (node_id = turn)
-  "advice": Advice,             // on your turn with a drawn tile and a concealed hand (no calls or kans), not in riichi, no tsumo offered; else null
+  "advice": Advice,             // on your turn with a drawn tile and a concealed hand (no calls or kans), not in riichi, no tsumo offered; else null (also null with advice=0)
   "danger": [ {"seat": 2, "tiles": {"5p": 3, "1z": 0}} ],  // on your turn: each other seat in riichi, rating every tile you hold
-                                // (hand and drawn): 0 safe, 1 low, 2 medium, 3 high; [] otherwise
+                                // (hand and drawn): 0 safe, 1 low, 2 medium, 3 high; [] otherwise (and with advice=0)
   "result": null                // Result once ended
 }
 ```

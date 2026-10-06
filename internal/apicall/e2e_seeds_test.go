@@ -117,6 +117,20 @@ func TestE2ESeedCPURiichi(t *testing.T) {
 	}
 }
 
+// SEED (phone game in game-advice.spec.ts): the advice, so the 「おすすめ」
+// chip shows, on your first turn and after one tsumogiri step.
+func TestE2ESeedPhoneAdvice(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newE2EGame(c, seed, "random")
+	for i := 0; i < 2; i++ {
+		if st.Advice == nil {
+			t.Fatalf("seed %d (SEED): no advice after %d moves; see the comment above tsConst", seed, i)
+		}
+		st, _ = c.game("POST", path, tsumogiriMove(st))
+	}
+}
+
 // CPU_DEALS: a CPU deals first.
 func TestE2ESeedCPUDeals(t *testing.T) {
 	seed := tsConst(t, "table.spec.ts", "CPU_DEALS")

@@ -81,7 +81,7 @@ func main() {
 	}))
 	js.Global().Set("mhjDojoRestoreGame", js.FuncOf(func(_ js.Value, args []js.Value) any {
 		if len(args) != 1 && len(args) != 2 {
-			return response(games, 400, apicall.ErrorBody("mhjDojoRestoreGame takes a save and a query"))
+			return response(games, 400, apicall.ErrorBody("mhjDojoRestoreGame takes a save and an optional query"))
 		}
 		query := ""
 		if len(args) == 2 {

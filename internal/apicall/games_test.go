@@ -172,17 +172,29 @@ func TestGameView(t *testing.T) {
 // but is otherwise the same state at every move, and both save the same
 // game (the view option reaches nothing the game is played or saved by).
 func TestGameAdviceOff(t *testing.T) {
+	// Seed 1 is the E2E's RIICHI_SEED: a CPU riichi gives a non-empty danger.
+	var sawAdvice, sawDanger bool
+	for _, seed := range []string{"4", "1"} {
+		a, d := checkAdviceOff(t, seed)
+		sawAdvice, sawDanger = sawAdvice || a, sawDanger || d
+	}
+	if !sawAdvice || !sawDanger {
+		t.Fatalf("the games with the advice never had advice (%v) or danger (%v)", sawAdvice, sawDanger)
+	}
+}
+
+func checkAdviceOff(t *testing.T, seed string) (sawAdvice, sawDanger bool) {
 	games := match.NewStore(256)
-	const body = `{"seed":4,"first_dealer":"you"}`
+	body := `{"seed":` + seed + `,"first_dealer":"you"}`
 	on := gameState(t, games, "POST", "/api/games", body)
 	off := gameState(t, games, "POST", "/api/games?advice=0", body)
 	onID, offID := on.GameID, off.GameID
-	sawAdvice := false
 	for i := 0; i < 40 && on.Result == nil; i++ {
 		if off.Advice != nil || len(off.Danger) != 0 {
 			t.Fatalf("move %d: advice=0 has advice %v danger %v", i, off.Advice != nil, off.Danger)
 		}
 		sawAdvice = sawAdvice || on.Advice != nil
+		sawDanger = sawDanger || len(on.Danger) != 0
 		on.Advice, on.Danger, on.GameID, off.GameID = nil, []match.SeatDanger{}, "", ""
 		a, _ := json.Marshal(on)
 		b, _ := json.Marshal(off)
@@ -192,9 +204,6 @@ func TestGameAdviceOff(t *testing.T) {
 		move := tsumogiriMove(on)
 		on = gameState(t, games, "POST", "/api/games/"+onID+"/action", move)
 		off = gameState(t, games, "POST", "/api/games/"+offID+"/action?advice=0", move)
-	}
-	if !sawAdvice {
-		t.Fatal("the game with the advice never had any")
 	}
 	mOn, _ := games.Get(onID)
 	mOff, _ := games.Get(offID)
@@ -210,6 +219,7 @@ func TestGameAdviceOff(t *testing.T) {
 	if st, ok := v.(match.State); !ok || status != statusOK || st.Advice != nil || len(st.Danger) != 0 {
 		t.Errorf("RestoreGame with advice=0 = %d %v", status, v)
 	}
+	return sawAdvice, sawDanger
 }
 
 func mustJSON(t *testing.T, v any) string {

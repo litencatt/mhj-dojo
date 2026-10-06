@@ -262,7 +262,6 @@ export function GameApp() {
 
   const me = state?.seats[state.you];
   const myTurn = !!state && state.phase === 'discard' && state.actor === state.you && !playback.playing;
-  // The tree may be minimized from practice mode, but game mode has none.
   // The advice and the danger of a state shown while they were off, asked
   // for once they are on (apart from the serial requests: nothing else waits
   // on them, and the playback stays). The answer is kept beside the state,
@@ -289,6 +288,7 @@ export function GameApp() {
   }, [state, adviceOn, stopped]);
   const lateOf = late && late.of === state ? late : null;
   const advice = state?.advice ?? lateOf?.advice ?? null;
+  // The tree may be minimized from practice mode, but game mode has none.
   const panels = phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS;
   const docked = panels.filter((p) => minimized.includes(p.key));
   const danger = adviceOn && myTurn ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
