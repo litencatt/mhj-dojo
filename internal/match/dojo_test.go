@@ -95,9 +95,7 @@ func TestDojoPeek(t *testing.T) {
 			if len(b.Seats[s].Hand) == 0 {
 				t.Fatalf("seed %d: seat %d not shown with peek", seed, s)
 			}
-			if n := len(b.Seats[s].Hand); b.Seats[s].Drawn != nil {
-				n++
-			} else if n != b.Seats[s].HandCount {
+			if n := len(b.Seats[s].Hand); b.Seats[s].Drawn == nil && n != b.Seats[s].HandCount {
 				t.Fatalf("seed %d: seat %d shows %d of %d tiles", seed, s, n, b.Seats[s].HandCount)
 			}
 		}
@@ -195,7 +193,7 @@ func redrawMove(st State, riichi *bool) game.Action {
 func TestDojoRoundSummaryAndRestore(t *testing.T) {
 	st := NewStore(64)
 	won, redrew := false, false
-	for seed := int64(0); seed < 20 && !(won && redrew); seed++ {
+	for seed := int64(0); seed < 20 && (!won || !redrew); seed++ {
 		m := dojoGame(t, st, seed, DojoOptions{Yaku: allYaku, RedrawsPerRound: 1})
 		s, riichi, redraws := m.State(), false, 0
 		for steps := 0; s.Result == nil; steps++ {
