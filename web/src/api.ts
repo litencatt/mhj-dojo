@@ -415,6 +415,17 @@ export interface GameState {
   remaining: Remaining;
   history: HistoryEntry[];
   result: GameResult | null;
+  // An engine from before these fields (a cached wasm) sends neither.
+  advice?: Advice | null; // your discard, concealed hand out of riichi only
+  danger?: SeatDanger[]; // on your turn: each other seat in riichi
+}
+
+/** 0 safe, 1 low, 2 medium, 3 high (docs/api.md "GameState"). */
+export type DangerLevel = 0 | 1 | 2 | 3;
+
+export interface SeatDanger {
+  seat: number;
+  tiles: Record<Tile, DangerLevel>; // every tile you hold
 }
 
 export interface GameOptions {

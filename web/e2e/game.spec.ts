@@ -311,23 +311,23 @@ test.describe('a phone game', () => {
 });
 
 // A desktop window made short (no touch screen) is no phone on its side:
-// the chart and the glossary stay, in the dock.
+// the chart, the advice and the glossary stay, in the dock.
 test('a short desktop window keeps the chart and the glossary', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 450 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  await expect(dock.getByRole('button')).toHaveText([/チャート/, /用語表/]);
+  await expect(dock.getByRole('button')).toHaveText([/チャート/, /アドバイス/, /用語表/]);
 });
 
-// With the chart and the glossary minimized (the default), a desktop game
-// keeps both in the dock.
+// With the chart, the advice and the glossary minimized (the default), a
+// desktop game keeps them in the dock.
 test('a desktop game keeps the chart and the glossary in the dock', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
-  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /用語表/]);
+  await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /アドバイス/, /用語表/]);
   await dock.getByRole('button', { name: '用語表' }).click();
   await expect(page.getByRole('region', { name: '用語表' })).toBeVisible();
 });
