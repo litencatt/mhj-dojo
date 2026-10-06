@@ -49,3 +49,17 @@ test('a CPU riichi marks the danger of every tile you hold', async ({ page }) =>
   await page.getByRole('checkbox', { name: 'アドバイス・危険度' }).uncheck();
   await expect(marked).toHaveCount(0);
 });
+
+test('after the CPU replay, the live region sums up the riichi', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`./?mode=game&seed=${RIICHI_SEED}&length=tonpuu`);
+  const status = page.locator('[role="status"].visually-hidden:has(+ .action-area)');
+  await waitForPlayback(page);
+  await expect(status).toHaveText('');
+  for (let i = 0; i < 3; i++) {
+    await playOneStep(page);
+    await waitForPlayback(page);
+    if (/がリーチ/.test(await status.innerText())) break;
+  }
+  await expect(status).toHaveText(/(下家|対面|上家)がリーチ.*。$/);
+});

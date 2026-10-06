@@ -70,6 +70,22 @@ function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { classNa
   return out;
 }
 
+const CALL_NAMES = { pon: 'ポン', chii: 'チー', kan: 'カン' } as const;
+
+/** One sentence on what the CPUs did (riichi, calls, kans) and whether you may
+ * ron, for a screen reader once the replay is over; '' when nothing of note. */
+function summarizeMoves(state: GameState): string {
+  const parts: string[] = [];
+  for (const e of state.events) {
+    if (e.seat === state.you) continue;
+    const who = seatLabel(e.seat, state.you);
+    if (e.type === 'riichi') parts.push(`${who}がリーチ`);
+    else if (e.type === 'pon' || e.type === 'chii' || e.type === 'kan') parts.push(`${who}が${CALL_NAMES[e.type]}`);
+  }
+  if (state.legal.ron) parts.push('ロンできます');
+  return parts.length > 0 ? `${parts.slice(-3).join('、')}。` : '';
+}
+
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
 
@@ -456,7 +472,7 @@ export function GameApp() {
               {/* Persistent (not conditionally mounted) so a screen reader
                   reliably announces the text change either way. */}
               <p class="visually-hidden" role="status" aria-live="polite">
-                {playback.playing ? 'CPUの動きを再生中…' : ''}
+                {playback.playing ? 'CPUの動きを再生中…' : state !== reopened.current ? summarizeMoves(state) : ''}
               </p>
               <div ref={actionAreaRef} class="action-area" tabIndex={-1}>
                 {playback.playing ? (
