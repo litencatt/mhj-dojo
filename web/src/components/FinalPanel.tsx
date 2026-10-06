@@ -29,7 +29,7 @@ function DojoReward({ reward, state }: { reward: Reward | null; state: GameState
           {multiplier && `（順位 +${reward.rankXp}${multiplier}）`}
         </li>
         <li>
-          雀銭 {signed(reward.coins)}（順位 +{reward.rankCoins}{multiplier}
+          銭 {signed(reward.coins)}（順位 +{reward.rankCoins}{multiplier}
           {reward.wins > 0 && `、和了 +${reward.hanCoins}、和了祝儀 +${reward.winBonusCoins}${cheatedNote(reward)}${paidNote(reward)}`}
           {reward.firstGameBonus > 0 && `、初回ボーナス +${reward.firstGameBonus}`}
           {reward.redraws > 0 && `、引き直し ${reward.redraws}回 -${reward.redrawCost}`}

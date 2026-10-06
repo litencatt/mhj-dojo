@@ -83,7 +83,7 @@ export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPane
       </div>
       {!!dojoHan && (
         <p class="dojo-round-reward" data-testid="dojo-round-reward">
-          道場の報酬 +{dojoHan * COINS_PER_HAN + bonus} 雀銭（和了 +{dojoHan * COINS_PER_HAN}、
+          道場の報酬 +{dojoHan * COINS_PER_HAN + bonus} 銭（和了 +{dojoHan * COINS_PER_HAN}、
           {bonus ? `和了祝儀 +${bonus}` : 'イカサマ使用のため和了祝儀なし'}）・稽古 +{dojoHan * XP_PER_HAN}
         </p>
       )}

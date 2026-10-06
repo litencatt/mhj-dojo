@@ -123,7 +123,7 @@ export const CATALOG: readonly ShopItem[] = [
 
   { id: 'cheat:wallpeek', kind: 'cheat', name: 'イカサマ: 山読み（次のツモ3枚）', price: 1200, level: 9 },
 
-  { id: 'cheat:summon', kind: 'cheat', name: 'イカサマ: 牌寄せ（指定牌を手牌に、1局1回・50雀銭/回）', price: 1500, level: 10 },
+  { id: 'cheat:summon', kind: 'cheat', name: 'イカサマ: 牌寄せ（指定牌を手牌に、1局1回・50銭/回）', price: 1500, level: 10 },
 
   // 七対子 first: a 字一色 seven pairs would be thrown out with its 七対子 reading.
   { id: YAKUMAN_PACK, kind: 'pack', name: '役満パック', price: 2000, level: 10, requires: ['chiitoitsu'], grants: YAKUMAN_KEYS },

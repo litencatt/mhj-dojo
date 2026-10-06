@@ -9,8 +9,6 @@ import {
   canAffordRedraw,
   canAffordSummon,
   dojoOptions,
-  exportProgress,
-  importProgress,
   initialProgress,
   level,
   loadProgress,
@@ -113,22 +111,6 @@ test('a progress from before the rounds were paid loads with none paid', () => {
   assert.deepEqual(parseProgress(JSON.stringify(old))?.paidRounds, {});
   assert.equal(parseProgress(JSON.stringify({ ...old, paidRounds: { g: -1 } })), null);
   assert.equal(parseProgress(JSON.stringify({ ...old, paidRounds: [] })), null);
-});
-
-test('importing an older backup keeps what was paid since: a settled game and its rounds are not paid again', () => {
-  const rounds = [{ han: 2 }, { han: 1 }];
-  const backup = payRounds(withFirstBonus({ settled: ['1'] }), 'g', rounds.slice(0, 1))!.progress;
-  // Since the backup: the game g (seed 7) was settled and another, h, paid 2 rounds.
-  const settledG = settle(backup, game(7, 2, rounds), 'g').progress;
-  const current = payRounds(settledG, 'h', [{ han: 1 }, {}])!.progress;
-  const merged = importProgress(current, { ...backup, firstGameBonus: false, paidRounds: { ...backup.paidRounds, h: 1, k: 3 } });
-  assert.equal(merged.coins, backup.coins);
-  assert.equal(merged.xp, backup.xp);
-  assert.deepEqual(merged.settled, ['1', '7']);
-  assert.deepEqual(merged.paidRounds, { g: 1, h: 2, k: 3 });
-  assert.equal(merged.firstGameBonus, true);
-  assert.equal(settle(merged, game(7, 1, rounds), 'g').reward, null);
-  assert.equal(payRounds(merged, 'h', [{ han: 1 }, {}]), null);
 });
 
 test('reward: 1st with two wins (3 and 2 han) and one redraw is 150 XP and 110 coins, 和了祝儀 (10 a win) included', () => {
@@ -308,17 +290,16 @@ test('no saved progress is a fresh start, not a corruption', () => {
   assert.equal(store.data.has(CORRUPT_KEY), false);
 });
 
-test('saved progress loads back, and an export imports to the same state', () => {
+test('saved progress loads back to the same state', () => {
   const p = settle(initialProgress(), game(77, 1, [{ han: 4, redraws: 1 }])).progress;
   const bought = purchase({ ...p, coins: 500 }, 'riichi');
   assert.ok(bought.ok);
   const store = memoryStore();
   assert.equal(saveProgress(bought.progress, store), true);
   assert.deepEqual(loadProgress(store).progress, bought.progress);
-  assert.deepEqual(parseProgress(exportProgress(bought.progress)), bought.progress);
 });
 
-test('an import with a wrong shape is refused', () => {
+test('a stored progress with a wrong shape is refused', () => {
   assert.equal(parseProgress('[]'), null);
   assert.equal(parseProgress('null'), null);
   assert.equal(parseProgress(JSON.stringify({ ...initialProgress(), coins: -1 })), null);
@@ -375,15 +356,14 @@ test('半荘戦 is chosen from Lv5 and the normal CPU from Lv7', () => {
   assert.deepEqual(dojoGame({ ...lv4, gameLength: 'hanchan', gameCpu: 'normal' }), { length: 'tonpuu', cpu: 'weak' });
 });
 
-test('a progress from before the game choice loads with 東風戦 against weak CPUs, and an import takes the loaded choice', () => {
+test('a progress from before the game choice loads with 東風戦 against weak CPUs', () => {
   const { gameLength: _l, gameCpu: _c, ...old } = withFirstBonus({ xp: 2100 });
   const parsed = parseProgress(JSON.stringify(old));
   assert.deepEqual([parsed?.gameLength, parsed?.gameCpu], ['tonpuu', 'weak']);
   assert.equal(parseProgress(JSON.stringify({ ...old, gameLength: 'south' })), null);
   assert.equal(parseProgress(JSON.stringify({ ...old, gameCpu: 3 })), null);
-  const loaded = parseProgress(JSON.stringify({ ...old, gameLength: 'hanchan', gameCpu: 'normal' }))!;
-  const merged = importProgress(withFirstBonus({ xp: 2100 }), loaded);
-  assert.deepEqual([merged.gameLength, merged.gameCpu], ['hanchan', 'normal']);
+  const chosen = parseProgress(JSON.stringify({ ...old, gameLength: 'hanchan', gameCpu: 'normal' }))!;
+  assert.deepEqual([chosen.gameLength, chosen.gameCpu], ['hanchan', 'normal']);
 });
 
 test('a level is shown as its 級位: 10級 to 1級, then 初段, 二段 and on', () => {

@@ -810,12 +810,12 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, ca
       )}
       {canRedraw && (
         <button type="button" class="action-redraw" disabled={busy} onClick={() => onAction('redraw')}>
-          引き直し（{REDRAW_COST}雀銭）
+          引き直し（{REDRAW_COST}銭）
         </button>
       )}
       {summonable && (
         <button type="button" class="action-redraw" aria-expanded={summoning} disabled={busy} onClick={() => setSummoning(!summoning)}>
-          牌寄せ（{SUMMON_COST}雀銭）
+          牌寄せ（{SUMMON_COST}銭）
         </button>
       )}
       {summonable && summoning && (

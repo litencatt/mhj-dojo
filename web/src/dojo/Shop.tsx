@@ -16,7 +16,7 @@ export const DENIED: Record<PurchaseDenied, string> = {
   owned: 'すでに持っています',
   level: '級位が足りません',
   requires: '前提の商品が必要です',
-  coins: '雀銭が足りません',
+  coins: '銭が足りません',
 };
 
 // The shop's tabs, each a group of item kinds (the yakuman pack sells with the yaku).
@@ -37,9 +37,7 @@ interface ShopProps {
 export function Shop({ progress: p, onChange }: ShopProps) {
   const [tab, setTab] = useState(TABS[0].key);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const lv = level(p.xp);
   const shown = CATALOG.filter((it) => TABS.find((t) => t.key === tab)!.kinds.includes(it.kind));
-  const levels = [...new Set(shown.map((it) => it.level))].sort((a, b) => a - b);
 
   // Arrow keys, Home and End move between the tabs (the WAI-ARIA tabs pattern).
   function onTabKey(e: KeyboardEvent, i: number) {
@@ -51,7 +49,17 @@ export function Shop({ progress: p, onChange }: ShopProps) {
     tabRefs.current[j]?.focus();
   }
 
-  function buy(id: string) {
+  // 購入 asks first, in a modal dialog: 購入 buys, キャンセル (or Esc) does not.
+  const confirmRef = useRef<HTMLDialogElement>(null);
+  const [pending, setPending] = useState<ShopItem | null>(null);
+  function ask(item: ShopItem) {
+    setPending(item);
+    confirmRef.current?.showModal();
+  }
+  function buy() {
+    const id = pending?.id;
+    confirmRef.current?.close();
+    if (!id) return;
     onChange((cur) => {
       const r = purchase(cur, id);
       return r.ok ? r.progress : cur;
@@ -82,11 +90,9 @@ export function Shop({ progress: p, onChange }: ShopProps) {
         ))}
       </div>
       <div id="shop-tabpanel" class="shop-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`shop-tab-${tab}`}>
-      {levels.map((n) => (
-        <div key={n} class="shop-level">
-          <h3 class={n > lv ? 'shop-level-locked' : undefined}>{rankName(n)}</h3>
+          {/* In unlock order; a locked item says its rank where its button would be. */}
           <ul class="shop-list">
-            {shown.filter((it) => it.level === n).map((it) => {
+            {[...shown].sort((a, b) => a.level - b.level).map((it) => {
               const have = owns(p, it.id);
               const locked = lockedLabel(p, it);
               // A theme or a back owned is chosen here (again: back to the default).
@@ -94,7 +100,7 @@ export function Shop({ progress: p, onChange }: ShopProps) {
               return (
                 <li key={it.id} class="shop-item" data-item={it.id} data-owned={have || undefined}>
                   <span class="shop-name">{it.name}</span>
-                  <span class="shop-price">{it.price} 雀銭</span>
+                  <span class="shop-price">{it.price} 銭</span>
                   {have && active !== null ? (
                     <button
                       type="button"
@@ -114,7 +120,7 @@ export function Shop({ progress: p, onChange }: ShopProps) {
                   ) : locked ? (
                     <span class="shop-locked">{locked}</span>
                   ) : (
-                    <button type="button" disabled={p.coins < it.price} onClick={() => buy(it.id)}>
+                    <button type="button" disabled={p.coins < it.price} onClick={() => ask(it)}>
                       購入
                     </button>
                   )}
@@ -122,9 +128,26 @@ export function Shop({ progress: p, onChange }: ShopProps) {
               );
             })}
           </ul>
-        </div>
-      ))}
       </div>
+      <dialog ref={confirmRef} class="shop-confirm" aria-labelledby="shop-confirm-heading" onClose={() => setPending(null)}>
+        {pending && (
+          <>
+            <h2 id="shop-confirm-heading">購入しますか？</h2>
+            <p class="shop-confirm-item">{pending.name}</p>
+            <p class="dojo-muted">
+              {pending.price} 銭（残り {p.coins} → {p.coins - pending.price} 銭）
+            </p>
+            <div class="dojo-actions">
+              <button type="button" class="shop-confirm-buy" onClick={buy}>
+                購入
+              </button>
+              <button type="button" onClick={() => confirmRef.current?.close()}>
+                キャンセル
+              </button>
+            </div>
+          </>
+        )}
+      </dialog>
     </section>
   );
 }

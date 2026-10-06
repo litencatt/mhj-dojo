@@ -297,7 +297,7 @@ export function setGameCpu(p: DojoProgress, cpu: CpuLevel): DojoProgress {
   return cpuUnlocked(p, cpu) ? { ...p, gameCpu: cpu } : p;
 }
 
-/** The length and CPU of the game the hub starts: the ones chosen, as defaults when not unlocked (a loaded backup's). */
+/** The length and CPU of the game the hub starts: the ones chosen, as defaults when not unlocked. */
 export function dojoGame(p: DojoProgress): { length: GameLength; cpu: CpuLevel } {
   return {
     length: lengthUnlocked(p, p.gameLength) ? p.gameLength : DEFAULT_GAME_LENGTH,
@@ -373,26 +373,6 @@ export function parseProgress(text: string): DojoProgress | null {
     gameLength,
     gameCpu,
   };
-}
-
-/**
- * A loaded progress (a backup) to replace the current one, keeping what the
- * current one paid: the settled games (both), the rounds paid (the larger count
- * by game) and the first-game bonus, so an older backup cannot pay them again.
- */
-export function importProgress(current: DojoProgress, loaded: DojoProgress): DojoProgress {
-  const paidRounds = { ...loaded.paidRounds };
-  for (const [id, n] of Object.entries(current.paidRounds)) paidRounds[id] = Math.max(n, paidRounds[id] ?? 0);
-  return {
-    ...loaded,
-    settled: [...loaded.settled, ...current.settled.filter((s) => !loaded.settled.includes(s))],
-    firstGameBonus: loaded.firstGameBonus || current.firstGameBonus,
-    paidRounds,
-  };
-}
-
-export function exportProgress(p: DojoProgress): string {
-  return JSON.stringify(p, null, 2);
 }
 
 /** The part of localStorage the dojo uses. */

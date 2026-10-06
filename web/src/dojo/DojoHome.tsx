@@ -4,12 +4,9 @@ import { YAKUHAI_KEYS, yakuName } from './catalog';
 import {
   cpuUnlocked,
   dojoGame,
-  exportProgress,
-  importProgress,
   level,
   levelProgress,
   loadProgress,
-  parseProgress,
   lengthUnlocked,
   saveProgress,
   setBack,
@@ -64,7 +61,6 @@ export function DojoHome() {
   const [notice, setNotice] = useState<string | null>(
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
-  const fileRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDialogElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The dojo's own unfinished games (the CPU game's list never has them).
@@ -102,30 +98,6 @@ export function DojoHome() {
     const next = apply(cur);
     setProgress(next);
     if (next !== cur && !saveProgress(next)) setNotice('道場のデータを保存できませんでした（ブラウザの保存領域を確認してください）。');
-  }
-
-  function download() {
-    const url = URL.createObjectURL(new Blob([exportProgress(progress)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mhj-dojo-progress.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function upload(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    const next = parseProgress(await file.text());
-    if (!next) {
-      setNotice('読み込めないファイルです。書き出した道場のデータを選んでください。');
-      return;
-    }
-    if (!window.confirm('今の道場のデータを、読み込んだデータで置き換えますか？')) return;
-    change((cur) => importProgress(cur, next));
-    setNotice('道場のデータを読み込みました。');
   }
 
   const lv = level(progress.xp);
@@ -174,14 +146,18 @@ export function DojoHome() {
             稽古 {progress.xp} / {next}
           </small>
           <span class="dojo-coin-count">
-            <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 雀銭
+            <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 銭
           </span>
         </div>
         <div class="dojo-play">
           {resume ? (
             <>
-              <a class="dojo-start" href={`?mode=dojo&game=${encodeURIComponent(resume.id)}`}>
-                続きから（{resume.round ? roundName(resume.round.wind, resume.round.number, resume.round.honba) : '対局'}）
+              <a
+                class="dojo-start"
+                href={`?mode=dojo&game=${encodeURIComponent(resume.id)}`}
+                title={resume.round ? roundName(resume.round.wind, resume.round.number, resume.round.honba) : undefined}
+              >
+                続きから
               </a>
               <a class="dojo-restart" href={playHref()} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
                 新しく始める
@@ -193,7 +169,33 @@ export function DojoHome() {
             </a>
           )}
         </div>
-        {/* The game a new start plays: the choices unlock with the level (no purchase). */}
+      </section>
+
+      <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
+        <h2 id="dojo-yaku-heading">所持役</h2>
+        <ul class="dojo-yaku" data-testid="dojo-yaku">
+          {ownedYakuNames(progress.ownedYaku).map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      </section>
+
+      <Shop progress={progress} onChange={change} />
+
+      {/* Esc (the dialog's cancel) and 閉じる close it; showModal makes the page behind inert. */}
+      <dialog ref={settingsRef} class="dojo-settings" aria-labelledby="dojo-settings-heading" onClose={() => setSettingsOpen(false)}>
+        <div class="dojo-settings-head">
+          <h2 id="dojo-settings-heading">設定</h2>
+          <button type="button" onClick={() => settingsRef.current?.close()}>
+            閉じる
+          </button>
+        </div>
+        {notice && settingsOpen && (
+          <p class="dojo-notice" role="status">
+            {notice}
+          </p>
+        )}
+        {/* The game a new start plays: the choices unlock with the rank (no purchase). */}
         <div class="dojo-game-options">
           <fieldset class="dojo-settings-group">
             <legend>長さ</legend>
@@ -233,32 +235,6 @@ export function DojoHome() {
             </p>
           )}
         </div>
-      </section>
-
-      <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
-        <h2 id="dojo-yaku-heading">所持役</h2>
-        <ul class="dojo-yaku" data-testid="dojo-yaku">
-          {ownedYakuNames(progress.ownedYaku).map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ul>
-      </section>
-
-      <Shop progress={progress} onChange={change} />
-
-      {/* Esc (the dialog's cancel) and 閉じる close it; showModal makes the page behind inert. */}
-      <dialog ref={settingsRef} class="dojo-settings" aria-labelledby="dojo-settings-heading" onClose={() => setSettingsOpen(false)}>
-        <div class="dojo-settings-head">
-          <h2 id="dojo-settings-heading">設定</h2>
-          <button type="button" onClick={() => settingsRef.current?.close()}>
-            閉じる
-          </button>
-        </div>
-        {notice && settingsOpen && (
-          <p class="dojo-notice" role="status">
-            {notice}
-          </p>
-        )}
         <fieldset class="dojo-settings-group">
           <legend>牌テーマ</legend>
           {TILE_THEMES.filter((t) => t.item === null || progress.ownedItems.includes(t.item)).map((t) => (
@@ -293,13 +269,6 @@ export function DojoHome() {
           <Tile tile="5s" size="sm" />
           <Tile tile="7z" size="sm" />
           <Tile tile="" size="sm" faceDown />
-        </div>
-        <h3>データの書き出しと読み込み</h3>
-        <p class="dojo-muted">道場のデータはこのブラウザにだけ保存されます。バックアップや引っ越しに使えます。</p>
-        <div class="dojo-actions">
-          <button type="button" onClick={download}>書き出す</button>
-          <button type="button" onClick={() => fileRef.current?.click()}>読み込む</button>
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={upload} />
         </div>
       </dialog>
     </div>

@@ -134,9 +134,6 @@
   color: var(--muted);
   font-size: 0.85rem;
 }
-.shop-level-locked {
-  color: var(--muted);
-}
 .dojo-actions {
   display: flex;
   flex-wrap: wrap;
@@ -210,8 +207,8 @@
 }
 /* The items scroll inside the shop so the tabs stay in view. */
 .shop-tabpanel {
-  max-height: min(60vh, 32rem);
-  overflow-y: auto;
+  height: min(60vh, 32rem); /* the same for every tab, which all scroll */
+  overflow-y: scroll;
   scrollbar-gutter: stable;
   padding-right: 4px;
 }
@@ -336,13 +333,7 @@
   font-weight: bold;
 }
 
-/* The hub's game choice (length and CPU), under 対局開始. */
-.dojo-game-options {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 12px;
-}
+/* The game choice (length and CPU), in 設定. */
 .dojo-game-options .dojo-settings-group label:has(input:disabled) {
   color: var(--muted);
   cursor: default;
@@ -364,8 +355,7 @@
   font-size: 0.85rem;
   white-space: nowrap;
 }
-/* Phones (style.css's breakpoint): compact buttons, and the game's choices
-   without their frames, so the hub's first screen stays short. */
+/* Phones (style.css's breakpoint): compact buttons. */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   .dojo-home .dojo-settings-button {
     padding: 3px 8px;
@@ -376,24 +366,37 @@
     padding: 4px 10px;
     font-size: 0.85rem;
   }
-  .dojo-game-options {
-    gap: 0 16px;
-  }
-  .dojo-game-options .dojo-settings-group {
-    gap: 2px 10px;
-    margin-top: 6px;
-    padding: 0;
-    border: 0;
-    font-size: 0.85rem;
-  }
-  .dojo-game-options .dojo-settings-group legend {
-    float: left;
-    margin-right: 6px;
-    padding: 0;
-    font-size: 0.8rem;
-    color: var(--muted);
-  }
-  .dojo-game-options .dojo-settings-group small {
-    font-size: 0.75rem;
-  }
+}
+
+/* The shop's purchase confirmation (a modal <dialog>). */
+.shop-confirm {
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-bg);
+  color: var(--fg);
+}
+.shop-confirm::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+.shop-confirm h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.shop-confirm p {
+  margin: 4px 0;
+}
+.shop-confirm-item {
+  font-weight: bold;
+}
+.shop-confirm .dojo-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.dojo-home .shop-confirm-buy {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
 }

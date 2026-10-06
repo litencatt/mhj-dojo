@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
 import {
   DOJO_REDRAW_SEED,
   DOJO_RIICHI_SEED,
@@ -67,6 +66,7 @@ test('a first game pays its reward once, and the 立直 it buys is offered in th
   await page.getByRole('button', { name: '道場へ戻る' }).click();
   await expect(page.getByTestId('dojo-coins')).toHaveText(String(paid!.coins));
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   await expect(page.locator('[data-item="riichi"]')).toContainText('所持');
   await expect(page.getByTestId('dojo-yaku')).toContainText('立直');
 
@@ -107,7 +107,7 @@ test('a redraw is restored by a reload and costs its coins once, when the game e
   await expect(reward).toContainText('引き直し 1回 -20');
   // The round of the redraw is marked: its win, if any, paid no 和了祝儀.
   await expect(page.locator('.final-rounds tbody tr').first()).toContainText('イカサマ使用');
-  const delta = Number(/雀銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
+  const delta = Number(/銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
   const paid = await dojoProgress(page);
   expect(paid?.coins).toBe(200 + delta);
   await page.reload();
@@ -215,6 +215,7 @@ test('the hub follows what another tab has stored, and buys on top of it', async
   });
   await expect(page.getByTestId('dojo-coins')).toHaveText('500');
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   await expect(page.getByTestId('dojo-coins')).toHaveText('460');
   expect((await dojoProgress(page))?.xp).toBe(100);
 });
@@ -239,10 +240,15 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   await page.keyboard.press('ArrowRight');
   await expect(panel.locator('[data-item^="cheat:"]')).toHaveCount(6);
 
-  // The yaku tab is longer than the list's height: it scrolls inside the shop.
+  // Every tab has the same height and scrolls inside the shop; the yaku tab is longer than it.
+  const box = async () => panel.evaluate((el) => ({ overflow: getComputedStyle(el).overflowY, height: el.clientHeight, full: el.scrollHeight }));
+  await tabs.getByRole('tab', { name: 'イカサマ' }).click();
+  const cheats = await box();
   await tabs.getByRole('tab', { name: '役' }).click();
-  const scrolls = await panel.evaluate((el) => getComputedStyle(el).overflowY === 'auto' && el.scrollHeight > el.clientHeight);
-  expect(scrolls).toBe(true);
+  const yaku = await box();
+  expect([cheats.overflow, yaku.overflow]).toEqual(['scroll', 'scroll']);
+  expect(cheats.height).toBe(yaku.height);
+  expect(yaku.full).toBeGreaterThan(yaku.height);
 });
 
 /** Opens the hub with a progress stored first (over the initial one), only while the browser has none. */
@@ -259,10 +265,11 @@ async function openHub(page: Page, progress: Partial<DojoProgress> = {}) {
 
 const htmlAttr = (page: Page, name: string) => page.evaluate((n) => document.documentElement.getAttribute(n), name);
 
-test('設定 opens a dialog with the theme, the back and the backup, closed by Esc or 閉じる', async ({ page }) => {
+test('設定 opens a dialog with the game choice, the theme and the back, closed by Esc or 閉じる', async ({ page }) => {
   await openHub(page, { coins: 123, ownedItems: ['theme:sakura', 'back:shima'], firstGameBonus: true });
-  // The backup is no longer a panel of the hub.
-  await expect(page.getByRole('heading', { name: 'データの書き出しと読み込み' })).toBeHidden();
+  // The game choice is in 設定, not on the hub; there is no backup.
+  await expect(page.getByRole('radio', { name: '東風戦' })).toBeHidden();
+  await expect(page.getByRole('button', { name: '書き出す' })).toHaveCount(0);
   const settings = page.getByRole('dialog', { name: '設定' });
   await expect(settings).toBeHidden();
 
@@ -287,22 +294,7 @@ test('設定 opens a dialog with the theme, the back and the backup, closed by E
   const stored = await dojoProgress(page);
   expect(stored).toMatchObject({ activeTheme: 'theme:sakura', activeBack: 'back:shima' });
 
-  // 書き出す saves the progress as it is stored.
-  const download = page.waitForEvent('download');
-  await settings.getByRole('button', { name: '書き出す' }).click();
-  const file = await (await download).path();
-  expect(JSON.parse(await readFile(file, 'utf8'))).toEqual(stored);
-
-  // 読み込む replaces it, once confirmed.
-  page.once('dialog', (d) => void d.accept());
-  await settings.locator('input[type="file"]').setInputFiles({
-    name: 'progress.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({ ...stored, coins: 999, activeBack: 'default' })),
-  });
-  await expect(settings.getByRole('status')).toContainText('読み込みました');
-  await expect(page.getByTestId('dojo-coins')).toHaveText('999');
-  await expect.poll(() => htmlAttr(page, 'data-tile-back')).toBe(null);
+  await expect(settings.getByRole('radio', { name: '東風戦' })).toBeChecked();
   await settings.getByRole('button', { name: '閉じる' }).click();
   await expect(settings).toBeHidden();
 });
@@ -473,17 +465,17 @@ test('牌寄せ fetches a chosen kind into the drawn tile once a round, and cost
   await finishDojoGame(page);
   const reward = page.getByTestId('dojo-reward');
   await expect(reward).toContainText('牌寄せ 1回 -50');
-  const delta = Number(/雀銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
+  const delta = Number(/銭 ([+-]\d+)/.exec(await reward.innerText())![1]);
   expect((await dojoProgress(page))?.coins).toBe(Math.max(0, 200 + delta));
 });
 
-test('a won round pays its 雀銭 as it ends, once, even after a reload', async ({ page }) => {
+test('a won round pays its 銭 as it ends, once, even after a reload', async ({ page }) => {
   test.setTimeout(90_000);
   // DOJO_WIN_SEED: tsumogiri wins the first round by tsumo, 門前清自摸和 (1 han).
   await newDojoGame(page, DOJO_WIN_SEED, { coins: 100, firstGameBonus: true });
   await playToResult(page);
   await expect(page.getByRole('region', { name: '結果' })).toContainText('自分のツモ和了');
-  await expect(page.getByTestId('dojo-round-reward')).toHaveText('道場の報酬 +20 雀銭（和了 +10、和了祝儀 +10）・稽古 +10');
+  await expect(page.getByTestId('dojo-round-reward')).toHaveText('道場の報酬 +20 銭（和了 +10、和了祝儀 +10）・稽古 +10');
   await expect.poll(async () => (await dojoProgress(page))?.coins).toBe(120);
   const paid = await dojoProgress(page);
   expect(Object.values(paid!.paidRounds)).toEqual([1]);
@@ -505,12 +497,15 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
     [STORAGE_KEY, stored({ xp: 1000 })], // Lv5
   );
   await page.goto(`./?mode=dojo&seed=${SEED}`);
-  const hanchan = page.getByRole('radio', { name: /半荘戦/ });
-  const normal = page.getByRole('radio', { name: /普通/ });
+  // The choice is in 設定.
+  const settings = page.getByRole('dialog', { name: '設定' });
+  await page.getByRole('button', { name: '設定' }).click();
+  const hanchan = settings.getByRole('radio', { name: /半荘戦/ });
+  const normal = settings.getByRole('radio', { name: /普通/ });
   await expect(page.getByRole('radio', { name: '東風戦' })).toBeChecked();
   await expect(hanchan).toBeEnabled();
   await expect(normal).toBeDisabled();
-  await expect(page.locator('label', { has: normal })).toContainText('4級で解禁');
+  await expect(settings.locator('label').filter({ has: page.getByRole('radio', { name: /普通/ }) })).toContainText('4級で解禁');
   await expect(page.getByTestId('dojo-multiplier')).toBeHidden();
   await hanchan.check();
   await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘 ×2');
@@ -519,10 +514,12 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   // Lv7: the normal CPU too; both pay the rank x3.
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, stored({ xp: 2100, gameLength: 'hanchan' })]);
   await page.reload();
+  await page.getByRole('button', { name: '設定' }).click();
   await expect(hanchan).toBeChecked();
   await normal.check();
   await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×3');
   expect((await dojoProgress(page))?.gameCpu).toBe('normal');
+  await settings.getByRole('button', { name: '閉じる' }).click();
 
   await page.getByRole('link', { name: '対局開始' }).click();
   await expect(handPanel(page)).toBeVisible();
@@ -531,15 +528,17 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×3）/);
 });
 
-test('a backup without the game choice plays 東風戦 against weak CPUs, and 半荘戦 is locked below Lv5', async ({ page }) => {
+test('a progress without the game choice plays 東風戦 against weak CPUs, and 半荘戦 is locked below 6級', async ({ page }) => {
   const { gameLength: _l, gameCpu: _c, ...old } = initialProgress();
   await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, JSON.stringify(old)]);
   await page.goto('./?mode=dojo');
-  await expect(page.getByRole('radio', { name: '東風戦' })).toBeChecked();
-  await expect(page.getByRole('radio', { name: /半荘戦/ })).toBeDisabled();
-  await expect(page.locator('label', { has: page.getByRole('radio', { name: /半荘戦/ }) })).toContainText('6級で解禁');
-  await expect(page.getByRole('radio', { name: '弱い' })).toBeChecked();
   await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('title', '東風戦、CPU は弱い');
+  await page.getByRole('button', { name: '設定' }).click();
+  const settings = page.getByRole('dialog', { name: '設定' });
+  await expect(settings.getByRole('radio', { name: '東風戦' })).toBeChecked();
+  await expect(settings.getByRole('radio', { name: /半荘戦/ })).toBeDisabled();
+  await expect(settings.locator('label').filter({ has: page.getByRole('radio', { name: /半荘戦/ }) })).toContainText('6級で解禁');
+  await expect(settings.getByRole('radio', { name: '弱い' })).toBeChecked();
 });
 
 test('the owned yaku list shows the dragons and the winds once, as 役牌', async ({ page }) => {
@@ -551,5 +550,31 @@ test('the owned yaku list shows the dragons and the winds once, as 役牌', asyn
   const owned = page.getByTestId('dojo-yaku').getByRole('listitem');
   await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和']);
   await page.locator('[data-item="yakuhai"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和', '役牌']);
+});
+
+test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), coins: 100, firstGameBonus: true })],
+  );
+  await page.goto('./?mode=dojo');
+  const confirm = page.getByRole('dialog', { name: '購入しますか？' });
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText('立直');
+  await expect(confirm).toContainText('残り 100 → 60 銭');
+  await confirm.getByRole('button', { name: 'キャンセル' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('100');
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('100');
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await confirm.getByRole('button', { name: '購入' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('60');
+  await expect(page.locator('[data-item="riichi"]')).toContainText('所持');
 });
