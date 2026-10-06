@@ -621,12 +621,17 @@ test('the log of moves stays where a player scrolled it', async ({ page }) => {
 // width (more than six to a row) in 15px tiles. The log of moves (upright
 // only with the rivers folded away) stays one row with the newest (the win)
 // in sight, its word shown where a plain discard's 打 is only read out.
+// A seed whose first round, played by the generic steps, ends in a win with
+// more than six tiles in the top seat's river. Guarded by TestE2ESeedWonRound
+// in internal/apicall/e2e_seeds_test.go.
+const WON_ROUND = 8;
+
 test('a phone fits the revealed hands and the rivers in their seats', async ({ page }) => {
   // It plays a whole round.
   test.setTimeout(60_000);
   slowEngine();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(`./?mode=game&seed=${WON_ROUND}&length=tonpuu`);
   await playToResult(page);
   const seats = ['.seat-top', '.seat-left', '.seat-right', '.seat-bottom'];
   for (const [width, height] of [[390, 844], [360, 800], [320, 640], [844, 390]]) {
