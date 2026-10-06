@@ -2,13 +2,15 @@ name: CI
 
 # The push to main that merges the release pull request changes only
 # CHANGELOG.md and skips CI (the tag's build is verified by
-# build-site-release.yml). The release pull request itself gets no CI run
-# anyway, since tagpr opens it with GITHUB_TOKEN.
+# build-site-release.yml). Deploy pull requests into lolipop-deploy-now
+# carry only main's already-checked commits plus web/dist-site, so pull
+# requests run CI only against main; verify-live.yml checks the deploy.
 on:
   push:
     branches: [main]
     paths-ignore: [CHANGELOG.md]
   pull_request:
+    branches: [main]
     paths-ignore: [CHANGELOG.md]
 
 permissions:

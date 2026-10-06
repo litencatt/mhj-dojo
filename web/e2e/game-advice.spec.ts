@@ -99,3 +99,23 @@ test.describe('a phone game', () => {
     expect((await calls()).filter((c) => /^GET \/api\/games\/[^?]+$/.test(c)).length).toBeGreaterThan(0);
   });
 });
+
+test('the advice lists each candidate with its danger against a riichi', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`./?mode=game&seed=${RIICHI_SEED}&length=tonpuu`);
+  const hand = handPanel(page);
+  await waitForPlayback(page);
+  for (let i = 0; i < 3 && (await hand.locator('.tile-danger').count()) === 0; i++) {
+    await playOneStep(page);
+    await waitForPlayback(page);
+  }
+  expect(await hand.locator('.tile-danger').count()).toBeGreaterThan(0);
+  await page.getByRole('navigation', { name: '最小化したパネル' }).getByRole('button', { name: 'アドバイス' }).click();
+  const panel = page.getByRole('region', { name: 'アドバイス' });
+  const candidates = panel.getByRole('list', { name: 'おすすめの打牌' }).getByRole('listitem');
+  await expect(candidates.first()).toBeVisible();
+  const n = await candidates.count();
+  await expect(panel.locator('.advice-danger')).toHaveCount(n);
+  await expect(candidates.first()).toHaveAttribute('aria-label', /、危険度 [安低中危]（手牌で表示）$/);
+  await expect(panel.getByText('順位は他家の手（危険度）を考えません')).toBeVisible();
+});
