@@ -116,7 +116,9 @@ test('a dojo game is saved apart from the CPU games and survives a reload as a d
   await waitForPlayback(page);
   await expect(handPanel(page)).toBeVisible();
   await expect(page).toHaveURL(/mode=dojo/);
-  await expect(page.getByRole('link', { name: '道場へ' })).toBeVisible();
+  // The header links back to the hub only, not to the other modes.
+  await expect(page.getByRole('link', { name: '道場へ戻る' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /練習へ|CPU対戦へ/ })).toHaveCount(0);
   expect(await tableState(page)).toEqual(before);
 
   // The CPU game's page offers none of the dojo's games.

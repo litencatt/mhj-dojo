@@ -34,8 +34,8 @@ interface AppShellProps {
   onContinue: () => void;
 }
 
-/** A dojo game (?mode=dojo&game=): the game's layout and styles, the dojo's names. */
-const DOJO_MODE = { subtitle: '道場', links: [['?mode=dojo', '道場へ'], ['?', '練習へ'], ['?mode=game', 'CPU対戦へ']], noun: '対局', newLabel: '新規対局' } as const;
+/** A dojo game (?mode=dojo&game=): the game's layout and styles, the dojo's names, and a link back to the hub only (the game is saved; 練習 and CPU対戦 are there). */
+const DOJO_MODE = { subtitle: '道場', links: [['?mode=dojo', '道場へ戻る']], noun: '対局', newLabel: '新規対局' } as const;
 
 /**
  * The page around a practice session or a CPU game: the header, the error,
