@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
 import type { GameEvent, GameState, YakuRow } from './api';
+import type { ResumeItem } from './components/ResumePanel';
 import { errorMessage } from './panels';
 import { claim, isStopped, onChange } from './singleTab';
 import {
@@ -141,6 +142,15 @@ export function useUrlResume<T>({ idKey, request, get, create, sync, offering }:
 /** Whether the page was opened with nothing to resume or deal in the URL (no id, seed or options). */
 export function bareUrl(): boolean {
   return [...new URLSearchParams(location.search).keys()].every((k) => k === 'mode');
+}
+
+/**
+ * The saves offered to resume: read once, and only when the page was
+ * opened with a bare URL (anything in it is resumed or dealt instead).
+ */
+export function useOffered(saved: () => ResumeItem[]): ResumeItem[] {
+  const [offered] = useState(() => (bareUrl() ? saved() : []));
+  return offered;
 }
 
 /**

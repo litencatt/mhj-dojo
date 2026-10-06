@@ -104,16 +104,31 @@ func TestE2ESeedWonRound(t *testing.T) {
 }
 
 // RIICHI_SEED: a CPU declares riichi within 3 of your tsumogiri moves, so
-// the danger marks show on your turn (game-advice.spec.ts).
+// the danger marks show on your turn, with the advice that lists them
+// (game-advice.spec.ts).
 func TestE2ESeedCPURiichi(t *testing.T) {
 	seed := tsConst(t, "game-advice.spec.ts", "RIICHI_SEED")
 	c := newClient(t, session.NewStore(256))
 	st, path := newE2EGame(c, seed, "random")
-	for i := 0; i < 3 && st.Result == nil && len(st.Danger) == 0; i++ {
+	for i := 0; i < 3 && st.Result == nil && (len(st.Danger) == 0 || st.Advice == nil); i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
-	if len(st.Danger) == 0 {
-		t.Errorf("seed %d (RIICHI_SEED): no CPU riichi on your turn within 3 moves; see the comment above tsConst", seed)
+	if len(st.Danger) == 0 || st.Advice == nil {
+		t.Errorf("seed %d (RIICHI_SEED): no CPU riichi with advice on your turn within 3 moves; see the comment above tsConst", seed)
+	}
+}
+
+// SEED (phone game in game-advice.spec.ts): the advice, so the 「おすすめ」
+// chip shows, on your first turn and after one tsumogiri step.
+func TestE2ESeedPhoneAdvice(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "SEED")
+	c := newClient(t, session.NewStore(256))
+	st, path := newE2EGame(c, seed, "random")
+	for i := 0; i < 2; i++ {
+		if st.Advice == nil {
+			t.Fatalf("seed %d (SEED): no advice after %d moves; see the comment above tsConst", seed, i)
+		}
+		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
 }
 

@@ -105,7 +105,7 @@ test('tabs on different sessions both play, and a new session lets go of the one
   await expect(page).toHaveURL(/[?&]session=/);
   const first = page.url();
   await page.locator('.new-game-form input[type="number"]').first().fill('32');
-  await page.getByRole('button', { name: '新規対局' }).click();
+  await page.getByRole('button', { name: '新しい練習' }).click();
   await expect(page).not.toHaveURL(first);
   await expect(page).toHaveURL(/[?&]seed=32(&|$)/);
 
