@@ -22,7 +22,7 @@ import {
 } from './progress';
 import { LENGTH_NAMES, roundName } from '../components/GameTable';
 import type { CpuLevel, GameLength } from '../api';
-import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel } from './rules';
+import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
 import { discardUnfinishedDojoGames, savedGames } from '../wasm';
 import { Shop } from './Shop';
 import { Tile } from '../components/Tile';
@@ -149,19 +149,19 @@ export function DojoHome() {
       <section class="dojo-panel" aria-labelledby="dojo-status-heading">
         <h2 id="dojo-status-heading">修行の記録</h2>
         <div class="dojo-status">
-          <span class="dojo-level" data-testid="dojo-level">Lv {lv}</span>
+          <span class="dojo-level" data-testid="dojo-level">{rankName(lv)}</span>
           <div
             class="dojo-xpbar"
             role="progressbar"
-            aria-label="次のレベルまでの経験値"
+            aria-label="次の級位までの稽古"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={bar}
           >
             <div style={{ width: `${bar}%` }} />
           </div>
-          <small class="dojo-muted" data-testid="dojo-xp" title="経験値">
-            {progress.xp} / {next}
+          <small class="dojo-muted" data-testid="dojo-xp" title="稽古">
+            稽古 {progress.xp} / {next}
           </small>
           <span class="dojo-coin-count">
             <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 雀銭
@@ -197,7 +197,7 @@ export function DojoHome() {
                   onChange={() => change((cur) => setGameLength(cur, o.value))}
                 />
                 {LENGTH_NAMES[o.value]}
-                {!lengthUnlocked(progress, o.value) && <small class="dojo-muted">（Lv {o.level} で解禁）</small>}
+                {!lengthUnlocked(progress, o.value) && <small class="dojo-muted">（{rankName(o.level)}で解禁）</small>}
               </label>
             ))}
           </fieldset>
@@ -213,7 +213,7 @@ export function DojoHome() {
                   onChange={() => change((cur) => setGameCpu(cur, o.value))}
                 />
                 {CPU_NAMES[o.value]}
-                {!cpuUnlocked(progress, o.value) && <small class="dojo-muted">（Lv {o.level} で解禁）</small>}
+                {!cpuUnlocked(progress, o.value) && <small class="dojo-muted">（{rankName(o.level)}で解禁）</small>}
               </label>
             ))}
           </fieldset>

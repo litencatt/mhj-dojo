@@ -1,10 +1,11 @@
 import { useRef, useState } from 'preact/hooks';
 import { CATALOG, findItem, type ItemKind, type ShopItem } from './catalog';
 import { level, owns, purchase, setBack, setTheme, type DojoProgress, type PurchaseDenied } from './progress';
+import { rankName } from './rules';
 
 /** Why an item is not for sale yet; null when it is. */
 function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
-  if (level(p.xp) < item.level) return `Lv ${item.level} で解禁`;
+  if (level(p.xp) < item.level) return `${rankName(item.level)}で解禁`;
   const missing = (item.requires ?? []).find((r) => !owns(p, r));
   if (missing) return `${findItem(missing)?.name ?? missing}が必要`;
   return null;
@@ -13,7 +14,7 @@ function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
 export const DENIED: Record<PurchaseDenied, string> = {
   unknown: '売っていない商品です',
   owned: 'すでに持っています',
-  level: 'レベルが足りません',
+  level: '級位が足りません',
   requires: '前提の商品が必要です',
   coins: '雀銭が足りません',
 };
@@ -83,7 +84,7 @@ export function Shop({ progress: p, onChange }: ShopProps) {
       <div id="shop-tabpanel" class="shop-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`shop-tab-${tab}`}>
       {levels.map((n) => (
         <div key={n} class="shop-level">
-          <h3 class={n > lv ? 'shop-level-locked' : undefined}>Lv {n}</h3>
+          <h3 class={n > lv ? 'shop-level-locked' : undefined}>{rankName(n)}</h3>
           <ul class="shop-list">
             {shown.filter((it) => it.level === n).map((it) => {
               const have = owns(p, it.id);

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CATALOG, INITIAL_YAKU, YAKUHAI_KEYS, YAKUMAN_KEYS } from './catalog.ts';
+import { rankName } from './rules.ts';
 import {
   CORRUPT_KEY,
   STORAGE_KEY,
@@ -383,4 +384,8 @@ test('a progress from before the game choice loads with 東風戦 against weak C
   const loaded = parseProgress(JSON.stringify({ ...old, gameLength: 'hanchan', gameCpu: 'normal' }))!;
   const merged = importProgress(withFirstBonus({ xp: 2100 }), loaded);
   assert.deepEqual([merged.gameLength, merged.gameCpu], ['hanchan', 'normal']);
+});
+
+test('a level is shown as its 級位: 10級 to 1級, then 初段, 二段 and on', () => {
+  assert.deepEqual([1, 2, 10, 11, 12, 20, 21].map(rankName), ['10級', '9級', '1級', '初段', '二段', '十段', '11段']);
 });

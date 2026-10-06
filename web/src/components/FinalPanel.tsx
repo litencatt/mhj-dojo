@@ -3,7 +3,7 @@ import { ABORT_NAMES, LENGTH_NAMES, roundName, seatLabel, WIND_NAMES } from './G
 import { deltaClass, signed } from './ResultPanel';
 import { CATALOG } from '../dojo/catalog';
 import { cheated, type Reward } from '../dojo/progress';
-import { rankMultiplierLabel } from '../dojo/rules';
+import { rankMultiplierLabel, rankName } from '../dojo/rules';
 
 export interface FinalPanelProps {
   state: GameState;
@@ -25,7 +25,7 @@ function DojoReward({ reward, state }: { reward: Reward | null; state: GameState
       <h3>道場の報酬</h3>
       <ul>
         <li>
-          経験値 +{reward.xp}
+          稽古 +{reward.xp}
           {multiplier && `（順位 +${reward.rankXp}${multiplier}）`}
         </li>
         <li>
@@ -36,7 +36,7 @@ function DojoReward({ reward, state }: { reward: Reward | null; state: GameState
           {reward.summons > 0 && `、牌寄せ ${reward.summons}回 -${reward.summonCost}`}）
         </li>
         {reward.levelAfter > reward.levelBefore && (
-          <li class="dojo-levelup">レベルアップ！ Lv {reward.levelBefore} → Lv {reward.levelAfter}</li>
+          <li class="dojo-levelup">{reward.levelAfter > 10 ? '昇段' : '昇級'}！ {rankName(reward.levelBefore)} → {rankName(reward.levelAfter)}</li>
         )}
         {unlocked.length > 0 && <li>ショップに解禁: {unlocked.map((it) => it.name).join('、')}</li>}
       </ul>
