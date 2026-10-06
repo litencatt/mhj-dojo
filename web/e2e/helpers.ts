@@ -294,6 +294,15 @@ export async function waitForPlayback(page: Page) {
   await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
 }
 
+/** With the page clock installed: runs it until the CPU moves have finished replaying. */
+export async function finishPlayback(page: Page) {
+  const table = page.locator('.game-table');
+  for (let i = 0; i < 100 && (await table.getAttribute('data-playing')) === 'true'; i++) {
+    await page.clock.runFor(1000);
+  }
+  await expect(table).toHaveAttribute('data-playing', 'false');
+}
+
 /** Everything a game action changes: the table (rivers, points, wall), the hand and the result panel. */
 export function gameSnapshot(page: Page) {
   return page.locator('.area-hand').innerText();

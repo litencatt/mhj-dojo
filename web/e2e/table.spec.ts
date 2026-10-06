@@ -3,6 +3,7 @@ import type { GameResult, GameState } from '../src/api';
 import {
   SEED,
   engineCalls,
+  finishPlayback,
   type EngineCall,
   handPanel,
   isGameAction,
@@ -192,7 +193,7 @@ test('the table follows the CPU playback step by step, and ends on the final val
   await expect(table).toBeVisible();
   // The clock stands still: let the CPU turns before your first play out, if any.
   if ((await table.getAttribute('data-playing')) === 'true') {
-    await page.clock.runFor(20_000);
+    await finishPlayback(page);
   }
   const hand = handPanel(page);
   await expect(hand.locator('.hand-drawn button')).toBeEnabled();
@@ -252,7 +253,7 @@ test('the table follows the CPU playback step by step, and ends on the final val
     // After skipping a call the CPUs move first: the wall before them.
     const lead = next.events[0].seat === next.you ? next.events[0].wall_remaining : next.events_wall_remaining;
     await expect(page.locator('.table-remaining')).toHaveText(`残り ${lead}`);
-    await page.clock.runFor(20_000);
+    await finishPlayback(page);
   }
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${next.wall_remaining}`);
@@ -274,7 +275,7 @@ async function openAtYourTurn(page: Page) {
   const table = page.locator('.game-table');
   await expect(table).toBeVisible();
   if ((await table.getAttribute('data-playing')) === 'true') {
-    await page.clock.runFor(20_000);
+    await finishPlayback(page);
   }
   await expect(handPanel(page).locator('.hand-drawn button')).toBeEnabled();
   return table;
@@ -336,7 +337,7 @@ test('the wall before the first CPU move of a round', async ({ page }) => {
   await expect(table).toHaveAttribute('data-playing', 'true');
   await expect(page.locator('.event-log li')).toHaveCount(0);
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.events_wall_remaining}`);
-  await page.clock.runFor(20_000);
+  await finishPlayback(page);
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.wall_remaining}`);
 });
 

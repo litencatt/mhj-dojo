@@ -242,10 +242,11 @@ export function GameApp() {
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
 
-  // Once the replay ends the action bar it was standing in for swaps back in:
-  // a button focused in it would drop to <body>. Move the focus into
-  // whatever now controls the turn instead - but only if focus was already
-  // in here (or nowhere in particular), so it never steals focus from
+  // The action bar is swapped for the playback hint when a replay starts and
+  // back when it ends, unmounting whatever button had the focus (the move
+  // just clicked, ...): the focus would drop to <body>. Once the replay ends,
+  // move it into whatever now controls the turn - but only if focus was
+  // already in here (or nowhere in particular), so it never steals focus from
   // something else on the page (the yaku table, the seed field, ...).
   useEffect(() => {
     if (wasPlaying.current && !playback.playing) {
