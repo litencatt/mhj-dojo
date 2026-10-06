@@ -28,9 +28,10 @@ export default defineConfig({
   // CPU game's playback. Every test starts its own game or session, so four
   // can share the server.
   workers: process.env.CI ? 4 : undefined,
-  // A hung run (a stuck browser or server) fails after this, rather than at
-  // the job's timeout. The slowest shard takes about 2 minutes.
-  globalTimeout: process.env.CI ? 8 * 60_000 : undefined,
+  // A hung run (a stuck browser or server) fails after this many ms, rather
+  // than at the job's timeout. Opt-in: ci.yml and build-site-release.yml set
+  // it to suit their runs; the nightly's repeated run is much longer.
+  globalTimeout: Number(process.env.E2E_GLOBAL_TIMEOUT_MS) || undefined,
   // The json report lets CI list the tests that passed only on a retry
   // (flaky) as warnings; see ci.yml.
   reporter: process.env.CI

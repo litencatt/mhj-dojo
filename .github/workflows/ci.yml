@@ -208,9 +208,9 @@ jobs:
           - shard: 1
             files: 'e2e/game\.spec'
           - shard: 2
-            files: 'e2e/game-saves e2e/practice-saves e2e/table'
+            files: 'e2e/game-saves\.spec e2e/practice-saves\.spec e2e/table\.spec'
           - shard: 3
-            files: 'e2e/(?!game\.spec|game-saves|practice-saves|table)'
+            files: 'e2e/(?!game\.spec|game-saves\.spec|practice-saves\.spec|table\.spec)'
     defaults:
       run:
         working-directory: web
@@ -245,19 +245,21 @@ jobs:
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
           E2E_FILES: ${{ matrix.files }}
+          E2E_GLOBAL_TIMEOUT_MS: '480000' # 8 minutes; a shard takes about 2
         # Unquoted on purpose: the file filters are split into words; set -f
         # keeps the shell from globbing the regular expressions.
         run: set -f; npm run e2e -- $E2E_FILES
       - name: Report flaky tests
         if: always()
         run: scripts/report-flaky.sh
-      # The version tests on the release build (shard 2, currently the shortest, runs them).
+      # The version tests on the release build (shard 3, currently the shortest, runs them).
       - name: Site version tests on a release build
         id: release
-        if: matrix.shard == 2
+        if: matrix.shard == 3
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo-release
           MHJDOJO_EXPECT_RELEASE: v2000.0101.0
+          E2E_GLOBAL_TIMEOUT_MS: '240000' # 4 minutes; the two specs take about 15 seconds
         run: npx playwright test e2e/version.spec.ts e2e/help.spec.ts
       - name: Report flaky release-build tests
         if: always() && steps.release.outcome != 'skipped'

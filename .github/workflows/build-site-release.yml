@@ -95,6 +95,7 @@ jobs:
         working-directory: web
         env:
           MHJDOJO_BIN: ${{ github.workspace }}/bin/mhj-dojo
+          E2E_GLOBAL_TIMEOUT_MS: '720000' # 12 minutes; the full run takes 3-5
         run: npm run e2e
       - name: Report flaky tests
         if: always()
