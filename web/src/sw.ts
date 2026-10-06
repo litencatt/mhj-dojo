@@ -10,7 +10,8 @@ const ENGINE_READY = 'mhj-dojo:wasm-init';
  * compete with the first load (it gets the engine from the HTTP cache). A
  * waiting worker of this page's own build takes over at once: the page
  * already runs that build. With the kill switch (MHJDOJO_SW=off at build
- * time) it unregisters any worker and deletes its caches instead.
+ * time) it unregisters any worker and deletes its caches instead; that is how
+ * the kill switch reaches pages whose cached sw.js?v=<old id> still runs.
  */
 export function registerServiceWorker() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator) || !isSecureContext) return;
