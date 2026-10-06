@@ -6,8 +6,9 @@
 // src/sw.ts registers it. scripts/sw.test.mjs tests swSource.
 //
 // MHJDOJO_SW=off is the kill switch: the page then unregisters any worker
-// and deletes its caches, and the sw.js written instead does the same for
-// pages of older builds that still register it.
+// and deletes its caches, and the sw.js written instead does the same. The
+// CDN caches sw.js?v=<id> for a year, so an old page's registered URL keeps
+// returning the old worker; the switch reaches users through the new page.
 import { readFileSync, readdirSync } from 'node:fs';
 import type { Plugin } from 'vite';
 
