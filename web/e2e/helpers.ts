@@ -289,7 +289,7 @@ export function pageOverflowX(page: Page) {
 export const SEED = 12;
 
 /** Waits until the CPU moves have finished replaying: while they replay,
- * the action bar holds a playback スキップ button that sends no request. */
+ * the action bar shows only a hint. */
 export async function waitForPlayback(page: Page) {
   await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
 }

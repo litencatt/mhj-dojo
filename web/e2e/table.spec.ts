@@ -164,7 +164,7 @@ test('a phone\'s 設定: Tab into the options, Escape and a new game fold them b
 // round's moves growing by one. The playback clock is Playwright's, so each
 // step is looked at in turn; the answer is patched with a riichi and a kan
 // dora so the steps check those too, whatever the seed deals.
-test('the table follows the CPU playback step by step, and スキップ jumps to the end', async ({ page }) => {
+test('the table follows the CPU playback step by step, and ends on the final values', async ({ page }) => {
   await page.clock.install();
   let patched: GameState | null = null;
   let riichiAt = -1;
@@ -190,9 +190,9 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   const table = page.locator('.game-table');
   await expect(table).toBeVisible();
-  // The clock stands still: skip the CPU turns before your first, if any.
+  // The clock stands still: let the CPU turns before your first play out, if any.
   if ((await table.getAttribute('data-playing')) === 'true') {
-    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+    await page.clock.runFor(20_000);
   }
   const hand = handPanel(page);
   await expect(hand.locator('.hand-drawn button')).toBeEnabled();
@@ -240,7 +240,7 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
   await expect(deposit).toHaveText(sticks(st!.deposit)!);
   await expect(doraTiles).toHaveCount(2 * finalDora);
 
-  // The next answer: スキップ right away shows its final values.
+  // The next answer: its final values show once the replay ends.
   const move =
     st!.phase === 'discard'
       ? hand.locator('.hand-drawn button, .hand-tiles button').last()
@@ -252,7 +252,7 @@ test('the table follows the CPU playback step by step, and スキップ jumps to
     // After skipping a call the CPUs move first: the wall before them.
     const lead = next.events[0].seat === next.you ? next.events[0].wall_remaining : next.events_wall_remaining;
     await expect(page.locator('.table-remaining')).toHaveText(`残り ${lead}`);
-    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+    await page.clock.runFor(20_000);
   }
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${next.wall_remaining}`);
@@ -274,7 +274,7 @@ async function openAtYourTurn(page: Page) {
   const table = page.locator('.game-table');
   await expect(table).toBeVisible();
   if ((await table.getAttribute('data-playing')) === 'true') {
-    await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+    await page.clock.runFor(20_000);
   }
   await expect(handPanel(page).locator('.hand-drawn button')).toBeEnabled();
   return table;
@@ -336,7 +336,7 @@ test('the wall before the first CPU move of a round', async ({ page }) => {
   await expect(table).toHaveAttribute('data-playing', 'true');
   await expect(page.locator('.event-log li')).toHaveCount(0);
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.events_wall_remaining}`);
-  await page.locator('.action-bar').getByRole('button', { name: 'スキップ' }).click();
+  await page.clock.runFor(20_000);
   await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.wall_remaining}`);
 });
 
