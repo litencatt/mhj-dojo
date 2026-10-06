@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, Advice, DangerLevel, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
+import type { ActionType, Advice, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
 import { AdvicePanel } from './components/AdvicePanel';
-import { DANGER_NAMES, dangerLevel } from './danger';
+import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Dock } from './components/Dock';
@@ -53,21 +53,6 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
-
-/** Each held tile's danger mark: its highest level over the riichi seats,
- * and a text naming the seats (each with its own level when there are two
- * or more). */
-function dangerMarks(danger: SeatDanger[], you: number): Record<TileT, { className: string; text: string }> {
-  const out: Record<TileT, { className: string; text: string }> = {};
-  for (const t of Object.keys(danger[0]?.tiles ?? {})) {
-    const level = dangerLevel(danger, t) as DangerLevel;
-    const each = danger
-      .map((d) => (danger.length > 1 ? `${seatLabel(d.seat, you)} ${DANGER_NAMES[d.tiles[t] ?? 3]}` : seatLabel(d.seat, you)))
-      .join('・');
-    out[t] = { className: `tile-danger tile-danger-${level}`, text: `危険度 ${DANGER_NAMES[level]}（${each}）` };
-  }
-  return out;
-}
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
