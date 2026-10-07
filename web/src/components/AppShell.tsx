@@ -42,6 +42,9 @@ interface AppShellProps {
  * the saves offered to resume or the engine loading, the dock of minimized
  * panels and the notice that another tab took over.
  */
+// A dojo game (?mode=dojo&game=) leads back to the hub, where it started (the game is saved).
+const DOJO_BACK = ['?mode=dojo', '道場トップへ戻る'] as const;
+
 export function AppShell(p: AppShellProps) {
   const m = MODES[p.mode];
   const appClass = p.started && p.docked.length > 0 ? `app app-${p.mode} has-dock` : `app app-${p.mode}`;
@@ -53,7 +56,7 @@ export function AppShell(p: AppShellProps) {
     <div ref={appRef} class={appClass}>
       <div class="area-main">
         <div class="area-header">
-          <SiteHeader mode={p.dojo ? 'dojo' : p.mode} onSettings={() => p.onSettingsOpen(true)} onShowGlossary={p.onShowGlossary}>
+          <SiteHeader mode={p.dojo ? 'dojo' : p.mode} back={p.dojo ? DOJO_BACK : undefined} onSettings={() => p.onSettingsOpen(true)} onShowGlossary={p.onShowGlossary}>
             {p.header}
           </SiteHeader>
           <SettingsDialog open={p.settingsOpen} onClose={() => p.onSettingsOpen(false)}>
