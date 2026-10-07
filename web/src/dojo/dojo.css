@@ -210,6 +210,7 @@
   cursor: pointer;
 }
 .dojo-settings-sample {
+  position: relative; /* the win effect's ground, as in the result panel */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -218,6 +219,10 @@
   padding: 6px;
   border-radius: var(--radius-md);
   background: var(--table-cloth, none); /* the cloth chosen (tokens.css) */
+}
+/* At the sample's right end, out of the tiles' way. */
+.dojo-effect-replay {
+  margin-left: auto;
 }
 
 /* A dojo game's aids and cheats (GameApp). */

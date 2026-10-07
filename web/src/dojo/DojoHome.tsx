@@ -95,6 +95,8 @@ export function DojoHome() {
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The win effect on the sample plays again on each change of it (its key), and on 演出を見る.
+  const [effectPlays, setEffectPlays] = useState(0);
   // The dojo's own unfinished games (the CPU game's list never has them).
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
   const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
@@ -307,6 +309,17 @@ export function DojoHome() {
           <Tile tile="7z" size="sm" />
           <Tile tile="" size="sm" faceDown />
           <span class="seat-riichi">リーチ</span>
+          {progress.activeEffect !== 'default' && (
+            <>
+              <button type="button" class="dojo-effect-replay" onClick={() => setEffectPlays((n) => n + 1)}>
+                演出を見る
+              </button>
+              {/* Shown while the dialog is open only, so it plays as 設定 opens too. */}
+              {settingsOpen && (
+                <div key={`${progress.activeEffect}-${effectPlays}`} class="win-effect" data-testid="win-effect" aria-hidden="true" />
+              )}
+            </>
+          )}
         </div>
       </SettingsDialog>
     </div>

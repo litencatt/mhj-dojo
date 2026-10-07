@@ -394,6 +394,14 @@ test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chose
   const sample = settings.getByLabel('見本');
   expect(await sample.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
   expect(await sample.locator('.seat-riichi').evaluate((el) => getComputedStyle(el, '::after').backgroundImage)).toContain('radial-gradient');
+  // The chosen win effect plays over the sample (as over a result), again on 演出を見る.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const preview = sample.getByTestId('win-effect');
+  await expect(preview).toHaveCSS('display', 'block');
+  await expect(preview).toHaveCSS('animation-name', 'win-fall');
+  await sample.getByRole('button', { name: '演出を見る' }).click();
+  await expect(preview).toHaveCSS('display', 'block');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   // A dojo game: the cloth under the table, the stick after a riichi badge, the
   // effect over a high win of yours, but not when motion is reduced.
