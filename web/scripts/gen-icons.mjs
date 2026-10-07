@@ -112,7 +112,7 @@ function ogImageHTML() {
       <div class="text">
         <h1>麻雀道場</h1>
         <div class="sub">mhj-dojo</div>
-        <div class="tag">役ごとの向聴と有効牌を見ながら、<br>一人打ちの練習もCPU対戦も</div>
+        <div class="tag">役ごとの向聴と有効牌を見ながら、<br>練習・CPU対戦・道場で腕を磨く</div>
       </div>
       ${ringsMark(280)}
     </div>
