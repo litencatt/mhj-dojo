@@ -99,6 +99,33 @@ function dojoGameOptions(p: DojoProgress): GameOptions {
 }
 
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game), or a dojo game (?mode=dojo). */
+/** A choice of the new-game form as radio buttons, one per name, boxed like the dojo's 設定. */
+function RadioGroup<T extends string>({
+  label,
+  name,
+  value,
+  names,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  value: T;
+  names: Record<T, string>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset class="dojo-settings-group option-group">
+      <legend>{label}</legend>
+      {(Object.keys(names) as T[]).map((k) => (
+        <label key={k}>
+          <input type="radio" name={name} value={k} checked={value === k} onChange={() => onChange(k)} />
+          {names[k]}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const [state, setState] = useState<GameState | null>(null);
   // The dojo's growth: read at the start, kept as it changes (settle, below).
@@ -178,12 +205,9 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     return dojo ? dojoGameOptions(loadProgress().progress) : parseOptions((k) => params.get(k));
   }
 
-  // One select of the new-game form changed.
-  function setOption(key: keyof GameOptions) {
-    return (e: Event) => {
-      const value = (e.target as HTMLSelectElement).value;
-      setOptionsInput((o) => ({ ...o, [key]: value }));
-    };
+  // One choice of the new-game form changed.
+  function setOption<K extends keyof GameOptions>(key: K) {
+    return (value: GameOptions[K]) => setOptionsInput((o) => ({ ...o, [key]: value }));
   }
 
   // The URL carries ?mode=game&game=&seed=&length=&first_dealer=&cpu= so a
@@ -304,7 +328,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (!d) return;
     if (optionsOpen && !d.open) {
       d.showModal();
-      d.querySelector<HTMLElement>('select')?.focus();
+      d.querySelector<HTMLElement>('input:checked')?.focus();
     } else if (!optionsOpen && d.open) d.close();
   }, [optionsOpen, modalOptions]);
 
@@ -415,16 +439,16 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
   const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
 
+  const chooseSpeed = (v: PlaybackSpeed) => {
+    setSpeed(v);
+    savePlaybackSpeed(v);
+  };
   const speedOption = (
     <label class="speed-option">
       再生速度
       <select
         value={speed}
-        onChange={(e) => {
-          const v = (e.target as HTMLSelectElement).value as PlaybackSpeed;
-          setSpeed(v);
-          savePlaybackSpeed(v);
-        }}
+        onChange={(e) => chooseSpeed((e.target as HTMLSelectElement).value as PlaybackSpeed)}
       >
         {speeds.map((k) => (
           <option key={k} value={k}>
@@ -443,38 +467,34 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   );
   const optionsForm = (
     <form id="new-game-options" class="new-game-form new-game-options" ref={formRef} onSubmit={handleNewGame}>
-      <label>
-        対局
-        <select value={optionsInput.length} onChange={setOption('length')}>
-          <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-          <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-        </select>
-      </label>
-      <label>
-        起家
-        <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-          <option value="random">{DEALER_NAMES.random}</option>
-          <option value="you">{DEALER_NAMES.you}</option>
-        </select>
-      </label>
-      <label>
-        CPU
-        <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-          <option value="weak">{CPU_NAMES.weak}</option>
-          <option value="normal">{CPU_NAMES.normal}</option>
-        </select>
-      </label>
-      <label>
-        シード
+      <RadioGroup label="対局" name="game-length" value={optionsInput.length} names={LENGTH_NAMES} onChange={setOption('length')} />
+      <RadioGroup label="起家" name="game-first-dealer" value={optionsInput.first_dealer} names={DEALER_NAMES} onChange={setOption('first_dealer')} />
+      <RadioGroup label="CPU" name="game-cpu" value={optionsInput.cpu} names={CPU_NAMES} onChange={setOption('cpu')} />
+      <fieldset class="dojo-settings-group option-group">
+        <legend>シード</legend>
         <input
           type="number"
+          aria-label="シード"
           value={seedInput}
           placeholder="ランダム"
           onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
         />
-      </label>
-      {phone && speedOption}
-      {phone && adviceOption}
+      </fieldset>
+      {phone && (
+        <RadioGroup
+          label="再生速度"
+          name="game-speed"
+          value={speed}
+          names={Object.fromEntries(speeds.map((k) => [k, PLAYBACK_SPEEDS[k].label])) as Record<PlaybackSpeed, string>}
+          onChange={chooseSpeed}
+        />
+      )}
+      {phone && (
+        <fieldset class="dojo-settings-group option-group">
+          <legend>表示</legend>
+          {adviceOption}
+        </fieldset>
+      )}
       <button type="submit" disabled={busy}>新規対局</button>
     </form>
   );

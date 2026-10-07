@@ -298,7 +298,7 @@ test.describe('a phone game', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
     await expect(form).toBeVisible();
-    await expect(form.getByRole('combobox').first()).toBeFocused();
+    await expect(form.getByRole('radio', { checked: true }).first()).toBeFocused();
     expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
     await page.keyboard.press('Escape');
     await expect(form).toBeHidden();
@@ -564,7 +564,9 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     const dialog = page.getByRole('dialog', { name: '設定' });
     await expect(dialog).toBeVisible();
     await expect(form).toBeVisible();
-    await expect(form.getByRole('combobox')).toHaveCount(4);
+    // Boxed as in the dojo's 設定: 対局, 起家, CPU, シード, 再生速度 and 表示; the choices are radio buttons.
+    await expect(form.getByRole('group')).toHaveCount(6);
+    await expect(form.getByRole('combobox')).toHaveCount(0);
     const d = (await dialog.boundingBox())!;
     expect(d.x).toBeGreaterThanOrEqual(0);
     expect(d.x + d.width).toBeLessThanOrEqual(width);
@@ -713,8 +715,8 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
     await expect(status.locator('div').filter({ hasText: 'シード' }).locator('dd')).toHaveText(String(SEED));
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
-    await expect(page.getByLabel('起家')).toHaveValue('you');
-    await expect(page.getByLabel('CPU')).toHaveValue('weak');
+    await expect(page.getByRole('group', { name: '起家' }).getByRole('radio', { name: '自分' })).toBeChecked();
+    await expect(page.getByRole('group', { name: 'CPU' }).getByRole('radio', { name: '弱い' })).toBeChecked();
     await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
     await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
     await expect(page).toHaveURL(/[?&]game=/);

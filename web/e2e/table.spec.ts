@@ -121,7 +121,8 @@ test('a phone\'s 設定: a dialog of the options, closed by Escape and a new gam
   await waitForPlayback(page);
   const toggle = page.getByRole('button', { name: /^設定/ });
   const form = page.locator('.new-game-form');
-  const length = form.getByRole('combobox').first();
+  const length = form.getByRole('radio', { name: '東風戦' });
+  const hanchan = form.getByRole('radio', { name: '半荘戦' });
 
   await toggle.focus();
   await page.keyboard.press('Enter');
@@ -133,7 +134,7 @@ test('a phone\'s 設定: a dialog of the options, closed by Escape and a new gam
 
   // A failed request keeps the options, as chosen.
   await page.keyboard.press('Enter');
-  await length.selectOption('hanchan');
+  await hanchan.check();
   const isCreate = (call: EngineCall) => isRequest(call, 'POST', /^\/api\/games$/);
   const fail = onEngineReply(page, (call, reply) => {
     if (!isCreate(call)) return;
@@ -144,7 +145,7 @@ test('a phone\'s 設定: a dialog of the options, closed by Escape and a new gam
   await page.keyboard.press('Enter');
   await expect(page.locator('.error-banner')).toBeVisible();
   await expect(form).toBeVisible();
-  await expect(length).toHaveValue('hanchan');
+  await expect(hanchan).toBeChecked();
 
   // A new game folds them away, focus back on 設定.
   fail();
