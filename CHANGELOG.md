@@ -1,5 +1,28 @@
 # Changelog
 
+## [v2026.1007.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1006.1...v2026.1007.0) - 2026-10-07
+
+### 新機能
+- 道場モードを追加する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/263
+- CPU対戦の設定をモーダルで開く by @litencatt in https://github.com/litencatt/mhj-dojo/pull/283
+- CPU対戦の設定をラジオボタンにし、道場の設定と同じ見た目にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/285
+- ヘッダーを3モード共通にし、設定をモーダルにまとめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/286
+- モーダルの外側クリックで閉じ、鳴きの操作欄を右寄せ、和了演出のプレビュー by @litencatt in https://github.com/litencatt/mhj-dojo/pull/289
+- 道場の対局のヘッダーに「道場トップへ戻る」リンクを出す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/290
+### 修正
+- CPUの再生開始で操作欄の高さが変わらないようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/287
+### ドキュメント
+- デザインを統一し、DESIGN.md（入口）と docs/design/ にまとめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/288
+### CI・リポジトリ
+- E2Eの高速化とハング対策 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/258
+- ワークフローを変えたリリースでも公開用 PR を作れるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/262
+- 手牌と操作欄の隙間を詰め、make dev を足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/282
+- OG の文面に道場モードを入れる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/284
+### その他
+- 道場のルール定数を Go のテストがフロントから読むようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/279
+- 道場の鳴いた手の「役なし」表示を実局面の E2E で確かめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/280
+- 道場のショップに見た目の商品（卓布・リーチ棒・和了演出）を足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/281
+
 ## [v2026.1006.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1006.0...v2026.1006.1) - 2026-10-06
 
 ### 新機能
