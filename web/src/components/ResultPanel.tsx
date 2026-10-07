@@ -7,6 +7,8 @@ import { yakuHanText, yakumanName } from '../yakumanLabel';
 import { COINS_PER_HAN, WIN_BONUS_COINS, XP_PER_HAN, yakuName } from '../dojo/catalog';
 import { cheated } from '../dojo/progress';
 
+const HIGH_LIMITS: Limit[] = ['haneman', 'baiman', 'sanbaiman', 'yakuman'];
+
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
   haneman: '跳満',
@@ -60,6 +62,8 @@ export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPane
   const who = (s: number) => seatLabel(s, state.you);
   const winner = result.winner >= 0 ? state.seats[result.winner] : null;
   const yakuman = result.yaku.some((y) => y.han >= 13);
+  // Your win at 跳満 or above: the dojo's win effect plays over it (style.css; none unless one is chosen).
+  const high = result.winner === state.you && HIGH_LIMITS.includes(result.points.limit);
   let title = '流局';
   if (result.kind === 'abort') title = `途中流局（${result.reason ? ABORT_NAMES[result.reason] : ''}）`;
   if (result.kind === 'tsumo') title = `${who(result.winner)}のツモ和了`;
@@ -81,6 +85,7 @@ export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPane
           </button>
         )}
       </div>
+      {high && <div class="win-effect" data-testid="win-effect" aria-hidden="true" />}
       {!!dojoHan && (
         <p class="dojo-round-reward" data-testid="dojo-round-reward">
           道場の報酬 +{dojoHan * COINS_PER_HAN + bonus} 銭（和了 +{dojoHan * COINS_PER_HAN}、

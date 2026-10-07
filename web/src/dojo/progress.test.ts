@@ -18,8 +18,11 @@ import {
   purchase,
   saveProgress,
   setBack,
+  setCloth,
+  setEffect,
   setGameCpu,
   setGameLength,
+  setStick,
   setTheme,
   settle,
   type DojoProgress,
@@ -267,6 +270,48 @@ test('a progress from before the tile backs loads with the default back', () => 
   assert.equal(parsed?.activeBack, 'default');
   assert.equal(parsed?.coins, 7);
   assert.equal(parseProgress(JSON.stringify({ ...old, activeBack: 3 })), null);
+});
+
+test('the looks (cloth, riichi stick, win effect) are bought, then set only when owned', () => {
+  const p0 = withFirstBonus({ coins: 1000, xp: 1000 });
+  assert.deepEqual([p0.activeCloth, p0.activeStick, p0.activeEffect], ['default', 'default', 'default']);
+  assert.equal(setCloth(p0, 'cloth:midori').activeCloth, 'default');
+  const bought = purchase(p0, 'cloth:midori');
+  assert.ok(bought.ok);
+  const p = { ...bought.progress, ownedItems: [...bought.progress.ownedItems, 'stick:take', 'effect:sakura'] };
+  assert.equal(p.coins, 960);
+  assert.equal(setCloth(p, 'cloth:midori').activeCloth, 'cloth:midori');
+  assert.equal(setCloth(p, 'cloth:kon').activeCloth, 'default');
+  assert.equal(setStick(p, 'stick:take').activeStick, 'stick:take');
+  assert.equal(setStick(p, 'stick:kogane').activeStick, 'default');
+  assert.equal(setEffect(p, 'effect:sakura').activeEffect, 'effect:sakura');
+  assert.equal(setEffect(p, 'effect:kinkou').activeEffect, 'default');
+  assert.equal(setCloth(setCloth(p, 'cloth:midori'), 'default').activeCloth, 'default');
+  // One look apart from the others and from the theme and back.
+  const set = setEffect(setStick(setCloth({ ...p, activeTheme: 'theme:wafuu' }, 'cloth:midori'), 'stick:take'), 'effect:sakura');
+  assert.deepEqual(
+    [set.activeTheme, set.activeBack, set.activeCloth, set.activeStick, set.activeEffect],
+    ['theme:wafuu', 'default', 'cloth:midori', 'stick:take', 'effect:sakura'],
+  );
+});
+
+test('the looks sell cheap from the first ranks', () => {
+  const looks = CATALOG.filter((it) => it.kind === 'cloth' || it.kind === 'stick' || it.kind === 'effect');
+  assert.equal(looks.length, 9);
+  assert.ok(looks.every((it) => it.price >= 40 && it.price <= 150 && it.level <= 5), JSON.stringify(looks));
+  assert.ok(looks.some((it) => it.level === 1));
+});
+
+test('a progress from before the looks loads with the default cloth, stick and effect', () => {
+  const { activeCloth: _c, activeStick: _s, activeEffect: _e, ...old } = withFirstBonus({ coins: 7 });
+  const parsed = parseProgress(JSON.stringify(old));
+  assert.deepEqual([parsed?.activeCloth, parsed?.activeStick, parsed?.activeEffect], ['default', 'default', 'default']);
+  assert.equal(parsed?.coins, 7);
+  const chosen = parseProgress(JSON.stringify({ ...old, activeCloth: 'cloth:kon', activeStick: 'stick:take', activeEffect: 'effect:kinkou' }));
+  assert.deepEqual([chosen?.activeCloth, chosen?.activeStick, chosen?.activeEffect], ['cloth:kon', 'stick:take', 'effect:kinkou']);
+  assert.equal(parseProgress(JSON.stringify({ ...old, activeCloth: 1 })), null);
+  assert.equal(parseProgress(JSON.stringify({ ...old, activeStick: null })), null);
+  assert.equal(parseProgress(JSON.stringify({ ...old, activeEffect: [] })), null);
 });
 
 test('broken JSON is kept aside and the dojo starts over', () => {

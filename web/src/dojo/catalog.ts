@@ -2,7 +2,8 @@
 // economy lives here; progress.ts and the tests read them from here.
 //
 // Economy targets (economy.test.ts checks them). "The core" is the yaku, the
-// assists and the tile themes; the cheats and the tile backs are left out.
+// assists and the tile themes; the cheats and the other looks (the tile backs,
+// the table cloths, the riichi sticks and the win effects) are left out.
 // - What a game is worth goes up as the yaku are bought. The engine measured
 //   it (docs/dojo-economy.md: seat 0 played by the weak CPU, 400 東風戦 a stage):
 //     S0 the initial yaku    1st-4th 8.0/25.5/29.0/37.5%, 0.74 han, 0.58 wins: about 43 XP, 41 coins
@@ -15,7 +16,7 @@
 // - Lv10 (4500 XP) comes after about 70 games, by which time 80% or more of
 //   the core's coin cost (the yakuman pack aside) has been bought.
 // - The yakuman pack costs at most 40 more games after Lv10, the core bought first.
-// - The cheats and the tile backs too: the whole shop is bought in about 175 games.
+// - The cheats and the other looks too: the whole shop is bought in about 175 games.
 
 /** XP and coins by final rank (1st to 4th). */
 export const RANK_XP = [100, 60, 30, 10] as const;
@@ -48,11 +49,14 @@ export const YAKUMAN_KEYS: readonly string[] = [
 export const YAKUMAN_PACK = 'yakuman-pack';
 export const DEFAULT_THEME = 'default';
 export const DEFAULT_BACK = 'default';
+export const DEFAULT_CLOTH = 'default';
+export const DEFAULT_STICK = 'default';
+export const DEFAULT_EFFECT = 'default';
 
-export type ItemKind = 'yaku' | 'theme' | 'back' | 'assist' | 'cheat' | 'pack';
+export type ItemKind = 'yaku' | 'theme' | 'back' | 'cloth' | 'stick' | 'effect' | 'assist' | 'cheat' | 'pack';
 
 export interface ShopItem {
-  /** A yaku's key, or 'theme:*', 'back:*', 'assist:*', 'cheat:*', 'yakuman-pack'. */
+  /** A yaku's key, or 'theme:*', 'back:*', 'cloth:*', 'stick:*', 'effect:*', 'assist:*', 'cheat:*', 'yakuman-pack'. */
   id: string;
   kind: ItemKind;
   name: string;
@@ -74,6 +78,8 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('iipeikou', '一盃口', 1, 40),
   { id: 'assist:noyaku', kind: 'assist', name: '補助: 役なし警告', price: 40, level: 1 },
   { id: 'assist:speed-fast', kind: 'assist', name: '補助: 再生速度「速い」', price: 40, level: 1 },
+  { id: 'cloth:midori', kind: 'cloth', name: '卓布: 緑', price: 40, level: 1 },
+  { id: 'stick:tenbou', kind: 'stick', name: 'リーチ棒: 千点棒', price: 40, level: 1 },
 
   yaku('ippatsu', '一発', 2, 30, ['riichi']),
   yaku('haitei', '海底摸月', 2, 30),
@@ -83,6 +89,8 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'theme:wafuu', kind: 'theme', name: '牌テーマ: 和風', price: 50, level: 2 },
   { id: 'theme:mono', kind: 'theme', name: '牌テーマ: モノクロ', price: 50, level: 2 },
   { id: 'back:shima', kind: 'back', name: '裏柄: 縞', price: 40, level: 2 },
+  { id: 'cloth:kon', kind: 'cloth', name: '卓布: 紺', price: 60, level: 2 },
+  { id: 'effect:kamifubuki', kind: 'effect', name: '和了演出: 紙吹雪', price: 80, level: 2 },
   { id: 'assist:waits', kind: 'assist', name: '補助: 待ち牌表示', price: 60, level: 2 },
 
   yaku('sanshoku', '三色同順', 3, 80),
@@ -98,18 +106,23 @@ export const CATALOG: readonly ShopItem[] = [
   yaku('double_riichi', 'ダブル立直', 3, 80, ['riichi']),
   { id: 'theme:sakura', kind: 'theme', name: '牌テーマ: 桜', price: 80, level: 3 },
   { id: 'back:ichimatsu', kind: 'back', name: '裏柄: 市松', price: 60, level: 3 },
+  { id: 'cloth:enji', kind: 'cloth', name: '卓布: えんじ', price: 60, level: 3 },
+  { id: 'stick:take', kind: 'stick', name: 'リーチ棒: 竹', price: 60, level: 3 },
   { id: 'assist:preview', kind: 'assist', name: '補助: 打牌プレビュー・複合役', price: 100, level: 3 },
   { id: 'assist:speed-instant', kind: 'assist', name: '補助: 再生速度「なし」（一括表示）', price: 80, level: 3, requires: ['assist:speed-fast'] },
 
   { id: 'assist:advice', kind: 'assist', name: '補助: アドバイスパネル', price: 120, level: 4 },
   { id: 'assist:danger', kind: 'assist', name: '補助: 危険牌の印', price: 120, level: 4 },
   { id: 'theme:yonshoku', kind: 'theme', name: '牌テーマ: 四色牌', price: 100, level: 4 },
+  { id: 'effect:sakura', kind: 'effect', name: '和了演出: 桜吹雪', price: 120, level: 4 },
 
   yaku('honitsu', '混一色', 5, 200),
   yaku('junchan', '純全帯么九', 5, 200),
   yaku('ryanpeikou', '二盃口', 5, 200),
   { id: 'theme:hisui', kind: 'theme', name: '牌テーマ: 翡翠', price: 120, level: 5 },
   { id: 'back:asanoha', kind: 'back', name: '裏柄: 麻の葉', price: 100, level: 5 },
+  { id: 'stick:kogane', kind: 'stick', name: 'リーチ棒: 金', price: 100, level: 5 },
+  { id: 'effect:kinkou', kind: 'effect', name: '和了演出: 金の光', price: 150, level: 5 },
   { id: 'assist:ukeire', kind: 'assist', name: '補助: 有効牌ハイライト', price: 150, level: 5 },
 
   { id: 'cheat:ura', kind: 'cheat', name: 'イカサマ: 裏ドラ透視', price: 600, level: 6 },
