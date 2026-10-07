@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SEED, handPanel, playOneStep, slowEngine, waitForPlayback } from './helpers';
+import { SEED, handPanel, openSettings, playOneStep, settingsChoice, slowEngine, waitForPlayback } from './helpers';
 
 // The CPU game's 設定 form picks how fast the CPU moves are replayed, kept in
 // this browser.
@@ -11,9 +11,11 @@ test('the playback speed is saved, and なし shows the CPU moves at once', asyn
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
 
-  const speed = page.getByLabel('再生速度');
-  await expect(speed).toHaveValue('normal');
-  await speed.selectOption({ label: 'なし' });
+  await openSettings(page);
+  const speed = settingsChoice(page, '再生速度');
+  await expect(speed.nth(1)).toBeChecked();
+  await speed.nth(3).check();
+  await page.keyboard.press('Escape');
   expect(await page.evaluate(() => localStorage.getItem('mhj-dojo.playback-speed.v1'))).toBe('none');
 
   // Record every change of the table's data-playing flag from now on.
@@ -32,7 +34,8 @@ test('the playback speed is saved, and なし shows the CPU moves at once', asyn
 
   await page.reload();
   await expect(handPanel(page)).toBeVisible();
-  await expect(page.getByLabel('再生速度')).toHaveValue('none');
+  await openSettings(page);
+  await expect(settingsChoice(page, '再生速度').nth(3)).toBeChecked();
 });
 
 test('a slow speed paces the CPU moves at least 600ms apart', async ({ page }) => {
@@ -41,7 +44,9 @@ test('a slow speed paces the CPU moves at least 600ms apart', async ({ page }) =
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
-  await page.getByLabel('再生速度').selectOption({ label: '遅い' });
+  await openSettings(page);
+  await settingsChoice(page, '再生速度').nth(0).check();
+  await page.keyboard.press('Escape');
   // Time each change of the log of moves while the next move is played.
   await page.evaluate(() => {
     const w = window as unknown as { logTimes: number[] };

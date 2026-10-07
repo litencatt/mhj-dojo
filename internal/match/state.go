@@ -20,6 +20,7 @@ type State struct {
 	Length            string                          `json:"length"`
 	FirstDealerMode   string                          `json:"first_dealer_mode"` // the first_dealer asked for: random or you
 	CPU               string                          `json:"cpu"`               // weak or normal
+	Dojo              bool                            `json:"dojo,omitempty"`    // a dojo game (Options.Dojo)
 	You               int                             `json:"you"`
 	FirstDealer       int                             `json:"first_dealer"` // the seat
 	Dealer            int                             `json:"dealer"`
@@ -36,10 +37,11 @@ type State struct {
 	Deposit           int                             `json:"deposit"`
 	DoraIndicators    []string                        `json:"dora_indicators"`
 	Dora              []string                        `json:"dora"`
-	UraDoraIndicators []string                        `json:"ura_dora_indicators"` // empty until the end
+	UraDoraIndicators []string                        `json:"ura_dora_indicators"` // empty until the end, unless the dojo's ura peek
 	UraDora           []string                        `json:"ura_dora"`
 	Seats             [4]Seat                         `json:"seats"`
-	LastDiscard       *string                         `json:"last_discard"` // the tile you may ron
+	MyNextDraws       []string                        `json:"my_next_draws,omitempty"` // dojo wall peek only: your next draws (at most DojoOptions.WallPeek) if nobody calls or makes a kan
+	LastDiscard       *string                         `json:"last_discard"`            // the tile you may ron
 	Legal             game.Legal                      `json:"legal"`
 	Events            []Event                         `json:"events"`
 	EventsFrom        int                             `json:"events_from"`           // the round's index of events[0]
@@ -74,6 +76,9 @@ type Seat struct {
 	// HandGroups are the blocks of hand, for your seat only (docs/api.md).
 	HandGroups []apiview.HandGroup `json:"hand_groups,omitempty"`
 	Drawn      *string             `json:"drawn,omitempty"`
+	// Waits are the kinds a seat in riichi waits on: another seat during a
+	// dojo game with the riichi waits peek only.
+	Waits []string `json:"waits,omitempty"`
 }
 
 // SeatDanger is how dangerous each tile you hold is against one riichi:
@@ -133,6 +138,12 @@ type RoundSummary struct {
 	Winner      int    `json:"winner"`
 	From        int    `json:"from"`
 	Deltas      [4]int `json:"deltas"`
+	// Dojo games only: Han is the han of your win's yaku (no dora; 0 if you
+	// did not win), Redraws and Summons the redraws and summons you made in
+	// the round.
+	Han     int `json:"han,omitempty"`
+	Redraws int `json:"redraws,omitempty"`
+	Summons int `json:"summons,omitempty"`
 }
 
 // Result is how the round ended.
@@ -158,6 +169,9 @@ type Result struct {
 	Deposit     int     `json:"deposit"`
 	// Pao are the seats responsible (包) for yakuman of the win.
 	Pao []game.Pao `json:"pao"`
+	// Excluded are the keys of the yaku your win did not count: not
+	// learned in the dojo (dojo games only).
+	Excluded []string `json:"excluded,omitempty"`
 }
 
 func (m *Match) state(view View) State {
@@ -168,6 +182,7 @@ func (m *Match) state(view View) State {
 		Length:            m.opts.Length,
 		FirstDealerMode:   m.opts.FirstDealer,
 		CPU:               m.opts.CPU,
+		Dojo:              m.opts.Dojo != nil,
 		You:               Human,
 		FirstDealer:       h.FirstDealer(),
 		Dealer:            v.Dealer,
@@ -205,9 +220,18 @@ func (m *Match) state(view View) State {
 	for s, sd := range h.Standings() {
 		st.Standings[s] = Standing{Seat: sd.Seat, Rank: sd.Rank, Points: sd.Points, Score: sd.Score}
 	}
-	if v.UraIndicators != nil {
-		st.UraDoraIndicators = tile.Strings(v.UraIndicators)
-		st.UraDora = apiview.DoraKinds(v.UraIndicators)
+	dojo := m.opts.Dojo
+	if ura := v.UraIndicators; ura != nil || (dojo != nil && dojo.UraPeek) {
+		if ura == nil {
+			ura = r.UraIndicators()
+		}
+		st.UraDoraIndicators = tile.Strings(ura)
+		st.UraDora = apiview.DoraKinds(ura)
+	}
+	if dojo != nil && dojo.WallPeek > 0 {
+		if next := r.NextDraws(Human, dojo.WallPeek); len(next) > 0 {
+			st.MyNextDraws = tile.Strings(next)
+		}
 	}
 	l := st.Legal
 	if v.LastDiscard != nil && (l.Ron || l.Pon || len(l.Chii) > 0 || len(l.Kan) > 0) {
@@ -234,6 +258,21 @@ func (m *Match) state(view View) State {
 		if sv.Drawn != nil {
 			d := sv.Drawn.String()
 			seat.Drawn = &d
+		}
+		if s != Human && v.Phase != game.PhaseEnded && dojo != nil && dojo.RiichiWaits && sv.Riichi {
+			for _, k := range r.WaitsOf(s) {
+				seat.Waits = append(seat.Waits, k.String())
+			}
+		}
+		if s != Human && v.Phase != game.PhaseEnded && dojo != nil && dojo.Peek {
+			// The dojo's peek shows the hands; what the analysis counts as
+			// seen (remaining, danger) still comes from v alone.
+			hand, drawn := r.Concealed(s)
+			seat.Hand = tile.Strings(hand)
+			if drawn != nil {
+				d := drawn.String()
+				seat.Drawn = &d
+			}
 		}
 		st.Seats[s] = seat
 	}
@@ -299,6 +338,11 @@ func (m *Match) state(view View) State {
 	}
 	st.History = slices.Clone(m.history)
 	st.Result = result(v.Result)
+	if res := v.Result; m.opts.Dojo != nil && res != nil && res.Win != nil && res.Winner == Human {
+		for _, y := range res.Win.Excluded {
+			st.Result.Excluded = append(st.Result.Excluded, y.Key)
+		}
+	}
 	return st
 }
 
@@ -323,8 +367,17 @@ func (m *Match) advice(v game.View, all []tile.Tile, byKind map[tile.Kind][]yaku
 	turn := len(v.Seats[Human].River)
 	return advice.Compute(advice.Input{
 		Tiles: all, Visible: *visible, Dora: dora, Turn: turn, MaxTurns: turn + 1 + v.DrawsLeft/4,
-		ByDiscard: byKind, Han: han, Analyzer: m.analyzer,
+		ByDiscard: byKind, Han: han, Allowed: m.allowed(), Analyzer: m.analyzer,
 	})
+}
+
+// allowed is the advice's filter of the yaku: the learned ones in the dojo,
+// nil (every yaku) outside it.
+func (m *Match) allowed() func(string) bool {
+	if m.learned == nil {
+		return nil
+	}
+	return m.learned.Has
 }
 
 // danger rates the tiles all against every other seat in riichi.
@@ -467,10 +520,20 @@ func (m *Match) summary() *RoundSummary {
 	if res == nil {
 		return nil
 	}
-	return &RoundSummary{
+	s := &RoundSummary{
 		RoundWind: h.RoundWind().String(), RoundNumber: h.Number(), Honba: h.Honba(),
 		Kind: res.Kind, Reason: res.Reason, Winner: res.Winner, From: res.From, Deltas: res.Deltas,
 	}
+	if m.opts.Dojo != nil {
+		s.Redraws = m.game.Round.Redraws(Human)
+		s.Summons = m.game.Round.Summons(Human)
+		if res.Winner == Human && res.Win != nil {
+			for _, y := range res.Win.Yaku {
+				s.Han += y.Han
+			}
+		}
+	}
+	return s
 }
 
 func result(res *game.Result) *Result {

@@ -265,7 +265,7 @@ export function goto(id: string, nodeId: number, view = FULL_VIEW): Promise<Sess
 // ---- Games against CPU players (docs/api.md "Games") ----
 
 export type GamePhase = 'discard' | 'call' | 'ended';
-export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'pon' | 'chii' | 'kan' | 'next';
+export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'pon' | 'chii' | 'kan' | 'redraw' | 'summon' | 'next';
 export type GameLength = 'tonpuu' | 'hanchan'; // 東風戦 | 半荘戦
 export type FirstDealerMode = 'random' | 'you'; // 起家: ランダム | 自分
 export type CpuLevel = 'weak' | 'normal'; // 弱い | 普通
@@ -294,9 +294,10 @@ export interface Seat {
   river: RiverTile[];
   melds: Meld[];
   hand_count: number;
-  hand?: Tile[]; // yours, or everyone's once the round has ended
+  hand?: Tile[]; // yours, or everyone's once the round has ended (or during it with the dojo's peek)
   hand_groups?: HandGroup[]; // yours only: blocks of hand
   drawn?: Tile;
+  waits?: Tile[]; // dojo's riichi_waits only: a CPU seat in riichi's waiting kinds
 }
 
 export interface Legal {
@@ -309,6 +310,8 @@ export interface Legal {
   pon: boolean; // may pon last_discard
   chii: [Tile, Tile][]; // the pairs of own tiles that can chii last_discard
   kan: Tile[]; // call phase: open kan of last_discard; own turn: kinds to ankan or add to a pon
+  redraw?: boolean; // dojo only: may redraw (sent only when true)
+  summon?: Tile[]; // dojo only: kinds a summon may fetch from the live wall (sent only when non-empty)
 }
 
 export interface GameEvent {
@@ -349,6 +352,11 @@ export interface RoundSummary {
   winner: number;
   from: number;
   deltas: number[];
+  // Dojo games only, omitted when 0: the han of your win's yaku (no dora)
+  // and your redraws and summons in the round.
+  han?: number;
+  redraws?: number;
+  summons?: number;
 }
 
 export interface GameResult {
@@ -371,6 +379,7 @@ export interface GameResult {
   tenpai: boolean[];
   deposit: number;
   pao: Pao[]; // seats responsible (包) for yakuman of the win
+  excluded?: string[]; // dojo only: keys of the yaku your win did not count (not learned)
 }
 
 export interface Pao {
@@ -384,6 +393,7 @@ export interface GameState {
   length: GameLength;
   first_dealer_mode: FirstDealerMode; // the first_dealer asked for
   cpu: CpuLevel;
+  dojo?: boolean; // a dojo game (sent only when true)
   you: number;
   first_dealer: number; // the seat
   dealer: number;
@@ -400,9 +410,10 @@ export interface GameState {
   deposit: number;
   dora_indicators: Tile[];
   dora: Tile[];
-  ura_dora_indicators: Tile[];
+  ura_dora_indicators: Tile[]; // [] until the round ends, unless the dojo's ura_peek
   ura_dora: Tile[];
   seats: Seat[];
+  my_next_draws?: Tile[]; // dojo's wall_peek only: your next live-wall draws (no calls or kans), at most wall_peek
   last_discard: Tile | null;
   legal: Legal;
   events: GameEvent[];
@@ -428,10 +439,22 @@ export interface SeatDanger {
   tiles: Record<Tile, DangerLevel>; // every tile you hold
 }
 
+/** A dojo game's options (docs/api.md "Dojo games"). */
+export interface DojoOptions {
+  yaku: string[]; // the yaku keys you may count
+  peek?: boolean; // show the other seats' hands during a round
+  redraws_per_round?: number; // redraws allowed per round; 0 or omitted: none
+  ura_peek?: boolean; // show the ura-dora indicators during a round
+  riichi_waits?: boolean; // show the waits of CPU seats in riichi
+  wall_peek?: number; // show your next N draws; 0 or omitted: none
+  summons_per_round?: number; // summons allowed per round; 0 or omitted: none
+}
+
 export interface GameOptions {
   length: GameLength;
   first_dealer: FirstDealerMode;
   cpu: CpuLevel;
+  dojo?: DojoOptions;
 }
 
 // A game request's path: with the advice and the danger left out (docs/api.md

@@ -358,7 +358,16 @@ type Analyzer struct {
 	todo  []pending
 	evald []comboCand
 	sel   []comboCand
+	// han, when set, gives the combos' han in place of yaku.HanOpenFor; a
+	// combo with a yaku it scores 0 is left out (see SetHan).
+	han func(key string, w Winds, open bool) int
 }
+
+// SetHan has Combos count each yaku's han with han (the dojo's: 0 for a
+// yaku not learned) and leave out the combos with a yaku of 0 han. The
+// shared combo list stays as it is: the combos are left out per analyzer.
+// It must be set before the first Combos call; ForWinds carries it.
+func (a *Analyzer) SetHan(han func(key string, w Winds, open bool) int) { a.han = han }
 
 // resultMemoSize is how many hands each result memo holds: a turn's discard
 // candidates (at most 14 kinds) and the hand itself, twice over, so a turn's
@@ -436,7 +445,7 @@ func NewAnalyzerFor(w Winds) *Analyzer {
 // must not be used concurrently, as one analyzer may not be either. The
 // results memo is not shared (the rows differ), only turned off if a's is.
 func (a *Analyzer) ForWinds(w Winds) *Analyzer {
-	b := &Analyzer{eng: a.eng, folds: a.folds, winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w)}
+	b := &Analyzer{eng: a.eng, folds: a.folds, winds: w, rows: RowsFor(w), pinfuT: pinfuTargets(w), han: a.han}
 	if a.rowsMemo.off {
 		b.DisableResultMemo()
 	}

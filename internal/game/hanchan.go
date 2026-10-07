@@ -44,29 +44,40 @@ type Hanchan struct {
 	index       int // rounds dealt so far, minus one: the wall seed index
 	round       *Round
 	logs        [][]Action // logs of the finished rounds
+	seats       SeatConfig // carried to every round
 }
 
 // NewHanchan deals the first round. The first dealer is seed mod 4.
 func NewHanchan(seed int64, rules Rules) *Hanchan {
-	return NewHanchanFrom(seed, rules, int(((seed%4)+4)%4))
+	return NewHanchanFrom(seed, rules, DefaultFirstDealer(seed))
 }
+
+// DefaultFirstDealer is the first dealer New and NewHanchan pick: seed mod 4.
+func DefaultFirstDealer(seed int64) int { return int(((seed % 4) + 4) % 4) }
 
 // NewHanchanFrom deals the first round with seat firstDealer (0-3) as the
 // first dealer; the walls are the same as NewHanchan's for the seed.
 func NewHanchanFrom(seed int64, rules Rules, firstDealer int) *Hanchan {
-	h := &Hanchan{rules: rules, seed: seed, firstDealer: firstDealer}
+	return NewHanchanWith(seed, rules, firstDealer, SeatConfig{})
+}
+
+// NewHanchanWith is NewHanchanFrom with per-seat house rules for every round,
+// the first one included.
+func NewHanchanWith(seed int64, rules Rules, firstDealer int, seats SeatConfig) *Hanchan {
+	h := &Hanchan{rules: rules, seed: seed, firstDealer: firstDealer, seats: seats}
 	h.deal([4]int{rules.StartPoints, rules.StartPoints, rules.StartPoints, rules.StartPoints})
 	return h
 }
 
 func (h *Hanchan) deal(points [4]int) {
 	h.round = NewRound(RoundConfig{
-		Wall:      wall.New(wall.RoundSeed(h.seed, h.index)),
-		Dealer:    h.Dealer(),
-		RoundWind: tile.East + tile.Kind(h.wind),
-		Honba:     h.honba,
-		Deposit:   h.deposit,
-		Points:    points,
+		Wall:       wall.New(wall.RoundSeed(h.seed, h.index)),
+		Dealer:     h.Dealer(),
+		RoundWind:  tile.East + tile.Kind(h.wind),
+		Honba:      h.honba,
+		Deposit:    h.deposit,
+		Points:     points,
+		SeatConfig: h.seats,
 	})
 }
 
