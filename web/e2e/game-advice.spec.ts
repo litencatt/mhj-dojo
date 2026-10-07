@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SEED, engineCalls, handPanel, playOneStep, waitForPlayback } from './helpers';
+import { SEED, engineCalls, handPanel, openSettings, playOneStep, waitForPlayback } from './helpers';
 
 // The CPU game's advice panel and the danger marks on your hand.
 
@@ -20,15 +20,16 @@ test('a desktop game offers the advice in the dock, and the option turns it off'
   await candidates.first().focus();
   await expect(handPanel(page).locator('.tile-advice').first()).toBeVisible();
 
-  const option = page.getByRole('checkbox', { name: 'アドバイス・危険度' });
+  const option = (await openSettings(page)).getByRole('checkbox', { name: 'アドバイス・危険度' });
   await expect(option).toBeChecked();
   await option.uncheck();
+  await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
   await expect(dock.getByRole('button', { name: 'アドバイス' })).toHaveCount(0);
   await page.reload();
   await waitForPlayback(page);
-  await expect(page.getByRole('checkbox', { name: 'アドバイス・危険度' })).not.toBeChecked();
   await expect(page.getByRole('region', { name: 'アドバイス' })).toHaveCount(0);
+  await expect((await openSettings(page)).getByRole('checkbox', { name: 'アドバイス・危険度' })).not.toBeChecked();
 });
 
 test('a CPU riichi marks the danger of every tile you hold', async ({ page }) => {
@@ -46,7 +47,8 @@ test('a CPU riichi marks the danger of every tile you hold', async ({ page }) =>
   await expect(marked.first()).toHaveAttribute('aria-label', /、危険度 [安低中危]（(下家|対面|上家)/);
   await expect(marked.first()).toHaveAttribute('title', /^危険度 /);
 
-  await page.getByRole('checkbox', { name: 'アドバイス・危険度' }).uncheck();
+  await (await openSettings(page)).getByRole('checkbox', { name: 'アドバイス・危険度' }).uncheck();
+  await page.keyboard.press('Escape');
   await expect(marked).toHaveCount(0);
 });
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SEED, discardDrawn, handPanel, playOneStep } from './helpers';
+import { SEED, discardDrawn, handPanel, openSettings, playOneStep, settingsDialog } from './helpers';
 
 // Opened with nothing in the URL (issue #186), the page offers the saves:
 // 「続きから」 resumes the most recently used one, the list the others, and
@@ -55,7 +55,7 @@ test('a bare open with a saved session still starts a new one on 新しい練習
   const first = param(page, 'session');
   await page.goto('./');
   await expect(resumePanel(page, '練習')).toBeVisible();
-  await page.getByRole('button', { name: '新しい練習' }).click();
+  await (await openSettings(page)).getByRole('button', { name: '新しい練習' }).click();
   await expect(handPanel(page).locator('.discard-river .tile')).toHaveCount(0);
   await expect(resumePanel(page, '練習')).toHaveCount(0);
   await expect(page).toHaveURL(/[?&]session=/);
@@ -81,14 +81,14 @@ test('a bare open of the CPU game offers its save, and 新規対局 mid-game ask
     asked.push(d.message());
     void d.dismiss();
   });
-  await page.getByRole('button', { name: '新規対局' }).click();
+  await (await openSettings(page)).getByRole('button', { name: '新規対局' }).click();
   await expect.poll(() => asked).toEqual(['対局中です。新しい対局を始めますか？']);
   await expect(handPanel(page)).toBeVisible();
   expect(param(page, 'game')).toBe(id);
 
   // Accepted: a new game.
   page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: '新規対局' }).click();
+  await settingsDialog(page).getByRole('button', { name: '新規対局' }).click();
   await expect.poll(() => param(page, 'game')).not.toBe(id);
 });
 

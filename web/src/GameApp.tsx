@@ -53,8 +53,6 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
-// Where the header has no room for the new-game options (style.css).
-const NARROW = '(width <= 760px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -149,12 +147,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   setDojoSpeeds(dojo ? speeds : null);
   const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
-  // On a narrow screen the new-game options open in a modal 「設定」 once a game is on.
+  // 設定 (the header's button) opens the options in a modal dialog; a new game closes it.
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const optionsRef = useRef<HTMLDialogElement>(null);
-  const narrow = useMediaQuery(NARROW);
   // The game shown: a new one (from the form, the final panel or the URL)
   // folds the options away.
   const shownGame = useRef<string | null>(null);
@@ -305,32 +299,14 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   }
 
   // The options stay open until the new game is on (a failed request keeps
-  // them, as chosen); then, if they were submitted from the keyboard, focus
-  // goes back to 設定 instead of dropping to the page once they fold away,
-  // unless the player has moved it elsewhere meanwhile.
-  async function handleNewGame(e: Event) {
+  // them, as chosen); the dialog then gives the focus back to 設定.
+  function handleNewGame(e: Event) {
     e.preventDefault();
-    const fromForm = !!formRef.current?.contains(document.activeElement);
     // The game on stays saved, but only the list of saves leads back to it.
     if (state && !state.game_over && !window.confirm('対局中です。新しい対局を始めますか？')) return;
-    const started = await startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
-    const toggle = toggleRef.current;
-    if (!started || !toggle || toggle.offsetParent === null) return;
-    const active = document.activeElement;
-    if (fromForm && (active === document.body || formRef.current?.contains(active))) toggle.focus();
+    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
   }
 
-  // 設定 shows the options as a modal dialog (focus on the first option); Esc, 閉じる and a
-  // new game close it, the dialog giving the focus back to 設定.
-  const modalOptions = !dojo && !!state && narrow;
-  useEffect(() => {
-    const d = optionsRef.current;
-    if (!d) return;
-    if (optionsOpen && !d.open) {
-      d.showModal();
-      d.querySelector<HTMLElement>('input:checked')?.focus();
-    } else if (!optionsOpen && d.open) d.close();
-  }, [optionsOpen, modalOptions]);
 
   // The dojo's yaku table and chart have the rows of the yaku learned only.
   const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
@@ -443,30 +419,43 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     setSpeed(v);
     savePlaybackSpeed(v);
   };
-  const speedOption = (
-    <label class="speed-option">
-      再生速度
-      <select
-        value={speed}
-        onChange={(e) => chooseSpeed((e.target as HTMLSelectElement).value as PlaybackSpeed)}
-      >
-        {speeds.map((k) => (
-          <option key={k} value={k}>
-            {PLAYBACK_SPEEDS[k].label}
-          </option>
-        ))}
-      </select>
-    </label>
+  const speedGroup = (
+    <RadioGroup
+      label="再生速度"
+      name="game-speed"
+      value={speed}
+      names={Object.fromEntries(speeds.map((k) => [k, PLAYBACK_SPEEDS[k].label])) as Record<PlaybackSpeed, string>}
+      onChange={chooseSpeed}
+    />
   );
-  const adviceOption = (
-    <label class="speed-option">
-      <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
-      {/* A phone has no advice panel: the advice is the action bar's chip there. */}
-      {phone ? 'おすすめ・危険度' : 'アドバイス・危険度'}
-    </label>
+  // What the page shows: the advice and the danger (a CPU game's own choice; the dojo's
+  // are bought), and the dojo's 透視 once bought.
+  const viewGroup = (!dojo || has('cheat:peek')) && (
+    <fieldset class="dojo-settings-group option-group">
+      <legend>表示</legend>
+      {!dojo && (
+        <label>
+          <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
+          {/* A phone has no advice panel: the advice is the action bar's chip there. */}
+          {phone ? 'おすすめ・危険度' : 'アドバイス・危険度'}
+        </label>
+      )}
+      {has('cheat:peek') && (
+        <label>
+          <input type="checkbox" checked={peek} onChange={(e) => setPeek((e.target as HTMLInputElement).checked)} />
+          透視
+        </label>
+      )}
+    </fieldset>
   );
-  const optionsForm = (
-    <form id="new-game-options" class="new-game-form new-game-options" ref={formRef} onSubmit={handleNewGame}>
+  // The 設定 dialog: a CPU game's new-game form, the dojo's game only how it is shown.
+  const settings = dojo ? (
+    <div class="new-game-form">
+      {speedGroup}
+      {viewGroup}
+    </div>
+  ) : (
+    <form id="new-game-options" class="new-game-form new-game-options" onSubmit={handleNewGame}>
       <RadioGroup label="対局" name="game-length" value={optionsInput.length} names={LENGTH_NAMES} onChange={setOption('length')} />
       <RadioGroup label="起家" name="game-first-dealer" value={optionsInput.first_dealer} names={DEALER_NAMES} onChange={setOption('first_dealer')} />
       <RadioGroup label="CPU" name="game-cpu" value={optionsInput.cpu} names={CPU_NAMES} onChange={setOption('cpu')} />
@@ -480,21 +469,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
           onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
         />
       </fieldset>
-      {phone && (
-        <RadioGroup
-          label="再生速度"
-          name="game-speed"
-          value={speed}
-          names={Object.fromEntries(speeds.map((k) => [k, PLAYBACK_SPEEDS[k].label])) as Record<PlaybackSpeed, string>}
-          onChange={chooseSpeed}
-        />
-      )}
-      {phone && (
-        <fieldset class="dojo-settings-group option-group">
-          <legend>表示</legend>
-          {adviceOption}
-        </fieldset>
-      )}
+      {speedGroup}
+      {viewGroup}
       <button type="submit" disabled={busy}>新規対局</button>
     </form>
   );
@@ -502,6 +478,9 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     <AppShell
       mode="game"
       dojo={dojo}
+      settings={settings}
+      settingsOpen={optionsOpen}
+      onSettingsOpen={setOptionsOpen}
       started={!!state}
       docked={docked}
       onRestore={restore}
@@ -558,44 +537,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                 uraDoraIndicators={table.ura_dora_indicators}
                 uraDora={table.ura_dora}
               />
-              {!phone && speedOption}
-              {!phone && !dojo && adviceOption}
-              {has('cheat:peek') && (
-                <label class="speed-option">
-                  <input type="checkbox" checked={peek} onChange={(e) => setPeek((e.target as HTMLInputElement).checked)} />
-                  透視
-                </label>
-              )}
-              {modalOptions && (
-                <button
-                  ref={toggleRef}
-                  type="button"
-                  class="options-toggle"
-                  aria-haspopup="dialog"
-                  onClick={() => setOptionsOpen(true)}
-                >
-                  設定
-                </button>
-              )}
             </div>
-          )}
-          {/* After the status; a desktop shows them on the first row (style.css). */}
-          {!dojo && !modalOptions && optionsForm}
-          {modalOptions && (
-            <dialog
-              ref={optionsRef}
-              class="game-options-dialog"
-              aria-labelledby="game-options-heading"
-              onClose={() => setOptionsOpen(false)}
-            >
-              <div class="game-options-head">
-                <h2 id="game-options-heading">設定</h2>
-                <button type="button" onClick={() => setOptionsOpen(false)}>
-                  閉じる
-                </button>
-              </div>
-              {optionsForm}
-            </dialog>
           )}
         </>
       }

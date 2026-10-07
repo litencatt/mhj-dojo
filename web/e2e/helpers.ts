@@ -473,3 +473,21 @@ export async function tableState(page: Page) {
     status: await page.locator('.game-status').innerText(),
   };
 }
+
+/** Opens the header's 設定 (every mode has one) and returns its dialog. */
+export async function openSettings(page: Page): Promise<Locator> {
+  await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).click();
+  const dialog = settingsDialog(page);
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+/** The 設定 dialog, open or not. */
+export function settingsDialog(page: Page): Locator {
+  return page.getByRole('dialog', { name: '設定' });
+}
+
+/** The radio buttons of a choice in 設定 (再生速度, 対局 ...), by its name. */
+export function settingsChoice(page: Page, name: string): Locator {
+  return settingsDialog(page).getByRole('group', { name, exact: true }).getByRole('radio');
+}

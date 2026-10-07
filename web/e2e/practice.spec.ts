@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, stoppedDialog } from './helpers';
+import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, openSettings, stoppedDialog } from './helpers';
 
 // Solo practice mode (the root page).
 
@@ -104,8 +104,9 @@ test('tabs on different sessions both play, and a new session lets go of the one
   await page.goto('./?seed=31&turns=18');
   await expect(page).toHaveURL(/[?&]session=/);
   const first = page.url();
-  await page.locator('.new-game-form input[type="number"]').first().fill('32');
-  await page.getByRole('button', { name: '新しい練習' }).click();
+  const settings = await openSettings(page);
+  await settings.getByRole('spinbutton', { name: 'シード' }).fill('32');
+  await settings.getByRole('button', { name: '新しい練習' }).click();
   await expect(page).not.toHaveURL(first);
   await expect(page).toHaveURL(/[?&]seed=32(&|$)/);
 

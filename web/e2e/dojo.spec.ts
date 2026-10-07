@@ -15,6 +15,7 @@ import {
   isRequest,
   newDojoGame,
   nextEngineReply,
+  openSettings,
   playOneStep,
   playToResult,
   slowEngine,
@@ -134,9 +135,11 @@ test('a dojo game is saved apart from the CPU games and survives a reload as a d
   await waitForPlayback(page);
   await expect(handPanel(page)).toBeVisible();
   await expect(page).toHaveURL(/mode=dojo/);
-  // The header links back to the hub only, not to the other modes.
-  await expect(page.getByRole('link', { name: '道場へ戻る' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /練習へ|CPU対戦へ/ })).toHaveCount(0);
+  // The header links to the three modes, 道場 (back to the hub) marked as this page's.
+  const modes = page.locator('.app-header h1').getByRole('link');
+  await expect(modes).toHaveText(['練習', 'CPU対戦', '道場']);
+  await expect(modes.nth(2)).toHaveAttribute('aria-current', 'page');
+  await expect(modes.nth(2)).toHaveAttribute('href', '?mode=dojo');
   expect(await tableState(page)).toEqual(before);
 
   // The CPU game's page offers none of the dojo's games.
@@ -195,9 +198,12 @@ test('透視 shows the other seats hands only while it is on', async ({ page }) 
   await newDojoGame(page, SEED, { ownedItems: ['cheat:peek'] });
   const hands = page.locator('.seat-hand[aria-label="手牌"]');
   await expect(hands).toHaveCount(0);
-  await page.getByLabel('透視').check();
+  // 透視 is in 設定's 表示.
+  await (await openSettings(page)).getByRole('checkbox', { name: '透視' }).check();
+  await page.keyboard.press('Escape');
   await expect(hands).toHaveCount(3);
-  await page.getByLabel('透視').uncheck();
+  await (await openSettings(page)).getByRole('checkbox', { name: '透視' }).uncheck();
+  await page.keyboard.press('Escape');
   await expect(hands).toHaveCount(0);
 });
 

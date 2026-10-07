@@ -4,6 +4,7 @@ import {
   clickAndWait,
   expectStopped,
   handPanel,
+  openSettings,
   pageOverflowX,
   playOneStep,
   playToResult,
@@ -580,19 +581,21 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
   });
 }
 
-// A desktop (and a phone on its side) shows the options with the title,
-// above the status, though they come after it in the page.
+// A desktop (and a phone on its side) has the options behind 設定 too, on
+// the title row; the header shows the title and the status only.
 for (const [width, height] of [[1280, 900], [844, 390]]) {
-  test(`a ${width}x${height} screen keeps the new-game options above the status`, async ({ page }) => {
+  test(`a ${width}x${height} screen has the new-game options behind 設定 on the title row`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
-    await expect(page.locator('.new-game-form')).toBeVisible();
-    const form = (await page.locator('.new-game-form').boundingBox())!;
-    const status = (await page.locator('.header-status').boundingBox())!;
+    await expect(page.locator('.new-game-form')).toBeHidden();
+    const settings = (await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).boundingBox())!;
     const title = (await page.locator('.app-header h1').boundingBox())!;
-    expect(form.y).toBeGreaterThanOrEqual(title.y);
-    expect(form.y + form.height).toBeLessThanOrEqual(status.y);
+    const status = (await page.locator('.header-status').boundingBox())!;
+    expect(settings.y + settings.height).toBeLessThanOrEqual(status.y);
+    expect(Math.abs(settings.y + settings.height / 2 - (title.y + title.height / 2))).toBeLessThanOrEqual(8);
+    const dialog = await openSettings(page);
+    await expect(dialog.getByRole('button', { name: '新規対局' })).toBeVisible();
   });
 }
 
@@ -686,14 +689,11 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
   expect((await discard.locator('.event-verb').boundingBox())!.width).toBeLessThanOrEqual(1);
 });
 
-// A desktop keeps the new-game options in the header, and the rivers at six
-// 18px tiles to a row.
-test('a desktop keeps the header options and six-tile rivers', async ({ page }) => {
+// A desktop keeps the rivers at six 18px tiles to a row.
+test('a desktop has six-tile rivers', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
-  await expect(page.locator('.new-game-form')).toBeVisible();
-  await expect(page.locator('.options-toggle')).toBeHidden();
   const river = page.locator('.seat-river').first();
   expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
   await expect(page.locator('.dora-indicators .tile').first()).toHaveCSS('width', '26px');
@@ -715,8 +715,10 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
     await expect(status.locator('div').filter({ hasText: 'シード' }).locator('dd')).toHaveText(String(SEED));
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
-    await expect(page.getByRole('group', { name: '起家' }).getByRole('radio', { name: '自分' })).toBeChecked();
-    await expect(page.getByRole('group', { name: 'CPU' }).getByRole('radio', { name: '弱い' })).toBeChecked();
+    const dialog = await openSettings(page);
+    await expect(dialog.getByRole('group', { name: '起家' }).getByRole('radio', { name: '自分' })).toBeChecked();
+    await expect(dialog.getByRole('group', { name: 'CPU' }).getByRole('radio', { name: '弱い' })).toBeChecked();
+    await page.keyboard.press('Escape');
     await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
     await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
     await expect(page).toHaveURL(/[?&]game=/);

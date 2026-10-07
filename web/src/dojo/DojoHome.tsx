@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { VersionTag } from '../components/VersionTag';
+import { useEffect, useState } from 'preact/hooks';
+import { SettingsDialog } from '../components/SettingsDialog';
+import { SiteHeader } from '../components/SiteHeader';
 import { YAKUHAI_KEYS, yakuName } from './catalog';
 import {
   cpuUnlocked,
@@ -93,7 +94,6 @@ export function DojoHome() {
   const [notice, setNotice] = useState<string | null>(
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
-  const settingsRef = useRef<HTMLDialogElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The dojo's own unfinished games (the CPU game's list never has them).
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
@@ -129,11 +129,6 @@ export function DojoHome() {
     };
   }, [progress.activeCloth, progress.activeStick, progress.activeEffect]);
 
-  function openSettings() {
-    settingsRef.current?.showModal();
-    setSettingsOpen(true);
-  }
-
   // Another tab may have changed the progress (paid a game): apply to what is stored now.
   function change(apply: (current: DojoProgress) => DojoProgress) {
     const cur = loadProgress().progress;
@@ -150,19 +145,7 @@ export function DojoHome() {
 
   return (
     <div class="dojo-home">
-      <header class="app-header">
-        <h1>
-          mhj-dojo <span class="app-subtitle">道場</span>
-          <a class="mode-link" href="?">練習へ</a>
-          <a class="mode-link" href="?mode=game">CPU対戦へ</a>
-        </h1>
-        <div class="header-meta">
-          <button type="button" class="dojo-settings-button" aria-haspopup="dialog" onClick={openSettings}>
-            設定
-          </button>
-          <VersionTag />
-        </div>
-      </header>
+      <SiteHeader mode="dojo" onSettings={() => setSettingsOpen(true)} />
 
       {notice && !settingsOpen && (
         <p class="dojo-notice" role="status">
@@ -224,14 +207,7 @@ export function DojoHome() {
 
       <Shop progress={progress} onChange={change} />
 
-      {/* Esc (the dialog's cancel) and 閉じる close it; showModal makes the page behind inert. */}
-      <dialog ref={settingsRef} class="dojo-settings" aria-labelledby="dojo-settings-heading" onClose={() => setSettingsOpen(false)}>
-        <div class="dojo-settings-head">
-          <h2 id="dojo-settings-heading">設定</h2>
-          <button type="button" onClick={() => settingsRef.current?.close()}>
-            閉じる
-          </button>
-        </div>
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)}>
         {notice && settingsOpen && (
           <p class="dojo-notice" role="status">
             {notice}
@@ -332,7 +308,7 @@ export function DojoHome() {
           <Tile tile="" size="sm" faceDown />
           <span class="seat-riichi">リーチ</span>
         </div>
-      </dialog>
+      </SettingsDialog>
     </div>
   );
 }
