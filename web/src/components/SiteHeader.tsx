@@ -11,13 +11,14 @@ const MODE_LINKS: readonly (readonly [HelpMode, string, string])[] = [
 
 interface SiteHeaderProps {
   mode: HelpMode; // the page's mode: marked among the links, and explained by the help
+  back?: readonly [string, string]; // [href, label]: a page inside a mode leads back to its top (a dojo game to the hub)
   onSettings?: () => void; // opens the mode's 設定 dialog; none: no 設定 button
   onShowGlossary?: () => void; // none: Help has no link to the glossary
   children?: ComponentChildren; // under the title row: the session's or game's status
 }
 
 /** Every mode's header: the title and the three modes (this one marked), then the version, 設定 and help. */
-export function SiteHeader({ mode, onSettings, onShowGlossary, children }: SiteHeaderProps) {
+export function SiteHeader({ mode, back, onSettings, onShowGlossary, children }: SiteHeaderProps) {
   return (
     <header class="app-header">
       <h1>
@@ -37,6 +38,12 @@ export function SiteHeader({ mode, onSettings, onShowGlossary, children }: SiteH
         )}
         <Help mode={mode} onShowGlossary={onShowGlossary} />
       </div>
+      {back && (
+        <a class="header-back" href={back[0]}>
+          <span aria-hidden="true">← </span>
+          {back[1]}
+        </a>
+      )}
       {children}
     </header>
   );

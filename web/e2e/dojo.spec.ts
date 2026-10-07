@@ -140,6 +140,8 @@ test('a dojo game is saved apart from the CPU games and survives a reload as a d
   await expect(modes).toHaveText(['練習', 'CPU対戦', '道場']);
   await expect(modes.nth(2)).toHaveAttribute('aria-current', 'page');
   await expect(modes.nth(2)).toHaveAttribute('href', '?mode=dojo');
+  // And a link of its own back to the hub (道場トップ).
+  await expect(page.locator('.app-header').getByRole('link', { name: '道場トップへ戻る' })).toHaveAttribute('href', '?mode=dojo');
   expect(await tableState(page)).toEqual(before);
 
   // The CPU game's page offers none of the dojo's games.

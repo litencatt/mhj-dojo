@@ -1429,6 +1429,13 @@ section,
   font-weight: normal;
   color: var(--accent);
 }
+/* A page inside a mode back to its top (SiteHeader's back): a row of its own
+   under the title, so the title row keeps its width on a phone. */
+.header-back {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
 /* This page's mode: plain text, not underlined, like a selected tab. */
 .mode-link[aria-current="page"] {
   color: var(--fg);
@@ -3008,4 +3015,21 @@ section,
 }
 .hand-panel:has(.tile-badge) .hand-row {
   padding-bottom: 14px;
+}
+
+/* The narrowest phones (320px): the title row (title, the three modes, 設定
+   and ?) still fits on one line, the version giving way first. */
+@media (width <= 360px) {
+  .app-header h1 {
+    font-size: 1rem;
+  }
+  .mode-link {
+    margin-left: 4px;
+  }
+  .help-button {
+    width: 32px;
+  }
+  .settings-button {
+    padding: 2px 8px;
+  }
 }

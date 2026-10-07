@@ -562,6 +562,10 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     await expect(page.locator('.game-status')).toBeVisible();
     await expect(page.locator('.dora-box')).toBeVisible();
     expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    // The title row's mode links never run under 設定 and ?, even at 320px.
+    const title = (await page.locator('.app-header h1').boundingBox())!;
+    const meta = (await page.locator('.header-meta').boundingBox())!;
+    expect(title.x + title.width).toBeLessThanOrEqual(meta.x);
     expect((await page.locator('.dora-indicators .tile').first().boundingBox())!.height).toBeLessThanOrEqual(24);
 
     // Open: the options in a dialog inside the screen, 新規対局 still a big button.
