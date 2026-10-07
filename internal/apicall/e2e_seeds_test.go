@@ -1,6 +1,7 @@
 package apicall
 
 import (
+	"encoding/json"
 	"os"
 	"regexp"
 	"slices"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/litencatt/mhj-dojo/internal/match"
 	"github.com/litencatt/mhj-dojo/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/webts"
 )
 
 // Guards the seeds the E2E specs (web/e2e) depend on: if a game-logic change
@@ -143,14 +145,24 @@ func TestE2ESeedCPUDeals(t *testing.T) {
 	}
 }
 
-// dojoE2EYaku are the yaku of the dojo seeds' games: the dojo's first set
-// plus riichi, bought after the first game.
-const dojoE2EYaku = `["tanyao","pinfu","haku","hatsu","chun","ton","nan","shaa","pei","riichi"]`
+// jsonList is keys as a JSON list.
+func jsonList(keys []string) string {
+	b, _ := json.Marshal(keys)
+	return string(b)
+}
+
+// initialYaku are the yaku a new dojo owns (INITIAL_YAKU in
+// web/src/dojo/catalog.ts).
+func initialYaku(t *testing.T) []string {
+	return webts.Strings(t, "src/dojo/catalog.ts", "INITIAL_YAKU")
+}
 
 // newDojoGame creates a game as the dojo does (tonpuu, the weak CPU, a
-// random first dealer) with dojoE2EYaku, one redraw and one summon a round.
-func newDojoGame(c *client, seed int) (match.State, string) {
-	return newDojoGameWith(c, seed, `{"yaku":`+dojoE2EYaku+`,"redraws_per_round":1,"summons_per_round":1}`)
+// random first dealer) with the yaku of the redraw and summon specs
+// (LEARNED in web/e2e/dojo.spec.ts), one redraw and one summon a round.
+func newDojoGame(t *testing.T, c *client, seed int) (match.State, string) {
+	learned := jsonList(webts.Strings(t, "e2e/dojo.spec.ts", "LEARNED"))
+	return newDojoGameWith(c, seed, `{"yaku":`+learned+`,"redraws_per_round":1,"summons_per_round":1}`)
 }
 
 // newDojoGameWith creates a game as the dojo does with the dojo options
@@ -160,12 +172,13 @@ func newDojoGameWith(c *client, seed int, dojo string) (match.State, string) {
 	return st, "/api/games/" + st.GameID + "/action"
 }
 
-// DOJO_RIICHI_SEED: a dojo game offers you riichi within 3 tsumogiri moves
-// (dojo.spec.ts: the riichi bought shows in the next game).
+// DOJO_RIICHI_SEED: a dojo game with the initial yaku and riichi offers you
+// riichi within 3 tsumogiri moves (dojo.spec.ts: the riichi bought after the
+// first game shows in the next game).
 func TestE2ESeedDojoRiichi(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_RIICHI_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGame(c, seed)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(append(initialYaku(t), "riichi"))+`}`)
 	for i := 0; i < 3 && st.Result == nil && len(st.Legal.Riichi) == 0; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
@@ -179,7 +192,7 @@ func TestE2ESeedDojoRiichi(t *testing.T) {
 func TestE2ESeedDojoRedraw(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_REDRAW_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGame(c, seed)
+	st, path := newDojoGame(t, c, seed)
 	for i := 0; i < 3 && st.Result == nil && !st.Legal.Redraw; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
@@ -196,7 +209,7 @@ func TestE2ESeedDojoRedraw(t *testing.T) {
 func TestE2ESeedDojoSummon(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_SUMMON_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGame(c, seed)
+	st, path := newDojoGame(t, c, seed)
 	for i := 0; i < 3 && st.Result == nil && len(st.Legal.Summon) == 0; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
@@ -210,25 +223,21 @@ func TestE2ESeedDojoSummon(t *testing.T) {
 	}
 }
 
-// dojoFirstYaku are the yaku a new dojo owns (INITIAL_YAKU in
-// web/src/dojo/catalog.ts), as a JSON list.
-const dojoFirstYaku = `["tanyao","pinfu","tsumo"]`
-
 // noLearnedYaku reports whether the hand is tenpai in the general form while
-// no row of the first yaku is: the 役なし警告 (DojoAids in web/src/GameApp.tsx;
+// no row of the learned yaku is: the 役なし警告 (DojoAids in web/src/GameApp.tsx;
 // 門前清自摸和 has no row).
-func noLearnedYaku(st match.State) bool {
-	tenpai, learned := false, false
+func noLearnedYaku(st match.State, learned []string) bool {
+	tenpai, near := false, false
 	for _, r := range st.Analysis {
 		switch {
 		case r.Shanten == nil:
 		case r.Key == "normal":
 			tenpai = *r.Shanten == 0
-		case slices.Contains([]string{"tanyao", "pinfu", "tsumo"}, r.Key) && *r.Shanten <= 0:
-			learned = true
+		case slices.Contains(learned, r.Key) && *r.Shanten <= 0:
+			near = true
 		}
 	}
-	return tenpai && !learned && !st.Seats[0].Riichi
+	return tenpai && !near && !st.Seats[0].Riichi
 }
 
 // DOJO_NOYAKU_SEED: a new dojo's game is tenpai in the general form without
@@ -236,11 +245,12 @@ func noLearnedYaku(st match.State) bool {
 func TestE2ESeedDojoNoYaku(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_NOYAKU_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`}`)
-	for i := 0; i < 3 && st.Result == nil && !noLearnedYaku(st); i++ {
+	first := initialYaku(t)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(first)+`}`)
+	for i := 0; i < 3 && st.Result == nil && !noLearnedYaku(st, first); i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
-	if !noLearnedYaku(st) {
+	if !noLearnedYaku(st, first) {
 		t.Errorf("seed %d (DOJO_NOYAKU_SEED): no tenpai without a learned yaku within 3 moves; see the comment above tsConst", seed)
 	}
 }
@@ -250,7 +260,7 @@ func TestE2ESeedDojoNoYaku(t *testing.T) {
 func TestE2ESeedDojoRiichiWaits(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_RIICHIWAITS_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`,"riichi_waits":true}`)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(initialYaku(t))+`,"riichi_waits":true}`)
 	shown := func(st match.State) bool {
 		return slices.ContainsFunc(st.Seats[1:], func(s match.Seat) bool { return s.Riichi && len(s.Waits) > 0 })
 	}
@@ -267,7 +277,7 @@ func TestE2ESeedDojoRiichiWaits(t *testing.T) {
 func TestE2ESeedDojoWin(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_WIN_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGameWith(c, seed, `{"yaku":`+dojoFirstYaku+`}`)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(initialYaku(t))+`}`)
 	for i := 0; i < 150 && st.Result == nil; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}
