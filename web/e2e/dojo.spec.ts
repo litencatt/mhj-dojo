@@ -290,6 +290,11 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
   await page.getByRole('button', { name: '設定' }).click();
   await settings.getByRole('button', { name: '閉じる' }).click();
   await expect(settings).toBeHidden();
+  // A click (or tap) outside it closes it too.
+  await page.getByRole('button', { name: '設定' }).click();
+  await expect(settings).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(settings).toBeHidden();
 
   // Only what is owned is offered; the choice is stored and shown.
   await page.getByRole('button', { name: '設定' }).click();
@@ -675,6 +680,12 @@ test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', as
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
   await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('100');
+  // A click outside it does not buy either.
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await expect(confirm).toBeVisible();
+  await page.mouse.click(5, 5);
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();

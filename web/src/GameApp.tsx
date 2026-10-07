@@ -710,7 +710,8 @@ function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, ca
     // The claimed tile is the last move shown: a discard, or an added kan (槍槓).
     const last = state.events[state.events.length - 1];
     return (
-      <div class="action-bar" role="group" aria-label="操作">
+      // At the right end, near the drawn tile the hand is played from (Hand.tsx).
+      <div class="action-bar action-bar-call" role="group" aria-label="操作">
         <span class="action-hint">
           {last && `${seatLabel(last.seat, state.you)}の${last.type === 'kan' ? '加槓' : '打牌'}`}
           {state.last_discard && <Tile tile={state.last_discard} size="sm" />}
