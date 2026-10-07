@@ -73,7 +73,8 @@ h2 {
   color: var(--fg);
   font-size: 0.85rem;
 }
-.new-game-form input {
+/* Text inputs only: a checkbox (アドバイス・危険度) keeps its own size. */
+.new-game-form input:not([type="checkbox"]) {
   width: 7em;
   padding: 4px 6px;
   border: 1px solid var(--border);
@@ -1867,7 +1868,9 @@ section {
   font-weight: normal;
 }
 .cpu-summary {
-  margin: 0;
+  /* Pulled into the column's gaps around it, so an empty line under the hand
+     stays short (but still held, see min-height). */
+  margin: -8px 0;
   padding: 2px 4px;
   min-height: 1.4em; /* held while empty, so the action bar never jumps */
   font-size: 0.85rem;
@@ -2046,12 +2049,12 @@ section {
     margin-left: 0;
     gap: 6px;
   }
-  .new-game-form input,
+  .new-game-form input:not([type="checkbox"]),
   .new-game-form select {
     font-size: 16px;
     padding: 5px 6px;
   }
-  .new-game-form input {
+  .new-game-form input:not([type="checkbox"]) {
     width: 5.5em;
   }
   .new-game-form input.input-narrow {
