@@ -282,10 +282,10 @@ test.describe('a phone game', () => {
     await expect(page.locator('.app')).not.toHaveClass(/has-dock/);
   });
 
-  // A 667x375 phone on its side (under 760px wide) folds the new-game
-  // options behind 設定 too: 設定 comes right before them in the focus
-  // order, they open under the status, and nothing overflows.
-  test('on its side at 667x375 folds the options behind 設定', async ({ page }) => {
+  // A 667x375 phone on its side (under 760px wide) has the new-game options
+  // behind 設定 too: a modal dialog, focus on the first option, nothing
+  // overflowing; Esc closes it, focus back on 設定.
+  test('on its side at 667x375 has the options behind 設定', async ({ page }) => {
     await page.setViewportSize({ width: 667, height: 375 });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
@@ -296,12 +296,9 @@ test.describe('a phone game', () => {
     await expect(page.getByRole('region', { name: '時系列チャート' })).toHaveCount(0);
     await toggle.focus();
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
     await expect(form).toBeVisible();
-    await page.keyboard.press('Tab');
     await expect(form.getByRole('combobox').first()).toBeFocused();
-    const status = (await page.locator('.header-status').boundingBox())!;
-    const f = (await form.boundingBox())!;
-    expect(f.y).toBeGreaterThanOrEqual(status.y + status.height - 1);
     expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
     await page.keyboard.press('Escape');
     await expect(form).toBeHidden();
@@ -542,10 +539,11 @@ test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
   await expect(page.locator('.area-hand')).toHaveCSS('position', 'static');
 });
 
-// On a phone the header is short: the new-game options fold behind 「設定」,
-// the status is one or two dense lines and the dora tiles are small.
+// On a phone the header is short: the new-game options are behind 「設定」
+// (a modal dialog), the status is one or two dense lines and the dora tiles
+// are small.
 for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390, 844, 130]]) {
-  test(`a ${width}px-wide phone folds the new-game options behind 設定`, async ({ page }) => {
+  test(`a ${width}px-wide phone has the new-game options behind 設定`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
@@ -553,7 +551,7 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     const form = page.locator('.new-game-form');
     const toggle = page.getByRole('button', { name: /^設定/ });
     await expect(form).toBeHidden();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveAttribute('aria-haspopup', 'dialog');
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(maxHeader);
     // The status stays in view, and 設定 is easy to tap.
     await expect(page.locator('.game-status')).toBeVisible();
@@ -561,18 +559,22 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     expect((await page.locator('.dora-indicators .tile').first().boundingBox())!.height).toBeLessThanOrEqual(24);
 
-    // Open: the options under the status, 新規対局 still a big button.
+    // Open: the options in a dialog inside the screen, 新規対局 still a big button.
     await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const dialog = page.getByRole('dialog', { name: '設定' });
+    await expect(dialog).toBeVisible();
     await expect(form).toBeVisible();
     await expect(form.getByRole('combobox')).toHaveCount(4);
-    expect((await form.boundingBox())!.y).toBeGreaterThan((await toggle.boundingBox())!.y);
+    const d = (await dialog.boundingBox())!;
+    expect(d.x).toBeGreaterThanOrEqual(0);
+    expect(d.x + d.width).toBeLessThanOrEqual(width);
     expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
     ).toBeLessThanOrEqual(0);
-    await toggle.click();
+    await dialog.getByRole('button', { name: '閉じる' }).click();
     await expect(form).toBeHidden();
+    await expect(toggle).toBeFocused();
   });
 }
 

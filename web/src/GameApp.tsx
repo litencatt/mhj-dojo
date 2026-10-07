@@ -53,6 +53,8 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
+// Where the header has no room for the new-game options (style.css).
+const NARROW = '(width <= 760px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -120,10 +122,12 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   setDojoSpeeds(dojo ? speeds : null);
   const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
-  // On a phone the new-game options fold behind 「設定」 once a game is on (style.css).
+  // On a narrow screen the new-game options open in a modal 「設定」 once a game is on.
   const [optionsOpen, setOptionsOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const optionsRef = useRef<HTMLDialogElement>(null);
+  const narrow = useMediaQuery(NARROW);
   // The game shown: a new one (from the form, the final panel or the URL)
   // folds the options away.
   const shownGame = useRef<string | null>(null);
@@ -292,6 +296,18 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (fromForm && (active === document.body || formRef.current?.contains(active))) toggle.focus();
   }
 
+  // 設定 shows the options as a modal dialog (focus on the first option); Esc, 閉じる and a
+  // new game close it, the dialog giving the focus back to 設定.
+  const modalOptions = !dojo && !!state && narrow;
+  useEffect(() => {
+    const d = optionsRef.current;
+    if (!d) return;
+    if (optionsOpen && !d.open) {
+      d.showModal();
+      d.querySelector<HTMLElement>('select')?.focus();
+    } else if (!optionsOpen && d.open) d.close();
+  }, [optionsOpen, modalOptions]);
+
   // The dojo's yaku table and chart have the rows of the yaku learned only.
   const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
   const keepRow = useCallback((key: string) => !dojo || key === 'normal' || learned.has(key), [dojo, learned]);
@@ -425,6 +441,43 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       {phone ? 'おすすめ・危険度' : 'アドバイス・危険度'}
     </label>
   );
+  const optionsForm = (
+    <form id="new-game-options" class="new-game-form new-game-options" ref={formRef} onSubmit={handleNewGame}>
+      <label>
+        対局
+        <select value={optionsInput.length} onChange={setOption('length')}>
+          <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
+          <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
+        </select>
+      </label>
+      <label>
+        起家
+        <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
+          <option value="random">{DEALER_NAMES.random}</option>
+          <option value="you">{DEALER_NAMES.you}</option>
+        </select>
+      </label>
+      <label>
+        CPU
+        <select value={optionsInput.cpu} onChange={setOption('cpu')}>
+          <option value="weak">{CPU_NAMES.weak}</option>
+          <option value="normal">{CPU_NAMES.normal}</option>
+        </select>
+      </label>
+      <label>
+        シード
+        <input
+          type="number"
+          value={seedInput}
+          placeholder="ランダム"
+          onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+        />
+      </label>
+      {phone && speedOption}
+      {phone && adviceOption}
+      <button type="submit" disabled={busy}>新規対局</button>
+    </form>
+  );
   return (
     <AppShell
       mode="game"
@@ -493,68 +546,37 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                   透視
                 </label>
               )}
-              {!dojo && <button
-                ref={toggleRef}
-                type="button"
-                class="options-toggle"
-                aria-expanded={optionsOpen}
-                aria-controls="new-game-options"
-                onClick={() => setOptionsOpen((open) => !open)}
-              >
-                設定<span aria-hidden="true">{optionsOpen ? ' ▴' : ' ▾'}</span>
-              </button>}
+              {modalOptions && (
+                <button
+                  ref={toggleRef}
+                  type="button"
+                  class="options-toggle"
+                  aria-haspopup="dialog"
+                  onClick={() => setOptionsOpen(true)}
+                >
+                  設定
+                </button>
+              )}
             </div>
           )}
-          {/* After the status, so that on a phone Tab goes from 設定 into
-              the options it opens; a desktop shows them on the first row
-              (style.css). */}
-          {!dojo && <form
-            id="new-game-options"
-            class={state && !optionsOpen ? 'new-game-form new-game-options new-game-options-closed' : 'new-game-form new-game-options'}
-            ref={formRef}
-            onSubmit={handleNewGame}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && state && optionsOpen) {
-                e.preventDefault();
-                setOptionsOpen(false);
-                toggleRef.current?.focus();
-              }
-            }}
-          >
-            <label>
-              対局
-              <select value={optionsInput.length} onChange={setOption('length')}>
-                <option value="tonpuu">{LENGTH_NAMES.tonpuu}</option>
-                <option value="hanchan">{LENGTH_NAMES.hanchan}</option>
-              </select>
-            </label>
-            <label>
-              起家
-              <select value={optionsInput.first_dealer} onChange={setOption('first_dealer')}>
-                <option value="random">{DEALER_NAMES.random}</option>
-                <option value="you">{DEALER_NAMES.you}</option>
-              </select>
-            </label>
-            <label>
-              CPU
-              <select value={optionsInput.cpu} onChange={setOption('cpu')}>
-                <option value="weak">{CPU_NAMES.weak}</option>
-                <option value="normal">{CPU_NAMES.normal}</option>
-              </select>
-            </label>
-            <label>
-              シード
-              <input
-                type="number"
-                value={seedInput}
-                placeholder="ランダム"
-                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-              />
-            </label>
-            {phone && speedOption}
-            {phone && adviceOption}
-            <button type="submit" disabled={busy}>新規対局</button>
-          </form>}
+          {/* After the status; a desktop shows them on the first row (style.css). */}
+          {!dojo && !modalOptions && optionsForm}
+          {modalOptions && (
+            <dialog
+              ref={optionsRef}
+              class="game-options-dialog"
+              aria-labelledby="game-options-heading"
+              onClose={() => setOptionsOpen(false)}
+            >
+              <div class="game-options-head">
+                <h2 id="game-options-heading">設定</h2>
+                <button type="button" onClick={() => setOptionsOpen(false)}>
+                  閉じる
+                </button>
+              </div>
+              {optionsForm}
+            </dialog>
+          )}
         </>
       }
       main={
