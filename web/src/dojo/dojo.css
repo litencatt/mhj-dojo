@@ -106,12 +106,15 @@
 }
 .shop-list {
   flex-direction: column;
+  flex-wrap: nowrap; /* one column: a wrapping column stretched rows of a short list unevenly */
   gap: 4px;
 }
 .shop-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  min-height: 46px; /* a row with 購入 is this tall: the others match it */
+  box-sizing: border-box;
   gap: 4px 12px;
   padding: 4px 0;
   border-bottom: 1px solid var(--border);
@@ -317,7 +320,15 @@
   align-items: center;
   gap: 4px;
 }
-.summon-picker button.tile {
+/* The tiles keep the tile face: .action-bar button would paint them with the
+   panel colour (dark in dark mode) and its padding. */
+.action-bar .summon-picker button.tile {
+  padding: 2px;
+  border: 1px solid var(--tile-border);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fffef8 0%, var(--tile-bg) 100%);
+  color: inherit;
+  font-weight: normal;
   cursor: pointer;
 }
 .dojo-round-reward {
