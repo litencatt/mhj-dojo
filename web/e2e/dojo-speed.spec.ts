@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SEED, newDojoGame, openSettings, settingsChoice } from './helpers';
+import { SEED, handPanel, newDojoGame, openSettings, settingsChoice, settingsDialog } from './helpers';
 
 // The dojo's playback speed: 遅い and 普通 from the start, 速い and なし once
 // bought, kept apart from the CPU game's own setting.
@@ -49,7 +49,10 @@ test('a speed not owned that was saved goes back to 普通', async ({ page }) =>
 test('the CPU game ignores the dojo speed', async ({ page }) => {
   await page.addInitScript(([k]) => localStorage.setItem(k, 'slow'), [DOJO_KEY]);
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  // Opened before the first game is dealt: the game coming in leaves it open.
   await openSettings(page);
+  await expect(handPanel(page)).toBeVisible();
+  await expect(settingsDialog(page)).toBeVisible();
   await expect(settingsChoice(page, '再生速度')).toHaveCount(4);
   await expect(settingsChoice(page, '再生速度').nth(1)).toBeChecked();
 });

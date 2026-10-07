@@ -27,9 +27,8 @@ export function App() {
   const [highlightTile, setHighlightTile] = useState<string | null>(null);
   const [seedInput, setSeedInput] = useState('');
   const [maxTurnsInput, setMaxTurnsInput] = useState('18');
-  // 設定 (the header's button) opens the new-practice form in a modal dialog; a new session closes it.
+  // 設定 (the header's button) opens the new-practice form in a modal dialog; a new session started from it closes it.
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const shownSession = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
   // Opened with no session or seed in the URL: the saved sessions, if any,
   // are offered instead of a new one.
@@ -66,10 +65,6 @@ export function App() {
 
   const { busy, error, retryable, request, retry } = useSerialRequest<SessionState>(
     (next) => {
-      if (shownSession.current !== next.session_id) {
-        shownSession.current = next.session_id;
-        setSettingsOpen(false);
-      }
       setState(next);
       setPreviewTile(null);
       setHighlightTile(null);
@@ -134,7 +129,8 @@ export function App() {
     e.preventDefault();
     const seed = seedInput.trim() === '' ? undefined : Number(seedInput);
     const maxTurns = maxTurnsInput.trim() === '' ? 18 : Number(maxTurnsInput);
-    void startGame(seed, maxTurns);
+    // A failed request keeps the form open, as filled in.
+    void startGame(seed, maxTurns).then((ok) => ok && setSettingsOpen(false));
   }
 
   function handleDiscard(tile: string) {
