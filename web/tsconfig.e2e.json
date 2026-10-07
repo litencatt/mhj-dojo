@@ -5,5 +5,5 @@
   "compilerOptions": {
     "types": ["node", "vite/client"]
   },
-  "include": ["e2e", "e2e-live", "playwright*.config.ts"]
+  "include": ["e2e", "e2e-live", "playwright*.config.ts", "src/dojo/*.test.ts"]
 }

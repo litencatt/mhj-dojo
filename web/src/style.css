@@ -73,7 +73,8 @@ h2 {
   color: var(--fg);
   font-size: 0.85rem;
 }
-.new-game-form input {
+/* Text inputs only: a checkbox (アドバイス・危険度) keeps its own size. */
+.new-game-form input:not([type="checkbox"]) {
   width: 7em;
   padding: 4px 6px;
   border: 1px solid var(--border);
@@ -195,8 +196,27 @@ h2 {
 }
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
-  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
   border-color: var(--tile-back);
+}
+/* The dojo's tile backs (tileThemes.ts): a light pattern over the same gradient. */
+:root[data-tile-back='shima'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+:root[data-tile-back='ichimatsu'] .tile.tile-back {
+  background:
+    conic-gradient(rgba(255, 255, 255, 0.24) 25%, transparent 0 50%, rgba(255, 255, 255, 0.24) 0 75%, transparent 0) 0 0 / 6px 6px,
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+/* 麻の葉: three crossing sets of lines, a lattice of six-pointed stars. */
+:root[data-tile-back='asanoha'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
 }
 
 .error-banner {
@@ -1587,7 +1607,6 @@ section {
   font-weight: bold;
 }
 .table-remaining {
-  margin-left: 8px;
   font-weight: normal;
   color: var(--muted);
 }
@@ -1698,7 +1717,7 @@ section {
   padding: 0 1px;
   border: 1px solid var(--tile-back);
   border-radius: 3px;
-  background: linear-gradient(180deg, #4f9a72 0%, var(--tile-back) 100%);
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
   color: #fff;
   font-size: 0.65rem;
   font-weight: bold;
@@ -1849,7 +1868,9 @@ section {
   font-weight: normal;
 }
 .cpu-summary {
-  margin: 0;
+  /* Pulled into the column's gaps around it, so an empty line under the hand
+     stays short (but still held, see min-height). */
+  margin: -8px 0;
   padding: 2px 4px;
   min-height: 1.4em; /* held while empty, so the action bar never jumps */
   font-size: 0.85rem;
@@ -2028,12 +2049,12 @@ section {
     margin-left: 0;
     gap: 6px;
   }
-  .new-game-form input,
+  .new-game-form input:not([type="checkbox"]),
   .new-game-form select {
     font-size: 16px;
     padding: 5px 6px;
   }
-  .new-game-form input {
+  .new-game-form input:not([type="checkbox"]) {
     width: 5.5em;
   }
   .new-game-form input.input-narrow {
@@ -2852,4 +2873,33 @@ section {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* The dojo's 有効牌ハイライト: each hand tile's ukeire once discarded, under its face; the best is marked. */
+.tile .tile-badge {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 1.4em;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.tile.tile-ukeire-best .tile-badge {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.tile.tile-ukeire-best {
+  border-color: var(--accent);
+}
+.hand-panel:has(.tile-badge) .hand-row {
+  padding-bottom: 14px;
 }

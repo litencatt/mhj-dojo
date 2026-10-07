@@ -239,6 +239,9 @@ function forgetSession(publicId: string) {
 
 const GAMES = '/api/games';
 const GAMES_KEY = 'mhj-dojo.site.games';
+// Dojo games (GameState.dojo) are kept apart: the CPU game's list of saves
+// never offers them, and the dojo resumes only its own.
+const DOJO_GAMES_KEY = 'mhj-dojo.site.dojo-games';
 const MAX_SAVED_GAMES = 5; // games kept; the least recently used goes first
 
 // A CPU game as the engine's own save (the match descriptor: seed, options
@@ -259,9 +262,9 @@ export interface SavedRound {
 
 type SavedGames = Record<string, SavedGame>; // by public game id
 
-function loadGames(): SavedGames {
+function loadGames(key = GAMES_KEY): SavedGames {
   try {
-    const s = JSON.parse(localStorage.getItem(GAMES_KEY) ?? 'null') as { v?: number; games?: SavedGames } | null;
+    const s = JSON.parse(localStorage.getItem(key) ?? 'null') as { v?: number; games?: SavedGames } | null;
     if (s?.v === 1 && s.games && typeof s.games === 'object') return s.games;
   } catch {
     // unreadable: treat as nothing saved
@@ -269,22 +272,33 @@ function loadGames(): SavedGames {
   return {};
 }
 
-function storeGames(games: SavedGames, keep?: string) {
-  write(GAMES_KEY, games, (g) => ({ v: 1, games: g }), keep);
+function storeGames(key: string, games: SavedGames, keep?: string) {
+  write(key, games, (g) => ({ v: 1, games: g }), keep);
 }
 
 function saveGame(publicId: string, save: string, st: GameState) {
-  const games = loadGames();
+  const key = st.dojo ? DOJO_GAMES_KEY : GAMES_KEY;
+  const games = loadGames(key);
   const round = { wind: st.round_wind, number: st.round_number, honba: st.honba, over: st.game_over };
   games[publicId] = { save, used: Date.now(), round };
   trim(games, MAX_SAVED_GAMES);
-  storeGames(games, publicId);
+  storeGames(key, games, publicId);
+}
+
+/** Drops the dojo's unfinished games: the dojo plays one game at a time, and a new one abandons the old (unpaid). */
+export function discardUnfinishedDojoGames() {
+  const games = loadGames(DOJO_GAMES_KEY);
+  const left = Object.fromEntries(Object.entries(games).filter(([, g]) => g.round?.over));
+  if (Object.keys(left).length !== Object.keys(games).length) storeGames(DOJO_GAMES_KEY, left);
 }
 
 function forgetGame(publicId: string) {
-  const games = loadGames();
-  delete games[publicId];
-  storeGames(games);
+  for (const key of [GAMES_KEY, DOJO_GAMES_KEY]) {
+    const games = loadGames(key);
+    if (!(publicId in games)) continue;
+    delete games[publicId];
+    storeGames(key, games);
+  }
 }
 
 // Newest first.
@@ -325,11 +339,12 @@ export interface GameSummary {
   used: number; // 0: unknown
 }
 
-/** The saved CPU games, the most recently used first; unreadable ones are left out. */
-export function savedGames(): GameSummary[] {
+/** The saved CPU games of a mode (the dojo's apart), the most recently used first; unreadable ones are left out. */
+export function savedGames(mode: 'game' | 'dojo' = 'game'): GameSummary[] {
   const list: GameSummary[] = [];
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
-  for (const [id, g] of Object.entries(loadGames() as Record<string, Partial<SavedGame> | null>)) {
+  const key = mode === 'dojo' ? DOJO_GAMES_KEY : GAMES_KEY;
+  for (const [id, g] of Object.entries(loadGames(key) as Record<string, Partial<SavedGame> | null>)) {
     if (!g || typeof g.save !== 'string') continue;
     try {
       const s = JSON.parse(g.save) as Record<string, unknown>;
@@ -408,8 +423,9 @@ const kinds: Kind[] = [
     base: GAMES,
     noun: 'game',
     restoreFn: 'restoreGame',
+    // Public ids are unique, so either list may hold it.
     saved: (id) => {
-      const g = loadGames()[id];
+      const g = loadGames()[id] ?? loadGames(DOJO_GAMES_KEY)[id];
       return typeof g?.save === 'string' ? g.save : null;
     },
     rebuilt: () => {},

@@ -34,6 +34,9 @@ type Win struct {
 	// Reading is the scored 4 melds + pair reading; nil for seven pairs and
 	// thirteen orphans.
 	Reading *Reading
+	// Excluded are the yaku of the chosen reading that the allowed set of
+	// EvaluateWith left out; nil under the standard rules.
+	Excluded []Yaku
 }
 
 // HasYaku reports whether the win has a yaku; dora alone cannot win.
@@ -190,6 +193,16 @@ func HanOpenFor(key string, w Winds, open bool) int {
 // or do not contain ctx.WinTile. A complete hand without yaku is ok with no
 // Yaku; callers must check HasYaku before allowing the win.
 func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
+	return EvaluateWith(tiles, ctx, nil)
+}
+
+// EvaluateWith is Evaluate counting only the yaku in allowed (nil: all of
+// them). A reading whose shape is itself a yaku (seven pairs, thirteen
+// orphans) is dropped when that yaku is not allowed; the other yaku are
+// removed reading by reading before the readings are compared, and a
+// yakuman reading wins only with an allowed yakuman. Dora still count, but
+// never make a win on their own.
+func EvaluateWith(tiles []tile.Tile, ctx Context, allowed *KeySet) (win Win, ok bool) {
 	c := tile.CountsOf(tiles)
 	if len(tiles) != 14-3*len(ctx.Melds) || c[ctx.WinTile] == 0 || !IsCompleteWith(c, ctx.Melds) {
 		return Win{}, false
@@ -216,19 +229,33 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		if c[ctx.WinTile] == 2 { // the 13 tiles held one of each kind: a 13-sided wait
 			y = yKokushi13
 		}
-		win.Yaku = order(append([]Yaku{y}, firstDraw(ctx)...))
+		ys := append([]Yaku{y}, firstDraw(ctx)...)
+		if !allowed.Has(yKokushi.Key) { // the shape is the yaku: no other reading
+			_, excluded := allowed.filter(ys)
+			win.Excluded = order(excluded)
+			return win, true
+		}
+		ys, win.Excluded = allowed.filter(ys)
+		win.Yaku = order(ys)
 		win.HanTotal = sumHan(win.Yaku)
+		if win.Excluded != nil {
+			win.Excluded = order(win.Excluded)
+		}
 		return win, true
 	}
-	var best, bestYakuman []Yaku
+	var best, bestYakuman, bestExcluded, bestYakumanExcluded []Yaku
 	var bestReading, bestYakumanReading *Reading
 	bestHan, bestFu, bestYakumanHan := -1, 0, 0
 	consider := func(ys, yakuman []Yaku, fu int, r *Reading) {
+		yakuman, yakumanExcluded := allowed.filter(yakuman)
+		ys, excluded := allowed.filter(ys)
 		if h := sumHan(yakuman); h > bestYakumanHan {
 			bestYakuman, bestYakumanHan, bestYakumanReading = order(yakuman), h, r
+			bestYakumanExcluded = yakumanExcluded
 		}
 		if h := sumHan(ys); h > bestHan || (h == bestHan && fu > bestFu) {
 			best, bestHan, bestFu, bestReading = order(ys), h, fu, r
+			bestExcluded = append(excluded, yakumanExcluded...)
 		}
 	}
 	if len(ctx.Melds) == 0 && IsChiitoitsu(c) {
@@ -238,7 +265,15 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 			ys = append(ys, yHonroutou)
 		}
 		ys = append(ys, yChiitoitsu)
-		consider(ys, append(yakumanWide(c, false, true, ctx.WinTile), firstDraw(ctx)...), chiitoitsuFu, nil)
+		yakuman := append(yakumanWide(c, false, true, ctx.WinTile), firstDraw(ctx)...)
+		if allowed.Has(yChiitoitsu.Key) {
+			consider(ys, yakuman, chiitoitsuFu, nil)
+		} else {
+			// The shape is the yaku: the reading scores nothing, and stays
+			// only to report what it left out when no other reading exists.
+			consider(nil, nil, 0, nil)
+			_, bestExcluded = allowed.filter(append(ys, yakuman...))
+		}
 	}
 	for _, r := range ReadingsWith(c, ctx.Melds, ctx.WinTile) {
 		ys := evalReading(all, r, ctx)
@@ -249,11 +284,17 @@ func Evaluate(tiles []tile.Tile, ctx Context) (win Win, ok bool) {
 		win.Yaku = bestYakuman
 		win.HanTotal = bestYakumanHan
 		win.Reading = bestYakumanReading
+		if bestYakumanExcluded != nil {
+			win.Excluded = order(bestYakumanExcluded)
+		}
 		return win, true
 	}
 	win.Yaku = best
 	win.Reading = bestReading
 	win.Fu = bestFu
+	if bestExcluded != nil {
+		win.Excluded = order(bestExcluded)
+	}
 	if len(best) > 0 {
 		win.HanTotal = bestHan + win.Dora + win.UraDora
 	}

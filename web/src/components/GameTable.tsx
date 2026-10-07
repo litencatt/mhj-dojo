@@ -28,6 +28,8 @@ const EVENT_VERB: Record<GameEvent['type'], string> = {
   pon: 'ポン',
   chii: 'チー',
   kan: 'カン',
+  redraw: '引き直し',
+  summon: '牌寄せ',
 };
 
 export interface GameTableProps {
@@ -96,8 +98,8 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
       <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} riverId="river-top" />
       <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} riverId="river-left" />
       <div class="table-center">
+        {/* The round's name is in the header's status line, not repeated here. */}
         <div class="table-round">
-          {roundName(state.round_wind, state.round_number, state.honba)}
           <span class="table-remaining">残り {state.wall_remaining}</span>
           {/* Phones only (style.css): the other seats' rivers fold away. */}
           <button
@@ -174,6 +176,15 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
       {!you && seat.hand && (
         <div class="seat-hand" aria-label="手牌">
           {[...seat.hand, ...(seat.drawn ? [seat.drawn] : [])].map((t, i) => <Tile key={`${t}-${i}`} tile={t} size="xs" />)}
+        </div>
+      )}
+      {/* The dojo's リーチ者の待ち透視: the engine sends a riichi seat's waits only then. */}
+      {!you && !!seat.waits?.length && (
+        <div class="seat-waits" aria-label="待ち" data-testid="seat-waits">
+          <span aria-hidden="true">待ち</span>
+          {seat.waits.map((t) => (
+            <Tile key={t} tile={t} size="xs" />
+          ))}
         </div>
       )}
       <Melds melds={seat.melds} owner={seat.seat} size="xs" />
