@@ -26,11 +26,15 @@ import { Tile } from '../components/Tile';
 import { TILE_BACKS, TILE_THEMES, applyTileBack, applyTileTheme } from '../tileThemes';
 import './dojo.css';
 
-/** ?mode=dojo&play=1[&seed=]: the page that starts a dojo game (the seed of this page's URL kept). */
-function playHref(): string {
+/**
+ * ?mode=dojo&play=1[&seed=]: the page that starts a dojo game. The seed of this
+ * page's URL is kept unless that game was settled already: it would pay its
+ * rounds again but never settle (no rank, no redraw or summon cost).
+ */
+function playHref(settled: readonly string[]): string {
   const params = new URLSearchParams({ mode: 'dojo', play: '1' });
   const seed = new URLSearchParams(location.search).get('seed');
-  if (seed) params.set('seed', seed);
+  if (seed && !settled.includes(seed)) params.set('seed', seed);
   return `?${params}`;
 }
 
@@ -54,7 +58,7 @@ function ownedYakuNames(owned: readonly string[]): string[] {
   return names;
 }
 
-/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (theme, back, backup). */
+/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (game choice, theme, back). */
 export function DojoHome() {
   const [loaded] = useState(() => loadProgress());
   const [progress, setProgress] = useState<DojoProgress>(loaded.progress);
@@ -143,7 +147,7 @@ export function DojoHome() {
             <div style={{ width: `${bar}%` }} />
           </div>
           <small class="dojo-muted" data-testid="dojo-xp" title="稽古">
-            稽古 {progress.xp} / {next}
+            {progress.xp} / {next}
           </small>
           <span class="dojo-coin-count">
             <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 銭
@@ -159,12 +163,12 @@ export function DojoHome() {
               >
                 続きから
               </a>
-              <a class="dojo-restart" href={playHref()} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
+              <a class="dojo-restart" href={playHref(progress.settled)} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
                 新しく始める
               </a>
             </>
           ) : (
-            <a class="dojo-start" href={playHref()} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_NAMES[game.cpu]}`}>
+            <a class="dojo-start" href={playHref(progress.settled)} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_NAMES[game.cpu]}`}>
               対局開始
             </a>
           )}
@@ -172,8 +176,8 @@ export function DojoHome() {
       </section>
 
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
-        <h2 id="dojo-yaku-heading">所持役</h2>
-        <ul class="dojo-yaku" data-testid="dojo-yaku">
+        <h2 id="dojo-yaku-heading">所持役（{ownedYakuNames(progress.ownedYaku).length}）</h2>
+        <ul class="dojo-yaku" data-testid="dojo-yaku" tabIndex={0} aria-labelledby="dojo-yaku-heading">
           {ownedYakuNames(progress.ownedYaku).map((name) => (
             <li key={name}>{name}</li>
           ))}

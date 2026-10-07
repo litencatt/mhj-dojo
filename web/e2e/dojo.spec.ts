@@ -299,18 +299,21 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
   await expect(settings).toBeHidden();
 });
 
-test('an owned tile back is chosen in the shop and patterns the backs of a dojo game only', async ({ page }) => {
+test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game only', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, ownedItems: ['back:shima', 'back:asanoha'], firstGameBonus: true });
   await page.getByRole('tab', { name: '牌テーマ' }).click();
-  const shima = page.locator('[data-item="back:shima"]');
   const asanoha = page.locator('[data-item="back:asanoha"]');
-  await asanoha.getByRole('button', { name: '使う' }).click();
-  await expect(asanoha.getByRole('button', { name: '使用中' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(asanoha).toContainText('所持');
+  await expect(asanoha.getByRole('button')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '設定' }).click();
+  const backs = page.getByRole('dialog', { name: '設定' }).getByRole('group', { name: '裏柄' });
+  await backs.getByRole('radio', { name: '麻の葉' }).check();
   await expect.poll(() => htmlAttr(page, 'data-tile-back')).toBe('asanoha');
-  await asanoha.getByRole('button', { name: '使用中' }).click();
+  await backs.getByRole('radio', { name: '無地' }).check();
   await expect.poll(() => htmlAttr(page, 'data-tile-back')).toBe(null);
-  await shima.getByRole('button', { name: '使う' }).click();
+  await backs.getByRole('radio', { name: '縞' }).check();
   expect((await dojoProgress(page))?.activeBack).toBe('back:shima');
 
   await page.goto(`./?mode=dojo&play=1&seed=${SEED}`);
@@ -494,7 +497,7 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
     ([key, value]) => {
       if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
     },
-    [STORAGE_KEY, stored({ xp: 1000 })], // Lv5
+    [STORAGE_KEY, stored({ xp: 1000 })], // 6級
   );
   await page.goto(`./?mode=dojo&seed=${SEED}`);
   // The choice is in 設定.
@@ -511,7 +514,7 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘 ×2');
   expect((await dojoProgress(page))?.gameLength).toBe('hanchan');
 
-  // Lv7: the normal CPU too; both pay the rank x3.
+  // 4級: the normal CPU too; both pay the rank x3.
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, stored({ xp: 2100, gameLength: 'hanchan' })]);
   await page.reload();
   await page.getByRole('button', { name: '設定' }).click();
@@ -563,18 +566,32 @@ test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', as
   const confirm = page.getByRole('dialog', { name: '購入しますか？' });
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
   await expect(confirm).toContainText('立直');
   await expect(confirm).toContainText('残り 100 → 60 銭');
   await confirm.getByRole('button', { name: 'キャンセル' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await expect(confirm).toBeVisible();
   await confirm.getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('60');
   await expect(page.locator('[data-item="riichi"]')).toContainText('所持');
+});
+
+test('a hub opened on a seed already settled starts a game on a random seed', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), settled: ['42'], firstGameBonus: true })],
+  );
+  await page.goto('./?mode=dojo&seed=42');
+  await expect(page.getByRole('link', { name: '対局開始' })).not.toHaveAttribute('href', /seed=/);
+  await page.goto('./?mode=dojo&seed=43');
+  await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('href', /seed=43/);
 });
