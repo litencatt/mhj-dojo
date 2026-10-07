@@ -3,6 +3,7 @@ import {
   DOJO_REDRAW_SEED,
   DOJO_RIICHI_SEED,
   DOJO_NOYAKU_SEED,
+  DOJO_CALLED_NOYAKU_SEED,
   DOJO_RIICHIWAITS_SEED,
   DOJO_SUMMON_SEED,
   DOJO_WIN_SEED,
@@ -396,6 +397,25 @@ test('without the aids, a tenpai without yaku shows nothing', async ({ page }) =
   test.setTimeout(90_000);
   await noYakuGame(page);
   await expect(page.getByTestId('dojo-waits')).toHaveCount(0);
+});
+
+test('役なし警告 on a called hand: 役なし', async ({ page }) => {
+  test.setTimeout(90_000);
+  // DOJO_CALLED_NOYAKU_SEED: taking every pon offered, and tsumogiri otherwise, the open hand is
+  // tenpai in the general form with no row of the initial yaku within 5 moves (e2e_seeds_test.go).
+  await newDojoGame(page, DOJO_CALLED_NOYAKU_SEED, { ownedItems: ['assist:noyaku'] });
+  const hand = handPanel(page);
+  const aid = page.getByTestId('dojo-waits');
+  const pon = page.locator('.action-bar').getByRole('button', { name: 'ポン', exact: true });
+  for (let i = 0; i < 5; i++) {
+    await waitForPlayback(page);
+    if (await aid.isVisible()) break;
+    await page.locator('.action-bar').waitFor({ state: 'visible', timeout: 15_000 });
+    if (await pon.isVisible()) await clickAndWait(page, pon);
+    else await playOneStep(page);
+  }
+  await expect(hand.getByRole('group', { name: 'ポン' }).first()).toBeVisible();
+  await expect(aid).toHaveText('役なし');
 });
 
 test('リーチ者の待ち透視: a CPU in riichi shows its waits', async ({ page }) => {
