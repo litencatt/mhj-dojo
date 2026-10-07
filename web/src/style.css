@@ -65,6 +65,31 @@ h2 {
   color: var(--muted);
   gap: 4px;
 }
+/* A choice, boxed as in the dojo's 設定 (.dojo-settings-group): its options keep the
+   page's text, not the form's small muted labels. */
+.new-game-form .option-group {
+  margin: 0;
+}
+.new-game-form .option-group label {
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+/* In the header (no game yet, or a wide screen) a choice is one unboxed line: its
+   name, small and muted, then its options. */
+.app-header > .new-game-form .option-group {
+  align-items: center;
+  gap: 2px 8px;
+  padding: 0;
+  border: 0;
+}
+.app-header > .new-game-form .option-group legend {
+  float: left;
+  padding: 0;
+  margin-right: 2px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--muted);
+}
 .new-game-form select {
   padding: 4px 6px;
   border: 1px solid var(--border);
@@ -73,8 +98,8 @@ h2 {
   color: var(--fg);
   font-size: 0.85rem;
 }
-/* Text inputs only: a checkbox (アドバイス・危険度) keeps its own size. */
-.new-game-form input:not([type="checkbox"]) {
+/* Text inputs only: a checkbox (アドバイス・危険度) or a radio button keeps its own size. */
+.new-game-form input:not([type="checkbox"], [type="radio"]) {
   width: 7em;
   padding: 4px 6px;
   border: 1px solid var(--border);
@@ -2178,17 +2203,22 @@ section {
     margin-left: 0;
     gap: 6px;
   }
-  .new-game-form input:not([type="checkbox"]),
+  .new-game-form input:not([type="checkbox"], [type="radio"]),
   .new-game-form select {
     font-size: 16px;
     padding: 5px 6px;
   }
-  .new-game-form input:not([type="checkbox"]) {
+  .new-game-form input:not([type="checkbox"], [type="radio"]) {
     width: 5.5em;
   }
   .new-game-form input.input-narrow {
     width: 3em;
   }
+  /* Each choice on its own line. */
+  .new-game-form .option-group {
+    flex-basis: 100%;
+  }
+
   .new-game-form button {
     min-height: 40px;
     margin-left: auto;
