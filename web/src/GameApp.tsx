@@ -147,11 +147,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   setDojoSpeeds(dojo ? speeds : null);
   const [speed, setSpeed] = useState<PlaybackSpeed>(loadPlaybackSpeed);
   const [optionsInput, setOptionsInput] = useState<GameOptions>(urlOptions);
-  // 設定 (the header's button) opens the options in a modal dialog; a new game closes it.
+  // 設定 (the header's button) opens the options in a modal dialog; a new game started from it closes it.
   const [optionsOpen, setOptionsOpen] = useState(false);
-  // The game shown: a new one (from the form, the final panel or the URL)
-  // folds the options away.
-  const shownGame = useRef<string | null>(null);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const phone = useMediaQuery(PHONE);
   // Opened with no game, seed or options in the URL: the saved games, if
@@ -166,10 +163,6 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       if (!optionsSynced.current) {
         optionsSynced.current = true;
         setOptionsInput({ length: next.length, first_dealer: next.first_dealer_mode, cpu: next.cpu });
-      }
-      if (shownGame.current !== next.game_id) {
-        shownGame.current = next.game_id;
-        setOptionsOpen(false);
       }
       setState(next);
       setPreviewTile(null);
@@ -299,12 +292,14 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   }
 
   // The options stay open until the new game is on (a failed request keeps
-  // them, as chosen); the dialog then gives the focus back to 設定.
+  // them, as chosen); the dialog then gives the focus back to 設定. Only this
+  // closes it: the first game, dealt as the page opens, leaves a 設定 opened
+  // meanwhile as it is.
   function handleNewGame(e: Event) {
     e.preventDefault();
     // The game on stays saved, but only the list of saves leads back to it.
     if (state && !state.game_over && !window.confirm('対局中です。新しい対局を始めますか？')) return;
-    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput));
+    void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput)).then((ok) => ok && setOptionsOpen(false));
   }
 
 

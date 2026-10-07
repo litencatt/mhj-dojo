@@ -31,6 +31,13 @@
   --row-tenpai-bg: #fde4e4; /* a yaku (or combo) already at 聴牌 or 和了 */
   --chart-grid: #e5e7eb;
   --group-taatsu: #b45309;
+  --tile-bg-hi: #fffef8; /* top of the tile face gradient */
+  --backdrop: rgb(0 0 0 / 0.45); /* behind a modal dialog */
+  /* Corners: small (buttons, inputs), medium (boxes in a panel), large (panels, dialogs). */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px; /* chips */
 }
 
 @media (prefers-color-scheme: dark) {

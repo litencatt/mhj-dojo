@@ -5,17 +5,11 @@
   flex-direction: column;
   gap: 12px;
 }
-.dojo-panel {
-  padding: 12px 14px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
 .dojo-notice {
   margin: 0;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--row-best-bg);
   font-size: 0.85rem;
 }
@@ -59,29 +53,8 @@
   height: 100%;
   background: var(--accent);
 }
-/* Not the shared header's buttons (設定, ?), which look the same in every mode. */
-.dojo-start,
-.dojo-restart,
-.dojo-home button:where(:not(.app-header *)) {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-.dojo-start {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-weight: bold;
-}
-.dojo-home button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
+/* The hub's buttons are style.css's (secondary, and .dojo-start primary), not the
+   shared header's (設定, ?), which look the same in every mode. */
 .dojo-yaku,
 .shop-list {
   display: flex;
@@ -100,7 +73,7 @@
 .dojo-yaku li {
   padding: 2px 10px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-pill);
   font-size: 0.85rem;
 }
 .shop-list {
@@ -167,7 +140,7 @@
   margin: 8px 0;
   padding: 6px 10px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
 }
 .dojo-peek-row {
@@ -223,7 +196,7 @@
   margin: 10px 0 0;
   padding: 6px 10px 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .dojo-settings-group legend {
   padding: 0 4px;
@@ -243,7 +216,7 @@
   gap: 4px;
   margin-top: 10px;
   padding: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--table-cloth, none); /* the cloth chosen (tokens.css) */
 }
 
@@ -262,7 +235,7 @@
 .dojo-aid-warn {
   padding: 1px 8px;
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--danger-bg);
   color: var(--danger);
   font-weight: bold;
@@ -270,7 +243,7 @@
 .dojo-aid-ok {
   padding: 1px 8px;
   border: 1px solid var(--success-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success);
   font-weight: bold;
@@ -308,7 +281,7 @@
   padding: 2px;
   border: 1px solid var(--tile-border);
   border-radius: 5px;
-  background: linear-gradient(180deg, #fffef8 0%, var(--tile-bg) 100%);
+  background: linear-gradient(180deg, var(--tile-bg-hi) 0%, var(--tile-bg) 100%);
   color: inherit;
   font-weight: normal;
   cursor: pointer;
@@ -333,30 +306,13 @@
   font-size: 0.85rem;
 }
 
-/* Phones (style.css's breakpoint): compact buttons. */
-@media (width <= 760px), (height <= 500px) and (pointer: coarse) {
-  .dojo-start,
-  .dojo-restart {
-    padding: 4px 10px;
-    font-size: 0.85rem;
-  }
-}
-
 /* The shop's purchase confirmation (a modal <dialog>). */
 .shop-confirm {
   width: min(360px, calc(100vw - 32px));
   padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel-bg);
-  color: var(--fg);
-}
-.shop-confirm::backdrop {
-  background: rgb(0 0 0 / 40%);
 }
 .shop-confirm h2 {
   margin: 0 0 8px;
-  font-size: 1rem;
 }
 .shop-confirm p {
   margin: 4px 0;
@@ -368,9 +324,4 @@
   justify-content: flex-end;
   margin-top: 12px;
 }
-.dojo-home .shop-confirm-buy {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-weight: bold;
-}
+
