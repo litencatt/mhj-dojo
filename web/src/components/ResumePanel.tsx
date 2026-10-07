@@ -67,7 +67,7 @@ export function ResumePanel({ noun, newLabel, items, busy, onOpen }: ResumePanel
           </ul>
         </>
       )}
-      <p class="muted">新しく始めるときは「{newLabel}」</p>
+      <p class="muted">新しく始めるときは「設定」の「{newLabel}」</p>
     </section>
   );
 }

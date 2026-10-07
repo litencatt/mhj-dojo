@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, engineCalls, expectStopped, labels, stoppedDialog } from './helpers';
+import { discardDrawn, engineCalls, expectStopped, labels, openSettings, stoppedDialog } from './helpers';
 
 // Practice mode's saves and tabs: the engine runs as WebAssembly in a Web
 // Worker, and each session's moves are saved to localStorage so a reload (or
@@ -49,7 +49,7 @@ test('practice runs in the browser: load, discard, no server requests', async ({
   await expect(rows).not.toHaveText(before);
 
   await expect(page).toHaveURL(/[?&]session=/);
-  await expect(page.getByRole('link', { name: 'CPU対戦へ' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'CPU対戦', exact: true })).toBeVisible();
   await expect(page.locator('.error-banner')).toHaveCount(0);
   expect(apiRequests).toEqual([]);
 });
@@ -441,7 +441,7 @@ test('an engine that fails to load shows an error, and a new game retries', asyn
   await page.goto('./?seed=1&turns=18');
   await expect(page.locator('.error-banner')).toContainText('計算エンジン');
   await page.unroute('**/mhj-dojo.wasm*');
-  await page.getByRole('button', { name: '新しい練習' }).click();
+  await (await openSettings(page)).getByRole('button', { name: '新しい練習' }).click();
   await expect(page.getByRole('region', { name: '手牌' }).locator('.hand-tiles .tile')).toHaveCount(13);
   await expect(page.locator('.error-banner')).toHaveCount(0);
 });

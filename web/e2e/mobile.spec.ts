@@ -181,7 +181,7 @@ test.describe('touch', () => {
     const name = await tile.getAttribute('aria-label');
     await tile.tap();
     await expect(hand.getByRole('status')).toHaveText(`選択中：${name}（もう一度タップで打牌）`);
-    await page.locator('.app-header h1').tap();
+    await page.locator('.game-status').tap(); // outside the hand (the title row has the mode links)
     await expect(hand.locator('.tile-picked')).toHaveCount(0);
     await expect(hand.getByRole('status')).toHaveText('');
     await expect(yaku.locator('.preview-note')).toHaveCount(0);

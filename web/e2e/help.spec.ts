@@ -22,10 +22,7 @@ test('practice: the header shows the version and the help opens, closes and link
     '画面の用語',
     '練習モード',
     '役別向聴の表の見方',
-    '複合役',
     '面子表示',
-    'アドバイス',
-    'CPU対戦',
     '牌の表記',
     '保存',
     'バージョン表示',
@@ -33,6 +30,8 @@ test('practice: the header shows the version and the help opens, closes and link
   ]) {
     await expect(dialog.getByRole('heading', { name: h, exact: true })).toBeVisible();
   }
+  // Each mode explains itself only: practice's help has no CPU対戦 or 道場 section.
+  for (const h of ['CPU対戦', '道場']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('row', { name: /1筒〜9筒/ })).toContainText('筒子（ピンズ）');
   // The app's own terms are here, not in the glossary.
   await expect(dialog.getByRole('term').filter({ hasText: /^シード$/ })).toBeVisible();
@@ -94,6 +93,7 @@ test('game mode: the header shows the version, and the help links to the glossar
 
   const dialog = await openHelp(page);
   await expect(dialog.getByRole('heading', { name: 'CPU対戦', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '練習モード', exact: true })).toHaveCount(0);
   await dialog.getByRole('button', { name: '用語表', exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(glossary).toBeVisible();
@@ -127,4 +127,15 @@ test('the help fits a phone screen and scrolls', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: 'ヘルプを閉じる' })).toBeInViewport();
   // The page behind scrolls no wider than the screen.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('the dojo hub has the same header, and its help explains the dojo', async ({ page }) => {
+  await page.goto('./?mode=dojo');
+  await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
+  await expect(page.locator('.app-header').getByRole('button', { name: '設定', exact: true })).toBeVisible();
+  const dialog = await openHelp(page);
+  await expect(dialog.getByRole('heading', { name: '道場', exact: true })).toBeVisible();
+  for (const h of ['練習モード', 'CPU対戦']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
+  // No glossary on the hub: the help points to practice mode's.
+  await expect(dialog.locator('.help-lead')).toContainText('練習モードの用語表');
 });

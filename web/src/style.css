@@ -13,7 +13,9 @@ body {
   line-height: 1.5;
 }
 
-.app {
+/* The page's width and margins, the same for the dojo's hub (.dojo-home). */
+.app,
+.dojo-home {
   max-width: 1280px;
   margin: 0 auto;
   padding: 12px 16px 48px;
@@ -22,11 +24,6 @@ body {
 h1 {
   font-size: 1.4rem;
   margin: 0 0 8px;
-}
-.app-subtitle {
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-weight: normal;
 }
 h2 {
   font-size: 1rem;
@@ -73,22 +70,6 @@ h2 {
 .new-game-form .option-group label {
   font-size: 0.9rem;
   color: var(--fg);
-}
-/* In the header (no game yet, or a wide screen) a choice is one unboxed line: its
-   name, small and muted, then its options. */
-.app-header > .new-game-form .option-group {
-  align-items: center;
-  gap: 2px 8px;
-  padding: 0;
-  border: 0;
-}
-.app-header > .new-game-form .option-group legend {
-  float: left;
-  padding: 0;
-  margin-right: 2px;
-  font-size: 0.75rem;
-  font-weight: normal;
-  color: var(--muted);
 }
 .new-game-form select {
   padding: 4px 6px;
@@ -208,11 +189,8 @@ h2 {
   color: var(--fg);
   font-size: 0.85rem;
 }
-/* The CPU game's 「設定」, opening the new-game options in a dialog: narrow screens only. */
-.options-toggle {
-  display: none;
-}
-.game-options-dialog {
+/* Every mode's 設定 (SettingsDialog): a modal dialog, its choices boxed one per row. */
+.settings-dialog {
   width: min(28rem, calc(100vw - 32px));
   box-sizing: border-box;
   padding: 12px 16px 16px;
@@ -221,21 +199,22 @@ h2 {
   background: var(--panel-bg);
   color: var(--fg);
 }
-.game-options-dialog::backdrop {
+.settings-dialog::backdrop {
   background: rgba(0, 0, 0, 0.45);
 }
-.game-options-head {
+.settings-dialog-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
-.game-options-head h2 {
+.settings-dialog-head h2 {
   margin: 0;
   font-size: 1.05rem;
 }
-.game-options-head button {
+.settings-dialog-head button,
+.settings-button {
   min-height: 32px;
   padding: 4px 12px;
   border: 1px solid var(--border);
@@ -243,14 +222,22 @@ h2 {
   background: var(--bg);
   color: var(--fg);
   font-size: 0.85rem;
+  white-space: nowrap;
   cursor: pointer;
 }
-/* The CPU game's options come after the status in the page (for a phone's
-   focus order, GameApp) but show on the first row. */
-@media (width > 760px) {
-  .app-game .app-header > .header-status {
-    order: 1;
-  }
+.settings-button {
+  min-height: 24px;
+  padding: 2px 10px;
+}
+.settings-dialog .new-game-form {
+  gap: 8px;
+  margin: 0;
+}
+.settings-dialog .new-game-form .option-group {
+  flex-basis: 100%;
+}
+.settings-dialog .new-game-form button {
+  margin-left: auto;
 }
 /* A face-down tile shows its coloured back. */
 .tile.tile-back {
@@ -539,7 +526,8 @@ h2 {
 /* viewport-fit=cover lets the page run under a notch or rounded corner (a
    phone on its side): keep content and the dock inside the safe area. The
    insets are 0 elsewhere, so this changes nothing on a desktop. */
-.app {
+.app,
+.dojo-home {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
@@ -1405,7 +1393,8 @@ section {
 }
 
 @media (max-width: 420px) {
-  .app {
+  .app,
+  .dojo-home {
     padding: 8px 10px 32px;
   }
   .tile-md {
@@ -1425,12 +1414,19 @@ section {
   font-weight: normal;
   color: var(--accent);
 }
+/* This page's mode: plain text, not underlined, like a selected tab. */
+.mode-link[aria-current="page"] {
+  color: var(--fg);
+  font-weight: bold;
+  text-decoration: none;
+}
 
 /* ---- Version and help (header) ---- */
 .header-meta {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto; /* at the title row's right end */
 }
 .version-tag {
   font-size: 0.7rem;
@@ -2154,7 +2150,8 @@ section {
 }
 
 @media (width <= 760px) {
-  .app {
+  .app,
+  .dojo-home {
     padding-top: max(8px, env(safe-area-inset-top));
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
@@ -2214,31 +2211,14 @@ section {
   .new-game-form input.input-narrow {
     width: 3em;
   }
-  /* Each choice on its own line. */
-  .new-game-form .option-group {
-    flex-basis: 100%;
-  }
-
   .new-game-form button {
     min-height: 40px;
     margin-left: auto;
     padding: 6px 12px;
     font-size: 0.9rem;
   }
-  /* CPU game: once a game is on, 「設定」 at the end of the dora row opens
-     the new-game options in a modal dialog. */
-  .options-toggle {
-    display: inline-flex;
-    align-items: center;
+  .settings-button {
     min-height: 32px;
-    margin-left: auto;
-    padding: 4px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--fg);
-    font-size: 0.85rem;
-    cursor: pointer;
   }
 
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
