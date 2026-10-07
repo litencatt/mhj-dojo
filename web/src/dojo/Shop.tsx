@@ -11,13 +11,17 @@ function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
   return null;
 }
 
-// The shop's tabs, each a group of item kinds (the yakuman pack sells with the yaku).
+// The shop's tabs, each a group of item kinds (the yakuman pack sells with the yaku, the
+// table's looks with the tile themes and backs).
 const TABS: { key: string; label: string; kinds: ItemKind[] }[] = [
   { key: 'yaku', label: '役', kinds: ['yaku', 'pack'] },
-  { key: 'theme', label: '牌テーマ', kinds: ['theme', 'back'] },
+  { key: 'theme', label: '見た目', kinds: ['theme', 'back', 'cloth', 'stick', 'effect'] },
   { key: 'assist', label: '補助', kinds: ['assist'] },
   { key: 'cheat', label: 'イカサマ', kinds: ['cheat'] },
 ];
+
+// The items chosen in 設定 once owned.
+const LOOK_KINDS: ItemKind[] = ['theme', 'back', 'cloth', 'stick', 'effect'];
 
 interface ShopProps {
   progress: DojoProgress;
@@ -101,7 +105,7 @@ export function Shop({ progress: p, onChange }: ShopProps) {
                   {have ? (
                     <span class="shop-owned">
                       所持
-                      {(it.kind === 'theme' || it.kind === 'back') && <small class="dojo-muted">（設定で選ぶ）</small>}
+                      {LOOK_KINDS.includes(it.kind) && <small class="dojo-muted">（設定で選ぶ）</small>}
                     </span>
                   ) : locked ? (
                     <span class="shop-locked">{locked}</span>

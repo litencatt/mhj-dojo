@@ -9,8 +9,9 @@
 // The games are spread evenly over the measured ranks and pay the measured
 // han and wins on average (the remainders carry over to the next game).
 // The targets count the core of the shop: the yaku, the assists and the tile
-// themes. The cheats and the tile backs are extras for the long run, bought
-// apart (the last test).
+// themes. The cheats and the other looks (the tile backs, the table cloths, the
+// riichi sticks and the win effects) are extras for the long run, bought apart
+// (the last test).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CATALOG, YAKUHAI_KEYS, YAKUMAN_PACK, type ShopItem } from './catalog.ts';
@@ -120,7 +121,7 @@ test('the yakuman pack is bought within 40 games of Lv10, the core shop bought f
   assert.ok(r.games - atTen <= 40, `${r.games - atTen} games after Lv10`);
 });
 
-test('the whole shop, cheats and tile backs included, is bought in about 175 games', () => {
+test('the whole shop, cheats and every look included, is bought in about 175 games', () => {
   const r = start();
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 160 && r.games <= 190, `${r.games} games`);

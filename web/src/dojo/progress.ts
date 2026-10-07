@@ -4,6 +4,9 @@
 import {
   COINS_PER_HAN,
   DEFAULT_BACK,
+  DEFAULT_CLOTH,
+  DEFAULT_EFFECT,
+  DEFAULT_STICK,
   DEFAULT_THEME,
   FIRST_GAME_BONUS,
   INITIAL_YAKU,
@@ -23,9 +26,13 @@ export interface DojoProgress {
   xp: number; // the total, never lowered
   coins: number;
   ownedYaku: string[];
-  ownedItems: string[]; // 'theme:*' | 'back:*' | 'assist:*' | 'cheat:*' | 'yakuman-pack' and every bought yaku
+  ownedItems: string[]; // 'theme:*' | 'back:*' | 'cloth:*' | 'stick:*' | 'effect:*' | 'assist:*' | 'cheat:*' | 'yakuman-pack' and every bought yaku
   activeTheme: string;
   activeBack: string; // a 'back:*' item or 'default' (data before the backs had none: 'default')
+  // A 'cloth:*', 'stick:*' or 'effect:*' item or 'default' (data before them had none: 'default').
+  activeCloth: string;
+  activeStick: string;
+  activeEffect: string;
   settled: string[]; // the seeds (decimal strings) of the games whose reward was paid
   firstGameBonus: boolean; // the first-game bonus was paid
   // The rounds of an unfinished game (by its public id, the URL's game) whose won han were paid
@@ -45,6 +52,9 @@ export function initialProgress(): DojoProgress {
     ownedItems: [],
     activeTheme: DEFAULT_THEME,
     activeBack: DEFAULT_BACK,
+    activeCloth: DEFAULT_CLOTH,
+    activeStick: DEFAULT_STICK,
+    activeEffect: DEFAULT_EFFECT,
     settled: [],
     firstGameBonus: false,
     paidRounds: {},
@@ -279,6 +289,18 @@ export function setBack(p: DojoProgress, back: string): DojoProgress {
   return back === DEFAULT_BACK || p.ownedItems.includes(back) ? { ...p, activeBack: back } : p;
 }
 
+export function setCloth(p: DojoProgress, cloth: string): DojoProgress {
+  return cloth === DEFAULT_CLOTH || p.ownedItems.includes(cloth) ? { ...p, activeCloth: cloth } : p;
+}
+
+export function setStick(p: DojoProgress, stick: string): DojoProgress {
+  return stick === DEFAULT_STICK || p.ownedItems.includes(stick) ? { ...p, activeStick: stick } : p;
+}
+
+export function setEffect(p: DojoProgress, effect: string): DojoProgress {
+  return effect === DEFAULT_EFFECT || p.ownedItems.includes(effect) ? { ...p, activeEffect: effect } : p;
+}
+
 /** Whether the game length is unlocked at the progress's level. */
 export function lengthUnlocked(p: DojoProgress, length: GameLength): boolean {
   return length === DEFAULT_GAME_LENGTH || level(p.xp) >= HANCHAN_LEVEL;
@@ -350,6 +372,10 @@ export function parseProgress(text: string): DojoProgress | null {
   if (typeof o.activeTheme !== 'string' || typeof o.firstGameBonus !== 'boolean') return null;
   // activeBack and paidRounds came later: a progress without them has the default back and none paid.
   if (o.activeBack !== undefined && typeof o.activeBack !== 'string') return null;
+  // The cloth, the riichi stick and the win effect came later still: a progress without them has the defaults.
+  for (const k of ['activeCloth', 'activeStick', 'activeEffect']) {
+    if (o[k] !== undefined && typeof o[k] !== 'string') return null;
+  }
   const paidRounds = o.paidRounds ?? {};
   if (typeof paidRounds !== 'object' || paidRounds === null || Array.isArray(paidRounds)) return null;
   if (!Object.values(paidRounds).every(isCount)) return null;
@@ -367,6 +393,9 @@ export function parseProgress(text: string): DojoProgress | null {
     ownedItems: o.ownedItems,
     activeTheme: o.activeTheme,
     activeBack: o.activeBack ?? DEFAULT_BACK,
+    activeCloth: (o.activeCloth as string | undefined) ?? DEFAULT_CLOTH,
+    activeStick: (o.activeStick as string | undefined) ?? DEFAULT_STICK,
+    activeEffect: (o.activeEffect as string | undefined) ?? DEFAULT_EFFECT,
     settled: o.settled,
     firstGameBonus: o.firstGameBonus,
     paidRounds: paidRounds as Record<string, number>,

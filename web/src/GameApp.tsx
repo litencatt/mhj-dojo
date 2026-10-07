@@ -33,7 +33,7 @@ import { summarizeMoves } from './summary';
 import { savedGames, type GameSummary } from './wasm';
 import { REDRAW_COST, SUMMON_COST } from './dojo/catalog';
 import { canAffordRedraw, canAffordSummon, dojoGame, dojoOptions, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './dojo/progress';
-import { TILE_BACKS, TILE_THEMES, applyTileBack, applyTileTheme } from './tileThemes';
+import { TILE_BACKS, TILE_THEMES, applyRiichiStick, applyTableCloth, applyTileBack, applyTileTheme, applyWinEffect } from './tileThemes';
 import './dojo/dojo.css';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -229,7 +229,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (!dojo && state?.dojo) location.replace(`?mode=dojo&game=${encodeURIComponent(state.game_id)}`);
   }, [dojo, state?.dojo, state?.game_id]);
 
-  // The tile theme and back bought in the dojo, for the dojo's screens only.
+  // The tile theme, back and other looks bought in the dojo, for the dojo's screens only.
   useEffect(() => {
     if (!dojo) return;
     applyTileTheme(TILE_THEMES.find((t) => t.item === progress.activeTheme)?.id ?? 'default');
@@ -240,6 +240,17 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     applyTileBack(TILE_BACKS.find((t) => t.item === progress.activeBack)?.id ?? 'default');
     return () => applyTileBack('default');
   }, [dojo, progress.activeBack]);
+  useEffect(() => {
+    if (!dojo) return;
+    applyTableCloth(progress.activeCloth);
+    applyRiichiStick(progress.activeStick);
+    applyWinEffect(progress.activeEffect);
+    return () => {
+      applyTableCloth('default');
+      applyRiichiStick('default');
+      applyWinEffect('default');
+    };
+  }, [dojo, progress.activeCloth, progress.activeStick, progress.activeEffect]);
 
   // A won round pays its han as it ends (progress.paidRounds keeps the rounds paid, by the
   // game's id); a finished dojo game pays the rest once (progress.settle keeps the seeds paid).

@@ -261,8 +261,13 @@
 }
 .dojo-settings-sample {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   margin-top: 10px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--table-cloth, none); /* the cloth chosen (tokens.css) */
 }
 
 /* A dojo game's aids and cheats (GameApp). */

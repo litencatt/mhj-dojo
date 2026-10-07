@@ -10,8 +10,11 @@ import {
   lengthUnlocked,
   saveProgress,
   setBack,
+  setCloth,
+  setEffect,
   setGameCpu,
   setGameLength,
+  setStick,
   setTheme,
   STORAGE_KEY,
   xpForLevel,
@@ -23,7 +26,19 @@ import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from '
 import { discardUnfinishedDojoGames, savedGames } from '../wasm';
 import { Shop } from './Shop';
 import { Tile } from '../components/Tile';
-import { TILE_BACKS, TILE_THEMES, applyTileBack, applyTileTheme } from '../tileThemes';
+import {
+  RIICHI_STICKS,
+  TABLE_CLOTHS,
+  TILE_BACKS,
+  TILE_THEMES,
+  WIN_EFFECTS,
+  applyRiichiStick,
+  applyTableCloth,
+  applyTileBack,
+  applyTileTheme,
+  applyWinEffect,
+  type Look,
+} from '../tileThemes';
 import './dojo.css';
 
 /**
@@ -37,6 +52,19 @@ function playHref(settled: readonly string[]): string {
   if (seed && !settled.includes(seed)) params.set('seed', seed);
   return `?${params}`;
 }
+
+// 設定's choices of the other looks, after the theme and the back: the free default and the ones owned.
+const LOOKS: {
+  name: string;
+  legend: string;
+  looks: readonly Look[];
+  field: 'activeCloth' | 'activeStick' | 'activeEffect';
+  set: (p: DojoProgress, item: string) => DojoProgress;
+}[] = [
+  { name: 'dojo-cloth', legend: '卓布', looks: TABLE_CLOTHS, field: 'activeCloth', set: setCloth },
+  { name: 'dojo-stick', legend: 'リーチ棒', looks: RIICHI_STICKS, field: 'activeStick', set: setStick },
+  { name: 'dojo-effect', legend: '和了演出', looks: WIN_EFFECTS, field: 'activeEffect', set: setEffect },
+];
 
 const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通' };
 const LENGTHS: { value: GameLength; level: number }[] = [
@@ -58,7 +86,7 @@ function ownedYakuNames(owned: readonly string[]): string[] {
   return names;
 }
 
-/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (game choice, theme, back). */
+/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (game choice, theme, back, looks). */
 export function DojoHome() {
   const [loaded] = useState(() => loadProgress());
   const [progress, setProgress] = useState<DojoProgress>(loaded.progress);
@@ -90,6 +118,16 @@ export function DojoHome() {
       applyTileBack('default');
     };
   }, [progress.activeTheme, progress.activeBack]);
+  useEffect(() => {
+    applyTableCloth(progress.activeCloth);
+    applyRiichiStick(progress.activeStick);
+    applyWinEffect(progress.activeEffect);
+    return () => {
+      applyTableCloth('default');
+      applyRiichiStick('default');
+      applyWinEffect('default');
+    };
+  }, [progress.activeCloth, progress.activeStick, progress.activeEffect]);
 
   function openSettings() {
     settingsRef.current?.showModal();
@@ -267,12 +305,32 @@ export function DojoHome() {
             </label>
           ))}
         </fieldset>
+        {LOOKS.map((g) => (
+          <fieldset key={g.name} class="dojo-settings-group">
+            <legend>{g.legend}</legend>
+            {g.looks
+              .filter((l) => l.item === null || progress.ownedItems.includes(l.item))
+              .map((l) => (
+                <label key={l.id}>
+                  <input
+                    type="radio"
+                    name={g.name}
+                    checked={(l.item ?? 'default') === progress[g.field]}
+                    onChange={() => change((cur) => g.set(cur, l.item ?? 'default'))}
+                  />
+                  {l.label}
+                </label>
+              ))}
+          </fieldset>
+        ))}
+        {/* On the cloth chosen: the tiles, a back and the riichi badge with its stick. */}
         <div class="dojo-settings-sample" aria-label="見本">
           <Tile tile="5m" size="sm" />
           <Tile tile="5p" size="sm" />
           <Tile tile="5s" size="sm" />
           <Tile tile="7z" size="sm" />
           <Tile tile="" size="sm" faceDown />
+          <span class="seat-riichi">リーチ</span>
         </div>
       </dialog>
     </div>

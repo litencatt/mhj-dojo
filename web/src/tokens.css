@@ -198,3 +198,27 @@
     --tile-back-hi: #a68220;
   }
 }
+
+/* Table cloths (tileThemes.ts): the dojo shop sets data-table-cloth on <html>,
+   and the CPU table (and 設定's sample) lies on --table-cloth. A tint, so the
+   seats' text keeps its contrast: pale in light mode, deep in dark mode. */
+:root[data-table-cloth='midori'] {
+  --table-cloth: #d3e8d6;
+}
+:root[data-table-cloth='kon'] {
+  --table-cloth: #d3dbee;
+}
+:root[data-table-cloth='enji'] {
+  --table-cloth: #f0d5d9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-table-cloth='midori'] {
+    --table-cloth: #15301f;
+  }
+  :root[data-table-cloth='kon'] {
+    --table-cloth: #141c33;
+  }
+  :root[data-table-cloth='enji'] {
+    --table-cloth: #361820;
+  }
+}

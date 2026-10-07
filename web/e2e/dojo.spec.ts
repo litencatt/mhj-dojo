@@ -224,15 +224,18 @@ test('the hub follows what another tab has stored, and buys on top of it', async
 test('the shop shows one kind of item per tab, in a list that scrolls', async ({ page }) => {
   await page.goto('./?mode=dojo');
   const tabs = page.getByRole('tablist', { name: '商品の種類' });
-  await expect(tabs.getByRole('tab')).toHaveText(['役', '牌テーマ', '補助', 'イカサマ']);
+  await expect(tabs.getByRole('tab')).toHaveText(['役', '見た目', '補助', 'イカサマ']);
   const panel = page.getByRole('tabpanel');
   await expect(tabs.getByRole('tab', { name: '役' })).toHaveAttribute('aria-selected', 'true');
   await expect(panel.locator('[data-item="yakuhai"]')).toBeVisible();
   await expect(panel.locator('[data-item^="theme:"]')).toHaveCount(0);
 
-  await tabs.getByRole('tab', { name: '牌テーマ' }).click();
+  await tabs.getByRole('tab', { name: '見た目' }).click();
   await expect(panel.locator('[data-item^="theme:"]')).toHaveCount(6);
   await expect(panel.locator('[data-item^="back:"]')).toHaveCount(3);
+  await expect(panel.locator('[data-item^="cloth:"]')).toHaveCount(3);
+  await expect(panel.locator('[data-item^="stick:"]')).toHaveCount(3);
+  await expect(panel.locator('[data-item^="effect:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item="riichi"]')).toHaveCount(0);
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
@@ -303,7 +306,7 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
 test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game only', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, ownedItems: ['back:shima', 'back:asanoha'], firstGameBonus: true });
-  await page.getByRole('tab', { name: '牌テーマ' }).click();
+  await page.getByRole('tab', { name: '見た目' }).click();
   const asanoha = page.locator('[data-item="back:asanoha"]');
   await expect(asanoha).toContainText('所持');
   await expect(asanoha.getByRole('button')).toHaveCount(0);
@@ -329,6 +332,77 @@ test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and p
   expect(await htmlAttr(page, 'data-tile-back')).toBe(null);
   const plain = page.locator('.seat-hand-backs .tile-back').first();
   expect(await plain.evaluate((el) => getComputedStyle(el).backgroundImage)).not.toContain('repeating-linear-gradient');
+});
+
+/** The computed style of an element of the class (in a parent of its own, when given) added to the page for the check. */
+function probe(page: Page, cls: string, prop: string, pseudo: string | null = null, parent: string | null = null) {
+  return page.evaluate(
+    ([cls, prop, pseudo, parent]) => {
+      const el = document.createElement('span');
+      el.className = cls;
+      el.textContent = 'リーチ';
+      const box = document.createElement('section');
+      if (parent) box.className = parent;
+      box.append(el);
+      document.body.append(box);
+      const v = getComputedStyle(el, pseudo).getPropertyValue(prop);
+      box.remove();
+      return v;
+    },
+    [cls, prop, pseudo, parent] as const,
+  );
+}
+
+test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chosen in 設定, and shown in a dojo game only', async ({ page }) => {
+  test.setTimeout(90_000);
+  await openHub(page, { xp: 1000, coins: 500, firstGameBonus: true });
+  await page.getByRole('tab', { name: '見た目' }).click();
+  for (const id of ['cloth:midori', 'stick:tenbou', 'effect:kamifubuki']) {
+    await page.locator(`[data-item="${id}"]`).getByRole('button', { name: '購入' }).click();
+    await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+    await expect(page.locator(`[data-item="${id}"]`)).toContainText('所持（設定で選ぶ）');
+  }
+  await expect(page.getByTestId('dojo-coins')).toHaveText(String(500 - 40 - 40 - 80));
+
+  // 設定 offers the default and what is owned; the choice is stored and shown on <html>.
+  await page.getByRole('button', { name: '設定' }).click();
+  const settings = page.getByRole('dialog', { name: '設定' });
+  const cloths = settings.getByRole('group', { name: '卓布' });
+  await expect(cloths.getByRole('radio')).toHaveCount(2); // 標準 and 緑
+  await cloths.getByRole('radio', { name: '緑' }).check();
+  await expect.poll(() => htmlAttr(page, 'data-table-cloth')).toBe('midori');
+  const sticks = settings.getByRole('group', { name: 'リーチ棒' });
+  await expect(sticks.getByRole('radio')).toHaveCount(2);
+  await sticks.getByRole('radio', { name: '千点棒' }).check();
+  await expect.poll(() => htmlAttr(page, 'data-riichi-stick')).toBe('tenbou');
+  const effects = settings.getByRole('group', { name: '和了演出' });
+  await expect(effects.getByRole('radio')).toHaveCount(2); // なし and 紙吹雪
+  await effects.getByRole('radio', { name: '紙吹雪' }).check();
+  await expect.poll(() => htmlAttr(page, 'data-win-effect')).toBe('kamifubuki');
+  expect(await dojoProgress(page)).toMatchObject({ activeCloth: 'cloth:midori', activeStick: 'stick:tenbou', activeEffect: 'effect:kamifubuki' });
+  const sample = settings.getByLabel('見本');
+  expect(await sample.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
+  expect(await sample.locator('.seat-riichi').evaluate((el) => getComputedStyle(el, '::after').backgroundImage)).toContain('radial-gradient');
+
+  // A dojo game: the cloth under the table, the stick after a riichi badge, the
+  // effect over a high win of yours, but not when motion is reduced.
+  await page.goto(`./?mode=dojo&play=1&seed=${SEED}`);
+  await expect(handPanel(page)).toBeVisible();
+  await expect.poll(() => htmlAttr(page, 'data-table-cloth')).toBe('midori');
+  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
+  expect(await probe(page, 'seat-riichi', 'background-image', '::after')).toContain('radial-gradient');
+  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('none');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('block');
+  expect(await probe(page, 'win-effect', 'animation-name', null, 'result-panel')).toBe('win-fall');
+
+  // A CPU game keeps the plain table, badge and result.
+  await page.goto(`./?mode=game&seed=${SEED}`);
+  await expect(handPanel(page)).toBeVisible();
+  for (const attr of ['data-table-cloth', 'data-riichi-stick', 'data-win-effect']) expect(await htmlAttr(page, attr)).toBe(null);
+  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await probe(page, 'seat-riichi', 'content', '::after')).toBe('none');
+  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('none');
 });
 
 test('the aids show only once bought: the ukeire per discard, the preview and the combos', async ({ page }) => {
