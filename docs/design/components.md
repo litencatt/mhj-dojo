@@ -12,6 +12,7 @@
 
 ## ダイアログ
 - すべて `<dialog>` を `showModal()` で開く(ESC・フォーカストラップ・背後の不活性化がブラウザ任せになる)。閉じたらトリガーのボタンにフォーカスを戻す。
+- 背景(ダイアログの外)のクリック・タップで閉じる: `components/backdrop.ts` の `useBackdropClose` を `<dialog>` に付ける(ドラッグの終点やダイアログ自身のスクロールバーでは閉じない)。例外は、閉じると操作が止まったままになる `.tab-stopped`。
 - 見た目は `.settings-dialog`、`.help-dialog`、`.tab-stopped`、`.shop-confirm` が共通(`--panel-bg`、`--radius-lg`、`--backdrop`)。幅は `min(Npx, 100vw - 32px)` を基本にする。
 - 設定: `web/src/components/SettingsDialog.tsx`。各モードの設定をここに集め、ヘッダーの 設定 から開く。開いたら選択中の入力にフォーカス。
 - ヘルプ: `Help.tsx`。スマホでは画面ほぼ全幅、閉じるボタンは大きくする。
@@ -31,4 +32,4 @@
 `.tile`(`tile-md` 36x48、`tile-sm` 26x35、`tile-xs` 18x24)。面は `TileFace.tsx` の SVG。選択可能な牌は `.tile-interactive`、選択中は `.tile-picked`、裏は `.tile-back`。色は `--tile-*` のみで、テーマ・裏柄は `<html>` の `data-tile-theme` / `data-tile-back` で切り替える。スマホの手牌は 14 枚が1行に収まるよう `--hand-tile` で幅を決める。
 
 ## アクションバー
-`.action-bar`(対局の操作ボタンの行)。スマホではボタンが `min-height: 44px; min-width: 64px; font-size: 1rem`。行そのものも `min-height: 44px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。
+`.action-bar`(対局の操作ボタンの行)。鳴きの問い(ロン・ポン・カン・チー・スキップ)は `.action-bar-call` で右寄せにし、打牌で使う右端(ツモ牌)の近くに置く。スマホではボタンが `min-height: 44px; min-width: 64px; font-size: 1rem`。行そのものも `min-height: 44px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。

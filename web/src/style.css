@@ -1903,6 +1903,11 @@ section,
   gap: 8px;
   margin-top: 8px;
 }
+/* A call (ロン/ポン/カン/チー/スキップ) at the right end, where the hand is
+   played from (its drawn tile): the pointer hardly moves to answer it. */
+.action-bar-call {
+  justify-content: flex-end;
+}
 .action-bar button {
   font-weight: bold;
 }

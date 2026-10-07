@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useBackdropClose } from '../components/backdrop';
 import { CATALOG, findItem, type ItemKind, type ShopItem } from './catalog';
 import { level, owns, purchase, type DojoProgress } from './progress';
 import { rankName } from './rules';
@@ -45,8 +46,9 @@ export function Shop({ progress: p, onChange }: ShopProps) {
     tabRefs.current[j]?.focus();
   }
 
-  // 購入 asks first, in a modal dialog: 購入 buys, キャンセル (or Esc) does not.
+  // 購入 asks first, in a modal dialog: 購入 buys, キャンセル (or Esc, or a click on the backdrop) does not.
   const confirmRef = useRef<HTMLDialogElement>(null);
+  const backdrop = useBackdropClose(() => confirmRef.current?.close());
   const [pending, setPending] = useState<ShopItem | null>(null);
   function ask(item: ShopItem) {
     setPending(item);
@@ -119,7 +121,7 @@ export function Shop({ progress: p, onChange }: ShopProps) {
             })}
           </ul>
       </div>
-      <dialog ref={confirmRef} class="shop-confirm" aria-labelledby="shop-confirm-heading" onClose={() => setPending(null)}>
+      <dialog ref={confirmRef} class="shop-confirm" aria-labelledby="shop-confirm-heading" onClose={() => setPending(null)} {...backdrop}>
         {pending && (
           <>
             <h2 id="shop-confirm-heading">購入しますか？</h2>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useBackdropClose } from './backdrop';
 
 /** The mode the help is opened from: its own explanation comes first, then what it uses. */
 export type HelpMode = 'practice' | 'game' | 'dojo';
@@ -19,14 +20,6 @@ const TILE_NOTATION: Array<[string, string]> = [
   ['赤5萬・赤5筒・赤5索', '赤5（赤ドラ）'],
 ];
 
-/** Whether a pointer event hit the modal dialog's backdrop: the dialog itself, outside its box. */
-function onBackdrop(e: MouseEvent): boolean {
-  const d = e.currentTarget as HTMLElement;
-  if (e.target !== d) return false;
-  const r = d.getBoundingClientRect();
-  return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-}
-
 /**
  * The ヘルプ button and the help it opens: a modal <dialog>, so the rest of
  * the page is inert while it is open, Esc closes it and focus goes back to
@@ -35,7 +28,7 @@ function onBackdrop(e: MouseEvent): boolean {
 export function Help({ mode, onShowGlossary }: HelpProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
-  const pressedOnBackdrop = useRef(false);
+  const backdrop = useBackdropClose(() => setOpen(false));
 
   useEffect(() => {
     const d = ref.current;
@@ -145,16 +138,7 @@ export function Help({ mode, onShowGlossary }: HelpProps) {
         class="help-dialog"
         aria-labelledby="help-title"
         onClose={() => setOpen(false)}
-        onPointerDown={(e) => {
-          pressedOnBackdrop.current = onBackdrop(e);
-        }}
-        onClick={(e) => {
-          // A click on the backdrop closes it, but not a drag (such as a
-          // text selection) that only ends there, nor a click on the
-          // dialog's own scrollbar (inside its box).
-          if (pressedOnBackdrop.current && onBackdrop(e)) setOpen(false);
-          pressedOnBackdrop.current = false;
-        }}
+        {...backdrop}
       >
         {open && (
           <div class="help-content">

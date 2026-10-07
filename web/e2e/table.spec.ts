@@ -131,6 +131,12 @@ test('a phone\'s 設定: a dialog of the options, closed by Escape and a new gam
   await page.keyboard.press('Escape');
   await expect(form).toBeHidden();
   await expect(toggle).toBeFocused();
+  // So does a tap outside it (the page's margin, beside the dialog).
+  await toggle.click();
+  await expect(form).toBeVisible();
+  await page.mouse.click(4, 400);
+  await expect(form).toBeHidden();
+  await toggle.focus();
 
   // A failed request keeps the options, as chosen.
   await page.keyboard.press('Enter');

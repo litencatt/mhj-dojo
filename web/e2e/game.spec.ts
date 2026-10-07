@@ -27,6 +27,10 @@ async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
   const ponButton = actionBar.getByRole('button', { name: 'ポン', exact: true });
   const calledTile = await actionBar.locator('.action-hint .tile').first().getAttribute('aria-label');
   expect(calledTile, 'the call bar should show the last-discarded tile').toBeTruthy();
+  // The call is at the right end, near the drawn tile the hand is played from.
+  const bar = (await actionBar.boundingBox())!;
+  const skip = (await actionBar.getByRole('button', { name: 'スキップ' }).boundingBox())!;
+  expect(bar.x + bar.width - (skip.x + skip.width)).toBeLessThanOrEqual(2);
   await clickAndWait(page, ponButton);
   return calledTile!;
 }

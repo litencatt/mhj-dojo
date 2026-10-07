@@ -290,6 +290,11 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
   await page.getByRole('button', { name: '設定' }).click();
   await settings.getByRole('button', { name: '閉じる' }).click();
   await expect(settings).toBeHidden();
+  // A click (or tap) outside it closes it too.
+  await page.getByRole('button', { name: '設定' }).click();
+  await expect(settings).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(settings).toBeHidden();
 
   // Only what is owned is offered; the choice is stored and shown.
   await page.getByRole('button', { name: '設定' }).click();
@@ -389,6 +394,14 @@ test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chose
   const sample = settings.getByLabel('見本');
   expect(await sample.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
   expect(await sample.locator('.seat-riichi').evaluate((el) => getComputedStyle(el, '::after').backgroundImage)).toContain('radial-gradient');
+  // The chosen win effect plays over the sample (as over a result), again on 演出を見る.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const preview = sample.getByTestId('win-effect');
+  await expect(preview).toHaveCSS('display', 'block');
+  await expect(preview).toHaveCSS('animation-name', 'win-fall');
+  await sample.getByRole('button', { name: '演出を見る' }).click();
+  await expect(preview).toHaveCSS('display', 'block');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   // A dojo game: the cloth under the table, the stick after a riichi badge, the
   // effect over a high win of yours, but not when motion is reduced.
@@ -675,6 +688,12 @@ test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', as
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
   await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('100');
+  // A click outside it does not buy either.
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await expect(confirm).toBeVisible();
+  await page.mouse.click(5, 5);
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
   await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
