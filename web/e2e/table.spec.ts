@@ -110,11 +110,10 @@ test('an upright phone shows your seat in the hand panel', async ({ page }) => {
   }
 });
 
-// 設定 comes right before its options in the focus order: Tab goes from it
-// into them. Escape folds them away, and so does a new game once it is on,
-// focus going back to 設定 either way; a new game that fails keeps them
-// open, as chosen.
-test('a phone\'s 設定: Tab into the options, Escape and a new game fold them back', async ({ page }) => {
+// 設定 opens its options in a modal dialog, focus on the first. Escape
+// closes it, and so does a new game once it is on, focus going back to 設定
+// either way; a new game that fails keeps them open, as chosen.
+test('a phone\'s 設定: a dialog of the options, closed by Escape and a new game', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   // 新規対局 mid-game asks first.
   page.on('dialog', (d) => void d.accept());
@@ -126,12 +125,10 @@ test('a phone\'s 設定: Tab into the options, Escape and a new game fold them b
 
   await toggle.focus();
   await page.keyboard.press('Enter');
-  await expect(form).toBeVisible();
-  await page.keyboard.press('Tab');
+  await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
   await expect(length).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(form).toBeHidden();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toBeFocused();
 
   // A failed request keeps the options, as chosen.

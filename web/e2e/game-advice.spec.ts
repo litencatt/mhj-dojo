@@ -97,8 +97,8 @@ test.describe('a phone game', () => {
     const settings = page.getByRole('button', { name: /^設定/ });
     await settings.click();
     await page.getByRole('checkbox', { name: 'おすすめ・危険度' }).uncheck();
+    await page.keyboard.press('Escape');
     await expect(chip).toHaveCount(0);
-    await settings.click();
     await calls();
     await playOneStep(page);
     await waitForPlayback(page);
