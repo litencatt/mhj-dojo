@@ -2552,8 +2552,9 @@ section {
   .action-area:focus {
     outline: none;
   }
-  /* The playback bar has no button now: hold the height the buttons give. */
-  .action-bar-playback {
+  /* Hold the height the buttons give, also with none (the playback, or a
+     dojo game's hint alone), so the page never jumps as a replay starts. */
+  .action-bar {
     min-height: 44px;
   }
   .action-bar button {
