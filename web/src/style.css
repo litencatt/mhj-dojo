@@ -1893,14 +1893,18 @@ section {
   font-weight: normal;
 }
 .cpu-summary {
-  /* Pulled into the column's gaps around it, so an empty line under the hand
-     stays short (but still held, see min-height). */
-  margin: -8px 0;
-  padding: 2px 4px;
+  /* Pulled into the column's gaps around it (12px), so the hand and the
+     action bar are only this line apart (still held, see min-height). */
+  margin: -12px 0;
+  padding: 0 4px;
   min-height: 1.4em; /* held while empty, so the action bar never jumps */
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--fg);
+}
+/* Right under the CPU summary line, the action bar needs no space of its own. */
+.cpu-summary + .action-area .action-bar {
+  margin-top: 0;
 }
 .action-hint {
   display: inline-flex;
