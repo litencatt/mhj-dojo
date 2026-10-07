@@ -301,6 +301,7 @@ export const DOJO_SUMMON_SEED = 1; // a summon offered within 3 tsumogiri moves 
 export const DOJO_NOYAKU_SEED = 16379; // a new dojo's hand is tenpai without a learned yaku's row (e2e_seeds_test.go)
 export const DOJO_RIICHIWAITS_SEED = 221; // a CPU riichi's waits show within 3 tsumogiri moves (e2e_seeds_test.go)
 export const DOJO_WIN_SEED = 11896; // a new dojo wins the first round by tsumogiri, with han (e2e_seeds_test.go)
+export const DOJO_CALLED_NOYAKU_SEED = 308; // a new dojo's hand, taking a pon, is open and tenpai without a learned yaku's row (e2e_seeds_test.go)
 
 /**
  * Opens a dojo game (?mode=dojo&play=1) on a seed. The dojo's progress is

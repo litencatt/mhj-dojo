@@ -286,3 +286,29 @@ func TestE2ESeedDojoWin(t *testing.T) {
 			seed, st.Result, st.Rounds)
 	}
 }
+
+// ponMove is tsumogiriMove, but every pon offered is taken (dojo.spec.ts's
+// called-hand game).
+func ponMove(st match.State) string {
+	if st.Legal.Pon {
+		return `{"type":"pon"}`
+	}
+	return tsumogiriMove(st)
+}
+
+// DOJO_CALLED_NOYAKU_SEED: in a new dojo's game, taking a pon when offered
+// and tsumogiri otherwise, your hand is open and tenpai in the general form
+// without a learned yaku's row within 5 moves (the 役なし警告's 「役なし」).
+func TestE2ESeedDojoCalledNoYaku(t *testing.T) {
+	seed := tsConst(t, "helpers.ts", "DOJO_CALLED_NOYAKU_SEED")
+	c := newClient(t, session.NewStore(256))
+	first := initialYaku(t)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(first)+`}`)
+	shown := func(st match.State) bool { return len(st.Seats[0].Melds) > 0 && noLearnedYaku(st, first) }
+	for i := 0; i < 5 && st.Result == nil && !shown(st); i++ {
+		st, _ = c.game("POST", path, ponMove(st))
+	}
+	if !shown(st) {
+		t.Errorf("seed %d (DOJO_CALLED_NOYAKU_SEED): no open tenpai without a learned yaku within 5 moves; see the comment above tsConst", seed)
+	}
+}
