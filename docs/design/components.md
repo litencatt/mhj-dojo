@@ -25,7 +25,7 @@
 `h2` を使い、右端にボタンを置くときは `.panel-heading`(`.panel-minimize` で最小化、最小化したパネルは右端の `.panel-dock` の `.dock-tab` に収まる)。
 
 ## チップ・バッジ
-- 役名のチップ: 枠のみの `--radius-pill`(`.advice-yaku li`、`.dojo-yaku li`)。解説のある所持役は、チップの中に枠なしのボタン(`.dojo-yaku-guide`)を置く。スマホではチップ全部を 44px の高さにそろえる。絞り込みの `.filter-chip` はオン時に `--accent` の塗り。
+- 役名のチップ: 枠のみの `--radius-pill`(`.advice-yaku li`、`.dojo-yaku li`)。解説のある所持役は、チップの中に枠なしのボタン(`.dojo-yaku-guide`)を置く。スマホではチップ全部を 44px の高さにそろえる。絞り込みの `.filter-chip` はオン時に `--accent` の塗り。オン・オフの切り替え(手牌の見出しの 面子表示、道場の自動和了・自動ツモ切り・鳴きなしの `.hand-tools`)も `.filter-chip` に `aria-pressed` を付けて使う。`.hand-tools` は見出しの右端(面子表示の後)に置き、スマホでは見出しの下の行に右寄せで並べる。
 - 状態バッジ: 成功は `--success*`、警告は `--danger*`(`.dojo-aid-ok` / `.dojo-aid-warn`)。
 - 通知: `.dojo-notice`(情報)、`.error-banner`(エラー、`--danger`)、`.save-failed`(警告)。
 
