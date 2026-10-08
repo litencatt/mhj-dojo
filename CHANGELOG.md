@@ -1,5 +1,12 @@
 # Changelog
 
+## [v2026.1008.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.1...v2026.1008.2) - 2026-10-08
+
+### 新機能
+- 道場に自動和了・自動ツモ切り・鳴きなしを足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/308
+### 修正
+- スマホの役別向聴の有効牌を小さくし、1行に並べる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/306
+
 ## [v2026.1008.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.0...v2026.1008.1) - 2026-10-08
 
 ### 新機能
