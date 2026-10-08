@@ -1,4 +1,4 @@
-.PHONY: build test run vet wasm site embed e2e deploy deploy-check
+.PHONY: build test run dev vet wasm site embed e2e deploy deploy-check
 
 # npm ci wipes node_modules, so it only runs when the lockfile changes (npm
 # writes node_modules/.package-lock.json on every install).
@@ -16,6 +16,11 @@ vet:
 
 run: embed
 	go run ./cmd/mhj-dojo
+
+# The site on Vite's dev server, which reloads the page's own code (src/) on
+# save; a change to the engine (Go) needs `make wasm` again and a page reload.
+dev: wasm web/node_modules/.package-lock.json
+	cd web && npm run dev
 
 # The engine (practice and CPU games) as WebAssembly for the static site
 # (issue #67), with the matching Go's JS glue, into web/site-public/ (not

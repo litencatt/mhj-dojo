@@ -1,0 +1,332 @@
+/* The dojo hub and shop. The colours are style.css's tokens. */
+/* Its width and margins are the practice and CPU game pages' (style.css .app). */
+.dojo-home {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dojo-notice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--row-best-bg);
+  font-size: 0.85rem;
+}
+.dojo-muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dojo-status,
+.dojo-play {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.dojo-play {
+  margin-top: 8px;
+}
+.dojo-level {
+  font-size: 1.1rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.dojo-coin-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.dojo-coins {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.dojo-xpbar {
+  flex: 1 1 80px;
+  min-width: 80px;
+  max-width: 260px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--chart-grid);
+  overflow: hidden;
+}
+.dojo-xpbar > div {
+  height: 100%;
+  background: var(--accent);
+}
+/* The hub's buttons are style.css's (secondary, and .dojo-start primary), not the
+   shared header's (設定, ?), which look the same in every mode. */
+.dojo-yaku,
+.shop-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* About three rows of chips, the next one half shown: the rest scrolls inside the panel. */
+.dojo-yaku {
+  max-height: 6.6rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.dojo-yaku li {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+}
+.shop-list {
+  flex-direction: column;
+  flex-wrap: nowrap; /* one column: a wrapping column stretched rows of a short list unevenly */
+  gap: 4px;
+}
+.shop-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 46px; /* a row with 購入 is this tall: the others match it */
+  box-sizing: border-box;
+  gap: 4px 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shop-name {
+  flex: 1 1 12em;
+}
+.shop-price {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.shop-owned {
+  color: var(--success);
+  font-size: 0.85rem;
+}
+.shop-locked {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dojo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A dojo game (GameApp, ResultPanel, FinalPanel). */
+.yaku-excluded td {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.yaku-excluded td + td {
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+.dojo-reward h3 {
+  margin: 8px 0 4px;
+  font-size: 0.95rem;
+}
+.dojo-reward ul {
+  margin: 0 0 8px;
+  padding-left: 1.2em;
+}
+.dojo-levelup {
+  color: var(--success);
+  font-weight: bold;
+}
+.dojo-peek {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+.dojo-peek-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.dojo-peek-row > span:first-child {
+  min-width: 4em;
+  margin-right: 6px;
+  color: var(--muted);
+}
+
+.shop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.shop-tabs [role='tab'] {
+  margin-bottom: -1px;
+  padding: 4px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.shop-tabs [role='tab'][aria-selected='true'] {
+  border-color: var(--border);
+  border-bottom-color: var(--panel-bg);
+  color: var(--fg);
+  font-weight: bold;
+}
+/* The items scroll inside the shop so the tabs stay in view. */
+.shop-tabpanel {
+  height: min(60vh, 32rem); /* the same for every tab, which all scroll */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+
+/* The hub's settings (SettingsDialog): the game choice, the theme and the back. */
+.settings-dialog p {
+  margin: 4px 0 8px;
+}
+.dojo-settings-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.dojo-settings-group legend {
+  padding: 0 4px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+.dojo-settings-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.dojo-settings-sample {
+  position: relative; /* the win effect's ground, as in the result panel */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--table-cloth, none); /* the cloth chosen (tokens.css) */
+}
+/* At the sample's right end, out of the tiles' way. */
+.dojo-effect-replay {
+  margin-left: auto;
+}
+
+/* A dojo game's aids and cheats (GameApp). */
+.dojo-aid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+.dojo-aid-label {
+  color: var(--muted);
+}
+.dojo-aid-warn {
+  padding: 1px 8px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: bold;
+}
+.dojo-aid-ok {
+  padding: 1px 8px;
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success);
+  font-weight: bold;
+}
+.dojo-aid-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dojo-aid-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.seat-waits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+}
+.seat-waits > span:first-child {
+  margin-right: 4px;
+  color: var(--danger);
+  font-weight: bold;
+}
+.summon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+/* The tiles keep the tile face: .action-bar button would paint them with the
+   panel colour (dark in dark mode) and its padding. */
+.action-bar .summon-picker button.tile {
+  padding: 2px;
+  border: 1px solid var(--tile-border);
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--tile-bg-hi) 0%, var(--tile-bg) 100%);
+  color: inherit;
+  font-weight: normal;
+  cursor: pointer;
+}
+.dojo-round-reward {
+  margin: 4px 0 8px;
+  color: var(--success);
+  font-weight: bold;
+}
+
+/* The game choice (length and CPU), in 設定. */
+.dojo-game-options .dojo-settings-group label:has(input:disabled) {
+  color: var(--muted);
+  cursor: default;
+}
+.dojo-game-options p {
+  margin: 10px 0 0;
+}
+/* 最終結果's rounds: a round with a redraw or a summon (no 和了祝儀). */
+.dojo-cheated {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The shop's purchase confirmation (a modal <dialog>). */
+.shop-confirm {
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+}
+.shop-confirm h2 {
+  margin: 0 0 8px;
+}
+.shop-confirm p {
+  margin: 4px 0;
+}
+.shop-confirm-item {
+  font-weight: bold;
+}
+.shop-confirm .dojo-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+

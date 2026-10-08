@@ -57,10 +57,10 @@ a {
 
 .release {
   margin: 0 0 12px;
-  padding: 12px 16px;
+  padding: 12px 14px;
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 .release h2 {
   display: flex;

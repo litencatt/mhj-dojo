@@ -4,6 +4,10 @@ import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
 import { yakuHanText, yakumanName } from '../yakumanLabel';
+import { COINS_PER_HAN, WIN_BONUS_COINS, XP_PER_HAN, yakuName } from '../dojo/catalog';
+import { cheated } from '../dojo/progress';
+
+const HIGH_LIMITS: Limit[] = ['haneman', 'baiman', 'sanbaiman', 'yakuman'];
 
 const LIMIT_NAMES: Record<Exclude<Limit, ''>, string> = {
   mangan: '満貫',
@@ -50,13 +54,16 @@ export interface ResultPanelProps {
   result: GameResult;
   busy: boolean;
   onNext: () => void;
+  dojoHan?: number; // a dojo game: the han of your win this round (paid at once), 0 for none
 }
 
 /** End of the round: the winning hand with yaku, fu and points, or the draw, and the point changes. */
-export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
+export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPanelProps) {
   const who = (s: number) => seatLabel(s, state.you);
   const winner = result.winner >= 0 ? state.seats[result.winner] : null;
   const yakuman = result.yaku.some((y) => y.han >= 13);
+  // Your win at 跳満 or above: the dojo's win effect plays over it (style.css; none unless one is chosen).
+  const high = result.winner === state.you && HIGH_LIMITS.includes(result.points.limit);
   let title = '流局';
   if (result.kind === 'abort') title = `途中流局（${result.reason ? ABORT_NAMES[result.reason] : ''}）`;
   if (result.kind === 'tsumo') title = `${who(result.winner)}のツモ和了`;
@@ -64,6 +71,9 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
 
   // A 内訳 column only when honba or riichi sticks moved points this round.
   const split = [0, 1, 2, 3].some((s) => result.honba_deltas[s] !== 0 || result.stick_deltas[s] !== 0);
+  // A win of a round with a redraw or a summon pays no 和了祝儀.
+  const round = state.rounds[state.rounds.length - 1];
+  const bonus = round && cheated(round) ? 0 : WIN_BONUS_COINS;
 
   return (
     <section class={result.winner === state.you ? 'result-panel win-panel' : 'result-panel'} aria-label="結果">
@@ -75,6 +85,13 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
           </button>
         )}
       </div>
+      {high && <div class="win-effect" data-testid="win-effect" aria-hidden="true" />}
+      {!!dojoHan && (
+        <p class="dojo-round-reward" data-testid="dojo-round-reward">
+          道場の報酬 +{dojoHan * COINS_PER_HAN + bonus} 銭（和了 +{dojoHan * COINS_PER_HAN}、
+          {bonus ? `和了祝儀 +${bonus}` : 'イカサマ使用のため和了祝儀なし'}）・稽古 +{dojoHan * XP_PER_HAN}
+        </p>
+      )}
       {winner && result.win_tile && (
         <>
           <div class="win-tiles" role="group" aria-label="和了形">
@@ -92,6 +109,13 @@ export function ResultPanel({ state, result, busy, onNext }: ResultPanelProps) {
                 <tr key={y.key}>
                   <td>{y.name}</td>
                   <td>{yakuHanText(y.han)}</td>
+                </tr>
+              ))}
+              {/* Dojo: the yaku the hand had but the player has not learned count for nothing. */}
+              {result.excluded?.map((k) => (
+                <tr key={`excluded-${k}`} class="yaku-excluded">
+                  <td>{yakuName(k)}</td>
+                  <td>未修得</td>
                 </tr>
               ))}
               {!yakuman && result.dora > 0 && (

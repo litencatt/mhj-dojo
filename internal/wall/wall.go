@@ -154,6 +154,32 @@ func (w *Wall) Draw4(k int) (tile.Tile, bool) {
 	return w.tiles[Seats*HandSize+k], true
 }
 
+// Redrawn returns a copy of the wall whose four-player draws k..last are
+// rotated left by one: draw k moves to last and every draw after it comes one
+// earlier. The tile set is unchanged, so the copy is still a full wall.
+func (w *Wall) Redrawn(k, last int) *Wall {
+	if k < 0 || last >= LiveDraws4 || k >= last {
+		panic(fmt.Sprintf("wall: redraw %d..%d out of range", k, last))
+	}
+	out := *w
+	live := out.tiles[Seats*HandSize+k : Seats*HandSize+last+1]
+	first := live[0]
+	copy(live, live[1:])
+	live[len(live)-1] = first
+	return &out
+}
+
+// Swapped returns a copy of the wall with four-player draws i and j
+// exchanged. The tile set is unchanged, so the copy is still a full wall.
+func (w *Wall) Swapped(i, j int) *Wall {
+	if i < 0 || j < 0 || i >= LiveDraws4 || j >= LiveDraws4 {
+		panic(fmt.Sprintf("wall: swap %d and %d out of range", i, j))
+	}
+	out := *w
+	out.tiles[Seats*HandSize+i], out.tiles[Seats*HandSize+j] = out.tiles[Seats*HandSize+j], out.tiles[Seats*HandSize+i]
+	return &out
+}
+
 // DoraIndicators returns the first dora indicator, the only one without kans.
 func (w *Wall) DoraIndicators() []tile.Tile { return w.DoraIndicatorsN(1) }
 

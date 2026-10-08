@@ -16,10 +16,28 @@
   --tile-bg: #fffdf5;
   --tile-border: #c9c2a8;
   --tile-back: #3f7d5c;
+  --tile-back-hi: #4f9a72; /* top of the tile-back gradient */
+  /* Tile face inks (TileFace.tsx); [data-tile-theme] below overrides them. */
+  --tile-pin: #1f4fbf;
+  --tile-sou: #15803d;
+  --tile-red: #c8201f; /* red fives and the accents on pin/sou faces */
+  --tile-ink: #1c1917;
+  --tile-man-num: #1c1917;
+  --tile-man-mark: #c8201f;
+  --tile-wind: #1c1917;
+  --tile-hatsu: #15803d;
+  --tile-chun: #c8201f;
   --row-best-bg: #fef3c7;
   --row-tenpai-bg: #fde4e4; /* a yaku (or combo) already at 聴牌 or 和了 */
   --chart-grid: #e5e7eb;
   --group-taatsu: #b45309;
+  --tile-bg-hi: #fffef8; /* top of the tile face gradient */
+  --backdrop: rgb(0 0 0 / 0.45); /* behind a modal dialog */
+  /* Corners: small (buttons, inputs), medium (boxes in a panel), large (panels, dialogs). */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px; /* chips */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -43,5 +61,171 @@
     --row-tenpai-bg: #3d1a1d;
     --chart-grid: #2c313a;
     --group-taatsu: #fbbf24;
+  }
+}
+
+/* Tile themes (tileThemes.ts): the dojo shop sets data-tile-theme on <html>.
+   Tile faces are always light, so only the ground and back change in dark mode. */
+:root[data-tile-theme='wafuu'] {
+  --tile-bg: #f6ecd2;
+  --tile-border: #b89b5e;
+  --tile-back: #7a1f2b;
+  --tile-back-hi: #9c3a46;
+  --tile-pin: #1d3a6e;
+  --tile-sou: #3b5d2c;
+  --tile-red: #c2362b;
+  --tile-ink: #231815;
+  --tile-man-num: #231815;
+  --tile-man-mark: #c2362b;
+  --tile-wind: #231815;
+  --tile-hatsu: #3b5d2c;
+  --tile-chun: #c2362b;
+}
+
+:root[data-tile-theme='mono'] {
+  --tile-bg: #f2f2f0;
+  --tile-border: #a8a8a4;
+  --tile-back: #4a4a4a;
+  --tile-back-hi: #6e6e6e;
+  --tile-pin: #1f1f1f;
+  --tile-sou: #4a4a4a;
+  --tile-red: #b3261e; /* the one colour kept: red fives and 中 */
+  --tile-ink: #1f1f1f;
+  --tile-man-num: #1f1f1f;
+  --tile-man-mark: #1f1f1f;
+  --tile-wind: #1f1f1f;
+  --tile-hatsu: #4a4a4a;
+  --tile-chun: #b3261e;
+}
+
+/* Four-colour deck: 萬 red, 筒 blue, 索 green, winds gold, dragons purple. */
+:root[data-tile-theme='yonshoku'] {
+  --tile-bg: #fbf8ec;
+  --tile-border: #c9c2a8;
+  --tile-back: #3a4f8a;
+  --tile-back-hi: #5570b0;
+  --tile-man-num: #c8201f;
+  --tile-man-mark: #c8201f;
+  --tile-wind: #8a5a00;
+  --tile-hatsu: #6d28d9;
+  --tile-chun: #6d28d9;
+}
+
+/* 桜: a blush ground, plum and leaf inks, a cherry back. */
+:root[data-tile-theme='sakura'] {
+  --tile-bg: #fdf1f3;
+  --tile-border: #d9a7b2;
+  --tile-back: #b0476a;
+  --tile-back-hi: #d06c8e;
+  --tile-pin: #6b2f6e;
+  --tile-sou: #2f6b3a;
+  --tile-red: #c21e4a;
+  --tile-ink: #2a1a20;
+  --tile-man-num: #2a1a20;
+  --tile-man-mark: #c21e4a;
+  --tile-wind: #2a1a20;
+  --tile-hatsu: #2f6b3a;
+  --tile-chun: #c21e4a;
+}
+
+/* 翡翠: a pale jade ground, deep green and teal inks, a jade back. */
+:root[data-tile-theme='hisui'] {
+  --tile-bg: #eef7f1;
+  --tile-border: #93bfa4;
+  --tile-back: #1f6b55;
+  --tile-back-hi: #3a8f74;
+  --tile-pin: #135e72;
+  --tile-sou: #1c6b3c;
+  --tile-red: #b3261e;
+  --tile-ink: #10241c;
+  --tile-man-num: #10241c;
+  --tile-man-mark: #b3261e;
+  --tile-wind: #10241c;
+  --tile-hatsu: #1c6b3c;
+  --tile-chun: #b3261e;
+}
+
+/* 黄金: a cream ground with dark bronze inks, a gold back. */
+:root[data-tile-theme='kogane'] {
+  --tile-bg: #fbf3d9;
+  --tile-border: #c9a64a;
+  --tile-back: #8a6a12;
+  --tile-back-hi: #c39a2a;
+  --tile-pin: #1f3f8a;
+  --tile-sou: #3d5a12;
+  --tile-red: #a8231a;
+  --tile-ink: #2b2006;
+  --tile-man-num: #2b2006;
+  --tile-man-mark: #a8231a;
+  --tile-wind: #5a3f00;
+  --tile-hatsu: #3d5a12;
+  --tile-chun: #a8231a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tile-theme='wafuu'] {
+    --tile-bg: #eadfc2;
+    --tile-border: #8f7a4a;
+    --tile-back: #5e1822;
+    --tile-back-hi: #8a3340;
+  }
+
+  :root[data-tile-theme='mono'] {
+    --tile-bg: #e9e9e7;
+    --tile-border: #777774;
+    --tile-back: #3a3a3a;
+    --tile-back-hi: #5c5c5c;
+  }
+
+  :root[data-tile-theme='yonshoku'] {
+    --tile-bg: #f4efe0;
+    --tile-border: #8a8264;
+    --tile-back: #2c3d6e;
+    --tile-back-hi: #4a63a0;
+  }
+
+  :root[data-tile-theme='sakura'] {
+    --tile-bg: #f3e3e7;
+    --tile-border: #9c6b77;
+    --tile-back: #8a3352;
+    --tile-back-hi: #b0547a;
+  }
+
+  :root[data-tile-theme='hisui'] {
+    --tile-bg: #e2eee6;
+    --tile-border: #5f8c72;
+    --tile-back: #175443;
+    --tile-back-hi: #2e7a62;
+  }
+
+  :root[data-tile-theme='kogane'] {
+    --tile-bg: #f0e6c6;
+    --tile-border: #9a7d30;
+    --tile-back: #6e540e;
+    --tile-back-hi: #a68220;
+  }
+}
+
+/* Table cloths (tileThemes.ts): the dojo shop sets data-table-cloth on <html>,
+   and the CPU table (and 設定's sample) lies on --table-cloth. A tint, so the
+   seats' text keeps its contrast: pale in light mode, deep in dark mode. */
+:root[data-table-cloth='midori'] {
+  --table-cloth: #d3e8d6;
+}
+:root[data-table-cloth='kon'] {
+  --table-cloth: #d3dbee;
+}
+:root[data-table-cloth='enji'] {
+  --table-cloth: #f0d5d9;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-table-cloth='midori'] {
+    --table-cloth: #15301f;
+  }
+  :root[data-table-cloth='kon'] {
+    --table-cloth: #141c33;
+  }
+  :root[data-table-cloth='enji'] {
+    --table-cloth: #361820;
   }
 }

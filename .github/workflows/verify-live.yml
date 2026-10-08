@@ -8,6 +8,12 @@ name: Verify live site
 # (web/e2e-live, `npm run e2e:live`) against it. A failure opens an issue.
 #
 # Can be run by hand to re-check the live site against any tag.
+#
+# On lolipop-deploy-now this file is main's latest (scripts/deploy-lolipop.sh
+# takes .github/workflows from main, issue #261), while web/ (e2e-live,
+# playwright.live.config.ts, package-lock.json) is the deployed tag's, which
+# can be older, e.g. after a rollback. Keep this workflow working with an
+# older web/: don't depend here on npm scripts or files a release may lack.
 on:
   push:
     branches: [lolipop-deploy-now]

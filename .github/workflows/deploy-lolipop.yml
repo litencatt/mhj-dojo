@@ -13,7 +13,11 @@ name: Deploy to Lolipop
 # entirely with the asset's contents, and opens a pull request into
 # lolipop-deploy-now listing what it brings. Merge it with a merge commit
 # (not squash), so the next release merges cleanly. `make deploy` still
-# deploys the working tree by hand.
+# deploys the working tree by hand. All of this is
+# scripts/deploy-lolipop.sh, which can also be run by hand; it takes
+# .github/workflows on the release branch from main, not from the tag,
+# since a GITHUB_TOKEN push whose workflow files differ from main's is
+# refused (issue #261; see the script).
 #
 # Run by hand for any existing tag (its Release must still carry the
 # artifact) to redeploy it, or to roll back to an older one: since
@@ -56,9 +60,10 @@ jobs:
     env:
       TAG: ${{ inputs.tag }}
     steps:
+      # The workflow's own commit (main), not the tag: the script it runs
+      # must be there even when redeploying a tag older than the script.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
           fetch-depth: 0 # merge into the release branch, list the commits
 
       # Guards against a pointless duplicate re-run of the exact same
@@ -71,10 +76,10 @@ jobs:
       - name: Anything to deploy?
         id: check
         run: |
-          {
-            echo "sha=$(git rev-parse HEAD)"
-            echo "short=$(git rev-parse --short HEAD)"
-          } >> "$GITHUB_OUTPUT"
+          if ! [[ $TAG =~ ^v[0-9]{4}\.[0-9]{4}\.[0-9]+$ ]]; then
+            echo "::error::not a release tag (vYYYY.MMDD.N): $TAG"
+            exit 1
+          fi
           if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null; then
             git fetch -q origin "$RELEASE_BRANCH"
             if git log -1 --format=%B "origin/$RELEASE_BRANCH" | grep -qF "Release $TAG to Deploy Now"; then
@@ -84,85 +89,14 @@ jobs:
           fi
           echo "deploy=true" >> "$GITHUB_OUTPUT"
 
-      - name: Download and verify the release artifact
+      # scripts/deploy-lolipop.sh downloads and verifies the release
+      # artifact, commits the release to release/<tag> and opens the pull
+      # request. Run it by hand if this step fails (README, "Deploying").
+      - name: Open the release pull request
         if: steps.check.outputs.deploy == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/asset"
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/asset" \
-            --pattern "mhj-dojo-site-$TAG.tar.gz" --pattern "mhj-dojo-site-$TAG.tar.gz.sha256"
-          cd "$RUNNER_TEMP/asset"
-          sha256sum -c "mhj-dojo-site-$TAG.tar.gz.sha256"
-          mkdir dist-site
-          tar -C dist-site -xzf "mhj-dojo-site-$TAG.tar.gz"
-
-      - name: Commit the release to a release branch
-        if: steps.check.outputs.deploy == 'true'
-        id: branch
-        env:
-          SHA: ${{ steps.check.outputs.sha }}
-          SHORT: ${{ steps.check.outputs.short }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # The first release starts lolipop-deploy-now at main.
-          if ! git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null; then
-            git push -q origin "$SHA:refs/heads/$RELEASE_BRANCH"
-            git fetch -q origin "$RELEASE_BRANCH"
-          fi
-          branch="release/$TAG"
-          git switch -q -c "$branch" "origin/$RELEASE_BRANCH"
-          git merge -q --no-ff --no-edit -m "Merge $TAG ($SHORT) for release" "$SHA"
-          # Replace web/dist-site entirely with the release asset's
-          # contents (not a merge of the two trees), so redeploying an
-          # older tag — a rollback — leaves the branch with exactly that
-          # release's files, not a mix with whatever came after it.
-          rm -rf web/dist-site
-          mv "$RUNNER_TEMP/asset/dist-site" web/dist-site
-          git add -f web/dist-site # gitignored on main
-          git commit -q -m "Deploy the site release $TAG" -m "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$TAG"
-          git push -q --force origin "$branch"
-          echo "name=$branch" >> "$GITHUB_OUTPUT"
-
-      - name: Open the deploy pull request
-        if: steps.check.outputs.deploy == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.check.outputs.sha }}
-          SHORT: ${{ steps.check.outputs.short }}
-          BRANCH: ${{ steps.branch.outputs.name }}
-        run: |
-          # What main brings since the last release: its merged pull requests
-          # (a merge commit's body is the pull request's title) and any
-          # commit pushed to main directly.
-          changes=$(git log --first-parent --format='%h%x1f%s%x1f%b%x1e' "origin/$RELEASE_BRANCH..$SHA" | python3 -c '
-          import re, sys
-          for rec in sys.stdin.read().split("\x1e"):
-              parts = rec.strip("\n").split("\x1f")
-              if len(parts) < 2:
-                  continue
-              sha, subject, body = parts[0], parts[1], parts[2] if len(parts) > 2 else ""
-              m = re.match(r"Merge pull request (#\d+)", subject)
-              title = f"{body.strip().splitlines()[0]} ({m.group(1)})" if m and body.strip() else subject
-              print(f"- {title} {sha}")
-          ')
-          {
-            echo "リリース [$TAG](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$TAG)（\`$SHORT\`）を公開用ブランチ \`$RELEASE_BRANCH\` に取り込み、リリースの公開サイト（\`web/dist-site\`。ヘッダーに $TAG と表示）を含めます。マージすると、デプロイナウが公開します。"
-            echo
-            echo "**「Create a merge commit」でマージしてください**（squash しない）。次回のリリースで main をきれいに取り込むためです。"
-            echo
-            echo "## 前回のリリース以降の変更"
-            echo "$changes"
-            echo
-            echo "## 確認"
-            echo "- 公開サイト版の E2E: リリースのビルド時に実行済み（[GitHub Release](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/$TAG) に添付のビルド）"
-            echo "- main の CI: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SHA}"
-          } > "$RUNNER_TEMP/body.md"
-          if url=$(gh pr view "$BRANCH" --json url -q .url 2>/dev/null); then
-            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/body.md" >/dev/null
-          else
-            url=$(gh pr create --base "$RELEASE_BRANCH" --head "$BRANCH" \
-              --title "Release $TAG to Deploy Now" --body-file "$RUNNER_TEMP/body.md")
-          fi
-          echo "Release pull request: $url" >> "$GITHUB_STEP_SUMMARY"
+          scripts/deploy-lolipop.sh "$TAG"

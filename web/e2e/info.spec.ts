@@ -77,16 +77,21 @@ test('the help and the header version open info/', async ({ page }) => {
   await expect(page).toHaveURL(/\/info\/$/);
 });
 
-test('info/ links back to practice and the CPU game', async ({ page }) => {
+test('info/ links back to practice, the CPU game and the dojo', async ({ page }) => {
   await page.goto('./info/');
   await page.getByRole('navigation').getByRole('link', { name: '練習' }).click();
   await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-  await expect(page.locator('.app-header h1')).toContainText('麻雀道場');
+  await expect(page.locator('.app-header h1')).toContainText('練習');
 
   await page.goto('./info/');
   await page.getByRole('navigation').getByRole('link', { name: 'CPU対戦' }).click();
   await expect(page).toHaveURL(/\/\?mode=game$/);
   await expect(page.locator('.app-header h1')).toContainText('CPU対戦');
+
+  await page.goto('./info/');
+  await page.getByRole('navigation').getByRole('link', { name: '道場' }).click();
+  await expect(page).toHaveURL(/\/\?mode=dojo$/);
+  await expect(page.locator('.app-header h1')).toContainText('道場');
 });
 
 test('練習 goes back to the practice session the page came from', async ({ page }) => {

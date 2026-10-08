@@ -4,6 +4,7 @@ import {
   clickAndWait,
   expectStopped,
   handPanel,
+  openSettings,
   pageOverflowX,
   playOneStep,
   playToResult,
@@ -26,6 +27,10 @@ async function playUntilPonTaken(page: Page, maxSteps = 60): Promise<string> {
   const ponButton = actionBar.getByRole('button', { name: 'ポン', exact: true });
   const calledTile = await actionBar.locator('.action-hint .tile').first().getAttribute('aria-label');
   expect(calledTile, 'the call bar should show the last-discarded tile').toBeTruthy();
+  // The call is at the right end, near the drawn tile the hand is played from.
+  const bar = (await actionBar.boundingBox())!;
+  const skip = (await actionBar.getByRole('button', { name: 'スキップ' }).boundingBox())!;
+  expect(bar.x + bar.width - (skip.x + skip.width)).toBeLessThanOrEqual(2);
   await clickAndWait(page, ponButton);
   return calledTile!;
 }
@@ -282,10 +287,10 @@ test.describe('a phone game', () => {
     await expect(page.locator('.app')).not.toHaveClass(/has-dock/);
   });
 
-  // A 667x375 phone on its side (under 760px wide) folds the new-game
-  // options behind 設定 too: 設定 comes right before them in the focus
-  // order, they open under the status, and nothing overflows.
-  test('on its side at 667x375 folds the options behind 設定', async ({ page }) => {
+  // A 667x375 phone on its side (under 760px wide) has the new-game options
+  // behind 設定 too: a modal dialog, focus on the first option, nothing
+  // overflowing; Esc closes it, focus back on 設定.
+  test('on its side at 667x375 has the options behind 設定', async ({ page }) => {
     await page.setViewportSize({ width: 667, height: 375 });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
@@ -296,12 +301,9 @@ test.describe('a phone game', () => {
     await expect(page.getByRole('region', { name: '時系列チャート' })).toHaveCount(0);
     await toggle.focus();
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
     await expect(form).toBeVisible();
-    await page.keyboard.press('Tab');
-    await expect(form.getByRole('combobox').first()).toBeFocused();
-    const status = (await page.locator('.header-status').boundingBox())!;
-    const f = (await form.boundingBox())!;
-    expect(f.y).toBeGreaterThanOrEqual(status.y + status.height - 1);
+    await expect(form.getByRole('radio', { checked: true }).first()).toBeFocused();
     expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
     await page.keyboard.press('Escape');
     await expect(form).toBeHidden();
@@ -542,10 +544,11 @@ test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
   await expect(page.locator('.area-hand')).toHaveCSS('position', 'static');
 });
 
-// On a phone the header is short: the new-game options fold behind 「設定」,
-// the status is one or two dense lines and the dora tiles are small.
+// On a phone the header is short: the new-game options are behind 「設定」
+// (a modal dialog), the status is one or two dense lines and the dora tiles
+// are small.
 for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390, 844, 130]]) {
-  test(`a ${width}px-wide phone folds the new-game options behind 設定`, async ({ page }) => {
+  test(`a ${width}px-wide phone has the new-game options behind 設定`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
@@ -553,42 +556,54 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     const form = page.locator('.new-game-form');
     const toggle = page.getByRole('button', { name: /^設定/ });
     await expect(form).toBeHidden();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveAttribute('aria-haspopup', 'dialog');
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(maxHeader);
     // The status stays in view, and 設定 is easy to tap.
     await expect(page.locator('.game-status')).toBeVisible();
     await expect(page.locator('.dora-box')).toBeVisible();
     expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    // The title row's mode links never run under 設定 and ?, even at 320px.
+    const title = (await page.locator('.app-header h1').boundingBox())!;
+    const meta = (await page.locator('.header-meta').boundingBox())!;
+    expect(title.x + title.width).toBeLessThanOrEqual(meta.x);
     expect((await page.locator('.dora-indicators .tile').first().boundingBox())!.height).toBeLessThanOrEqual(24);
 
-    // Open: the options under the status, 新規対局 still a big button.
+    // Open: the options in a dialog inside the screen, 新規対局 still a big button.
     await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const dialog = page.getByRole('dialog', { name: '設定' });
+    await expect(dialog).toBeVisible();
     await expect(form).toBeVisible();
-    await expect(form.getByRole('combobox')).toHaveCount(4);
-    expect((await form.boundingBox())!.y).toBeGreaterThan((await toggle.boundingBox())!.y);
+    // Boxed as in the dojo's 設定: 対局, 起家, CPU, シード, 再生速度 and 表示; the choices are radio buttons.
+    await expect(form.getByRole('group')).toHaveCount(6);
+    await expect(form.getByRole('combobox')).toHaveCount(0);
+    const d = (await dialog.boundingBox())!;
+    expect(d.x).toBeGreaterThanOrEqual(0);
+    expect(d.x + d.width).toBeLessThanOrEqual(width);
     expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
     ).toBeLessThanOrEqual(0);
-    await toggle.click();
+    await dialog.getByRole('button', { name: '閉じる' }).click();
     await expect(form).toBeHidden();
+    await expect(toggle).toBeFocused();
   });
 }
 
-// A desktop (and a phone on its side) shows the options with the title,
-// above the status, though they come after it in the page.
+// A desktop (and a phone on its side) has the options behind 設定 too, on
+// the title row; the header shows the title and the status only.
 for (const [width, height] of [[1280, 900], [844, 390]]) {
-  test(`a ${width}x${height} screen keeps the new-game options above the status`, async ({ page }) => {
+  test(`a ${width}x${height} screen has the new-game options behind 設定 on the title row`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     await waitForPlayback(page);
-    await expect(page.locator('.new-game-form')).toBeVisible();
-    const form = (await page.locator('.new-game-form').boundingBox())!;
-    const status = (await page.locator('.header-status').boundingBox())!;
+    await expect(page.locator('.new-game-form')).toBeHidden();
+    const settings = (await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).boundingBox())!;
     const title = (await page.locator('.app-header h1').boundingBox())!;
-    expect(form.y).toBeGreaterThanOrEqual(title.y);
-    expect(form.y + form.height).toBeLessThanOrEqual(status.y);
+    const status = (await page.locator('.header-status').boundingBox())!;
+    expect(settings.y + settings.height).toBeLessThanOrEqual(status.y);
+    expect(Math.abs(settings.y + settings.height / 2 - (title.y + title.height / 2))).toBeLessThanOrEqual(8);
+    const dialog = await openSettings(page);
+    await expect(dialog.getByRole('button', { name: '新規対局' })).toBeVisible();
   });
 }
 
@@ -682,14 +697,11 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
   expect((await discard.locator('.event-verb').boundingBox())!.width).toBeLessThanOrEqual(1);
 });
 
-// A desktop keeps the new-game options in the header, and the rivers at six
-// 18px tiles to a row.
-test('a desktop keeps the header options and six-tile rivers', async ({ page }) => {
+// A desktop keeps the rivers at six 18px tiles to a row.
+test('a desktop has six-tile rivers', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
-  await expect(page.locator('.new-game-form')).toBeVisible();
-  await expect(page.locator('.options-toggle')).toBeHidden();
   const river = page.locator('.seat-river').first();
   expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
   await expect(page.locator('.dora-indicators .tile').first()).toHaveCSS('width', '26px');
@@ -711,8 +723,10 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
     await expect(status.locator('div').filter({ hasText: 'シード' }).locator('dd')).toHaveText(String(SEED));
     await expect(status.locator('div').filter({ hasText: '自風' }).locator('dd')).toHaveText('東');
     await expect(status.locator('div').filter({ hasText: 'CPU' }).locator('dd')).toHaveText('弱い');
-    await expect(page.getByLabel('起家')).toHaveValue('you');
-    await expect(page.getByLabel('CPU')).toHaveValue('weak');
+    const dialog = await openSettings(page);
+    await expect(dialog.getByRole('group', { name: '起家' }).getByRole('radio', { name: '自分' })).toBeChecked();
+    await expect(dialog.getByRole('group', { name: 'CPU' }).getByRole('radio', { name: '弱い' })).toBeChecked();
+    await page.keyboard.press('Escape');
     await expect(page).toHaveURL(/[?&]first_dealer=you(&|$)/);
     await expect(page).toHaveURL(/[?&]cpu=weak(&|$)/);
     await expect(page).toHaveURL(/[?&]game=/);

@@ -644,7 +644,7 @@ Body (optional): `{"seed": 42, "length": "hanchan", "first_dealer": "you",
 "cpu": "weak"}`. `length` is `"tonpuu"` (the default) or `"hanchan"`;
 `first_dealer` is `"random"` (the default: `seed mod 4`) or `"you"`; `cpu` is
 `"normal"` (the default) or `"weak"`. Any other value is a `400`. Returns a
-`GameState`. Every round's wall is
+`GameState`. Optional `"dojo"` makes it a [dojo game](#dojo-games). Every round's wall is
 derived one-way from the seed. Without a seed a random seed in `[0, 2^53)` is used and `seed` stays `null`
 until the game ends, because the seed rebuilds every wall.
 
@@ -665,10 +665,70 @@ Body: `{"type": "discard", "tile": "5m"}`. `type` is one of:
 | `chii` | `legal.chii` | `tiles`: one of the pairs in `legal.chii` |
 | `kan` | `legal.kan`: in the call phase an open kan of `last_discard`; on your turn a concealed or added kan | on your turn, `tile`: a kind from `legal.kan` |
 | `kyuushu` | `legal.kyuushu`: your first uninterrupted turn with nine or more different terminals and honors (九種九牌, an abortive draw) | – |
+| `redraw` | `legal.redraw` (dojo games only, see [Dojo games](#dojo-games)): send your drawn tile to the end of the live wall and draw the next one | – |
+| `summon` | `legal.summon` (dojo games only, see [Dojo games](#dojo-games)): swap your drawn tile with a tile of a kind from the live wall | `tile`: a kind from `legal.summon` |
 | `next` | `can_next`: the round has ended and another follows | – |
 
 Errors: `400` malformed body, unknown type or a tile you do not hold, `404`
 unknown game, `409` a move that is not legal now.
+
+### Dojo games
+
+`POST /api/games` with `"dojo"` creates a dojo game: the page's 道場 mode,
+where you learn yaku one by one. The CPU seats play by the standard rules.
+
+```jsonc
+"dojo": {
+  "yaku": ["tanyao", "pinfu", "haku"], // the yaku keys you may count (the YakuRow / yaku[] keys, winds included); [] none
+  "peek": true,                        // optional: show the other seats' hands during a round
+  "redraws_per_round": 1,              // optional: redraw moves you may make per round (0, the default: none)
+  "ura_peek": true,                    // optional: show the ura-dora indicators during a round
+  "riichi_waits": true,                // optional: show the waits of the other seats in riichi
+  "wall_peek": 3,                      // optional: how many of your next draws to show (0, the default: none)
+  "summons_per_round": 1               // optional: summon moves you may make per round (0, the default: none)
+}
+```
+
+An unknown key or a negative `redraws_per_round`, `wall_peek` or
+`summons_per_round` is a `400`. In a dojo game:
+
+- Only the yaku in `yaku` count. A reading whose shape is the yaku itself
+  (`chiitoitsu`, `kokushi`) is dropped when it is not learned; a yakuman
+  reading wins only with a learned yakuman (else the best other reading
+  counts); `double_riichi` not learned counts as `riichi` when that is
+  learned. Dora still count but never win on their own: a hand with no
+  learned yaku cannot `ron` or `tsumo`, and passing its winning tile makes
+  you furiten as for any hand without yaku.
+- `legal.riichi` stays empty unless `riichi` is learned.
+- `redraw` (`legal.redraw`) is allowed on your turn after a live-wall draw
+  (not a kan replacement), after your first go-around, not in riichi, with a
+  draw left and a redraw left this round; otherwise `409`. The live wall from
+  your draw to its end turns by one: your tile goes last, and you and every
+  seat after you draw one tile later. The draws left and your hand size do not
+  change. It is an event `{"seat": 0, "type": "redraw"}` (no tile) and part of
+  the save's moves.
+- `summon` with `tile` a kind from `legal.summon` swaps your drawn tile with
+  the first tile of that kind in the live wall from the next draw on. It is
+  allowed when a redraw would be (a summon left this round in place of a
+  redraw left) and the kind is still in that part of the live wall; otherwise
+  `409` (`400` without `tile`). `legal.summon` lists those kinds in kind order,
+  omitted when there are none. The draws left and your hand size do not
+  change. It is an event `{"seat": 0, "type": "summon"}` (no tile) and part of
+  the save's moves.
+- The state has `"dojo": true`; `analysis` rows give a yaku not learned 0
+  han, and `combos` and `advice` (`yaku`, `near_yaku`) leave those yaku out.
+- With `peek`, `seats[].hand` and `drawn` show for every seat during a round;
+  `remaining`, `danger` and `advice` still count only what you see without it.
+- With `ura_peek`, `ura_dora_indicators` and `ura_dora` show during a round.
+- With `riichi_waits`, `seats[].waits` lists the kinds each other seat in
+  riichi waits on, during a round; omitted otherwise.
+- With `wall_peek` N, `my_next_draws` lists up to N of your next live-wall
+  draws, during a round, as they stand if nobody calls or makes a kan from
+  now on; omitted when none are left.
+- `rounds[]` add `han` (the han of your win's yaku, dora not counted; omitted
+  when 0, as when you did not win), `redraws` and `summons` (your redraws and
+  summons that round, omitted when 0); `result` adds `excluded`: the keys of the yaku your win did
+  not count. None of these show outside a dojo game.
 
 ### Game saves
 
@@ -704,6 +764,7 @@ The save (`match.Save`):
   "length": "tonpuu",        // the options, filled in: tonpuu|hanchan
   "first_dealer": "random",  // random|you
   "cpu": "normal",           // normal|weak
+  "dojo": {"yaku": ["tanyao"]}, // the dojo options of a dojo game; omitted otherwise
   "actions": [               // the human's successful moves in order, "next" included
     {"type": "discard", "tile": "5m"},
     {"type": "chii", "tiles": ["3m", "4m"]},
@@ -735,6 +796,7 @@ under the 64 KiB body limit.
   "length": "tonpuu",           // "tonpuu" | "hanchan"
   "first_dealer_mode": "random", // the first_dealer asked for: "random" | "you"
   "cpu": "normal",              // "normal" | "weak"
+  "dojo": true,                 // a dojo game (omitted otherwise)
   "you": 0,
   "first_dealer": 2,            // 起家: the seat
   "dealer": 2,                  // seat of 東 this round
@@ -762,7 +824,7 @@ under the 64 KiB body limit.
   ],
   "last_discard": null,         // the tile you may claim, in the call phase
   "legal": { "discards": ["1m", "..."], "riichi": [], "tsumo": false, "ron": false, "skip": false, "kyuushu": false,
-             "pon": false, "chii": [["3m", "4m"]], "kan": [] },
+             "pon": false, "chii": [["3m", "4m"]], "kan": [], "redraw": true, "summon": ["1m", "7z"] },  // redraw, summon: dojo games only, omitted when false or empty
   "events": [ {"seat": 1, "type": "discard", "tile": "2z", "wall_remaining": 70},
               {"seat": 2, "type": "pon", "tile": "2z", "tiles": ["2z", "2z"], "wall_remaining": 70} ],  // moves since your previous move; no skips
                                 // wall_remaining: live draws left right after the move (an open or concealed kan's replacement

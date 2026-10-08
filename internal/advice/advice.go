@@ -46,6 +46,9 @@ type Input struct {
 	// 13 tiles left after discarding it.
 	ByDiscard map[tile.Kind][]yakushanten.Result
 	Han       func(key string) int
+	// Allowed, when set, keeps only the rows of the yaku it allows out of
+	// the near yaku (the dojo's learned yaku); nil allows every row.
+	Allowed func(key string) bool
 	// Analyzer computes the shanten of hypothetical hands (the waits).
 	Analyzer *yakushanten.Analyzer
 }
@@ -129,6 +132,9 @@ type cand struct {
 	dora    int
 }
 
+// allowed reports whether in.Allowed allows the row key.
+func (in Input) allowed(key string) bool { return in.Allowed == nil || in.Allowed(key) }
+
 // Compute ranks the discards of in.Tiles.
 func Compute(in Input) *Advice {
 	w := waiter{a: in.Analyzer, memo: map[tile.Counts]form{}}
@@ -160,7 +166,7 @@ func Compute(in Input) *Advice {
 			c.wait, c.hasWait = w.expected(left, in.Visible, c.uke), true
 		}
 		for _, r := range res[1:] {
-			if r.Possible && !r.Yakuman && r.Shanten <= max(c.normal, 1) {
+			if r.Possible && !r.Yakuman && r.Shanten <= max(c.normal, 1) && in.allowed(r.Key) {
 				c.yakuN++
 				c.yakuHan += in.Han(r.Key)
 				c.yaku = append(c.yaku, r.Name)
@@ -203,7 +209,7 @@ func Compute(in Input) *Advice {
 	default:
 		adv.Shape += shape(handshape.Groups(left, 0))
 	}
-	adv.NearYaku = nearYaku(cs, in.Han)
+	adv.NearYaku = nearYaku(cs, in.Han, in.allowed)
 	if len(cs) > 1 {
 		adv.Notes = append(adv.Notes, versus(cs[0], cs[1]))
 	}
@@ -452,7 +458,7 @@ func phase(junme, shanten int, tenpai float64, draws int) (string, string) {
 // discards is 1 or less, or no more than the best normal-form shanten (so a
 // near chiitoitsu does not hide the normal-form yaku), closest first, and
 // whether the best discard keeps that best.
-func nearYaku(cs []cand, han func(string) int) []NearYaku {
+func nearYaku(cs []cand, han func(string) int, allowed func(string) bool) []NearYaku {
 	limit := cs[0].normal
 	for _, c := range cs {
 		limit = min(limit, c.normal)
@@ -460,7 +466,7 @@ func nearYaku(cs []cand, han func(string) int) []NearYaku {
 	limit = max(limit, 1)
 	var out []NearYaku
 	for i, r := range cs[0].res {
-		if i == 0 || r.Yakuman {
+		if i == 0 || r.Yakuman || !allowed(r.Key) {
 			continue
 		}
 		bestSh, ok := 0, false

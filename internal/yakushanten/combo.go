@@ -417,7 +417,13 @@ func (a *Analyzer) combos(c tile.Counts, melds []yaku.Meld, rows []Result, prune
 			if (len(melds) > 0 && needNoMelds[k]) || (open && needClosed[k]) {
 				ok = false
 			}
-			han += yaku.HanOpenFor(k, a.winds, open)
+			if a.han == nil {
+				han += yaku.HanOpenFor(k, a.winds, open)
+			} else if h := a.han(k, a.winds, open); h > 0 {
+				han += h
+			} else {
+				ok = false
+			}
 			if k == "shousangen" {
 				han += shousangenYakuhai
 			}

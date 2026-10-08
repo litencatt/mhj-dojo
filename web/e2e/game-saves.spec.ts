@@ -42,7 +42,7 @@ test('a CPU game runs in the browser and a reload resumes it', async ({ page }) 
   });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await expect(handPanel(page)).toBeVisible();
-  await expect(page.getByRole('link', { name: '練習へ' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '練習', exact: true })).toBeVisible();
   // The table's log keeps the round's moves across your moves (events_from):
   // it never shrinks within the round (skipping a call adds nothing when
   // the draw is yours next) and holds at least every discard on the table.
