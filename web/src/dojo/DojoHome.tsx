@@ -208,7 +208,7 @@ export function DojoHome() {
           {ownedYaku(progress.ownedYaku).map(({ name, guide: guideKey }) => (
             <li key={name}>
               {guideKey ? (
-                <button type="button" class="dojo-yaku-guide" aria-haspopup="dialog" onClick={() => setGuide({ key: guideKey, learned: false })}>
+                <button type="button" class="dojo-yaku-guide" data-guide={guideKey} aria-haspopup="dialog" onClick={() => setGuide({ key: guideKey, learned: false })}>
                   {name}
                 </button>
               ) : (
@@ -220,7 +220,11 @@ export function DojoHome() {
       </section>
 
       <Shop progress={progress} onChange={change} onLearned={(key) => setGuide({ key, learned: true })} />
-      <GuideDialog yakuKey={guide?.key ?? null} learned={guide?.learned ?? false} onClose={() => setGuide(null)} />
+      <GuideDialog yakuKey={guide?.key ?? null} learned={guide?.learned ?? false} onClose={() => {
+        // The 購入 that opened a bought yaku's guide is gone, so focus goes to the yaku's chip.
+        if (guide?.learned) document.querySelector<HTMLElement>(`[data-guide="${guide.key}"]`)?.focus();
+        setGuide(null);
+      }} />
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)}>
         {notice && settingsOpen && (

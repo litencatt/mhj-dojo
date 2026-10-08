@@ -778,6 +778,28 @@ test('buying a yaku shows its guide: condition, han, an example hand and a way t
   expect(guide.practice!.shanten).toBeLessThanOrEqual(1);
 });
 
+test('closing the guide of a bought yaku leaves focus on its chip; a purchase that fails shows no guide', async ({ page }) => {
+  await openHub(page, { xp: 5000, coins: 500, firstGameBonus: true });
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+  const dialog = page.getByRole('dialog', { name: '立直' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('門前で聴牌するまでを練習します');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '立直' })).toBeFocused();
+
+  // Another tab spent the coins after the confirm dialog opened: nothing is bought, no guide.
+  await page.locator('[data-item="iipeikou"]').getByRole('button', { name: '購入' }).click();
+  await page.evaluate((key) => {
+    const p = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(key, JSON.stringify({ ...p, coins: 0 }));
+  }, STORAGE_KEY);
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+  await expect(page.getByRole('dialog', { name: '一盃口' })).toBeHidden();
+  await expect(page.getByText('修得しました')).toBeHidden();
+});
+
 test('an owned yaku in 所持役 opens its guide again; Esc and a click outside close it', async ({ page }) => {
   await openHub(page, { ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei', 'haitei'] });
   const dialog = page.getByRole('dialog', { name: '立直' });

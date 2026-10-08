@@ -33,7 +33,7 @@
   },
   "sanshoku": {
     "han": 2, "openHan": 1,
-    "example": { "hand": "123m123p123s789s99p", "win": "1m" }
+    "example": { "hand": "123m123p123s456s99p", "win": "1m" }
   },
   "ittsu": {
     "han": 2, "openHan": 1,
@@ -61,7 +61,7 @@
   },
   "sankantsu": {
     "han": 2, "openHan": 2,
-    "example": { "hand": "456s77z", "melds": ["1111m", "9999p", "2222s"], "win": "7z", "note": "カンを3回して、4枚ずつの組を3つ作る" }
+    "example": { "hand": "456s77z", "melds": ["1111m", "9999p", "2222s"], "win": "7z", "note": "4枚ずつの組（槓子）が3つ" }
   },
   "shousangen": {
     "han": 2, "openHan": 2,

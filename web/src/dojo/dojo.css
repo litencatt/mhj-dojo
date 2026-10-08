@@ -387,9 +387,12 @@
   align-items: flex-end;
   gap: 2px;
 }
-.yaku-guide-meld {
+.yaku-guide-group {
   display: flex;
+  flex-wrap: nowrap;
   gap: 2px;
+}
+.yaku-guide-meld {
   margin-left: 8px;
 }
 .yaku-guide-hand .yaku-guide-win {
@@ -405,6 +408,10 @@
 }
 /* A phone's tap targets are 44px: every chip of 所持役 is as tall, button or not. */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
+  /* Two and a half rows of 44px chips: the next row half shown, as on a wide screen. */
+  .dojo-yaku {
+    max-height: 7.3rem;
+  }
   .dojo-yaku li {
     display: flex;
     align-items: center;

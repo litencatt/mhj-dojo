@@ -44,7 +44,7 @@ export interface YakuGuide {
   /** The tiles in hand (without the winning tile), the called or concealed kans, and the winning tile. */
   example: { hand: string[]; melds: string[][]; win: string; note?: string };
   /** The practice seed, and what the starting hand is at in its row; none where practice mode cannot reach the yaku. */
-  practice: { seed: number; rowName: string; shanten: number } | null;
+  practice: { seed: number; row: string; rowName: string; shanten: number } | null;
 }
 
 /** The guide key of an owned yaku key: the dragons and the winds are one item, 役牌. */
@@ -90,7 +90,7 @@ export function guideFor(key: string): YakuGuide | undefined {
     condition: CONDITIONS[k] ?? YAKU_CONDITIONS[k] ?? '',
     hanLabel: hanLabel(g.han, g.openHan),
     example: { hand, melds: (g.example.melds ?? []).map(expandTiles), win, note: g.example.note },
-    practice: s ? { seed: s.seed, rowName: s.row === 'normal' ? '一般形' : yakuName(s.row), shanten: s.shanten } : null,
+    practice: s ? { seed: s.seed, row: s.row, rowName: s.row === 'normal' ? '一般形' : yakuName(s.row), shanten: s.shanten } : null,
   };
 }
 

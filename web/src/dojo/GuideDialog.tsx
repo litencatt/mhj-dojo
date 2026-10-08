@@ -22,15 +22,17 @@ export function GuideDialog({ yakuKey, learned, onClose }: GuideDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const backdrop = useBackdropClose(() => ref.current?.close());
   const guide = yakuKey ? guideFor(yakuKey) : undefined;
-  // A phone's dialog is too narrow for 14 tiles of the wider size.
+  // A phone's dialog is too narrow for 14 tiles of the wider size, and so is any dialog for a hand with kans.
   const phone = useMediaQuery('(width <= 760px)');
-  const size = phone ? 'xs' : 'sm';
+  const groups = guide ? [guide.example.hand, ...guide.example.melds] : [];
+  const tiles = groups.reduce((n, g) => n + g.length, 1);
+  const size = phone || tiles > 14 ? 'xs' : 'sm';
 
   // Opened once the guide is rendered in it, so it has its content and focus lands on its first control.
   useEffect(() => {
     const d = ref.current;
     if (guide && d && !d.open) d.showModal();
-  }, [guide]);
+  }, [guide?.key]);
 
   const href = guide && practiceHref(guide);
   return (
@@ -51,22 +53,23 @@ export function GuideDialog({ yakuKey, learned, onClose }: GuideDialogProps) {
           </dl>
           <h3>例の手</h3>
           <div class="yaku-guide-hand" role="group" aria-label="例の手">
-            {guide.example.hand.map((t, i) => (
-              <Tile key={i} tile={t} size={size} />
-            ))}
-            {guide.example.melds.map((m, i) => (
-              <span key={i} class="yaku-guide-meld" role="group" aria-label="槓子">
-                {m.map((t, j) => (
+            {groups.map((g, i) => (
+              <span key={i} class={i === 0 ? 'yaku-guide-group' : 'yaku-guide-group yaku-guide-meld'} role={i === 0 ? undefined : 'group'} aria-label={i === 0 ? undefined : '槓子'}>
+                {g.map((t, j) => (
                   <Tile key={j} tile={t} size={size} />
                 ))}
+                {i === groups.length - 1 && (
+                  <Tile tile={guide.example.win} size={size} className="yaku-guide-win" label={`和了牌 ${tileName(guide.example.win)}`} />
+                )}
               </span>
             ))}
-            <Tile tile={guide.example.win} size={size} className="yaku-guide-win" label={`和了牌 ${tileName(guide.example.win)}`} />
           </div>
-          <p class="dojo-muted yaku-guide-note">右端が和了牌。{guide.example.note}</p>
+          <p class="dojo-muted yaku-guide-note">離して置いた最後の牌が和了牌。{guide.example.note}</p>
           {guide.practice && (
             <p class="dojo-muted yaku-guide-seed">
-              配牌が{guide.practice.rowName}{shantenText(guide.practice.shanten)}のシード {guide.practice.seed} で練習できます。
+              {guide.practice.row === 'normal'
+                ? `練習モードでは立直の宣言はできないので、門前で聴牌するまでを練習します（配牌は${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed}）。`
+                : `配牌が${guide.practice.rowName}${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed} で練習できます。`}
             </p>
           )}
           {!guide.practice && <p class="dojo-muted yaku-guide-seed">この役は、捨てるだけの練習モードでは練習できません。</p>}

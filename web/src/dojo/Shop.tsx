@@ -68,11 +68,14 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
     const id = pending?.id;
     confirmRef.current?.close();
     if (!id) return;
+    // The guide is for a purchase that went through (another tab may have spent the coins since).
+    let bought = false;
     onChange((cur) => {
       const r = purchase(cur, id);
+      bought = r.ok;
       return r.ok ? r.progress : cur;
     });
-    if (guideFor(id)) onLearned(id);
+    if (bought && guideFor(id)) onLearned(id);
   }
 
   return (
