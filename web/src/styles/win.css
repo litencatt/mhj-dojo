@@ -1,0 +1,55 @@
+/* ---- Win panel ---- */
+.win-panel {
+  border-color: var(--success-border);
+}
+.win-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.win-yaku-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+.win-yaku-table th,
+.win-yaku-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.win-dora-ignored td:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.win-note {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.win-yaku-table tfoot th,
+.win-yaku-table tfoot td {
+  border-top: 2px solid var(--fg);
+  border-bottom: none;
+  font-weight: bold;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (max-width: 420px) {
+  .app,
+  .dojo-home {
+    padding: 8px 10px 32px;
+  }
+  .tile-md {
+    width: 28px;
+    height: 38px;
+    font-size: 0.9rem;
+  }
+}
+.tree-node-btn:disabled {
+  cursor: progress;
+}

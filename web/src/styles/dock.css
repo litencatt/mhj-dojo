@@ -1,0 +1,69 @@
+/* ---- Minimize and dock ---- */
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-minimize {
+  flex: none;
+  width: 24px;
+  height: 22px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.panel-minimize:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+.panel-dock {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dock-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  box-shadow: -2px 2px 6px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+.dock-tab:hover {
+  color: var(--accent);
+}
+/* Keep content clear of the docked tabs. */
+.app.has-dock {
+  padding-right: 44px;
+}
+/* viewport-fit=cover lets the page run under a notch or rounded corner (a
+   phone on its side): keep content and the dock inside the safe area. The
+   insets are 0 elsewhere, so this changes nothing on a desktop. */
+.app,
+.dojo-home {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app.has-dock {
+  padding-right: calc(44px + env(safe-area-inset-right, 0px));
+}
+.panel-dock {
+  right: env(safe-area-inset-right, 0px);
+}

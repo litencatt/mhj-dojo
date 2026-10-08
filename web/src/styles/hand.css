@@ -1,0 +1,116 @@
+/* ---- Hand ---- */
+/* Hand tiles scale with the panel so all 14 (13 + drawn) fit on one row:
+   14 tiles + 12 gaps of 4px + 16px row gap + 14px drawn-tile divider = 78px.
+   Below 28px per tile (the old phone size) the row wraps instead. */
+.hand-panel {
+  container-type: inline-size;
+}
+.hand-panel .tile-md {
+  width: clamp(28px, calc((100cqw - 78px) / 14), 36px);
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
+.hand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hand-tiles {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.hand-drawn {
+  display: flex; /* no line box around the tile: it sits level with the hand */
+  padding-left: 12px;
+  border-left: 2px dashed var(--border);
+}
+/* With 面子表示 the brackets sit above the tiles: the drawn tile (and its
+   divider) lines up with the tiles, not with the middle of the brackets. */
+.hand-row:has(> .hand-tiles-grouped) {
+  align-items: flex-end;
+}
+.hand-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.hand-heading h2 {
+  margin: 0;
+}
+/* Your wind, points, rank and river in the hand panel (CPU game): on an
+   upright phone only, where they replace your seat at the table (below). */
+.hand-panel .hand-status,
+.hand-panel .hand-river {
+  display: none;
+}
+/* 面子表示: each block under a labelled bracket; blocks wrap as units, and
+   tiles sit closer inside a block than between blocks. With 2px inside and
+   6px between, up to 7 blocks take no more width than the 4px gaps of the
+   plain row, so the drawn tile stays on the same row. */
+.hand-tiles-grouped {
+  align-items: flex-end;
+  gap: 6px;
+}
+.hand-group {
+  display: flex;
+  flex-direction: column;
+  color: var(--muted);
+}
+.hand-group-meld { color: var(--accent); }
+.hand-group-pair { color: var(--success); }
+.hand-group-taatsu { color: var(--group-taatsu); }
+.hand-group-label {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+.hand-group-label::after {
+  content: "";
+  display: block;
+  height: 5px;
+  margin: 1px 2px 6px;
+  border: 1.5px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+}
+.hand-group-float .hand-group-label::after {
+  border-style: dashed;
+}
+.hand-group-tiles {
+  display: flex;
+  gap: 2px;
+}
+/* Floats can be up to 13 tiles: let them wrap inside the group on phones. */
+.hand-group-float .hand-group-tiles {
+  flex-wrap: wrap;
+}
+.discard-label {
+  margin-right: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.discard-river {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.exhausted-banner {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-weight: bold;
+}

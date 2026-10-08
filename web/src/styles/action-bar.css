@@ -1,0 +1,58 @@
+/* ---- Action bar ---- */
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* A call (ロン/ポン/カン/チー/スキップ) at the right end, where the hand is
+   played from (its drawn tile): the pointer hardly moves to answer it. */
+.action-bar-call {
+  justify-content: flex-end;
+}
+.action-bar button {
+  font-weight: bold;
+}
+.action-bar .action-advice[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.action-riichi.active {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.action-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.call-tiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-weight: normal;
+}
+.cpu-summary {
+  /* Pulled into the column's gaps around it (12px), so the hand and the
+     action bar are only this line apart (still held, see min-height). */
+  margin: -12px 0;
+  padding: 0 4px;
+  min-height: 1.4em; /* held while empty, so the action bar never jumps */
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+/* Right under the CPU summary line, the action bar needs no space of its own. */
+.cpu-summary + .action-area .action-bar {
+  margin-top: 0;
+}
+.action-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}

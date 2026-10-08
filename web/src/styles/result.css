@@ -1,0 +1,141 @@
+/* ---- Result ---- */
+.result-panel {
+  position: relative; /* the win effect's ground */
+  margin-top: 10px;
+}
+/* The dojo's win effects (tileThemes.ts): played once over a win of yours at
+   跳満 or above (ResultPanel), never when motion is reduced. */
+.win-effect {
+  display: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-win-effect] .win-effect {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    animation: win-fall 1.8s ease-in forwards;
+  }
+  :root[data-win-effect='kamifubuki'] .win-effect {
+    background-image:
+      radial-gradient(circle, #ef4444 0 3px, transparent 4px),
+      radial-gradient(circle, #3b82f6 0 3px, transparent 4px),
+      radial-gradient(circle, #eab308 0 3px, transparent 4px),
+      radial-gradient(circle, #22c55e 0 3px, transparent 4px);
+    background-size: 53px 47px, 71px 61px, 89px 43px, 61px 79px;
+  }
+  :root[data-win-effect='sakura'] .win-effect {
+    background-image:
+      radial-gradient(ellipse 6px 4px, #f9a8d4 0 90%, transparent),
+      radial-gradient(ellipse 5px 3px, #fbcfe8 0 90%, transparent),
+      radial-gradient(ellipse 6px 4px, #f472b6 0 90%, transparent),
+      radial-gradient(ellipse 4px 3px, #fce7f3 0 90%, transparent);
+    background-size: 67px 59px, 83px 71px, 97px 53px, 59px 89px;
+  }
+  /* 金の光: a golden glow that spreads from the middle. */
+  :root[data-win-effect='kinkou'] .win-effect {
+    background: radial-gradient(closest-side, rgba(253, 224, 71, 0.75), rgba(234, 179, 8, 0.25) 60%, transparent) center / 40% 40% no-repeat;
+    animation-name: win-glow;
+  }
+}
+@keyframes win-fall {
+  0% {
+    opacity: 0;
+    background-position: 0 0, 17px 9px, 31px 23px, 5px 41px;
+  }
+  10%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    background-position: 6px 240px, 9px 310px, 37px 270px, 0 350px;
+  }
+}
+@keyframes win-glow {
+  0% {
+    opacity: 0;
+    background-size: 40% 40%;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    background-size: 220% 220%;
+  }
+}
+.result-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.result-heading h2 {
+  margin: 0;
+}
+.result-breakdown {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.result-pao {
+  margin: 4px 0;
+  font-weight: bold;
+}
+/* The rounds table can be wider than a phone: it scrolls on its own. */
+.table-scroll {
+  overflow-x: auto;
+}
+.final-rounds caption {
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.final-rounds td,
+.final-rounds th {
+  white-space: nowrap;
+}
+.result-win-tile {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 2px dashed var(--border);
+}
+.result-deltas {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.result-deltas th,
+.result-deltas td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.result-you td {
+  font-weight: bold;
+}
+.delta-plus {
+  color: var(--success-border);
+}
+.delta-minus {
+  color: var(--danger);
+}
+
+@media (max-width: 600px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "top top"
+      "left right"
+      "center center"
+      "bottom bottom";
+  }
+}
