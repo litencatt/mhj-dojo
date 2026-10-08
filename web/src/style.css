@@ -2403,7 +2403,8 @@ section,
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* With no dock bar at the bottom (nothing minimized), the yaku panel runs
-     nearly to the screen's foot. */
+     nearly to the screen's foot. (With one, an upright phone's has-dock rule
+     below makes room for the bar.) */
   .app-practice:not(.has-dock),
   .app-game:not(.has-dock) {
     --yaku-bottom: 8px;
@@ -2415,7 +2416,7 @@ section,
     top: env(safe-area-inset-top, 0px);
     z-index: 5;
     background: var(--bg);
-    box-shadow: 0 0 0 8px var(--bg);
+    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
   }
   .app-practice .area-yaku,
   .app-game .area-yaku {
@@ -2473,11 +2474,12 @@ section,
     z-index: 2;
     background: var(--panel-bg);
   }
-  /* The panel is its own scroller: stick to its top edge, over its 10px
-     padding, so no row shows above the header. */
+  /* The panel is its own scroller: stick to its top edge, over its 8px
+     padding (the phone's section padding above), so no row shows above the
+     header. */
   .app-practice .yaku-table thead,
   .app-game .yaku-table thead {
-    top: -10px;
+    top: -8px;
   }
   .yaku-table th,
   .yaku-table td,
