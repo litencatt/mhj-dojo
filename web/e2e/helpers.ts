@@ -436,7 +436,8 @@ export async function playOneStep(page: Page) {
  * them acts on it. */
 export async function playUntilPonOffered(page: Page, maxSteps = 60) {
   const actionBar = page.locator('.action-bar');
-  const result = page.getByRole('region', { name: '結果' });
+  // Exact: 結果 also matches 最終結果, which shows with the last round's result.
+  const result = page.getByRole('region', { name: '結果', exact: true });
   for (let i = 0; i < maxSteps; i++) {
     await waitForPlayback(page);
     if (await result.isVisible()) {
@@ -453,13 +454,27 @@ export async function playUntilPonOffered(page: Page, maxSteps = 60) {
 
 /** Plays generic steps until the round's result panel appears. */
 export async function playToResult(page: Page, maxSteps = 150) {
-  const result = page.getByRole('region', { name: '結果' });
+  const result = page.getByRole('region', { name: '結果', exact: true });
   for (let i = 0; i < maxSteps; i++) {
     await waitForPlayback(page);
     if (await result.isVisible()) return;
     await playOneStep(page);
   }
   throw new Error(`round did not reach a result panel within ${maxSteps} steps`);
+}
+
+/** Plays the game on the page to its end (最終結果), round by round with 次の局へ: no engine shortcut. */
+export async function playGameToEnd(page: Page, maxSteps = 1500) {
+  const result = page.getByRole('region', { name: '結果', exact: true });
+  const final = page.getByRole('region', { name: '最終結果' });
+  const next = result.getByRole('button', { name: '次の局へ' });
+  for (let i = 0; i < maxSteps; i++) {
+    await waitForPlayback(page);
+    if (await final.isVisible()) return;
+    if (await next.isVisible()) await clickAndWait(page, next);
+    else await playOneStep(page);
+  }
+  throw new Error(`game did not reach 最終結果 within ${maxSteps} steps`);
 }
 
 /** Every river, your hand and the status line: what a reload or another tab must show the same. */
