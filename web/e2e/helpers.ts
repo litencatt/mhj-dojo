@@ -388,9 +388,10 @@ export async function finishPlayback(page: Page) {
   await expect(table).toHaveAttribute('data-playing', 'false');
 }
 
-/** Everything a game action changes: the table (rivers, points, wall), the hand and the result panel. */
-export function gameSnapshot(page: Page) {
-  return page.locator('.area-hand').innerText();
+/** Everything a game action changes: the table (rivers, points), the hand, the result panel and the wall left (in the header, or over the hand on a phone). */
+export async function gameSnapshot(page: Page) {
+  const status = page.locator('.header-status');
+  return `${(await status.count()) > 0 ? await status.innerText() : ''}\n${await page.locator('.area-hand').innerText()}`;
 }
 
 /** Clicks and waits until the engine has answered, so the next step never
@@ -436,7 +437,8 @@ export async function playOneStep(page: Page) {
  * them acts on it. */
 export async function playUntilPonOffered(page: Page, maxSteps = 60) {
   const actionBar = page.locator('.action-bar');
-  const result = page.getByRole('region', { name: '結果' });
+  // Exact: 結果 also matches 最終結果, which shows with the last round's result.
+  const result = page.getByRole('region', { name: '結果', exact: true });
   for (let i = 0; i < maxSteps; i++) {
     await waitForPlayback(page);
     if (await result.isVisible()) {
@@ -453,13 +455,27 @@ export async function playUntilPonOffered(page: Page, maxSteps = 60) {
 
 /** Plays generic steps until the round's result panel appears. */
 export async function playToResult(page: Page, maxSteps = 150) {
-  const result = page.getByRole('region', { name: '結果' });
+  const result = page.getByRole('region', { name: '結果', exact: true });
   for (let i = 0; i < maxSteps; i++) {
     await waitForPlayback(page);
     if (await result.isVisible()) return;
     await playOneStep(page);
   }
   throw new Error(`round did not reach a result panel within ${maxSteps} steps`);
+}
+
+/** Plays the game on the page to its end (最終結果), round by round with 次の局へ: no engine shortcut. */
+export async function playGameToEnd(page: Page, maxSteps = 1500) {
+  const result = page.getByRole('region', { name: '結果', exact: true });
+  const final = page.getByRole('region', { name: '最終結果' });
+  const next = result.getByRole('button', { name: '次の局へ' });
+  for (let i = 0; i < maxSteps; i++) {
+    await waitForPlayback(page);
+    if (await final.isVisible()) return;
+    if (await next.isVisible()) await clickAndWait(page, next);
+    else await playOneStep(page);
+  }
+  throw new Error(`game did not reach 最終結果 within ${maxSteps} steps`);
 }
 
 /** Every river, your hand and the status line: what a reload or another tab must show the same. */
@@ -490,4 +506,23 @@ export function settingsDialog(page: Page): Locator {
 /** The radio buttons of a choice in 設定 (再生速度, 対局 ...), by its name. */
 export function settingsChoice(page: Page, name: string): Locator {
   return settingsDialog(page).getByRole('group', { name, exact: true }).getByRole('radio');
+}
+
+/** The 設定 checkbox that folds the other seats' rivers away on a phone. */
+export function riversOption(page: Page): Locator {
+  return settingsDialog(page).getByRole('checkbox', { name: '他家の捨て牌' });
+}
+
+/** Folds the other seats' rivers away (or back) through 設定, closing it after. */
+export async function toggleRivers(page: Page) {
+  await openSettings(page);
+  await riversOption(page).click();
+  await page.keyboard.press('Escape');
+  await expect(settingsDialog(page)).toBeHidden();
+}
+
+/** The wall left as shown: in the header, or on a phone over the hand. Both copies are in the page, one
+ * hidden: always look for the displayed one (this, or a `visible: true` filter for the dora). */
+export function wallRemaining(page: Page): Locator {
+  return page.getByTestId('wall-remaining').filter({ visible: true });
 }

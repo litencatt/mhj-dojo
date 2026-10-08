@@ -43,6 +43,7 @@ iOS の入力欄は拡大を避けるため、スマホ幅では `font-size: 16p
 ## 余白と角丸
 
 - パネル: `padding: 12px 14px`、`border: 1px solid var(--border)`、`border-radius: var(--radius-lg)`、`--panel-bg`。パネル同士の間隔は 12px。
+- スマホ(`width <= 760px`)は役別向聴の欄を広く取るため詰める: パネルの内側 8px、列・パネル同士の間隔 6px、ページ下端はドックがなければ 8px(縦向きでドックがあれば 60px)。`.cpu-summary` の負のマージンと、上に固定される手牌の欄の `box-shadow` の広がりは、列の間隔と同じ値にする(PC は 12px)。役別向聴の見出し行の `top` はパネルの内側の余白と同じ値の負数。
 - パネル内の枠(選択肢の枠など): `padding: 6px 10px 8px`、`--radius-md`。
 - ボタン: `padding: 6px 12px`、`--radius-sm`。ボタン同士の間隔は 8px。
 - ダイアログ: `--radius-lg`、背後は `--backdrop`。

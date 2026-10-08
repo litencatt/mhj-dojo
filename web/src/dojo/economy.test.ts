@@ -33,14 +33,23 @@ const STAGES: readonly Stage[] = [
   { ranks: [0.278, 0.235, 0.235, 0.252], han: 2.37, wins: 1.11 },
 ];
 
+// The same stages with seat 0 played human-like (docs/dojo-economy.md: the
+// normal CPU without calls, which folds against a riichi): the faster bound.
+const HUMAN_STAGES: readonly Stage[] = [
+  { ranks: [0.175, 0.3175, 0.335, 0.1725], han: 1.23, wins: 1.01 },
+  { ranks: [0.3725, 0.28, 0.22, 0.1275], han: 2.61, wins: 1.53 },
+  { ranks: [0.4175, 0.27, 0.2025, 0.11], han: 3.1, wins: 1.65 },
+  { ranks: [0.47, 0.2625, 0.165, 0.1025], han: 3.75, wins: 1.63 },
+];
+
 const TWO_HAN = ['double_riichi', 'sanshoku', 'ittsu', 'chanta', 'chiitoitsu', 'toitoi', 'sanankou', 'sanshoku_doukou', 'sankantsu', 'shousangen', 'honroutou'];
 const ALL_YAKU = CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id);
 
-function stage(p: DojoProgress): Stage {
+function stage(p: DojoProgress, stages: readonly Stage[]): Stage {
   const has = (keys: readonly string[]) => keys.every((k) => p.ownedYaku.includes(k));
-  if (has(ALL_YAKU) && p.ownedItems.includes(YAKUMAN_PACK)) return STAGES[3];
-  if (!has(['riichi', ...YAKUHAI_KEYS])) return STAGES[0];
-  return has(TWO_HAN) ? STAGES[2] : STAGES[1];
+  if (has(ALL_YAKU) && p.ownedItems.includes(YAKUMAN_PACK)) return stages[3];
+  if (!has(['riichi', ...YAKUHAI_KEYS])) return stages[0];
+  return has(TWO_HAN) ? stages[2] : stages[1];
 }
 
 /** The rank whose share holds u (0 to 1). */
@@ -59,15 +68,16 @@ interface Run {
   games: number;
   han: number;
   wins: number;
+  stages: readonly Stage[];
 }
 
-function start(): Run {
-  return { p: initialProgress(), games: 0, han: 0, wins: 0 };
+function start(stages: readonly Stage[] = STAGES): Run {
+  return { p: initialProgress(), games: 0, han: 0, wins: 0, stages };
 }
 
 /** One game at the run's stage, then buys the cheapest thing it can of `shop` (the core by default). */
 function play(r: Run, shop: readonly ShopItem[] = core) {
-  const s = stage(r.p);
+  const s = stage(r.p, r.stages);
   r.games++;
   r.han += s.han;
   r.wins += s.wins;
@@ -125,4 +135,22 @@ test('the whole shop, cheats and every look included, is bought in about 175 gam
   const r = start();
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 160 && r.games <= 190, `${r.games} games`);
+});
+
+test('human-like: 立直 and 役牌 are bought within 2 games', () => {
+  const r = start(HUMAN_STAGES);
+  while (!['riichi', ...YAKUHAI_KEYS].every((k) => r.p.ownedYaku.includes(k)) && r.games < 10) play(r);
+  assert.ok(r.games <= 2, `${r.games} games`);
+});
+
+test('human-like: Lv10 comes after 40 to 60 games', () => {
+  const r = start(HUMAN_STAGES);
+  while (level(r.p.xp) < 10) play(r);
+  assert.ok(r.games >= 40 && r.games <= 60, `${r.games} games`);
+});
+
+test('human-like: the whole shop is bought in 110 to 150 games', () => {
+  const r = start(HUMAN_STAGES);
+  while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
+  assert.ok(r.games >= 110 && r.games <= 150, `${r.games} games`);
 });
