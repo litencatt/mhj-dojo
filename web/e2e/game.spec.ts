@@ -253,7 +253,7 @@ test.describe('a phone game', () => {
         const yaku = (await page.locator('.area-yaku').boundingBox())!;
         return Math.round(844 - (yaku.y + yaku.height));
       })
-      .toBe(32);
+      .toBe(8); // no dock bar: the panel runs nearly to the screen's foot
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight))
       .toBe(0);
