@@ -96,6 +96,9 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'cloth:kon', kind: 'cloth', name: '卓布: 紺', price: 60, level: 2 },
   { id: 'effect:kamifubuki', kind: 'effect', name: '和了演出: 紙吹雪', price: 80, level: 2 },
   { id: 'assist:waits', kind: 'assist', name: '補助: 待ち牌表示', price: 60, level: 2 },
+  { id: 'assist:autowin', kind: 'assist', name: '補助: 自動和了', price: 30, level: 2 },
+  { id: 'assist:tsumogiri', kind: 'assist', name: '補助: 自動ツモ切り', price: 30, level: 2 },
+  { id: 'assist:nocall', kind: 'assist', name: '補助: 鳴きなし', price: 30, level: 2 },
 
   yaku('sanshoku', '三色同順', 3, 80),
   yaku('ittsu', '一気通貫', 3, 80),
