@@ -38,20 +38,10 @@
   line-height: 1.5;
 }
 
-/* A panel: every mode's boxes (the dojo hub's, the saved sessions and the
-   更新情報 page's .release are the same box). */
-section,
-.resume-panel,
-.dojo-panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 12px 14px;
-}
-
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
-  section {
-    padding: 8px;
+  /* 16px keeps iOS from zooming in on focus. */
+  .glossary-search {
+    font-size: 16px;
   }
 }

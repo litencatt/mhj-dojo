@@ -129,33 +129,14 @@
   color: var(--danger);
 }
 
-@media (max-width: 600px) {
-  .game-table {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      "top top"
-      "left right"
-      "center center"
-      "bottom bottom";
-  }
-}
-
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
+  /* A result's 14 tiles on one row (win.css's tiles). */
+  .result-panel {
+    container-type: inline-size;
+  }
   .result-win-tile {
     margin-left: 4px;
     padding-left: 4px;
-  }
-}
-/* A phone upright (the seats' layout: table.css). */
-@media (width <= 760px) and (height > 500px) {
-  .game-table {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "top"
-      "left"
-      "right"
-      "center";
-    gap: 3px;
   }
 }

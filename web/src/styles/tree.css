@@ -52,6 +52,10 @@
   font-size: 0.7rem;
 }
 
+.tree-node-btn:disabled {
+  cursor: progress;
+}
+
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   .tree-flat {

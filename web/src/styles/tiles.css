@@ -115,13 +115,38 @@
   border: 1px solid var(--danger);
 }
 
+/* A face-down tile shows its coloured back. */
+.tile.tile-back {
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+  border-color: var(--tile-back);
+}
+/* The dojo's tile backs (tileThemes.ts): a light pattern over the same gradient. */
+:root[data-tile-back='shima'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+:root[data-tile-back='ichimatsu'] .tile.tile-back {
+  background:
+    conic-gradient(rgba(255, 255, 255, 0.24) 25%, transparent 0 50%, rgba(255, 255, 255, 0.24) 0 75%, transparent 0) 0 0 / 6px 6px,
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+/* 麻の葉: three crossing sets of lines, a lattice of six-pointed stars. */
+:root[data-tile-back='asanoha'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+
 /* ---- Narrow screens and phones ---- */
-@media (width <= 760px) {
-  .win-tiles .tile-md {
-    width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
-    height: auto;
-    aspect-ratio: 3 / 4;
-    padding: 1.5px;
+/* A narrow phone (420px or less): smaller tiles (the hand's scale with its panel instead). */
+@media (max-width: 420px) {
+  .tile-md {
+    width: 28px;
+    height: 38px;
+    font-size: 0.9rem;
   }
 }
 /* A phone, upright or on its side: smaller dora tiles. */
@@ -133,7 +158,4 @@
     border-radius: 3px;
     box-shadow: 0 1px 0 var(--tile-back);
   }
-}
-.tile.tile-ukeire-best {
-  border-color: var(--accent);
 }
