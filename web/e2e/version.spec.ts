@@ -26,7 +26,6 @@ async function routeVersion(page: Page, build: () => Build) {
   return seen;
 }
 
-
 // A check the page makes on its own schedule: past the one-a-minute limit,
 // when the tab comes back into view.
 async function recheck(page: Page) {

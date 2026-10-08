@@ -7,7 +7,6 @@ import { loaded } from './helpers';
 
 test.use({ serviceWorkers: 'allow' });
 
-
 // Waits for the page's worker to be active (it registers after load).
 async function swReady(page: Page) {
   await page.evaluate(async () => {

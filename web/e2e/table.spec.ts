@@ -1,12 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { GameResult, GameState } from '../src/api';
 import {
-  type EngineCall,
   GAME_URL,
   PHONE,
   SEED,
   engineCalls,
   finishPlayback,
+  type EngineCall,
   handPanel,
   isGameAction,
   isRequest,
@@ -530,7 +530,7 @@ test('playback with the points tied: ranks go to the seat nearer the first deale
 });
 
 test.describe('touch', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test.use({ viewport: PHONE, hasTouch: true });
 
   // A pick made before リーチ is toggled must not declare riichi with one tap.
   // The engine rarely offers riichi early, so its answers are patched to

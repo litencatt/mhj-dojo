@@ -9,6 +9,7 @@ import {
   nextMove,
   playOneStep,
   playToResult,
+  savedGame,
   stoppedDialog,
   tableState,
   waitForPlayback,
@@ -144,10 +145,6 @@ async function twoTabs(page: Page, context: BrowserContext): Promise<Page> {
   await waitForPlayback(other);
   await expect(handPanel(other)).toBeVisible();
   return other;
-}
-
-async function savedGame(page: Page) {
-  return (await savedGames(page))?.games[gameId(page)!]?.save;
 }
 
 test('a save from a newer engine is kept when this tab takes the game back, and asks for a reload', async ({

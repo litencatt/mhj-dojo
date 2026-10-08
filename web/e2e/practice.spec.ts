@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PHONE, discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, openSettings, savedMoves, stoppedDialog } from './helpers';
+import { PHONE, discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, openSettings, pageOverflowX, savedMoves, stoppedDialog } from './helpers';
 
 // Solo practice mode (the root page).
 
@@ -195,7 +195,7 @@ test('hand groups fit a 390px-wide viewport', async ({ page }) => {
   await hand.getByRole('button', { name: '面子表示' }).click();
   await expect(hand.locator('.hand-group').first()).toBeVisible();
   await expect(hand.locator('.hand-tiles .tile')).toHaveCount(13);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await pageOverflowX(page);
   expect(overflow).toBeLessThanOrEqual(1);
 });
 

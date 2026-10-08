@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { forUsersOnly, parseChangelog } from '../src/changelog';
-import { PHONE } from './helpers';
+import { PHONE, loaded, pageOverflowX } from './helpers';
 
 // The 更新情報 page (info/), which the build renders from CHANGELOG.md: the
 // releases newest first, without the authors or the repository's own
@@ -65,7 +65,7 @@ test('the help and the header version open info/', async ({ page }) => {
   // The help links to it about the app and about the version.
   for (const section of ['このアプリについて', 'バージョン表示']) {
     await page.goto('./?seed=1&turns=18');
-    await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+    await loaded(page);
     await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
     await dialog.getByRole('region', { name: section }).getByRole('link', { name: '更新情報' }).click();
@@ -81,7 +81,7 @@ test('the help and the header version open info/', async ({ page }) => {
 test('info/ links back to practice, the CPU game and the dojo', async ({ page }) => {
   await page.goto('./info/');
   await page.getByRole('navigation').getByRole('link', { name: '練習' }).click();
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
   await expect(page.locator('.app-header h1')).toContainText('練習');
 
   await page.goto('./info/');
@@ -97,7 +97,7 @@ test('info/ links back to practice, the CPU game and the dojo', async ({ page })
 
 test('練習 goes back to the practice session the page came from', async ({ page }) => {
   await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
   await expect(page).toHaveURL(/session=/);
   const practice = page.url();
   await page.locator('.app-header .version-tag').click();
@@ -111,5 +111,5 @@ test('info/ fits a phone: no sideways scroll at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await page.goto('./info/');
   await expect(page.locator('.release').first()).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
 });

@@ -118,7 +118,6 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
   for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
 
-
 test('an answer that comes after the tab stopped is neither shown nor saved', async ({ page, context }) => {
   await page.goto('./?seed=24&turns=18');
   await expect(page).toHaveURL(/[?&]session=/);

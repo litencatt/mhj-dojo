@@ -96,7 +96,7 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   await page.setViewportSize(PHONE);
   await expect(page.getByRole('heading', { name: /mhj-dojo/ })).toBeVisible();
   await expect(hand).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await pageOverflowX(page);
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
@@ -111,7 +111,7 @@ for (const width of [360, 390]) {
     await expect(hand).toBeVisible();
     const noOverflow = async () =>
       expect(
-        await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        await pageOverflowX(page),
       ).toBeLessThanOrEqual(0);
     const rowsOf = (locator: Locator) =>
       locator.evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
@@ -185,7 +185,7 @@ for (const [width, height] of [[320, 640], [390, 844], [844, 390]]) {
     });
     const full = await heights();
     for (let i = 0; i < seats.length; i++) expect(compact[i]).toBeLessThan(full[i]);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await pageOverflowX(page);
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
@@ -583,7 +583,7 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     expect(d.x + d.width).toBeLessThanOrEqual(width);
     expect((await form.getByRole('button', { name: '新規対局' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      await pageOverflowX(page),
     ).toBeLessThanOrEqual(0);
     await dialog.getByRole('button', { name: '閉じる' }).click();
     await expect(form).toBeHidden();
@@ -668,7 +668,7 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
     }, seats);
     expect(outside, `${width}x${height}`).toEqual([]);
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      await pageOverflowX(page),
     ).toBeLessThanOrEqual(0);
     const river = page.locator('.seat-top .seat-river');
     const tile = river.locator('.river-tile:not(.river-riichi) .tile').first();

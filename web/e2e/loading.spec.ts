@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { loaded } from './helpers';
 
 // The wait for the engine (issue #192): a status with a spinner while the
 // wasm downloads, and a manifest that installs and opens modes properly.
@@ -15,7 +16,7 @@ test('engine loading is announced while the wasm downloads, then goes away', asy
   await expect(status).toBeVisible();
   await expect(status.locator('.spinner')).toBeVisible();
   release();
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
   await expect(status).toHaveCount(0);
 });
 
