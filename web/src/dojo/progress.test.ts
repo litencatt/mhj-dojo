@@ -371,7 +371,7 @@ test('a won round with a redraw or a summon pays its han but no 和了祝儀', (
   assert.equal(settle(paid, game(2, 1, rounds), 'h').progress.coins, 60 + 50 + 10 - 50);
 });
 
-test('the rank pays x2 in 半荘戦, x1.5 against the normal CPU and x3 with both; the han and the bonuses do not', () => {
+test('the rank pays x2 in 半荘戦, x2 against the normal CPU and x4 with both; the han and the bonuses do not', () => {
   const rounds = [{ han: 2 }];
   const at = (length: FinishedGame['length'], cpu: FinishedGame['cpu'], rank = 1) =>
     settle(initialProgress(), { ...game(1, rank, rounds), length, cpu }).reward!;
@@ -380,9 +380,9 @@ test('the rank pays x2 in 半荘戦, x1.5 against the normal CPU and x3 with bot
   const hanchan = at('hanchan', 'weak');
   assert.deepEqual([hanchan.rankMultiplier, hanchan.rankXp, hanchan.rankCoins, hanchan.xp, hanchan.coins], [2, 200, 120, 220, 120 + 20 + 10 + 40]);
   const normal = at('tonpuu', 'normal', 4);
-  assert.deepEqual([normal.rankMultiplier, normal.rankXp, normal.rankCoins], [1.5, 15, 23]); // 10 x 1.5, 15 x 1.5 rounded
+  assert.deepEqual([normal.rankMultiplier, normal.rankXp, normal.rankCoins], [2, 20, 30]); // 10 x 2, 15 x 2
   const both = at('hanchan', 'normal', 2);
-  assert.deepEqual([both.rankMultiplier, both.rankXp, both.rankCoins], [3, 180, 120]);
+  assert.deepEqual([both.rankMultiplier, both.rankXp, both.rankCoins], [4, 240, 160]);
   // A game without them (from before) is the plain game.
   assert.equal(settle(initialProgress(), game(1, 1, rounds)).reward?.rankMultiplier, 1);
 });

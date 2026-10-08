@@ -605,7 +605,7 @@ test('a won round pays its 銭 as it ends, once, even after a reload', async ({ 
   expect(await dojoProgress(page)).toEqual(paid);
 });
 
-test('半荘戦 and the normal CPU unlock with the level, and their game pays the rank x3', async ({ page }) => {
+test('半荘戦 and the normal CPU unlock with the level, and their game pays the rank x4', async ({ page }) => {
   test.setTimeout(120_000);
   await watchEngine(page);
   const stored = (p: Partial<DojoProgress>) => JSON.stringify({ ...initialProgress(), firstGameBonus: true, ...p });
@@ -630,13 +630,13 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘 ×2');
   expect((await dojoProgress(page))?.gameLength).toBe('hanchan');
 
-  // 4級: the normal CPU too; both pay the rank x3.
+  // 4級: the normal CPU too; both pay the rank x4.
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, stored({ xp: 2100, gameLength: 'hanchan' })]);
   await page.reload();
   await page.getByRole('button', { name: '設定' }).click();
   await expect(hanchan).toBeChecked();
   await normal.check();
-  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×3');
+  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×4');
   expect((await dojoProgress(page))?.gameCpu).toBe('normal');
   await settings.getByRole('button', { name: '閉じる' }).click();
 
@@ -644,7 +644,7 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(handPanel(page)).toBeVisible();
   await finishDojoGame(page);
   await expect(page.getByRole('heading', { name: '最終結果（半荘戦）' })).toBeVisible();
-  await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×3）/);
+  await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×4）/);
 });
 
 test('a progress without the game choice plays 東風戦 against weak CPUs, and 半荘戦 is locked below 6級', async ({ page }) => {

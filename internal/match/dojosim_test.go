@@ -50,12 +50,19 @@ type simStats struct {
 // simGame plays a dojo game to its end with the weak CPU on your seat.
 func simGame(t *testing.T, st *Store, seed int64, yaku []string, s *simStats) {
 	t.Helper()
-	m, err := st.Create(&seed, Options{CPU: cpu.Weak, Dojo: &DojoOptions{Yaku: yaku}})
+	simGameWith(t, st, seed, yaku, Options{CPU: cpu.Weak}, cpu.NewWeak(), s)
+}
+
+// simGameWith plays a dojo game with the options (the opponents' level and
+// the length) and p on your seat.
+func simGameWith(t *testing.T, st *Store, seed int64, yaku []string, o Options, p game.Decider, s *simStats) {
+	t.Helper()
+	o.Dojo = &DojoOptions{Yaku: yaku}
+	m, err := st.Create(&seed, o)
 	if err != nil {
 		t.Fatal(err)
 	}
 	m.game.OnHumanDiscard = nil // the history's analysis is not needed
-	p := cpu.NewWeak()
 	for {
 		r := m.game.Round
 		if r.Phase() != game.PhaseEnded {
