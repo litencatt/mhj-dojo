@@ -26,6 +26,8 @@ import type { CpuLevel, GameLength } from '../api';
 import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
 import { discardUnfinishedDojoGames, savedGames } from '../wasm';
 import { Shop } from './Shop';
+import { GuideDialog } from './GuideDialog';
+import { guideFor } from './yakuGuide';
 import { Tile } from '../components/Tile';
 import {
   RIICHI_STICKS,
@@ -77,14 +79,14 @@ const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'normal', level: NORMAL_CPU_LEVEL },
 ];
 
-/** The names of the owned yaku, the dragons and the winds shown once as 役牌 (they are bought as one). */
-function ownedYakuNames(owned: readonly string[]): string[] {
-  const names: string[] = [];
+/** The owned yaku, the dragons and the winds shown once as 役牌 (they are bought as one); `guide` is the key of its guide, if it has one. */
+function ownedYaku(owned: readonly string[]): { name: string; guide?: string }[] {
+  const out: { name: string; guide?: string }[] = [];
   for (const k of owned) {
     const name = YAKUHAI_KEYS.includes(k) ? '役牌' : yakuName(k);
-    if (!names.includes(name)) names.push(name);
+    if (!out.some((y) => y.name === name)) out.push({ name, guide: guideFor(k)?.key });
   }
-  return names;
+  return out;
 }
 
 /** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (game choice, theme, back, looks). */
@@ -95,6 +97,8 @@ export function DojoHome() {
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The yaku guide shown (a yaku just bought, or an owned one chosen in 所持役).
+  const [guide, setGuide] = useState<{ key: string; learned: boolean } | null>(null);
   // The win effect on the sample plays again on each change of it (its key), and on 演出を見る.
   const [effectPlays, setEffectPlays] = useState(0);
   // The dojo's own unfinished games (the CPU game's list never has them).
@@ -199,15 +203,24 @@ export function DojoHome() {
       </section>
 
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
-        <h2 id="dojo-yaku-heading">所持役（{ownedYakuNames(progress.ownedYaku).length}）</h2>
+        <h2 id="dojo-yaku-heading">所持役（{ownedYaku(progress.ownedYaku).length}）</h2>
         <ul class="dojo-yaku" data-testid="dojo-yaku" tabIndex={0} aria-labelledby="dojo-yaku-heading">
-          {ownedYakuNames(progress.ownedYaku).map((name) => (
-            <li key={name}>{name}</li>
+          {ownedYaku(progress.ownedYaku).map(({ name, guide: guideKey }) => (
+            <li key={name}>
+              {guideKey ? (
+                <button type="button" class="dojo-yaku-guide" aria-haspopup="dialog" onClick={() => setGuide({ key: guideKey, learned: false })}>
+                  {name}
+                </button>
+              ) : (
+                name
+              )}
+            </li>
           ))}
         </ul>
       </section>
 
-      <Shop progress={progress} onChange={change} />
+      <Shop progress={progress} onChange={change} onLearned={(key) => setGuide({ key, learned: true })} />
+      <GuideDialog yakuKey={guide?.key ?? null} learned={guide?.learned ?? false} onClose={() => setGuide(null)} />
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)}>
         {notice && settingsOpen && (

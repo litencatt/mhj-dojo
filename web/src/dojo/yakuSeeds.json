@@ -1,0 +1,95 @@
+{
+  "range": 10000,
+  "seeds": {
+    "chanta": {
+      "seed": 1285,
+      "row": "chanta",
+      "shanten": 2
+    },
+    "chiitoitsu": {
+      "seed": 590,
+      "row": "chiitoitsu",
+      "shanten": 1
+    },
+    "chinitsu": {
+      "seed": 3202,
+      "row": "chinitsu",
+      "shanten": 3
+    },
+    "double_riichi": {
+      "seed": 8430,
+      "row": "normal",
+      "shanten": 0
+    },
+    "honitsu": {
+      "seed": 9904,
+      "row": "honitsu",
+      "shanten": 1
+    },
+    "honroutou": {
+      "seed": 1501,
+      "row": "honroutou",
+      "shanten": 3
+    },
+    "iipeikou": {
+      "seed": 8430,
+      "row": "iipeikou",
+      "shanten": 0
+    },
+    "ippatsu": {
+      "seed": 8430,
+      "row": "normal",
+      "shanten": 0
+    },
+    "ittsu": {
+      "seed": 4837,
+      "row": "ittsu",
+      "shanten": 1
+    },
+    "junchan": {
+      "seed": 3293,
+      "row": "junchan",
+      "shanten": 2
+    },
+    "riichi": {
+      "seed": 8430,
+      "row": "normal",
+      "shanten": 0
+    },
+    "ryanpeikou": {
+      "seed": 2299,
+      "row": "ryanpeikou",
+      "shanten": 2
+    },
+    "sanankou": {
+      "seed": 7727,
+      "row": "sanankou",
+      "shanten": 1
+    },
+    "sanshoku": {
+      "seed": 7139,
+      "row": "sanshoku",
+      "shanten": 1
+    },
+    "sanshoku_doukou": {
+      "seed": 435,
+      "row": "sanshoku_doukou",
+      "shanten": 3
+    },
+    "shousangen": {
+      "seed": 432,
+      "row": "shousangen",
+      "shanten": 3
+    },
+    "toitoi": {
+      "seed": 1846,
+      "row": "toitoi",
+      "shanten": 2
+    },
+    "yakuhai": {
+      "seed": 1934,
+      "row": "hatsu",
+      "shanten": 1
+    }
+  }
+}

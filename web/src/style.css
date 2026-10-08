@@ -223,7 +223,8 @@ h2 {
 .settings-dialog,
 .help-dialog,
 .tab-stopped,
-.shop-confirm {
+.shop-confirm,
+.yaku-guide {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--panel-bg);
@@ -232,7 +233,8 @@ h2 {
 .settings-dialog::backdrop,
 .help-dialog::backdrop,
 .tab-stopped::backdrop,
-.shop-confirm::backdrop {
+.shop-confirm::backdrop,
+.yaku-guide::backdrop {
   background: var(--backdrop);
 }
 .settings-dialog {
