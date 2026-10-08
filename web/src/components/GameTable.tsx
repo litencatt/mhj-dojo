@@ -41,13 +41,13 @@ export interface GameTableProps {
   highlight?: PlaybackHighlight | null;
   playing?: boolean;
   // Whether the other seats' rivers are shown: a phone can fold them away
-  // (設定's 表示, GameApp); a desktop always shows them (style.css).
+  // (設定's 表示, GameApp); a desktop always shows them (styles/*.css).
   riversShown?: boolean;
 }
 
 /** The table: each seat's river, points and (hidden) hand around the round
  * info and the round's moves. The skip control lives in the action bar
- * (GameApp), not here. */
+ * (components/ActionBar.tsx), not here. */
 export function GameTable({ state, log = state.events, highlight, playing = false, riversShown = true }: GameTableProps) {
   const at = (rel: number) => state.seats[(state.you + rel) % 4];
   const logRef = useRef<HTMLOListElement>(null);
@@ -76,7 +76,7 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
   }, [log.length, round]);
   // A phone turned on its side keeps the newest in sight too, and so does
   // the log coming back on an upright phone, where the rivers stand in for
-  // it while they are shown (style.css): hidden, it lost its place.
+  // it while they are shown (styles/*.css): hidden, it lost its place.
   useEffect(() => {
     const el = logRef.current;
     if (!el || typeof ResizeObserver !== 'function') return;
@@ -148,7 +148,7 @@ function SeatBox({ className, seat, state, highlight, playing, riverId }: SeatBo
         <SeatStatus seat={seat} state={state} />
         {!you && !seat.hand && (
           // Face down: a row of backs under the head, or on a phone one
-          // back with the count on it, in the head itself (style.css), so
+          // back with the count on it, in the head itself (styles/*.css), so
           // the seat stays short.
           <div class="seat-hand seat-hand-hidden">
             <span class="visually-hidden">手牌 {seat.hand_count}枚</span>

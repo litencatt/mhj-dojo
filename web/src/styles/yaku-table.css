@@ -1,0 +1,411 @@
+/* ---- Yaku table ---- */
+/* 絞り込み folds the filter options away; its row, with the count and the
+   reset, stays above the table. On a phone it sits in the heading instead. */
+.yaku-filter-toggle {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.yaku-filter-toggle:hover {
+  color: var(--fg);
+  border-color: var(--muted);
+}
+.panel-heading .yaku-filter-toggle {
+  margin: 0 0 8px auto;
+}
+/* Folded on a phone, the count (and ✕) sit in the heading row before 絞り込み. */
+.panel-heading .yaku-filter-status {
+  margin: 0 0 8px auto;
+}
+.panel-heading .yaku-filter-status + .yaku-filter-toggle {
+  margin-left: 0;
+}
+/* Filter bar: the toggle, (when open) the category chips, and the count
+   and reset on the first row, then (when open) search, shanten limit and
+   sort. It sits outside the scrolling table. */
+.yaku-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.yaku-filter-chips {
+  display: contents;
+}
+/* Folded parts stay folded whatever their display. */
+.yaku-filter[hidden],
+.yaku-filter [hidden] {
+  display: none;
+}
+.yaku-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.yaku-filter label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.yaku-filter-search,
+.yaku-filter select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+}
+.yaku-filter-search {
+  flex: 1 1 12em;
+  min-width: 0;
+}
+.filter-chip {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.filter-chip-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+/* The count and the reset stay together, at the right end of the first row
+   or wrapped under it. */
+.yaku-filter-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.yaku-filter-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.filter-clear {
+  padding: 2px 8px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.yaku-filter-empty {
+  margin: 12px 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.yaku-table-scroll {
+  overflow-x: auto;
+}
+.yaku-table,
+.combo-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 480px; /* below this, scroll sideways rather than squeezing the ukeire column */
+  font-size: 0.85rem;
+}
+.yaku-table thead th {
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-bg);
+  box-shadow: inset 0 -1px 0 var(--border); /* collapsed borders do not stick */
+}
+.yaku-table th,
+.yaku-table td,
+.combo-table th,
+.combo-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.yaku-name-cell {
+  white-space: nowrap;
+}
+.combo-section {
+  margin: 0 0 8px;
+  overflow-x: auto;
+  flex: 0 0 auto;
+}
+.combo-section summary {
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+.combo-table thead th {
+  white-space: nowrap;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.combo-name-cell {
+  min-width: 8em;
+  font-weight: normal;
+}
+.han-cell {
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.yaku-name {
+  cursor: help;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 3px;
+}
+.yaku-tip {
+  position: fixed;
+  z-index: 20;
+  width: 280px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: normal;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.row-best {
+  background: var(--row-best-bg);
+}
+/* After .row-best: a row at 聴牌 (or 和了) takes the red even when it is also the closest. */
+.row-tenpai {
+  background: var(--row-tenpai-bg);
+}
+.badge-approx {
+  margin-left: 6px;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+.shanten-cell {
+  white-space: nowrap;
+}
+.delta {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.delta-improve {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.delta-worse {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.delta-flat {
+  color: var(--muted);
+}
+.ukeire-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 6px;
+  max-height: 78px; /* ~2 rows of xs tile + count; more scrolls vertically */
+  overflow-y: auto;
+}
+.ukeire-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.ukeire-count {
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ukeire-item-zero .ukeire-count {
+  opacity: 0.5;
+}
+.ukeire-total-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.preview-note {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: var(--accent);
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  .filter-chip,
+  .legend-item,
+  .yaku-filter-toggle {
+    min-height: 32px;
+  }
+  .filter-chip {
+    padding: 4px 8px;
+  }
+  /* Open, the chips, the short count and the ✕ share one row at 320px; the
+     row keeps its height with or without the ✕. */
+  .yaku-filter-row {
+    gap: 6px;
+  }
+  .yaku-filter-status {
+    min-height: 32px;
+  }
+  .filter-clear-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0.9rem;
+  }
+  /* Filter bar: no name search (YakuTable.tsx), the two selects share the
+     first row. */
+  .yaku-filter-row label {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .yaku-filter-row label select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .yaku-filter select {
+    font-size: 16px;
+  }
+  .yaku-tip {
+    width: min(280px, calc(100vw - 16px));
+  }
+  .app-practice .area-yaku,
+  .app-game .area-yaku {
+    display: flex;
+    flex-direction: column;
+    height: max(
+      200px,
+      calc(100dvh - var(--yaku-top, 50dvh) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
+    );
+  }
+  .app-practice .yaku-table-panel,
+  .app-game .yaku-table-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  /* The yaku and combo tables: each row on two lines, name / 翻 / 向聴 / 合計
+     above and the effective tiles across the whole width below, so nothing
+     is cut off or needs a sideways scroll. The header row sticks to the top
+     of the screen while the long yaku table scrolls by. */
+  .yaku-table-scroll,
+  .combo-section {
+    overflow: visible;
+  }
+  .yaku-table,
+  .combo-table,
+  .yaku-table thead,
+  .yaku-table tbody,
+  .combo-table thead,
+  .combo-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .yaku-table tr,
+  .combo-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.9em 5.8em 3.4em;
+    grid-template-areas:
+      "name han shanten total"
+      "ukeire ukeire ukeire ukeire";
+    align-items: center;
+    column-gap: 6px;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .yaku-table thead tr,
+  .combo-table thead tr {
+    grid-template-areas: "name han shanten total";
+    padding: 4px;
+  }
+  .yaku-table thead {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 2;
+    background: var(--panel-bg);
+  }
+  /* The panel is its own scroller: stick to its top edge, over its 8px
+     padding (the phone's section padding above), so no row shows above the
+     header. */
+  .app-practice .yaku-table thead,
+  .app-game .yaku-table thead {
+    top: -8px;
+  }
+  .yaku-table th,
+  .yaku-table td,
+  .combo-table th,
+  .combo-table td {
+    padding: 0;
+    border: none;
+  }
+  .yaku-table thead th,
+  .combo-table thead th {
+    position: static;
+    box-shadow: none;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .yaku-table tr > :nth-child(1),
+  .combo-table tr > :nth-child(1) { grid-area: name; }
+  .yaku-table tr > :nth-child(2),
+  .combo-table tr > :nth-child(2) { grid-area: han; }
+  .yaku-table tr > :nth-child(3),
+  .combo-table tr > :nth-child(3) { grid-area: shanten; }
+  .yaku-table tr > :nth-child(4),
+  .combo-table tr > :nth-child(4) { grid-area: ukeire; }
+  .yaku-table tr > :nth-child(5),
+  .combo-table tr > :nth-child(5) { grid-area: total; text-align: right; }
+  /* The 有効牌 header has no column to head: it is kept for screen readers only. */
+  .yaku-table thead th:nth-child(4),
+  .combo-table thead th:nth-child(4) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .yaku-name-cell,
+  .shanten-cell {
+    white-space: normal;
+  }
+  .combo-name-cell {
+    min-width: 0;
+  }
+  .delta {
+    margin-left: 3px;
+  }
+  .yaku-table td.ukeire-cell,
+  .combo-table td.ukeire-cell {
+    padding-top: 6px;
+  }
+  /* No effective tiles (a 「—」): no second line. */
+  .ukeire-cell:has(> .muted) {
+    display: none;
+  }
+}

@@ -1,4 +1,4 @@
-/* The colours, light and dark: the app (style.css) and the 更新情報 page (info.css) share them. */
+/* The colours, light and dark: the app (style.css and styles/) and the 更新情報 page (info.css) share them. */
 :root {
   color-scheme: light dark;
   --bg: #f4f5f7;

@@ -1,5 +1,15 @@
 # Changelog
 
+## [v2026.1008.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.0...v2026.1008.1) - 2026-10-08
+
+### 新機能
+- スマホの操作欄のボタンを設定ボタンと同じ大きさにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/299
+### その他
+- リファクタリング: GameApp を分割し、道場の対局の処理をフックにまとめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/300
+- リファクタリング: E2E の補助関数と定数をまとめる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/303
+- リファクタリング: CSS を部品ごとのファイルに分ける by @litencatt in https://github.com/litencatt/mhj-dojo/pull/302
+- CSS のルールを本来の部品のファイルへ移す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/304
+
 ## [v2026.1008.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1007.0...v2026.1008.0) - 2026-10-08
 
 ### 新機能

@@ -11,7 +11,7 @@ export interface DockProps {
 
 /**
  * Minimized panels, docked as vertical tabs on the right edge of the screen;
- * on a phone-width screen (style.css) a bar of tabs along the bottom instead,
+ * on a phone-width screen (styles/*.css) a bar of tabs along the bottom instead,
  * so they never cover the page.
  */
 export function Dock({ items, onRestore }: DockProps) {

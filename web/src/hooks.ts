@@ -174,12 +174,12 @@ export function useLastAnalysis(analysis: YakuRow[] | undefined): YakuRow[] {
   return analysis && analysis.length > 0 ? analysis : last.current;
 }
 
-// The yaku panel's least height on a phone (style.css).
+// The yaku panel's least height on a phone (styles/*.css).
 const YAKU_MIN_HEIGHT = 200;
 
 /**
  * On a phone the yaku panel fills the height left under the header and the
- * hand (style.css): this keeps --yaku-top, where the panel starts on the
+ * hand (styles/*.css): this keeps --yaku-top, where the panel starts on the
  * page, on the returned app element, and data-hand-fits: whether the hand
  * (in a CPU game, with the table) and the shortest panel fit the screen
  * together, so the hand can stick to the top without covering the panel.

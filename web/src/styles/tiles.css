@@ -1,0 +1,161 @@
+/* ---- Tiles ---- */
+/* Ivory body with a darker back edge for depth; the face is an SVG (TileFace). */
+.tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--tile-bg-hi) 0%, var(--tile-bg) 100%);
+  border: 1px solid var(--tile-border);
+  border-radius: 5px;
+  box-shadow: 0 2px 0 var(--tile-back), 0 3px 3px rgba(0, 0, 0, 0.18);
+  padding: 2px;
+  font-family: inherit;
+}
+.tile-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.tile-md {
+  width: 36px;
+  height: 48px;
+}
+.tile-sm {
+  width: 26px;
+  height: 35px;
+  padding: 1.5px;
+}
+.tile-xs {
+  width: 18px;
+  height: 24px;
+  padding: 1px;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--tile-back);
+}
+.tile-dimmed {
+  opacity: 0.35;
+}
+.tile-interactive {
+  cursor: pointer;
+}
+.tile-interactive:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  outline: none;
+}
+/* Only a real pointer hovers: on touch the raise would stick to the last tapped tile. */
+@media (hover: hover) {
+  .tile-interactive:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    outline: none;
+  }
+}
+/* A tile a tap selected (touch: the second tap discards it). */
+.tile.tile-picked {
+  transform: translateY(-6px);
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* CPU game: a hand tile's danger against a riichi, a lettered badge in its
+   corner (the tile's label and title spell it out); ::after is a phone's
+   tap area. */
+.tile.tile-danger::before {
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  min-width: 1.2em;
+  padding: 0 1px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2em;
+  text-align: center;
+  pointer-events: none;
+  z-index: 1;
+}
+/* A phone's hand tiles are a few px apart: the badge sits inside its own
+   tile, so it never covers a neighbour (raised or not). */
+@media (width <= 760px), (height <= 500px) and (pointer: coarse) {
+  .tile.tile-danger::before {
+    top: 1px;
+    right: 1px;
+    min-width: 1.1em;
+    padding: 0;
+    border-radius: 3px;
+    font-size: 0.55rem;
+    line-height: 1.1em;
+  }
+}
+.tile.tile-danger-0::before {
+  content: "安";
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+.tile.tile-danger-1::before {
+  content: "低";
+  background: var(--panel-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.tile.tile-danger-2::before {
+  content: "中";
+  background: var(--row-best-bg);
+  color: var(--group-taatsu);
+  border: 1px solid var(--group-taatsu);
+}
+.tile.tile-danger-3::before {
+  content: "危";
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* A face-down tile shows its coloured back. */
+.tile.tile-back {
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+  border-color: var(--tile-back);
+}
+/* The dojo's tile backs (tileThemes.ts): a light pattern over the same gradient. */
+:root[data-tile-back='shima'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+:root[data-tile-back='ichimatsu'] .tile.tile-back {
+  background:
+    conic-gradient(rgba(255, 255, 255, 0.24) 25%, transparent 0 50%, rgba(255, 255, 255, 0.24) 0 75%, transparent 0) 0 0 / 6px 6px,
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+/* 麻の葉: three crossing sets of lines, a lattice of six-pointed stars. */
+:root[data-tile-back='asanoha'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+
+/* ---- Narrow screens and phones ---- */
+/* A narrow phone (420px or less): smaller tiles (the hand's scale with its panel instead). */
+@media (max-width: 420px) {
+  .tile-md {
+    width: 28px;
+    height: 38px;
+    font-size: 0.9rem;
+  }
+}
+/* A phone, upright or on its side: smaller dora tiles. */
+@media (width <= 760px), (height <= 500px) {
+  .dora-indicators .tile-sm {
+    width: 18px;
+    height: 24px;
+    padding: 1px;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--tile-back);
+  }
+}

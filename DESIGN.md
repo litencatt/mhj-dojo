@@ -12,7 +12,7 @@ mhj-dojo の UI を作る・直すときの入口。詳細は `docs/design/` に
 ## Source of truth
 
 - トークン(色・角丸): `web/src/tokens.css`(ライトの `:root` とダークの `@media`。`style.css` と更新情報の `info.css` が共有)。文書は役割の説明だけで、値は CSS が正
-- 部品の見た目: `web/src/style.css`(本体)、`web/src/dojo/dojo.css`(道場)、`web/src/info.css`(更新情報)
+- 部品の見た目: `web/src/styles/*.css`(部品ごと。その部品の狭い画面・スマホ向けの `@media` も同じファイルの、主に末尾に)を `web/src/style.css` が決まった順に読み込む。ほかに `web/src/dojo/dojo.css`(道場)、`web/src/info.css`(更新情報)
 - 共通の部品: `web/src/components/SiteHeader.tsx`(ヘッダー)、`SettingsDialog.tsx`(設定)、`Help.tsx`(ヘルプ)
 - 文書と CSS が食い違ったら CSS が正。直した人が文書も直す
 
@@ -22,5 +22,5 @@ mhj-dojo の UI を作る・直すときの入口。詳細は `docs/design/` に
 - 頼まれた UI は、新しい見せ方を足す前に、既存のパターン(`components.md` の部品)に置き換えられないか考える
 - 本当に新しいパターンが要るときは、トークン(`tokens.css`)や共通部品として足し、同じ変更で `docs/design/` と、必要ならこのファイルも更新する
 - 同じ役割の要素は全モードで同じ見た目にする。モードで変えてよいのは盤面(牌・卓)だけ
-- スマホ(`(width <= 760px), (height <= 500px) and (pointer: coarse)`)のタップ領域は 44px、状態の切り替えで高さを変えない
+- スマホ(`(width <= 760px), (height <= 500px) and (pointer: coarse)`)のボタンは高さ 32px 以上(操作欄のボタンもヘッダーの 設定 と同じ 32px)。状態の切り替えで高さを変えない
 - 終わる前に `cd web && npm run typecheck` と `make e2e` を通し、3モードをライト/ダーク・1280/390 で目視する(`operation.md`)

@@ -1,0 +1,67 @@
+/* ---- History tree ---- */
+/* Flat list; indentation (via inline margin-left) only steps in at fork
+ * points, so a long single-child chain stays a compact vertical list. */
+.tree-flat {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.tree-row {
+  margin: 2px 0;
+  transition: margin-left 0.1s ease;
+}
+.tree-branch-start {
+  border-left: 2px solid var(--accent);
+  padding-left: 6px;
+}
+.tree-node-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.tree-node-label,
+.tree-node-turn {
+  font-weight: 700;
+  color: var(--muted);
+}
+.tree-node-shanten {
+  color: var(--muted);
+}
+.tree-on-path .tree-node-btn {
+  border-color: var(--accent);
+}
+.tree-current {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.tree-current .tree-node-label,
+.tree-current .tree-node-turn,
+.tree-current .tree-node-shanten {
+  color: inherit;
+}
+.tree-node-status {
+  font-size: 0.7rem;
+}
+
+.tree-node-btn:disabled {
+  cursor: progress;
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  .tree-flat {
+    max-height: 50vh;
+  }
+  .tree-node-btn {
+    min-height: 36px;
+  }
+}

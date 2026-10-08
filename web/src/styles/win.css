@@ -1,0 +1,53 @@
+/* ---- Win panel ---- */
+.win-panel {
+  border-color: var(--success-border);
+}
+.win-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.win-yaku-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+.win-yaku-table th,
+.win-yaku-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.win-dora-ignored td:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.win-note {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.win-yaku-table tfoot th,
+.win-yaku-table tfoot td {
+  border-top: 2px solid var(--fg);
+  border-bottom: none;
+  font-weight: bold;
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  /* A win's 14 tiles on one row too. */
+  .win-panel {
+    container-type: inline-size;
+  }
+  .win-tiles {
+    gap: 2px;
+  }
+  .win-tiles .tile-md {
+    width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1.5px;
+  }
+}

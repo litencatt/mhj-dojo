@@ -1,0 +1,166 @@
+/* ---- Advice ---- */
+.advice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.advice-body p {
+  margin: 0;
+}
+.advice-review {
+  padding: 6px 10px;
+  border-left: 3px solid var(--group-taatsu);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.advice-review-best {
+  border-left-color: var(--success-border);
+  color: var(--success);
+}
+.advice-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.advice-candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+.advice-candidate:first-child {
+  background: var(--row-best-bg);
+}
+.advice-candidate:hover,
+.advice-candidate:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.advice-rank {
+  flex: none;
+  width: 1.2em;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+.advice-candidate .tile {
+  flex: none;
+}
+.advice-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  min-width: 0;
+}
+.advice-shanten {
+  font-weight: 700;
+}
+/* CPU game: a candidate's danger against a riichi, lettered like the badge on a hand tile. */
+.advice-danger {
+  flex: none;
+  margin-left: auto;
+  min-width: 1.4em;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4em;
+  text-align: center;
+}
+.advice-danger-0 {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+.advice-danger-1 {
+  background: var(--panel-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.advice-danger-2 {
+  background: var(--panel-bg);
+  color: var(--group-taatsu);
+  border: 1px solid var(--group-taatsu);
+}
+.advice-danger-3 {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.advice-danger-note {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+}
+.advice-outlook {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+}
+.advice-outlook div {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.advice-outlook dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.advice-outlook dd {
+  margin: 0;
+  font-weight: 700;
+}
+.advice-guideline {
+  font-weight: 700;
+}
+.advice-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.6;
+}
+.advice-yaku {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.advice-yaku-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.advice-yaku ul {
+  display: contents;
+}
+.advice-yaku li {
+  list-style: none;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+}
+.advice-yaku-lost {
+  color: var(--muted);
+}
+.advice-yaku-mark {
+  font-size: 0.7rem;
+}
+.advice-caveat {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+/* A hand tile named by a hovered advice candidate. */
+.tile.tile-advice {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

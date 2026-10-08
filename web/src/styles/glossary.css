@@ -1,0 +1,47 @@
+/* ---- Glossary ---- */
+.glossary-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.9rem;
+}
+.glossary-group h3 {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+.glossary-group dl {
+  margin: 0;
+}
+.glossary-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.glossary-item dt {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.glossary-reading {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.glossary-item dd {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  /* 16px keeps iOS from zooming in on focus. */
+  .glossary-search {
+    font-size: 16px;
+  }
+}

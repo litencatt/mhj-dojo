@@ -49,7 +49,7 @@ export function AppShell(p: AppShellProps) {
   const m = MODES[p.mode];
   const appClass = p.started && p.docked.length > 0 ? `app app-${p.mode} has-dock` : `app app-${p.mode}`;
   // On a phone the yaku panel scrolls on its own in the height left under the
-  // header and the hand (and a game's table) (style.css).
+  // header and the hand (and a game's table) (styles/*.css).
   const appRef = useYakuTop(p.started);
 
   return (
