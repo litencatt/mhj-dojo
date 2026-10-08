@@ -2549,16 +2549,16 @@ section,
   .action-area:focus {
     outline: none;
   }
-  /* Hold the height the buttons give, also with none (the playback, or a
+  /* The buttons are the header's 設定 size (32px), so the yaku table keeps
+     the room; the row holds that height also with none (the playback, or a
      dojo game's hint alone), so the page never jumps as a replay starts. */
   .action-bar {
-    min-height: 44px;
+    min-height: 32px;
   }
   .action-bar button {
-    min-height: 44px;
-    min-width: 64px;
-    padding: 8px 16px;
-    font-size: 1rem;
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
   }
 
 

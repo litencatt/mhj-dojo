@@ -116,11 +116,14 @@ for (const width of [360, 390]) {
     await playUntilPonOffered(page);
     await noOverflow();
     expect(await rowsOf(hand.locator('.hand-tiles button.tile'))).toBe(1);
+    // The call's buttons are the header's 設定 size: compact, yet easy to tap.
     const buttons = page.locator('.action-bar button');
     expect(await buttons.count()).toBeGreaterThanOrEqual(2);
+    const settings = (await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).boundingBox())!;
     for (const b of await buttons.all()) {
       const bb = await b.boundingBox();
-      expect(bb!.height).toBeGreaterThanOrEqual(40);
+      expect(bb!.height).toBeGreaterThanOrEqual(32);
+      expect(Math.abs(bb!.height - settings.height)).toBeLessThanOrEqual(2);
     }
     // Each opponent's concealed hand is one back with a count (see below).
     for (const seat of ['.seat-top', '.seat-left', '.seat-right']) {
