@@ -408,4 +408,25 @@
   .ukeire-cell:has(> .muted) {
     display: none;
   }
+  /* The effective tiles on one row: each shrinks (to 16px at most, 11px
+     at least) to share the row; once 11px tiles no longer fit, the row
+     scrolls sideways. */
+  .ukeire-tiles {
+    flex-wrap: nowrap;
+    gap: 2px;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .ukeire-item {
+    flex: 0 1 16px;
+    min-width: 11px;
+  }
+  .ukeire-item .tile-xs {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
 }
