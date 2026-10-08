@@ -228,7 +228,7 @@ test('the table follows the CPU playback step by step, and ends on the final val
   for (let step = 1; step < events.length; step++) {
     await expect(table).toHaveAttribute('data-playing', 'true');
     await expect(log).toHaveCount(earlier + step);
-    await expect(page.locator('.table-remaining')).toHaveText(`残り ${events[step - 1].wall_remaining}`);
+    await expect(page.getByTestId('wall-remaining')).toHaveText(String(events[step - 1].wall_remaining));
     const accepted = step > riichiAt;
     const points = st!.seats[riichiSeat].points + (accepted ? 0 : 1000);
     await expect(riichiPoints).toHaveText(points.toLocaleString());
@@ -240,7 +240,7 @@ test('the table follows the CPU playback step by step, and ends on the final val
   }
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(log).toHaveCount(earlier + events.length);
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st!.wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(st!.wall_remaining));
   await expect(riichiPoints).toHaveText(st!.seats[riichiSeat].points.toLocaleString());
   await expect(deposit).toHaveText(sticks(st!.deposit)!);
   await expect(doraTiles).toHaveCount(2 * finalDora);
@@ -256,11 +256,11 @@ test('the table follows the CPU playback step by step, and ends on the final val
     await expect(table).toHaveAttribute('data-playing', 'true');
     // After skipping a call the CPUs move first: the wall before them.
     const lead = next.events[0].seat === next.you ? next.events[0].wall_remaining : next.events_wall_remaining;
-    await expect(page.locator('.table-remaining')).toHaveText(`残り ${lead}`);
+    await expect(page.getByTestId('wall-remaining')).toHaveText(String(lead));
     await finishPlayback(page);
   }
   await expect(table).toHaveAttribute('data-playing', 'false');
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${next.wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(next.wall_remaining));
   await expect(log).toHaveCount(next.events_from + next.events.length);
 });
 
@@ -299,7 +299,7 @@ test('the playback jumps to the end when the tab is hidden', async ({ page }) =>
   await hide(page);
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(st.wall_remaining));
 });
 
 // A tab hidden before the answer lands never starts the steps at all.
@@ -313,7 +313,7 @@ test('the playback starts at its end when the tab is already hidden', async ({ p
   await page.clock.runFor(50);
   await expect(table).toHaveAttribute('data-playing', 'false');
   await expect(page.locator('.event-log li')).toHaveCount(st.events_from + st.events.length);
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${st.wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(st.wall_remaining));
 });
 
 // A game whose first dealer is a CPU opens with the CPU turns before yours:
@@ -340,9 +340,9 @@ test('the wall before the first CPU move of a round', async ({ page }) => {
   }
   await expect(table).toHaveAttribute('data-playing', 'true');
   await expect(page.locator('.event-log li')).toHaveCount(0);
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.events_wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(first.events_wall_remaining));
   await finishPlayback(page);
-  await expect(page.locator('.table-remaining')).toHaveText(`残り ${first.wall_remaining}`);
+  await expect(page.getByTestId('wall-remaining')).toHaveText(String(first.wall_remaining));
 });
 
 // playbackState works the table out backwards from an answer's final

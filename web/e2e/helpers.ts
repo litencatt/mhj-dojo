@@ -388,9 +388,10 @@ export async function finishPlayback(page: Page) {
   await expect(table).toHaveAttribute('data-playing', 'false');
 }
 
-/** Everything a game action changes: the table (rivers, points, wall), the hand and the result panel. */
-export function gameSnapshot(page: Page) {
-  return page.locator('.area-hand').innerText();
+/** Everything a game action changes: the table (rivers, points), the hand, the result panel and the wall left (in the header). */
+export async function gameSnapshot(page: Page) {
+  const wall = page.getByTestId('wall-remaining');
+  return `${(await wall.count()) > 0 ? await wall.innerText() : ''}\n${await page.locator('.area-hand').innerText()}`;
 }
 
 /** Clicks and waits until the engine has answered, so the next step never
@@ -505,4 +506,17 @@ export function settingsDialog(page: Page): Locator {
 /** The radio buttons of a choice in 設定 (再生速度, 対局 ...), by its name. */
 export function settingsChoice(page: Page, name: string): Locator {
   return settingsDialog(page).getByRole('group', { name, exact: true }).getByRole('radio');
+}
+
+/** The 設定 checkbox that folds the other seats' rivers away on a phone. */
+export function riversOption(page: Page): Locator {
+  return settingsDialog(page).getByRole('checkbox', { name: '他家の捨て牌' });
+}
+
+/** Folds the other seats' rivers away (or back) through 設定, closing it after. */
+export async function toggleRivers(page: Page) {
+  await openSettings(page);
+  await riversOption(page).click();
+  await page.keyboard.press('Escape');
+  await expect(settingsDialog(page)).toBeHidden();
 }

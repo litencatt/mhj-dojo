@@ -5,6 +5,7 @@ import {
   expectStopped,
   handPanel,
   openSettings,
+  riversOption,
   pageOverflowX,
   playOneStep,
   playToResult,
@@ -12,6 +13,7 @@ import {
   slowEngine,
   stoppedDialog,
   tableState,
+  toggleRivers,
   waitForPlayback,
 } from './helpers';
 
@@ -128,7 +130,7 @@ for (const width of [360, 390]) {
     // rivers folded away, the round's moves so far run sideways in one short
     // row, the newest in sight.
     await expect(page.getByRole('list', { name: 'この局の動き' })).toBeHidden();
-    await page.getByRole('button', { name: '捨て牌' }).click();
+    await toggleRivers(page);
     await expectPhoneLog(page);
 
     // After the pon, the hand is still one row and the meld sits below it.
@@ -368,19 +370,21 @@ test('a 320x640 phone pins the hand only while it leaves the yaku panel room', a
   await check('false');
 });
 
-// On a phone 捨て牌 ▴/▾ folds the other seats' rivers away (your own, in
-// the hand panel, stays), leaving each seat its head, and the yaku panel the room; the log
+// On a phone 設定's 他家の捨て牌 folds the other seats' rivers away (your own,
+// in the hand panel, stays), leaving each seat its head, and the yaku panel the room; the log
 // of moves stands in for them meanwhile. The choice survives a reload.
-test('a phone folds the other seats\' rivers away with 捨て牌, and remembers it', async ({ page }) => {
+test('a phone folds the other seats\' rivers away with 設定\'s 他家の捨て牌, and remembers it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   // A turn round the table: every river has a tile (an empty one isn't shown).
   await playOneStep(page);
   await waitForPlayback(page);
-  const toggle = page.getByRole('button', { name: '捨て牌' });
   const cpuRivers = ['#river-top', '#river-left', '#river-right'];
   const expectShown = async (shown: boolean) => {
-    await expect(toggle).toHaveAttribute('aria-expanded', String(shown));
+    await openSettings(page);
+    if (shown) await expect(riversOption(page)).toBeChecked();
+    else await expect(riversOption(page)).not.toBeChecked();
+    await page.keyboard.press('Escape');
     for (const r of cpuRivers) {
       if (shown) await expect(page.locator(r)).toBeVisible();
       else await expect(page.locator(r)).toBeHidden();
@@ -394,19 +398,17 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
   await expectShown(true);
   // Only a choice is saved, not the default.
   expect(await page.evaluate(() => localStorage.getItem('mhj-dojo.rivers.v1'))).toBeNull();
-  expect((await toggle.getAttribute('aria-controls'))!.split(' ').sort()).toEqual(['river-left', 'river-right', 'river-top']);
-  expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
   const log = page.getByRole('list', { name: 'この局の動き' });
   await expect(log).toBeHidden();
   const yakuTop = async () => (await page.locator('.area-yaku').boundingBox())!.y;
   const before = await yakuTop();
 
-  await toggle.click();
+  await toggleRivers(page);
   await expectShown(false);
-  // The log is back, under the round's row with 捨て牌 in it.
+  // The log is back, under the CPU seats.
   await expect(log).toBeVisible();
-  const t = (await toggle.boundingBox())!;
-  expect(t.y + t.height).toBeLessThanOrEqual((await log.boundingBox())!.y);
+  const seat = (await page.locator('.seat-right').boundingBox())!;
+  expect(seat.y + seat.height).toBeLessThanOrEqual((await log.boundingBox())!.y + 1);
   // The table got shorter (by less than the rivers, the log taking a row),
   // and the yaku panel starts higher.
   await expect.poll(yakuTop).toBeLessThan(before - 10);
@@ -415,7 +417,7 @@ test('a phone folds the other seats\' rivers away with 捨て牌, and remembers 
   await waitForPlayback(page);
   await expectShown(false);
 
-  await toggle.click();
+  await toggleRivers(page);
   await expectShown(true);
   await page.reload();
   await waitForPlayback(page);
@@ -475,15 +477,12 @@ test('an upright phone shows the log of moves only with the rivers folded away',
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   const log = page.getByRole('list', { name: 'この局の動き' });
-  const toggle = page.getByRole('button', { name: '捨て牌' });
   for (let i = 0; i < 6; i++) await playOneStep(page);
   await waitForPlayback(page);
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(log).toBeHidden();
   expect(await page.locator('.event-log li').count()).toBeGreaterThan(12);
 
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggleRivers(page);
   await expectPhoneLog(page);
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
   // It keeps the newest in sight as moves land.
@@ -491,7 +490,7 @@ test('an upright phone shows the log of moves only with the rivers folded away',
   await waitForPlayback(page);
   await expectPhoneLog(page);
 
-  await toggle.click();
+  await toggleRivers(page);
   await expect(log).toBeHidden();
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
 });
@@ -520,13 +519,15 @@ for (const [width, height] of [[844, 390], [1280, 900]]) {
   });
 }
 
-// A desktop has no 捨て牌 toggle, and shows every river even with the phone's
-// choice saved as hidden.
-test('a desktop always shows the rivers, with no 捨て牌 toggle', async ({ page }) => {
+// A desktop has no 他家の捨て牌 option, and shows every river even with the
+// phone's choice saved as hidden.
+test('a desktop always shows the rivers, with no 他家の捨て牌 option', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('mhj-dojo.rivers.v1', 'hidden'));
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);
-  await expect(page.getByRole('button', { name: '捨て牌' })).toBeHidden();
+  await openSettings(page);
+  await expect(riversOption(page)).toHaveCount(0);
+  await page.keyboard.press('Escape');
   for (const r of ['#river-top', '#river-left', '#river-right']) {
     await expect(page.locator(r)).toHaveCSS('display', 'grid');
   }
@@ -679,11 +680,10 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
     expect(tops.length).toBeGreaterThan(6);
     expect(tops.filter((t) => t === tops[0]).length).toBeGreaterThan(6);
     if (height > 500) {
-      const toggle = page.getByRole('button', { name: '捨て牌' });
       await expect(page.getByRole('list', { name: 'この局の動き' })).toBeHidden();
-      await toggle.click();
+      await toggleRivers(page);
       await expectPhoneLog(page);
-      await toggle.click();
+      await toggleRivers(page);
     } else {
       await expectPhoneLog(page);
     }

@@ -4,7 +4,6 @@ import type { PlaybackHighlight } from '../playback';
 import { Tile } from './Tile';
 import { tileName } from '../tiles';
 import { Melds } from './Melds';
-import { useRiversShown } from '../panels';
 import { seatLabel } from '../seats';
 
 export const WIND_NAMES: Record<string, string> = { '1z': '東', '2z': '南', '3z': '西', '4z': '北' };
@@ -41,15 +40,17 @@ export interface GameTableProps {
   log?: GameEvent[];
   highlight?: PlaybackHighlight | null;
   playing?: boolean;
+  // Whether the other seats' rivers are shown: a phone can fold them away
+  // (設定's 表示, GameApp); a desktop always shows them (style.css).
+  riversShown?: boolean;
 }
 
 /** The table: each seat's river, points and (hidden) hand around the round
  * info and the round's moves. The skip control lives in the action bar
  * (GameApp), not here. */
-export function GameTable({ state, log = state.events, highlight, playing = false }: GameTableProps) {
+export function GameTable({ state, log = state.events, highlight, playing = false, riversShown = true }: GameTableProps) {
   const at = (rel: number) => state.seats[(state.you + rel) % 4];
   const logRef = useRef<HTMLOListElement>(null);
-  const rivers = useRiversShown();
   // The newest move stays in sight: the log scrolls to its end as moves land
   // (its bottom, or on a phone, where it runs sideways, its right end), but
   // only while it is there, so a player reading earlier moves stays put.
@@ -93,25 +94,12 @@ export function GameTable({ state, log = state.events, highlight, playing = fals
       class="game-table"
       aria-label="卓"
       data-playing={playing ? 'true' : 'false'}
-      data-rivers={rivers.shown ? 'shown' : 'hidden'}
+      data-rivers={riversShown ? 'shown' : 'hidden'}
     >
       <SeatBox className="seat-top" seat={at(2)} state={state} highlight={highlight} playing={playing} riverId="river-top" />
       <SeatBox className="seat-left" seat={at(3)} state={state} highlight={highlight} playing={playing} riverId="river-left" />
       <div class="table-center">
-        {/* The round's name is in the header's status line, not repeated here. */}
-        <div class="table-round">
-          <span class="table-remaining">残り {state.wall_remaining}</span>
-          {/* Phones only (style.css): the other seats' rivers fold away. */}
-          <button
-            type="button"
-            class="rivers-toggle"
-            aria-expanded={rivers.shown}
-            aria-controls="river-top river-left river-right"
-            onClick={rivers.toggle}
-          >
-            捨て牌<span aria-hidden="true">{rivers.shown ? ' ▴' : ' ▾'}</span>
-          </button>
-        </div>
+        {/* The round's name and the wall left are in the header's status line, not repeated here. */}
         {state.deposit > 0 && <div class="table-deposit">供託 {state.deposit / 1000}本</div>}
         {/* Focusable so a keyboard can scroll it too. */}
         <ol ref={logRef} class="event-log" aria-label="この局の動き" tabIndex={0} onScroll={onLogScroll}>
