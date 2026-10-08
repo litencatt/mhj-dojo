@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { versionPattern } from './helpers';
+import { PHONE, loaded, versionPattern } from './helpers';
 
 // The header's version and the help dialog, in both modes.
 
@@ -13,7 +13,7 @@ async function openHelp(page: Page) {
 test('practice: the header shows the version and the help opens, closes and links to the glossary', async ({ page }) => {
   await page.goto('./?seed=1&turns=18');
   await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
 
   const helpButton = page.getByRole('button', { name: 'ヘルプ', exact: true });
   let dialog = await openHelp(page);
@@ -65,7 +65,7 @@ test('practice: the header shows the version and the help opens, closes and link
 test('a click on the backdrop closes the help, a drag that ends there does not', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('./?seed=1&turns=18');
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
 
   // Selecting text inside and letting go over the backdrop.
   const dialog = await openHelp(page);
@@ -86,7 +86,7 @@ test('game mode: the header shows the version, and the help links to the glossar
   await page.goto('./?mode=game&seed=1');
   await expect(page.locator('.app-header .version-tag')).toHaveText(versionPattern());
   // The game is dealt (the engine takes a moment to load) before the help opens.
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+  await loaded(page);
   // The glossary starts in the dock.
   const glossary = page.getByRole('region', { name: '用語表' });
   await expect(glossary).toBeHidden();
@@ -102,7 +102,7 @@ test('game mode: the header shows the version, and the help links to the glossar
 
 // A phone game has no glossary: the help points to practice mode's instead.
 test('game mode on a phone: the help points to the glossary in practice mode', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./?mode=game&seed=1');
   const dialog = await openHelp(page);
   await expect(dialog.getByRole('button', { name: '用語表', exact: true })).toHaveCount(0);
@@ -110,7 +110,7 @@ test('game mode on a phone: the help points to the glossary in practice mode', a
 });
 
 test('the help fits a phone screen and scrolls', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./?seed=1&turns=18');
   const dialog = await openHelp(page);
   const box = await dialog.boundingBox();

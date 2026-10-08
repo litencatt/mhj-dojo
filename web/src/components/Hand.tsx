@@ -18,7 +18,7 @@ export interface HandProps {
   onlyDrawn?: boolean;
   melds?: ComponentChildren; // called melds, shown after the hand (game mode)
   // Game mode: your wind, points, rank and riichi beside the heading, and
-  // your river under the hand, shown on an upright phone only (style.css),
+  // your river under the hand, shown on an upright phone only (styles/*.css),
   // where they stand in for your seat at the table.
   status?: ComponentChildren;
   river?: ComponentChildren;

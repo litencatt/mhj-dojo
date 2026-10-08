@@ -13,12 +13,12 @@
 - ページの幅と余白: `.app` と `.dojo-home` が共通(`max-width: 1280px`、`padding: 12px 16px 48px`、ノッチの安全領域を考慮)。新しいページもこのどちらかのクラスを使う。
 - ヘッダー: 必ず `web/src/components/SiteHeader.tsx`。タイトル(`h1`)、3モードのリンク(現在のモードは `aria-current="page"`)、バージョン、`設定`、`?` ヘルプ(`Help.tsx`)。下にモード固有の状態(`children`)を置ける。モードの中のページ(道場の対局)は `back` でそのモードのトップへ戻るリンク(`.header-back`、タイトルの下の1行)を出す。モードのリンクは3つとも全画面で同じ順序(練習・CPU対戦・道場)。
 - 残り牌とドラ: 練習・CPU対戦・道場の対局とも `components/PinnedStatus.tsx` の `WallDora`(`.status-wall-dora`、残り牌の直後にドラ)。PC ではヘッダーの状態の行の右端、スマホ(`width <= 760px`)ではヘッダーから外し、上端に固定される手牌の欄の先頭(`PinnedStatus`、`.pinned-status`)に出して、スクロールしても常に見えるようにする。どちらか一方だけを表示する。
-- パネル: `section`、`.resume-panel`、`.dojo-panel` は同じ見た目(`style.css` の「A panel」)。`.release`(更新情報)も同じ寸法。新しいパネルは `section`(盤面側)か `.dojo-panel`(ハブ側)を使い、個別に border や radius を書かない。
+- パネル: `section`、`.resume-panel`、`.dojo-panel` は同じ見た目(`styles/base.css` の「A panel」)。`.release`(更新情報)も同じ寸法。新しいパネルは `section`(盤面側)か `.dojo-panel`(ハブ側)を使い、個別に border や radius を書かない。
 - 更新情報(`web/info/index.html`)は静的ページで SiteHeader を使わず、`.info-header` + `.info-nav`。色・角丸・パネルはトークンと共通。
 
 ## インタラクションとアクセシビリティ
 
-- タッチ操作の最小は 44px(スマホのアクションバー、牌のタップ領域は `::after` で隣へ広げる)。ヘッダーの小型ボタンはスマホで 32px 以上。
+- タッチ操作の最小はスマホで 32px(ヘッダーの 設定・? と、操作欄のロン・ポン・おすすめ等のボタンは同じ 32px)。牌のタップ領域は `::after` で隣へ広げる。
 - フォーカスリングを消さない。消すのは `.action-area:focus` のようにプログラムでフォーカスを移しただけの要素に限る。
 - 状態は属性で表す: モード → `aria-current="page"`、トグル → `aria-pressed`、タブ → `role="tab"` + `aria-selected`、ダイアログを開くボタン → `aria-haspopup="dialog"`。
 - ホバー表現は `@media (hover: hover)` の中だけ(タッチで持ち上げが残らないように)。

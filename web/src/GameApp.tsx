@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import * as api from './api';
-import type { ActionType, Advice, GameOptions, GameState, Remaining, SeatDanger, Tile as TileT, YakuRow } from './api';
+import type { ActionType, Advice, GameOptions, GameState, SeatDanger, Tile as TileT } from './api';
 import { AdvicePanel } from './components/AdvicePanel';
 import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
-import { Tile } from './components/Tile';
 import { PinnedStatus, WallDora } from './components/PinnedStatus';
 import { SidePanels } from './components/SidePanels';
-import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seatLabel } from './components/GameTable';
+import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
 import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { AppShell } from './components/AppShell';
-import type { ResumeItem } from './components/ResumePanel';
 import { PANELS, focusGlossary, type PanelKey, optionalInt, useGameAdvice, useMinimized, useRiversShown } from './panels';
 import {
   useLastAnalysis,
@@ -28,12 +26,14 @@ import {
 } from './hooks';
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, setDojoSpeeds, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
-import { tileName } from './tiles';
 import { summarizeMoves } from './summary';
-import { savedGames, type GameSummary } from './wasm';
-import { REDRAW_COST, SUMMON_COST } from './dojo/catalog';
-import { canAffordRedraw, canAffordSummon, dojoGame, dojoOptions, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './dojo/progress';
-import { TILE_BACKS, TILE_THEMES, applyRiichiStick, applyTableCloth, applyTileBack, applyTileTheme, applyWinEffect } from './tileThemes';
+import { savedGames } from './wasm';
+import { canAffordRedraw, canAffordSummon, loadProgress } from './dojo/progress';
+import { DojoAids, ukeireBadges } from './dojo/DojoAids';
+import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
+import { ActionBar } from './components/ActionBar';
+import { RadioGroup } from './components/RadioGroup';
+import { CPU_NAMES, DEALER_NAMES, dojoGameOptions, parseOptions, savedItem, urlOptions } from './gameOptions';
 import './dojo/dojo.css';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -46,94 +46,22 @@ const NO_COMBOS_BY_DISCARD: GameState['combos_by_discard'] = {};
 // is offered unless turned off in the options.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
-// On a phone, upright or on its side (style.css), the game leaves the chart
+// On a phone, upright or on its side (styles/*.css), the game leaves the chart
 // and the glossary (and the advice panel: the best discard is a chip in the
 // action bar; the danger marks stay) to practice mode, giving their room to
 // the yaku table. A
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
-// Where the other seats' rivers can fold away (style.css).
+// Where the other seats' rivers can fold away (styles/*.css).
 const RIVERS_FOLD = '(width <= 760px), (height <= 500px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
-const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
-const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
-
-/** The game options in the URL (or a form), unknown values as the defaults. */
-function parseOptions(get: (key: string) => string | null): GameOptions {
-  return {
-    length: get('length') === 'hanchan' ? 'hanchan' : 'tonpuu',
-    first_dealer: get('first_dealer') === 'you' ? 'you' : 'random',
-    cpu: get('cpu') === 'weak' ? 'weak' : 'normal',
-  };
-}
-
-/** A saved game in the list of saves: 「東風戦 東2局 シード 5」, and the URL params that deal it again. */
-function savedItem(g: GameSummary): ResumeItem {
-  const r = g.round;
-  const round = r && (r.over ? '終局' : WIND_NAMES[r.wind] && roundName(r.wind, r.number, r.honba));
-  const seed = g.seed !== null && `シード ${g.seed}`;
-  const params: Record<string, string> = {};
-  if (g.length) params.length = g.length;
-  if (g.firstDealer) params.first_dealer = g.firstDealer;
-  if (g.cpu) params.cpu = g.cpu;
-  if (g.seedKnown) params.seed = String(g.seed);
-  return {
-    id: g.id,
-    label: [LENGTH_NAMES[g.length as GameOptions['length']], round, seed].filter(Boolean).join(' '),
-    used: g.used,
-    params,
-    over: !!r?.over,
-  };
-}
-
-function urlOptions(): GameOptions {
-  const params = new URLSearchParams(location.search);
-  return parseOptions((k) => params.get(k));
-}
-
-/** The game a dojo plays: the length and CPU chosen in the hub, with what the dojo has bought. */
-function dojoGameOptions(p: DojoProgress): GameOptions {
-  return { ...dojoGame(p), first_dealer: 'random', dojo: dojoOptions(p) };
-}
-
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game), or a dojo game (?mode=dojo). */
-/** A choice of the new-game form as radio buttons, one per name, boxed like the dojo's 設定. */
-function RadioGroup<T extends string>({
-  label,
-  name,
-  value,
-  names,
-  onChange,
-}: {
-  label: string;
-  name: string;
-  value: T;
-  names: Record<T, string>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <fieldset class="dojo-settings-group option-group">
-      <legend>{label}</legend>
-      {(Object.keys(names) as T[]).map((k) => (
-        <label key={k}>
-          <input type="radio" name={name} value={k} checked={value === k} onChange={() => onChange(k)} />
-          {names[k]}
-        </label>
-      ))}
-    </fieldset>
-  );
-}
-
 export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const [state, setState] = useState<GameState | null>(null);
-  // The dojo's growth: read at the start, kept as it changes (settle, below).
-  const [progress, setProgress] = useState<DojoProgress>(() => (dojo ? loadProgress().progress : initialProgress()));
-  const [saveFailed, setSaveFailed] = useState(false);
-  const [reward, setReward] = useState<Reward | null>(null);
+  const { progress, has, learned, reward, saveFailed } = useDojoGame(dojo, state);
   const [peek, setPeek] = useState(false);
-  const has = (id: string) => dojo && (progress.ownedItems.includes(id) || progress.ownedYaku.includes(id));
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   // A hovered advice candidate, marked in the hand.
   const [highlightTile, setHighlightTile] = useState<string | null>(null);
@@ -248,48 +176,6 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (!dojo && state?.dojo) location.replace(`?mode=dojo&game=${encodeURIComponent(state.game_id)}`);
   }, [dojo, state?.dojo, state?.game_id]);
 
-  // The tile theme, back and other looks bought in the dojo, for the dojo's screens only.
-  useEffect(() => {
-    if (!dojo) return;
-    applyTileTheme(TILE_THEMES.find((t) => t.item === progress.activeTheme)?.id ?? 'default');
-    return () => applyTileTheme('default');
-  }, [dojo, progress.activeTheme]);
-  useEffect(() => {
-    if (!dojo) return;
-    applyTileBack(TILE_BACKS.find((t) => t.item === progress.activeBack)?.id ?? 'default');
-    return () => applyTileBack('default');
-  }, [dojo, progress.activeBack]);
-  useEffect(() => {
-    if (!dojo) return;
-    applyTableCloth(progress.activeCloth);
-    applyRiichiStick(progress.activeStick);
-    applyWinEffect(progress.activeEffect);
-    return () => {
-      applyTableCloth('default');
-      applyRiichiStick('default');
-      applyWinEffect('default');
-    };
-  }, [dojo, progress.activeCloth, progress.activeStick, progress.activeEffect]);
-
-  // A won round pays its han as it ends (progress.paidRounds keeps the rounds paid, by the
-  // game's id); a finished dojo game pays the rest once (progress.settle keeps the seeds paid).
-  // Both read fresh from storage so that another tab's purchases are not lost.
-  useEffect(() => {
-    if (!dojo || !state) return;
-    if (!state.game_over) {
-      const paid = payRounds(loadProgress().progress, state.game_id, state.rounds);
-      if (!paid) return;
-      setSaveFailed(!saveProgress(paid.progress));
-      setProgress(paid.progress);
-      return;
-    }
-    const { progress: next, reward: paid } = settle(loadProgress().progress, state, state.game_id);
-    if (!paid) return;
-    setSaveFailed(!saveProgress(next));
-    setProgress(next);
-    setReward(paid);
-  }, [state]);
-
   function act(type: ActionType, tile?: TileT, tiles?: TileT[]) {
     if (!state) return;
     void request(() => asked(api.gameAction(state.game_id, type, tile, tiles, adviceOn)));
@@ -306,19 +192,10 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput)).then((ok) => ok && setOptionsOpen(false));
   }
 
-
   // The dojo's yaku table and chart have the rows of the yaku learned only.
-  const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
-  const keepRow = useCallback((key: string) => !dojo || key === 'normal' || learned.has(key), [dojo, learned]);
-  const chartHistory = useMemo(
-    () =>
-      dojo && state
-        ? state.history.map((h) => ({ ...h, shanten: Object.fromEntries(Object.entries(h.shanten).filter(([k]) => keepRow(k))) }))
-        : state?.history,
-    [state, dojo, keepRow],
-  );
+  const rows = useLearnedRows(dojo, learned, state);
   // After a call the analysis is empty; the chart keeps the rows from before.
-  const chartAnalysis = useLastAnalysis(useMemo(() => state?.analysis.filter((r: YakuRow) => keepRow(r.key)), [state, keepRow]));
+  const chartAnalysis = useLastAnalysis(rows.analysis);
   const rowNames = useRowNames(chartAnalysis);
   const minimizeChart = useCallback(() => minimize('chart'), [minimize]); // the chart is memoized
 
@@ -393,17 +270,6 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const isMinOrLocked = (k: PanelKey) => isMin(k) || !bought(k);
   const panels = (phone ? PHONE_GAME_PANELS : adviceOn ? GAME_PANELS : NO_ADVICE_PANELS).filter((p) => bought(p.key));
   const docked = panels.filter((p) => minimized.includes(p.key));
-  const sideAnalysis = useMemo(
-    () => (dojo && state ? state.analysis.filter((r: YakuRow) => keepRow(r.key)) : state?.analysis),
-    [state, dojo, keepRow],
-  );
-  const sideByDiscard = useMemo(
-    () =>
-      dojo && state
-        ? Object.fromEntries(Object.entries(state.by_discard).map(([t, rows]) => [t, rows.filter((r) => keepRow(r.key))]))
-        : state?.by_discard,
-    [state, dojo, keepRow],
-  );
   const canRedraw = dojo && !!state?.legal.redraw && canAffordRedraw(progress, state.rounds);
   const summonable = dojo && state?.legal.summon?.length && canAffordSummon(progress, state.rounds) ? state.legal.summon : undefined;
   // The dojo's 打牌プレビュー・複合役 is bought: without it, no preview of a hovered discard and no combos.
@@ -661,7 +527,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
               <div class="area-chart" hidden={isMinOrLocked('chart')}>
                 <ShantenChart
                   sessionId={state.game_id}
-                  history={chartHistory ?? state.history}
+                  history={rows.history ?? state.history}
                   currentAnalysis={chartAnalysis}
                   rowNames={rowNames}
                   minimized={isMinOrLocked('chart')}
@@ -675,8 +541,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     >
       {state && (
         <SidePanels
-          analysis={sideAnalysis ?? state.analysis}
-          byDiscard={sideByDiscard ?? state.by_discard}
+          analysis={rows.analysis ?? state.analysis}
+          byDiscard={rows.byDiscard ?? state.by_discard}
           combos={previewOn ? state.combos : NO_COMBOS}
           combosByDiscard={previewOn ? state.combos_by_discard : NO_COMBOS_BY_DISCARD}
           remaining={state.remaining}
@@ -701,252 +567,5 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
         />
       )}
     </AppShell>
-  );
-}
-
-interface ActionBarProps {
-  state: GameState;
-  busy: boolean;
-  myTurn: boolean;
-  riichiMode: boolean;
-  onRiichiMode: (on: boolean) => void;
-  onAction: (type: ActionType, tile?: TileT, tiles?: TileT[]) => void;
-  canRedraw: boolean; // dojo: 引き直し is legal and affordable
-  summonable?: TileT[]; // dojo: the kinds 牌寄せ may fetch, when legal and affordable
-  /** On a phone, the advice to offer as a chip (no advice panel there). */
-  advice: Advice | null;
-  highlight: string | null; // the hand's marked tile
-  onHighlight: (tile: string | null) => void;
-}
-
-/** Your options right now: ron / pon / kan / chii / skip on a discard, or on
- * your turn tsumo, kan, riichi, 九種九牌, or a hint. */
-function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, canRedraw, summonable, advice, highlight, onHighlight }: ActionBarProps) {
-  const { legal } = state;
-  // 牌寄せ opens a row of the kinds it may fetch; a new state closes it.
-  const [summoning, setSummoning] = useState(false);
-  useEffect(() => setSummoning(false), [state]);
-  if (state.phase === 'ended') return null;
-  if (state.phase === 'call' && legal.skip) {
-    // The claimed tile is the last move shown: a discard, or an added kan (槍槓).
-    const last = state.events[state.events.length - 1];
-    return (
-      // At the right end, near the drawn tile the hand is played from (Hand.tsx).
-      <div class="action-bar action-bar-call" role="group" aria-label="操作">
-        <span class="action-hint">
-          {last && `${seatLabel(last.seat, state.you)}の${last.type === 'kan' ? '加槓' : '打牌'}`}
-          {state.last_discard && <Tile tile={state.last_discard} size="sm" />}
-        </span>
-        {legal.ron && (
-          <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('ron')}>
-            ロン
-          </button>
-        )}
-        {legal.pon && (
-          <button type="button" disabled={busy} onClick={() => onAction('pon')}>
-            ポン
-          </button>
-        )}
-        {legal.kan.length > 0 && (
-          <button type="button" disabled={busy} onClick={() => onAction('kan')}>
-            カン
-          </button>
-        )}
-        {legal.chii.map((pair) => (
-          <button
-            key={pair.join()}
-            type="button"
-            class="action-call"
-            aria-label={`チー ${pair.map(tileName).join(' ')} + ${state.last_discard ? tileName(state.last_discard) : ''}`}
-            disabled={busy}
-            onClick={() => onAction('chii', undefined, pair)}
-          >
-            チー
-            <span class="call-tiles" aria-hidden="true">
-              <Tile tile={pair[0]} size="xs" />
-              <Tile tile={pair[1]} size="xs" />
-              {state.last_discard && (
-                <>
-                  +<Tile tile={state.last_discard} size="xs" />
-                </>
-              )}
-            </span>
-          </button>
-        ))}
-        <button type="button" disabled={busy} onClick={() => onAction('skip')}>
-          {legal.ron ? '見逃す' : 'スキップ'}
-        </button>
-      </div>
-    );
-  }
-  if (!myTurn) return null;
-  const riichiAllowed = legal.riichi.length > 0;
-  const best = advice?.candidates[0]?.tile;
-  return (
-    <div class="action-bar" role="group" aria-label="操作">
-      {best && (
-        // The best discard of the advice; a tap marks it in the hand (again, unmarks).
-        <button
-          type="button"
-          class="action-advice"
-          aria-pressed={highlight === best}
-          onClick={() => onHighlight(highlight === best ? null : best)}
-        >
-          おすすめ: {tileName(best)}
-        </button>
-      )}
-      {legal.tsumo && (
-        <button type="button" class="action-primary" disabled={busy} onClick={() => onAction('tsumo')}>
-          ツモ
-        </button>
-      )}
-      {legal.kan.map((t) => (
-        <button
-          key={t}
-          type="button"
-          class="action-call"
-          aria-label={`カン ${tileName(t)}`}
-          disabled={busy}
-          onClick={() => onAction('kan', t)}
-        >
-          カン
-          <span class="call-tiles" aria-hidden="true">
-            <Tile tile={t} size="xs" />
-          </span>
-        </button>
-      ))}
-      {legal.kyuushu && (
-        <button type="button" disabled={busy} onClick={() => onAction('kyuushu')}>
-          九種九牌
-        </button>
-      )}
-      {canRedraw && (
-        <button type="button" class="action-redraw" disabled={busy} onClick={() => onAction('redraw')}>
-          引き直し（{REDRAW_COST}銭）
-        </button>
-      )}
-      {summonable && (
-        <button type="button" class="action-redraw" aria-expanded={summoning} disabled={busy} onClick={() => setSummoning(!summoning)}>
-          牌寄せ（{SUMMON_COST}銭）
-        </button>
-      )}
-      {summonable && summoning && (
-        <div class="summon-picker" role="group" aria-label="寄せる牌">
-          {summonable.map((t) => (
-            <Tile key={t} tile={t} size="sm" interactive label={`${tileName(t)}を寄せる`} onClick={() => onAction('summon', t)} />
-          ))}
-        </div>
-      )}
-      {riichiAllowed && (
-        <button
-          type="button"
-          class={riichiMode ? 'action-riichi active' : 'action-riichi'}
-          aria-pressed={riichiMode}
-          disabled={busy}
-          onClick={() => onRiichiMode(!riichiMode)}
-        >
-          リーチ
-        </button>
-      )}
-      <span class="action-hint">
-        {riichiMode ? (
-          <span>
-            リーチ宣言牌を<ClickOrTap />（聴牌が残る牌だけ選べます）
-          </span>
-        ) : state.seats[state.you].riichi ? (
-          'リーチ中：和了るかツモ切り'
-        ) : (
-          <span>
-            捨てる牌を<ClickOrTap />
-          </span>
-        )}
-      </span>
-    </div>
-  );
-}
-
-/** 「クリック」, or on a touch screen 「タップ（もう一度で打牌）」: a tap
- * first selects a tile and a second tap discards it (components/Hand.tsx). */
-function ClickOrTap() {
-  return (
-    <>
-      <span class="hint-mouse">クリック</span>
-      <span class="hint-touch">タップ（もう一度タップで打牌）</span>
-      <span class="hint-hybrid">（タッチでは2回タップ）</span>
-    </>
-  );
-}
-
-/** Each hand tile's ukeire once discarded (the normal row of by_discard); the best (lowest shanten, then most) marked. */
-function ukeireBadges(state: GameState): Record<string, { count: number; text: string; best: boolean }> {
-  const rows = Object.entries(state.by_discard).flatMap(([t, rs]) => {
-    const n = rs.find((r) => r.key === 'normal');
-    return n && n.shanten !== null ? [{ t, shanten: n.shanten, count: n.ukeire_total }] : [];
-  });
-  const low = Math.min(...rows.map((r) => r.shanten));
-  const most = Math.max(...rows.filter((r) => r.shanten === low).map((r) => r.count));
-  return Object.fromEntries(
-    rows.map((r) => [r.t, { count: r.count, text: `切ると有効牌${r.count}枚`, best: r.shanten === low && r.count === most }]),
-  );
-}
-
-interface DojoAidsProps {
-  analysis: YakuRow[];
-  learned: Set<string>;
-  closed: boolean; // no open meld (an ankan keeps the hand closed)
-  riichi: boolean; // already in riichi
-  remaining: Remaining;
-  noyaku: boolean; // 補助: 役なし警告
-  riichiOwned: boolean;
-  waits: boolean; // 補助: 待ち牌表示
-  nextDraws?: TileT[]; // イカサマ: 山読み
-}
-
-/** The dojo's aids above the hand: 役なし (or 立直, or a tsumo, to win), the waits with their copies left, and the next draws. */
-function DojoAids({ analysis, learned, closed, riichi, remaining, noyaku, riichiOwned, waits, nextDraws }: DojoAidsProps) {
-  const normal = analysis.find((r) => r.key === 'normal');
-  const tenpai = normal?.shanten === 0;
-  // Tenpai in the general form, but no learned yaku's row is: a win would have no yaku (立直 and
-  // 門前清自摸和 have no row; a closed hand that owns 門前清自摸和 still wins by tsumo).
-  const noYaku = tenpai && !riichi && !analysis.some((r) => r.key !== 'normal' && learned.has(r.key) && r.shanten !== null && r.shanten <= 0);
-  const warn = noyaku && noYaku;
-  const showWaits = waits && tenpai && normal.ukeire.length > 0;
-  if (!warn && !showWaits && !nextDraws?.length) return null;
-  return (
-    <div class="dojo-aids">
-      {(warn || showWaits) && (
-        <p class="dojo-aid" data-testid="dojo-waits">
-          {warn &&
-            (closed && riichiOwned ? (
-              <span class="dojo-aid-ok">役なし：立直で和了れます</span>
-            ) : closed && learned.has('tsumo') ? (
-              <span class="dojo-aid-warn">ロンでは和了れません（ツモなら門前清自摸和）</span>
-            ) : (
-              <span class="dojo-aid-warn">役なし</span>
-            ))}
-          {showWaits && (
-            <>
-              <span class="dojo-aid-label">待ち</span>
-              {normal.ukeire.map((t) => (
-                <span key={t} class="dojo-aid-tile">
-                  <Tile tile={t} size="xs" dimmed={(remaining[t] ?? 0) === 0} label={`${tileName(t)} 残り${remaining[t] ?? 0}枚`} />
-                  <span class="dojo-aid-count" aria-hidden="true">
-                    {remaining[t] ?? 0}
-                  </span>
-                </span>
-              ))}
-            </>
-          )}
-        </p>
-      )}
-      {!!nextDraws?.length && (
-        <p class="dojo-aid" data-testid="dojo-next-draws">
-          <span class="dojo-aid-label">次のツモ（鳴きがなければ）</span>
-          {nextDraws.map((t, i) => (
-            <Tile key={i} tile={t} size="xs" />
-          ))}
-        </p>
-      )}
-    </div>
   );
 }

@@ -1,0 +1,273 @@
+/* ---- Hand ---- */
+/* Hand tiles scale with the panel so all 14 (13 + drawn) fit on one row:
+   14 tiles + 12 gaps of 4px + 16px row gap + 14px drawn-tile divider = 78px.
+   Below 28px per tile (the old phone size) the row wraps instead. */
+.hand-panel {
+  container-type: inline-size;
+}
+.hand-panel .tile-md {
+  width: clamp(28px, calc((100cqw - 78px) / 14), 36px);
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
+.hand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hand-tiles {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.hand-drawn {
+  display: flex; /* no line box around the tile: it sits level with the hand */
+  padding-left: 12px;
+  border-left: 2px dashed var(--border);
+}
+/* With 面子表示 the brackets sit above the tiles: the drawn tile (and its
+   divider) lines up with the tiles, not with the middle of the brackets. */
+.hand-row:has(> .hand-tiles-grouped) {
+  align-items: flex-end;
+}
+.hand-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.hand-heading h2 {
+  margin: 0;
+}
+/* Your wind, points, rank and river in the hand panel (CPU game): on an
+   upright phone only, where they replace your seat at the table (below). */
+.hand-panel .hand-status,
+.hand-panel .hand-river {
+  display: none;
+}
+/* 面子表示: each block under a labelled bracket; blocks wrap as units, and
+   tiles sit closer inside a block than between blocks. With 2px inside and
+   6px between, up to 7 blocks take no more width than the 4px gaps of the
+   plain row, so the drawn tile stays on the same row. */
+.hand-tiles-grouped {
+  align-items: flex-end;
+  gap: 6px;
+}
+.hand-group {
+  display: flex;
+  flex-direction: column;
+  color: var(--muted);
+}
+.hand-group-meld { color: var(--accent); }
+.hand-group-pair { color: var(--success); }
+.hand-group-taatsu { color: var(--group-taatsu); }
+.hand-group-label {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+.hand-group-label::after {
+  content: "";
+  display: block;
+  height: 5px;
+  margin: 1px 2px 6px;
+  border: 1.5px solid currentColor;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
+}
+.hand-group-float .hand-group-label::after {
+  border-style: dashed;
+}
+.hand-group-tiles {
+  display: flex;
+  gap: 2px;
+}
+/* Floats can be up to 13 tiles: let them wrap inside the group on phones. */
+.hand-group-float .hand-group-tiles {
+  flex-wrap: wrap;
+}
+.discard-label {
+  margin-right: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.discard-river {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.exhausted-banner {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-weight: bold;
+}
+
+/* ---- Narrow screens and phones ---- */
+/* No double-tap zoom on the hand: its tiles are tapped twice on purpose. */
+.hand-row {
+  touch-action: manipulation;
+}
+@media (width <= 760px) {
+  /* Discards a little smaller than the hand's tiles, which shrink with the
+     screen, instead of a fixed 26px that dwarfs them on a phone. */
+  .discard-river {
+    gap: 2px;
+  }
+  .discard-river .tile-sm {
+    width: clamp(14px, calc((100cqw - var(--hand-fixed)) / 14 * 0.85), 26px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  /* The hand (with the pinned wall and dora, base.css) stays on screen as
+     the page scrolls: not while a win or a result fills it, nor when its
+     tiles don't fit on one row (hooks.ts). */
+  .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
+  .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--bg);
+    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
+  }
+  /* Hand: 14 tiles on one row. The tile width is what is left of the panel
+     after the fixed gaps (12 of 2px, the drawn tile's 6px gap, 5px padding
+     and 2px divider, rounded up; more for the 面子表示 brackets' gaps), so
+     at 360px a tile is about 20px wide, and 16px still fits at 320px. A tile's tap area reaches into the
+     gaps and above and below it. */
+  .hand-panel {
+    --hand-fixed: 40px;
+    --hand-tile: clamp(16px, calc((100cqw - var(--hand-fixed)) / 14), 36px);
+  }
+  .hand-panel:has(.hand-tiles-grouped) {
+    --hand-fixed: 54px;
+  }
+  .hand-panel .tile-md {
+    width: var(--hand-tile);
+    padding: 1.5px;
+    border-radius: 4px;
+  }
+  .hand-row {
+    gap: 6px;
+  }
+  .hand-tiles {
+    gap: 2px;
+  }
+  .hand-tiles-grouped {
+    gap: 4px;
+  }
+  .hand-group-tiles {
+    gap: 2px;
+  }
+  .hand-group-label {
+    font-size: 0.6rem;
+  }
+  .hand-drawn {
+    padding-left: 5px;
+  }
+  .hand-panel button.tile::after {
+    content: "";
+    position: absolute;
+    inset: -8px -1px;
+  }
+  /* Called melds (CPU game) get a row of their own under the hand, the
+     hand and the melds both from the left edge, in the hand's tile size so
+     that four fit on the row (the called tile sideways, as at 26px). */
+  .hand-row:has(> .melds) {
+    justify-content: flex-start;
+  }
+  .hand-row > .melds {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  .hand-row > .melds .tile-sm {
+    width: var(--hand-tile);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  .hand-row > .melds .meld-called .tile-sm {
+    transform: translateY(calc(var(--hand-tile) / 6)) rotate(90deg);
+    margin: 0 calc(var(--hand-tile) / 6);
+  }
+  .hand-row > .melds .meld-called.meld-added .tile-sm {
+    transform: rotate(90deg);
+    margin: calc(var(--hand-tile) / -6) calc(var(--hand-tile) / 6);
+  }
+}
+/* A phone upright: your seat in the hand panel (the seats' layout: table.css). */
+@media (width <= 760px) and (height > 500px) {
+  /* Your turn: the hand panel marked as your seat's box was. */
+  .hand-panel.hand-acting {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  /* One line between 手牌 and 面子表示, clipped rather than wrapped. */
+  .hand-panel .hand-status {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .hand-heading > h2,
+  .hand-heading > button {
+    flex: none;
+  }
+  .hand-panel .hand-river:not(:empty) {
+    display: flex;
+    margin-top: 8px;
+  }
+  .hand-river .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
+}
+/* The dojo's 有効牌ハイライト: each hand tile's ukeire once discarded, under its face; the best is marked. */
+.tile .tile-badge {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 1.4em;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.tile.tile-ukeire-best {
+  border-color: var(--accent);
+}
+.tile.tile-ukeire-best .tile-badge {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.hand-panel:has(.tile-badge) .hand-row {
+  padding-bottom: 14px;
+}

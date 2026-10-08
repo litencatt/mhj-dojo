@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, engineCalls, expectStopped, labels, openSettings, stoppedDialog } from './helpers';
+import { discardDrawn, engineCalls, expectStopped, labels, openSettings, savedMoves, stoppedDialog } from './helpers';
 
 // Practice mode's saves and tabs: the engine runs as WebAssembly in a Web
 // Worker, and each session's moves are saved to localStorage so a reload (or
@@ -117,15 +117,6 @@ test('two tabs keep their own saved sessions', async ({ page, context }) => {
   await discardDrawn(other);
   for (const p of [page, other]) await expect(stoppedDialog(p)).toHaveCount(0);
 });
-
-function savedMoves(page: Page) {
-  return page.evaluate((id) => {
-    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
-      sessions: Record<string, { moves: unknown[] }>;
-    } | null;
-    return s?.sessions[id!]?.moves.length;
-  }, new URL(page.url()).searchParams.get('session'));
-}
 
 test('an answer that comes after the tab stopped is neither shown nor saved', async ({ page, context }) => {
   await page.goto('./?seed=24&turns=18');

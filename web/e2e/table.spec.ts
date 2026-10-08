@@ -1,6 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { GameResult, GameState } from '../src/api';
 import {
+  GAME_URL,
+  PHONE,
   SEED,
   engineCalls,
   finishPlayback,
@@ -10,6 +12,7 @@ import {
   isRequest,
   nextEngineReply,
   onEngineReply,
+  openGame,
   pageOverflowX,
   playOneStep,
   waitForPlayback,
@@ -46,8 +49,8 @@ async function act(page: Page, locator: Locator): Promise<GameState> {
 // left edge, in the hand's tile size, so four fit on one row. The game's
 // state is patched with a riichi and four melds, whatever the seed deals.
 test('an upright phone shows your seat in the hand panel', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.setViewportSize(PHONE);
+  await page.goto(GAME_URL);
   for (let i = 0; i < 4; i++) await playOneStep(page);
   await waitForPlayback(page);
   let st: GameState | null = null;
@@ -115,11 +118,10 @@ test('an upright phone shows your seat in the hand panel', async ({ page }) => {
 // closes it, and so does a new game once it is on, focus going back to 設定
 // either way; a new game that fails keeps them open, as chosen.
 test('a phone\'s 設定: a dialog of the options, closed by Escape and a new game', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   // 新規対局 mid-game asks first.
   page.on('dialog', (d) => void d.accept());
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const toggle = page.getByRole('button', { name: /^設定/ });
   const form = page.locator('.new-game-form');
   const length = form.getByRole('radio', { name: '東風戦' });
@@ -193,7 +195,7 @@ test('the table follows the CPU playback step by step, and ends on the final val
     patched = state;
   });
 
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   const table = page.locator('.game-table');
   await expect(table).toBeVisible();
   // The clock stands still: let the CPU turns before your first play out, if any.
@@ -276,7 +278,7 @@ async function hide(page: Page) {
 /** Opens the game with the clock installed, past any CPU turns before yours, your drawn tile ready. */
 async function openAtYourTurn(page: Page) {
   await page.clock.install();
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   const table = page.locator('.game-table');
   await expect(table).toBeVisible();
   if ((await table.getAttribute('data-playing')) === 'true') {
@@ -407,7 +409,7 @@ async function checkRoundEnd(page: Page, end: RoundEnd) {
       sd.rank = ranks[sd.seat];
     }
   });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   const hand = handPanel(page);
   await expect(hand.locator('.hand-drawn button')).toBeEnabled({ timeout: 15_000 });
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
@@ -528,7 +530,7 @@ test('playback with the points tied: ranks go to the seat nearer the first deale
 });
 
 test.describe('touch', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test.use({ viewport: PHONE, hasTouch: true });
 
   // A pick made before リーチ is toggled must not declare riichi with one tap.
   // The engine rarely offers riichi early, so its answers are patched to

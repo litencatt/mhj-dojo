@@ -1,0 +1,55 @@
+/* ---- Chart ---- */
+.shanten-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+.chart-axis-label {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.chart-axis-title {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.legend-off {
+  opacity: 0.4;
+}
+.legend-group-label {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.legend-yakuman .legend-swatch {
+  border-radius: 2px;
+}
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--legend-color, var(--muted));
+  display: inline-block;
+}

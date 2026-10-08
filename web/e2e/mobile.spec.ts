@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { SEED, discardsSent, engineCalls, waitForPlayback } from './helpers';
+import { PHONE, SEED, discardsSent, engineCalls, loaded, pageOverflowX, waitForPlayback } from './helpers';
 
 // Practice mode on phone-sized screens (320 to 390px wide): no sideways page
 // scroll, the 14 hand tiles on one row, the minimized panels as a tab bar
@@ -20,10 +20,6 @@ async function box(locator: Locator): Promise<Box> {
 
 function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-}
-
-async function pageOverflow(page: Page) {
-  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
 
 /** How many rows the hand's tiles (hand tiles and the drawn tile) take: a
@@ -66,7 +62,7 @@ for (const width of [320, 360, 390]) {
 
     test('the hand fits one row and the dock is a bottom bar clear of the page', async ({ page }) => {
       await openPractice(page, ALL_PANELS);
-      expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+      expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
       expect(await handRows(page)).toBe(1);
       // Tiles stay big enough to see and tap.
       const tile = await box(page.locator('.hand-tiles button.tile').first());
@@ -109,7 +105,7 @@ for (const width of [320, 360, 390]) {
     test('with every panel open, the page and the yaku tables fit the width', async ({ page }) => {
       await openPractice(page, []);
       await expect(page.getByRole('navigation', { name: '最小化したパネル' })).toHaveCount(0);
-      expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+      expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
       expect(await handRows(page)).toBe(1);
 
       const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
@@ -139,7 +135,7 @@ for (const width of [320, 360, 390]) {
 }
 
 test.describe('touch', () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  test.use({ viewport: PHONE, hasTouch: true });
 
   test('a tap selects and previews a tile, a second tap discards it', async ({ page }) => {
     const calls = await engineCalls(page);
@@ -207,7 +203,7 @@ test.describe('touch', () => {
 });
 
 test('a phone hides the name search, and 条件をクリア keeps its saved text', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   // A search saved on a wide screen (it matches no yaku here, so it would empty the table).
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('e2e-filter')) {
@@ -231,7 +227,7 @@ test('a phone hides the name search, and 条件をクリア keeps its saved text
 });
 
 test('a mouse click at phone width discards at once', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   const calls = await engineCalls(page);
   await openPractice(page, ALL_PANELS);
   const hand = page.getByRole('region', { name: '手牌' });
@@ -247,14 +243,14 @@ test('a mouse click at phone width discards at once', async ({ page }) => {
 // table) and the 役別向聴 table are open; every other panel starts in the dock.
 for (const [label, viewport] of [
   ['desktop', { width: 1280, height: 800 }],
-  ['390px', { width: 390, height: 844 }],
+  ['390px', PHONE],
 ] as const) {
   test.describe(`default panels (${label})`, () => {
     test.use({ viewport });
 
     test('practice: only the header, the hand and 役別向聴 are open', async ({ page }) => {
       await page.goto('./?seed=1&turns=18');
-      await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+      await loaded(page);
       await expect(page.locator('.app-header')).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
       for (const name of ['時系列チャート', '履歴ツリー', 'アドバイス', '用語表']) {
@@ -267,7 +263,7 @@ for (const [label, viewport] of [
 
     test('CPU game: only the header, the table, the hand and 役別向聴 are open', async ({ page }) => {
       await page.goto(`./?mode=game&seed=${SEED}`);
-      await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
+      await loaded(page);
       await expect(page.getByRole('region', { name: '卓' })).toBeVisible();
       await expect(page.getByRole('region', { name: '役別向聴テーブル' })).toBeVisible();
       for (const name of ['時系列チャート', 'アドバイス', '用語表']) {
@@ -314,7 +310,7 @@ test('the desktop layout keeps the dock on the right edge', async ({ page }) => 
 // it lines up with the hand tiles (as it does with 面子表示 off).
 for (const [label, viewport] of [
   ['desktop', { width: 1280, height: 800 }],
-  ['390px', { width: 390, height: 844 }],
+  ['390px', PHONE],
 ] as const) {
   test(`the drawn tile lines up with the grouped hand (${label})`, async ({ page }) => {
     await page.setViewportSize(viewport);
@@ -339,7 +335,7 @@ for (const [label, viewport] of [
 // its side, open on a wider screen (practice.spec.ts), and the player's
 // choice is kept. Folded, the count (and 条件をクリア) sits in the heading row.
 test.describe('the yaku filter bar on a phone', () => {
-  test.use({ viewport: { width: 390, height: 844 } });
+  test.use({ viewport: PHONE });
 
   test('starts folded, opens to filter, and keeps the choice over a reload', async ({ page }) => {
     await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
@@ -425,7 +421,7 @@ test.describe('the yaku filter bar on a phone', () => {
   });
 
   for (const [mode, viewport] of [
-    ['a CPU game', { width: 390, height: 844 }],
+    ['a CPU game', PHONE],
     ['a CPU game on its side', { width: 844, height: 390 }],
   ] as const) {
     test(`${mode} starts folded too`, async ({ page }) => {
@@ -488,7 +484,7 @@ for (const width of [320, 360, 390]) {
       // Nothing sticks out of the bar or the page.
       const right = await bar.evaluate((el) => Math.max(...[...el.querySelectorAll('*')].map((e) => e.getBoundingClientRect().right)));
       expect(right).toBeLessThanOrEqual(barBox.x + barBox.width + 0.5);
-      expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+      expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
       // The ✕ is easy to tap.
       const c = await box(clear);
       expect(c.width).toBeGreaterThanOrEqual(32);
@@ -508,14 +504,14 @@ for (const width of [320, 360, 390]) {
 // 絞り込み moves between the heading (a phone) and the filter bar: crossing
 // 760px keeps its focus.
 test('絞り込み keeps focus when the width crosses 760px', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
   const toggle = page.getByRole('region', { name: '役別向聴テーブル' }).getByRole('button', { name: '絞り込み', exact: true });
   await toggle.focus();
   await expect(page.locator('.panel-heading .yaku-filter-toggle')).toBeFocused();
   await page.setViewportSize({ width: 900, height: 844 });
   await expect(page.locator('.yaku-filter .yaku-filter-toggle')).toBeFocused();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await expect(page.locator('.panel-heading .yaku-filter-toggle')).toBeFocused();
 });
 
@@ -529,7 +525,7 @@ test.describe('320px touch', () => {
     const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
     await page.getByRole('region', { name: '手牌' }).locator('.hand-tiles button.tile').first().tap();
     await expect(yaku.locator('.preview-note')).toBeVisible();
-    expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
     const heading = await box(yaku.locator('.panel-heading'));
     for (const b of [yaku.getByRole('button', { name: '絞り込み', exact: true }), yaku.getByRole('button', { name: '役別向聴を最小化' })]) {
       await expect(b).toBeVisible();

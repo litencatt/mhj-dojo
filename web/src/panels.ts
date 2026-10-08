@@ -133,7 +133,7 @@ export function useGameAdvice(): [boolean, (on: boolean) => void] {
  * lands somewhere down the page: scroll it into view once it has rendered.
  * The wider layouts show it in place, in a column of its own.
  */
-const ONE_COLUMN = '(width <= 1100px)'; // style.css's one-column layout
+const ONE_COLUMN = '(width <= 1100px)'; // the one-column layout (styles/base.css)
 
 function revealPanel(k: PanelKey) {
   if (typeof matchMedia !== 'function' || !matchMedia(ONE_COLUMN).matches) return;

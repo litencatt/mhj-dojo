@@ -1,0 +1,425 @@
+/* ---- Game table (CPU mode) ----
+   A 3x3 grid: 対面 on top, 上家 left, 下家 right, you at the bottom and the
+   round info in the middle. Rivers wrap at six tiles like a real table. */
+.game-table {
+  border-radius: var(--radius-md);
+  background: var(--table-cloth, none); /* the dojo's table cloth (tokens.css) */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas:
+    ". top ."
+    "left center right"
+    ". bottom .";
+  gap: 6px;
+  padding: 8px;
+}
+.seat-top { grid-area: top; }
+.seat-left { grid-area: left; }
+.seat-right { grid-area: right; }
+.seat-bottom { grid-area: bottom; }
+.table-center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  font-size: 0.8rem;
+}
+.table-deposit {
+  color: var(--muted);
+}
+/* The round's moves, scrolled to the newest (GameTable): six and a half
+   rows of 24px tiles, the half row a hint that more are above. */
+.event-log {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.event-log li {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.event-seat {
+  min-width: 2.5em;
+  color: var(--muted);
+}
+.event-tiles {
+  display: inline-flex;
+  gap: 4px;
+}
+.seat-box {
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+.seat-acting {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.seat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+.seat-name {
+  font-weight: bold;
+}
+.seat-wind {
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.seat-dealer {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.seat-points {
+  font-variant-numeric: tabular-nums;
+}
+.seat-rank {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.seat-riichi {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+/* The dojo's riichi sticks (tileThemes.ts): a stick drawn after the リーチ badge. */
+:root[data-riichi-stick] .seat-riichi::after {
+  content: '';
+  display: inline-block;
+  width: 2.8em;
+  height: 0.6em;
+  margin-left: 4px;
+  vertical-align: -0.05em;
+  border-radius: 0.3em;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+/* 千点棒: white with one red dot. */
+:root[data-riichi-stick='tenbou'] .seat-riichi::after {
+  background: radial-gradient(circle, #c8201f 0 0.17em, transparent 0.19em), #fafaf7;
+}
+/* 竹: green, with nodes. */
+:root[data-riichi-stick='take'] .seat-riichi::after {
+  background: repeating-linear-gradient(90deg, #3f6212 0 1px, #84cc16 1px 0.7em);
+}
+/* 金: gold, with the red dot. */
+:root[data-riichi-stick='kogane'] .seat-riichi::after {
+  background: radial-gradient(circle, #c8201f 0 0.17em, transparent 0.19em), linear-gradient(180deg, #fde68a, #ca8a04);
+}
+.seat-hand,
+.seat-hand-backs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+}
+.seat-hand {
+  margin-bottom: 4px;
+}
+/* The face-down hand sits in the seat head: on a row of its own (the head's
+   6px row gap less 2px, as a row under the head), or on phones one back
+   with the count on it, beside the points (below). */
+.seat-head .seat-hand-hidden {
+  flex-basis: 100%;
+  margin: -2px 0 0;
+}
+.seat-hand-count {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 15px;
+  height: 19px;
+  padding: 0 1px;
+  border: 1px solid var(--tile-back);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.seat-river {
+  display: grid;
+  grid-template-columns: repeat(6, max-content);
+  gap: 2px;
+  min-height: 22px;
+}
+.river-tile {
+  display: inline-flex;
+}
+/* The riichi declaration tile lies sideways. */
+.river-riichi .tile {
+  transform: rotate(90deg);
+  margin: 0 4px;
+}
+
+/* Called melds: each group together, the called tile sideways (the rotated
+   tile keeps its box, so the margin makes room and the shift sits it low). */
+.melds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.meld {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+.meld-called {
+  display: inline-flex;
+}
+.meld-called .tile-xs {
+  transform: translateY(3px) rotate(90deg);
+  margin: 0 3px;
+}
+.meld-called .tile-sm {
+  transform: translateY(4.5px) rotate(90deg);
+  margin: 0 5px;
+}
+/* A kakan stacks the added tile on the called one: the negative margins
+   shrink each rotated tile's box to its visible height. */
+.meld-called.meld-added {
+  flex-direction: column;
+  gap: 1px;
+}
+.meld-called.meld-added .tile-xs {
+  transform: rotate(90deg);
+  margin: -3px 3px;
+}
+.meld-called.meld-added .tile-sm {
+  transform: rotate(90deg);
+  margin: -4.5px 5px;
+}
+.seat-box .melds {
+  margin-bottom: 4px;
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  /* CPU game: a tighter table (its seats' tiles and log below). */
+  .game-table {
+    gap: 4px;
+    padding: 4px;
+  }
+  .seat-box {
+    padding: 4px;
+  }
+}
+/* A narrow screen: the side seats share a row. */
+@media (max-width: 600px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "top top"
+      "left right"
+      "center center"
+      "bottom bottom";
+  }
+}
+/* A phone, upright or on its side: the CPU seats' face-down hands shrink
+   to one back with the count on it, the rows of backs taking too much of
+   the table. */
+@media (width <= 760px), (height <= 500px) {
+  /* The log's moves in short: a small seat and verb, a discard's verb read
+     out only. */
+  .event-seat,
+  .event-verb {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .event-verb:not(.event-verb-discard) {
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .event-verb-discard {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .seat-hand-hidden .seat-hand-backs {
+    display: none;
+  }
+  .seat-head {
+    gap: 3px;
+  }
+  .seat-head .seat-hand-hidden {
+    flex-basis: auto;
+    margin: 0;
+  }
+  .seat-hand-hidden .seat-hand-count {
+    display: inline-flex;
+  }
+  /* The seats' tiles (rivers, melds and revealed hands) at 15px, and the
+     rivers wrapping at the seat's width instead of six to a row, so each
+     seat takes two or three rows less. A revealed hand still shrinks to fit
+     its 14 tiles on one row. */
+  .seat-box {
+    container-type: inline-size;
+  }
+  .seat-box .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
+  .seat-hand .tile-xs {
+    width: min(15px, calc((100cqw - 13px) / 14));
+    height: auto;
+    aspect-ratio: 3 / 4;
+  }
+  .seat-river {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    min-height: 20px;
+  }
+  .river-riichi .tile {
+    margin: 0 2.5px;
+  }
+  .seat-box .melds {
+    gap: 3px 6px;
+  }
+  .seat-box .meld-called .tile-xs {
+    transform: translateY(2.5px) rotate(90deg);
+    margin: 0 2.5px;
+  }
+  .seat-box .meld-called.meld-added .tile-xs {
+    transform: rotate(90deg);
+    margin: -2.5px 2.5px;
+  }
+  /* The log of moves runs sideways in one row, scrolled to the newest at
+     the right end (GameTable): each move its seat over its tile, a plain
+     discard's 打 read out only, so a call, riichi or win (its word in the
+     accent colour) stands out. */
+  .event-log {
+    align-self: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
+    max-height: none;
+    padding: 0 2px 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .table-center {
+    min-width: 0;
+  }
+  /* The other seats' rivers can fold away (設定's 他家の捨て牌), leaving each its head,
+     melds and, at a round's end, its revealed hand; your own river stays. */
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-river {
+    display: none;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-head {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-hand,
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .melds {
+    margin-top: 4px;
+    margin-bottom: 0;
+  }
+  .event-log li {
+    position: relative; /* holds the read-out-only 打 (below) */
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: 2px;
+    row-gap: 1px;
+  }
+  .event-seat {
+    min-width: 0;
+  }
+  .event-tiles {
+    grid-column: 1 / -1;
+    gap: 1px;
+  }
+}
+/* The narrowest phones: a tighter seat head, so the count still fits beside
+   the points in a 上家/下家 seat. */
+@media (width <= 340px) {
+  .seat-box {
+    padding: 4px;
+  }
+  .seat-head {
+    gap: 2px;
+  }
+  .seat-wind {
+    padding: 0 1px;
+  }
+}
+/* A phone upright: the CPU seats one under another at the full width, 対面,
+   上家, 下家, then the round's moves (with the rivers folded away); a seat with no discards yet ends at its
+   head. Your seat moves into the hand panel: its wind, points, rank and
+   riichi beside the heading, its river under the hand. The rivers show
+   every discard, so the log of moves only stands in for them while they are
+   folded away (設定's 他家の捨て牌). On its side the phone keeps the grid above, your
+   seat and the log. */
+@media (width <= 760px) and (height > 500px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "center";
+    gap: 3px;
+  }
+  .game-table .seat-bottom {
+    display: none;
+  }
+  /* A revealed hand and the melds share a row, the head and the river each
+     a row of their own. */
+  .seat-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 8px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .seat-box > .seat-head,
+  .seat-box > .seat-river {
+    flex-basis: 100%;
+  }
+  .seat-river:empty {
+    display: none;
+  }
+  .seat-box > :has(+ .seat-river:empty) {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="shown"] .event-log {
+    display: none;
+  }
+  /* With the rivers shown and no deposit, the center holds nothing to show. */
+  .game-table[data-rivers="shown"] .table-center:not(:has(.table-deposit)) {
+    display: none;
+  }
+}
