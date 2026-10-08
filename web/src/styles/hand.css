@@ -43,6 +43,23 @@
 .hand-heading h2 {
   margin: 0;
 }
+/* The dojo's automations (自動和了, 自動ツモ切り, 鳴きなし): chips like
+   面子表示, after it at the heading's right end; on a phone, a row of their
+   own under the heading (below). */
+.hand-heading:has(> .hand-tools) {
+  flex-wrap: wrap;
+}
+.hand-heading > .filter-chip:has(+ .hand-tools),
+.hand-tools {
+  margin-left: auto;
+}
+.hand-heading > .filter-chip + .hand-tools {
+  margin-left: 0;
+}
+.hand-tools {
+  display: flex;
+  gap: 4px;
+}
 /* Your wind, points, rank and river in the hand panel (CPU game): on an
    upright phone only, where they replace your seat at the table (below). */
 .hand-panel .hand-status,
@@ -231,6 +248,10 @@
   .hand-heading > h2,
   .hand-heading > button {
     flex: none;
+  }
+  .hand-tools {
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
   .hand-panel .hand-river:not(:empty) {
     display: flex;
