@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { onStorageFailed } from '../wasm';
+import { onStorageFailed } from '../saves';
 
 interface ErrorBannerProps {
   message: string;
@@ -29,7 +29,7 @@ export function ErrorBanner({ message, busy, onRetry }: ErrorBannerProps) {
   );
 }
 
-/** Tells the player, once, that this browser refused to save (wasm.ts). */
+/** Tells the player, once, that this browser refused to save (saves.ts). */
 export function SaveFailedNotice() {
   const [failed, setFailed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
