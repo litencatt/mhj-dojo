@@ -33,4 +33,4 @@
 `.tile`(`tile-md` 36x48、`tile-sm` 26x35、`tile-xs` 18x24)。面は `TileFace.tsx` の SVG。選択可能な牌は `.tile-interactive`、選択中は `.tile-picked`、裏は `.tile-back`。色は `--tile-*` のみで、テーマ・裏柄は `<html>` の `data-tile-theme` / `data-tile-back` で切り替える。スマホの手牌は 14 枚が1行に収まるよう `--hand-tile` で幅を決める。
 
 ## アクションバー
-`.action-bar`(対局の操作ボタンの行)。鳴きの問い(ロン・ポン・カン・チー・スキップ)は `.action-bar-call` で右寄せにし、打牌で使う右端(ツモ牌)の近くに置く。スマホではボタンをヘッダーの 設定 と同じ大きさ(`min-height: 32px; padding: 4px 12px; font-size: 0.85rem`)にして役別向聴の欄を広く取る。行そのものも `min-height: 32px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。
+`.action-bar`(対局の操作ボタンの行)。鳴きの問い(ロン・ポン・カン・チー・スキップ)は `.action-bar-call` で右寄せにし、打牌で使う右端(ツモ牌)の近くに置く。スマホ(`width <= 760px`)ではボタンをヘッダーの 設定 と同じ高さ 32px(`min-height: 32px; padding: 4px 12px; font-size: 0.85rem`、主ボタン `.action-primary` も同じ、牌入りの `.action-call` は上下 3px)にして役別向聴の欄を広く取る。行そのものも `min-height: 32px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。

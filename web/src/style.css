@@ -2555,10 +2555,15 @@ section,
   .action-bar {
     min-height: 32px;
   }
-  .action-bar button {
+  .action-bar button,
+  .action-bar .action-primary {
     min-height: 32px;
     padding: 4px 12px;
     font-size: 0.85rem;
+  }
+  /* A call with its tiles (チー, カン) holds the same 32px. */
+  .action-bar .action-call {
+    padding-block: 3px;
   }
 
 
