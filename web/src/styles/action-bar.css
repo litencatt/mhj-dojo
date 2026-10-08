@@ -56,3 +56,43 @@
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* A touch screen (or pen) taps a tile twice to discard it
+   (components/Hand.tsx): a touch-only device says so instead of 「クリック」,
+   one with a mouse as well adds it. */
+@media (any-pointer: coarse) and (not (any-pointer: fine)) {
+  .hint-mouse { display: none; }
+  .hint-touch { display: inline; }
+}
+@media (any-pointer: coarse) and (any-pointer: fine) {
+  .hint-hybrid { display: inline; }
+}
+@media (width <= 760px) {
+  .cpu-summary {
+    margin: -6px 0; /* the column's gaps, as above */
+  }
+  .action-bar {
+    gap: 8px;
+  }
+  /* Focus lands on the action area after a CPU playback: no ring round it. */
+  .action-area:focus {
+    outline: none;
+  }
+  /* The buttons are the header's 設定 size (32px), so the yaku table keeps
+     the room; the row holds that height also with none (the playback, or a
+     dojo game's hint alone), so the page never jumps as a replay starts. */
+  .action-bar {
+    min-height: 32px;
+  }
+  .action-bar button,
+  .action-bar .action-primary {
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+  }
+  /* A call with its tiles (チー, カン) holds the same 32px. */
+  .action-bar .action-call {
+    padding-block: 3px;
+  }
+}

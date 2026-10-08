@@ -114,3 +114,28 @@
   color: var(--danger);
   border: 1px solid var(--danger);
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  .win-tiles .tile-md {
+    width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1.5px;
+  }
+}
+/* A phone, upright or on its side: the CPU seats' face-down hands shrink
+   to one back with the count on it, the rows of backs taking too much of
+   the table. */
+@media (width <= 760px), (height <= 500px) {
+  .dora-indicators .tile-sm {
+    width: 18px;
+    height: 24px;
+    padding: 1px;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--tile-back);
+  }
+}
+.tile.tile-ukeire-best {
+  border-color: var(--accent);
+}

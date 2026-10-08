@@ -252,3 +252,161 @@
   font-weight: normal;
   color: var(--accent);
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  .filter-chip,
+  .legend-item,
+  .yaku-filter-toggle {
+    min-height: 32px;
+  }
+  .filter-chip {
+    padding: 4px 8px;
+  }
+  /* Open, the chips, the short count and the ✕ share one row at 320px; the
+     row keeps its height with or without the ✕. */
+  .yaku-filter-row {
+    gap: 6px;
+  }
+  .yaku-filter-status {
+    min-height: 32px;
+  }
+  .filter-clear-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0.9rem;
+  }
+  /* Filter bar: no name search (YakuTable.tsx), the two selects share the
+     first row. */
+  .yaku-filter-row label {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .yaku-filter-row label select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .yaku-filter select,
+  .glossary-search {
+    font-size: 16px;
+  }
+  .yaku-tip {
+    width: min(280px, calc(100vw - 16px));
+  }
+  .app-practice .area-yaku,
+  .app-game .area-yaku {
+    display: flex;
+    flex-direction: column;
+    height: max(
+      200px,
+      calc(100dvh - var(--yaku-top, 50dvh) - var(--yaku-bottom) - env(safe-area-inset-bottom, 0px))
+    );
+  }
+  .app-practice .yaku-table-panel,
+  .app-game .yaku-table-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  /* The yaku and combo tables: each row on two lines, name / 翻 / 向聴 / 合計
+     above and the effective tiles across the whole width below, so nothing
+     is cut off or needs a sideways scroll. The header row sticks to the top
+     of the screen while the long yaku table scrolls by. */
+  .yaku-table-scroll,
+  .combo-section {
+    overflow: visible;
+  }
+  .yaku-table,
+  .combo-table,
+  .yaku-table thead,
+  .yaku-table tbody,
+  .combo-table thead,
+  .combo-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .yaku-table tr,
+  .combo-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2.9em 5.8em 3.4em;
+    grid-template-areas:
+      "name han shanten total"
+      "ukeire ukeire ukeire ukeire";
+    align-items: center;
+    column-gap: 6px;
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .yaku-table thead tr,
+  .combo-table thead tr {
+    grid-template-areas: "name han shanten total";
+    padding: 4px;
+  }
+  .yaku-table thead {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 2;
+    background: var(--panel-bg);
+  }
+  /* The panel is its own scroller: stick to its top edge, over its 8px
+     padding (the phone's section padding above), so no row shows above the
+     header. */
+  .app-practice .yaku-table thead,
+  .app-game .yaku-table thead {
+    top: -8px;
+  }
+  .yaku-table th,
+  .yaku-table td,
+  .combo-table th,
+  .combo-table td {
+    padding: 0;
+    border: none;
+  }
+  .yaku-table thead th,
+  .combo-table thead th {
+    position: static;
+    box-shadow: none;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .yaku-table tr > :nth-child(1),
+  .combo-table tr > :nth-child(1) { grid-area: name; }
+  .yaku-table tr > :nth-child(2),
+  .combo-table tr > :nth-child(2) { grid-area: han; }
+  .yaku-table tr > :nth-child(3),
+  .combo-table tr > :nth-child(3) { grid-area: shanten; }
+  .yaku-table tr > :nth-child(4),
+  .combo-table tr > :nth-child(4) { grid-area: ukeire; }
+  .yaku-table tr > :nth-child(5),
+  .combo-table tr > :nth-child(5) { grid-area: total; text-align: right; }
+  /* The 有効牌 header has no column to head: it is kept for screen readers only. */
+  .yaku-table thead th:nth-child(4),
+  .combo-table thead th:nth-child(4) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .yaku-name-cell,
+  .shanten-cell {
+    white-space: normal;
+  }
+  .combo-name-cell {
+    min-width: 0;
+  }
+  .delta {
+    margin-left: 3px;
+  }
+  .yaku-table td.ukeire-cell,
+  .combo-table td.ukeire-cell {
+    padding-top: 6px;
+  }
+  /* No effective tiles (a 「—」): no second line. */
+  .ukeire-cell:has(> .muted) {
+    display: none;
+  }
+}

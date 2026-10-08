@@ -67,3 +67,140 @@
 .panel-dock {
   right: env(safe-area-inset-right, 0px);
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Phones (up to 760px wide) ----
+   The one-column layout (above) tightened for a phone: the hand's 14 tiles on
+   one row, the dock as a tab bar along the bottom (clear of the page and of
+   the home indicator), the yaku tables as two-line rows instead of a sideways
+   scroll, and controls big enough to tap. Tablets and desktops are unchanged. */
+.dock-tab-icon,
+.dock-tab-short,
+.hint-touch,
+.hint-hybrid {
+  display: none;
+}
+@media (width <= 760px) {
+  /* Panels: bigger minimize buttons, filter chips and legend items. */
+  .panel-minimize {
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  /* With no dock bar at the bottom (nothing minimized), the yaku panel runs
+     nearly to the screen's foot. (With one, an upright phone's has-dock rule
+     below makes room for the bar.) */
+  .app-practice:not(.has-dock),
+  .app-game:not(.has-dock) {
+    --yaku-bottom: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+}
+/* A short screen (a phone on its side): the right-edge tabs take their short
+   names (チャート, 履歴) and less padding, so they fit the height; the column
+   scrolls if it still doesn't. */
+@media (height <= 500px) {
+  .panel-dock {
+    gap: 4px;
+    max-height: calc(100dvh - 8px);
+    overflow-y: auto;
+  }
+  .dock-tab {
+    padding: 6px 5px;
+    letter-spacing: 0;
+  }
+  .dock-tab-label {
+    display: none;
+  }
+  .dock-tab-short {
+    display: block;
+  }
+}
+/* A phone upright: the minimized panels as a tab bar along the bottom. On
+   its side the screen is short, so the tabs stay on the right edge as on a
+   desktop (the rules above). */
+@media (width <= 760px) and (orientation: portrait) {
+  /* Minimized panels: a tab bar along the bottom, one equal-width tab per
+     panel (up to five), above the home indicator. */
+  .panel-dock {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 96px);
+    justify-content: center;
+    gap: 4px;
+    padding: 3px max(8px, env(safe-area-inset-right)) calc(3px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 14px rgb(0 0 0 / 0.1);
+  }
+  .dock-tab {
+    writing-mode: horizontal-tb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    min-height: 34px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg);
+    box-shadow: none;
+    font-size: 0.7rem;
+    letter-spacing: 0;
+    line-height: 1.15;
+  }
+  .dock-tab-label {
+    display: none;
+  }
+  .dock-tab-short {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dock-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .app.has-dock {
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  .app-practice.has-dock,
+  .app-game.has-dock {
+    --yaku-bottom: 60px;
+  }
+  /* The site's update notice sits above the dock bar. */
+  body:has(.panel-dock) .update-banner {
+    bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+}
+/* The narrowest phones: tighter gaps and a smaller font, so five short
+   names (アドバイス the longest) still fit without clipping. */
+@media (width <= 340px) and (orientation: portrait) {
+  .panel-dock {
+    gap: 2px;
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+  .dock-tab {
+    font-size: 0.64rem;
+  }
+}

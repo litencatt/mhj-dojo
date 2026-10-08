@@ -51,3 +51,13 @@
 .tree-node-status {
   font-size: 0.7rem;
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  .tree-flat {
+    max-height: 50vh;
+  }
+  .tree-node-btn {
+    min-height: 36px;
+  }
+}

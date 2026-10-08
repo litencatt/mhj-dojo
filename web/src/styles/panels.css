@@ -48,3 +48,10 @@ section,
   border-radius: var(--radius-lg);
   padding: 12px 14px;
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  section {
+    padding: 8px;
+  }
+}

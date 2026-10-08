@@ -139,3 +139,29 @@
       "bottom bottom";
   }
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  .result-win-tile {
+    margin-left: 4px;
+    padding-left: 4px;
+  }
+}
+/* A phone upright: the CPU seats one under another at the full width, 対面,
+   上家, 下家, then the round's moves (with the rivers folded away); a seat with no discards yet ends at its
+   head. Your seat moves into the hand panel: its wind, points, rank and
+   riichi beside the heading, its river under the hand. The rivers show
+   every discard, so the log of moves only stands in for them while they are
+   folded away (設定's 他家の捨て牌). On its side the phone keeps the grid above, your
+   seat and the log. */
+@media (width <= 760px) and (height > 500px) {
+  .game-table {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "center";
+    gap: 3px;
+  }
+}

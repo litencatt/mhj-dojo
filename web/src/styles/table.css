@@ -217,3 +217,180 @@
 .seat-box .melds {
   margin-bottom: 4px;
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  /* Discards a little smaller than the hand's tiles, which shrink with the
+     screen, instead of a fixed 26px that dwarfs them on a phone. */
+  .discard-river {
+    gap: 2px;
+  }
+  .discard-river .tile-sm {
+    width: clamp(14px, calc((100cqw - var(--hand-fixed)) / 14 * 0.85), 26px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  /* CPU game: a tighter table (its seats' tiles and log below). */
+  .game-table {
+    gap: 4px;
+    padding: 4px;
+  }
+  .seat-box {
+    padding: 4px;
+  }
+}
+/* A phone, upright or on its side: the CPU seats' face-down hands shrink
+   to one back with the count on it, the rows of backs taking too much of
+   the table. */
+@media (width <= 760px), (height <= 500px) {
+  .seat-hand-hidden .seat-hand-backs {
+    display: none;
+  }
+  .seat-head {
+    gap: 3px;
+  }
+  .seat-head .seat-hand-hidden {
+    flex-basis: auto;
+    margin: 0;
+  }
+  .seat-hand-hidden .seat-hand-count {
+    display: inline-flex;
+  }
+  /* The seats' tiles (rivers, melds and revealed hands) at 15px, and the
+     rivers wrapping at the seat's width instead of six to a row, so each
+     seat takes two or three rows less. A revealed hand still shrinks to fit
+     its 14 tiles on one row. */
+  .seat-box {
+    container-type: inline-size;
+  }
+  .seat-box .tile-xs {
+    width: 15px;
+    height: 20px;
+    padding: 0.5px;
+    border-radius: 2px;
+  }
+  .seat-hand .tile-xs {
+    width: min(15px, calc((100cqw - 13px) / 14));
+    height: auto;
+    aspect-ratio: 3 / 4;
+  }
+  .seat-river {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    min-height: 20px;
+  }
+  .river-riichi .tile {
+    margin: 0 2.5px;
+  }
+  .seat-box .melds {
+    gap: 3px 6px;
+  }
+  .seat-box .meld-called .tile-xs {
+    transform: translateY(2.5px) rotate(90deg);
+    margin: 0 2.5px;
+  }
+  .seat-box .meld-called.meld-added .tile-xs {
+    transform: rotate(90deg);
+    margin: -2.5px 2.5px;
+  }
+  /* The log of moves runs sideways in one row, scrolled to the newest at
+     the right end (GameTable): each move its seat over its tile, a plain
+     discard's 打 read out only, so a call, riichi or win (its word in the
+     accent colour) stands out. */
+  .event-log {
+    align-self: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
+    max-height: none;
+    padding: 0 2px 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .table-center {
+    min-width: 0;
+  }
+  /* The other seats' rivers can fold away (設定's 他家の捨て牌), leaving each its head,
+     melds and, at a round's end, its revealed hand; your own river stays. */
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-river {
+    display: none;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-head {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .seat-hand,
+  .game-table[data-rivers="hidden"] .seat-box:not(.seat-bottom) .melds {
+    margin-top: 4px;
+    margin-bottom: 0;
+  }
+  .event-log li {
+    position: relative; /* holds the read-out-only 打 (below) */
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: 2px;
+    row-gap: 1px;
+  }
+  .event-seat {
+    min-width: 0;
+  }
+  .event-tiles {
+    grid-column: 1 / -1;
+    gap: 1px;
+  }
+}
+/* The narrowest phones: a tighter seat head, so the count still fits beside
+   the points in a 上家/下家 seat. */
+@media (width <= 340px) {
+  .seat-box {
+    padding: 4px;
+  }
+  .seat-head {
+    gap: 2px;
+  }
+  .seat-wind {
+    padding: 0 1px;
+  }
+}
+/* A phone upright: the CPU seats one under another at the full width, 対面,
+   上家, 下家, then the round's moves (with the rivers folded away); a seat with no discards yet ends at its
+   head. Your seat moves into the hand panel: its wind, points, rank and
+   riichi beside the heading, its river under the hand. The rivers show
+   every discard, so the log of moves only stands in for them while they are
+   folded away (設定's 他家の捨て牌). On its side the phone keeps the grid above, your
+   seat and the log. */
+@media (width <= 760px) and (height > 500px) {
+  .game-table .seat-bottom {
+    display: none;
+  }
+  /* A revealed hand and the melds share a row, the head and the river each
+     a row of their own. */
+  .seat-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 8px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .seat-box > .seat-head,
+  .seat-box > .seat-river {
+    flex-basis: 100%;
+  }
+  .seat-river:empty {
+    display: none;
+  }
+  .seat-box > :has(+ .seat-river:empty) {
+    margin-bottom: 0;
+  }
+  .game-table[data-rivers="shown"] .event-log {
+    display: none;
+  }
+  /* With the rivers shown and no deposit, the center holds nothing to show. */
+  .game-table[data-rivers="shown"] .table-center:not(:has(.table-deposit)) {
+    display: none;
+  }
+}

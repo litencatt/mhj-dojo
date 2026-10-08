@@ -206,3 +206,79 @@
   color: var(--muted);
   font-size: 1.1rem;
 }
+
+/* ---- Narrow screens and phones (from the responsive rules) ---- */
+@media (width <= 760px) {
+  .mode-link {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 4px 0;
+  }
+  /* Always beside the title: the version gives way (cut short) first. */
+  .header-meta {
+    flex: 1 1 0;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-left: auto;
+  }
+  .version-tag {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .help-button {
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  .settings-button {
+    min-height: 32px;
+  }
+  /* Help: nearly the whole screen, with a bigger close button. */
+  .help-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 32px);
+  }
+  .help-content {
+    padding: 12px 14px 16px;
+  }
+  .help-heading {
+    margin: -12px -14px 0;
+    padding: 8px 14px 6px;
+  }
+  .help-close {
+    width: 38px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  /* The site's update notice: fitted to the screen, on one line at 390px. */
+  .update-banner {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    gap: 8px;
+    padding: 6px 6px 6px 12px;
+    font-size: 0.85rem;
+  }
+  .update-banner-reload,
+  .update-banner-close {
+    min-height: 36px;
+  }
+  .update-banner-reload {
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+}
+/* The narrowest phones (320px): the title row (title, the three modes, 設定
+   and ?) still fits on one line, the version giving way first. */
+@media (width <= 360px) {
+  .mode-link {
+    margin-left: 4px;
+  }
+  .help-button {
+    width: 32px;
+  }
+  .settings-button {
+    padding: 2px 8px;
+  }
+}
