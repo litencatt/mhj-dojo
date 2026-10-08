@@ -293,6 +293,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     if (!move) return;
     autoPlayed.current = state;
     act(move.type, move.tile);
+    // act closes over state (a dependency) and adviceOn only: no need to re-run for it.
   }, [state, busy, error, stopped, playback.playing, autoOn]);
   const autoTools = autoOwned.length > 0 && (
     <div class="hand-tools" role="group" aria-label="自動">

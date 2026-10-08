@@ -854,7 +854,7 @@ test('the automations show once bought, switch in the hand heading, and play a r
   await page.reload();
   await waitForPlayback(page);
   const tools = handPanel(page).getByRole('group', { name: '自動' });
-  for (const name of ['自動和了', 'ツモ切り', '鳴きなし']) {
+  for (const name of ['自動和了', '自動ツモ切り', '鳴きなし']) {
     const chip = tools.getByRole('button', { name });
     await expect(chip).toHaveAttribute('aria-pressed', 'false');
     await chip.click();
@@ -865,4 +865,17 @@ test('the automations show once bought, switch in the hand heading, and play a r
   // The switches stay on for the next game.
   await page.reload();
   await expect(tools.getByRole('button', { name: '自動和了' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a CPU game shows no automations, whatever the dojo bought and switched on', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => {
+      localStorage.setItem(key, value);
+      localStorage.setItem('mhj-dojo.dojo.auto.v1', '["win","tsumogiri","nocall"]');
+    },
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), ownedItems: ['assist:autowin', 'assist:tsumogiri', 'assist:nocall'] })],
+  );
+  await page.goto(`./?mode=game&seed=${SEED}`);
+  await waitForPlayback(page);
+  await expect(handPanel(page).getByRole('group', { name: '自動' })).toHaveCount(0);
 });

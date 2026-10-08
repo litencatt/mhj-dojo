@@ -35,6 +35,14 @@ test('ツモ切り discards the drawn tile only, on your own turn', () => {
   assert.equal(autoMove(at('discard', { discards: ['1m', '5p'] }, '5p'), on('win', 'nocall')), null);
 });
 
+test('a riichi\'d hand: ツモ切り plays the drawn tile past the kan; 槍槓 and 九種九牌 likewise', () => {
+  assert.deepEqual(autoMove(at('discard', { discards: ['5p'], kan: ['5p'] }, '5p'), on('tsumogiri')), { type: 'discard', tile: '5p' });
+  assert.deepEqual(autoMove(at('discard', { discards: ['1m', '9s'], kyuushu: true }, '9s'), on('tsumogiri')), { type: 'discard', tile: '9s' });
+  // 槍槓: a ron on an added kan, no call to make.
+  assert.deepEqual(autoMove(at('call', { ron: true, skip: true }), on('win')), { type: 'ron' });
+  assert.equal(autoMove(at('call', { ron: true, skip: true }), on('tsumogiri', 'nocall')), null);
+});
+
 test('鳴きなし passes on a pon, chii or kan', () => {
   assert.deepEqual(autoMove(at('call', { skip: true, pon: true, kan: ['5p'] }), on('nocall')), { type: 'skip' });
   assert.deepEqual(autoMove(at('call', { skip: true, chii: [['3m', '4m']] }), ALL), { type: 'skip' });

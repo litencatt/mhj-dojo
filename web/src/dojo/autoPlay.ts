@@ -3,7 +3,7 @@ import type { ActionType, GameState, Tile } from '../api';
 
 /**
  * The dojo's automations (#277), each a bought assist switched on and off in
- * the hand's heading: 自動和了 wins whenever it can, ツモ切り discards the
+ * the hand's heading: 自動和了 wins whenever it can, 自動ツモ切り discards the
  * drawn tile, 鳴きなし passes on every pon, chii and open kan.
  */
 export type AutoKey = 'win' | 'tsumogiri' | 'nocall';
@@ -13,7 +13,7 @@ export const AUTO_KEYS: readonly AutoKey[] = ['win', 'tsumogiri', 'nocall'];
 /** Each automation's shop item and the label of its switch. */
 export const AUTO_ITEMS: Record<AutoKey, { item: string; label: string }> = {
   win: { item: 'assist:autowin', label: '自動和了' },
-  tsumogiri: { item: 'assist:tsumogiri', label: 'ツモ切り' },
+  tsumogiri: { item: 'assist:tsumogiri', label: '自動ツモ切り' },
   nocall: { item: 'assist:nocall', label: '鳴きなし' },
 };
 
