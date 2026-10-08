@@ -1,6 +1,6 @@
 // Tile themes and backs, and the dojo's other looks: the colours live in
 // tokens.css under [data-tile-theme] and [data-table-cloth], the patterns and
-// the win effects in style.css under [data-tile-back], [data-riichi-stick] and
+// the win effects in styles/*.css under [data-tile-back], [data-riichi-stick] and
 // [data-win-effect]. The dojo applies one for the duration of a dojo game only
 // (dojo/useDojoGame.ts applies it and removes it on leaving); the hub only offers the
 // purchase and the choice.

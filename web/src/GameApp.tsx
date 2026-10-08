@@ -46,14 +46,14 @@ const NO_COMBOS_BY_DISCARD: GameState['combos_by_discard'] = {};
 // is offered unless turned off in the options.
 const GAME_PANELS = PANELS.filter((p) => p.key !== 'tree');
 const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
-// On a phone, upright or on its side (style.css), the game leaves the chart
+// On a phone, upright or on its side (styles/*.css), the game leaves the chart
 // and the glossary (and the advice panel: the best discard is a chip in the
 // action bar; the danger marks stay) to practice mode, giving their room to
 // the yaku table. A
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
-// Where the other seats' rivers can fold away (style.css).
+// Where the other seats' rivers can fold away (styles/*.css).
 const RIVERS_FOLD = '(width <= 760px), (height <= 500px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 

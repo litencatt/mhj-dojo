@@ -1,0 +1,699 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* The page's width and margins, the same for the dojo's hub (.dojo-home). */
+.app,
+.dojo-home {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 16px 48px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 8px;
+}
+h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+/* Compact header: title and new-game form share the first row, the game
+   status (label and value side by side) fills the second. */
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 8px 14px;
+}
+.app-header h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+/* The new-game form sits at the right end of the first row. */
+.new-game-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.new-game-form label {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  gap: 4px;
+}
+/* A choice, boxed as in the dojo's 設定 (.dojo-settings-group): its options keep the
+   page's text, not the form's small muted labels. */
+.new-game-form .option-group {
+  margin: 0;
+}
+.new-game-form .option-group label {
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+.new-game-form select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
+/* Text inputs only: a checkbox (アドバイス・危険度) or a radio button keeps its own size. */
+.new-game-form input:not([type="checkbox"], [type="radio"]) {
+  width: 7em;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
+/* Buttons. Secondary is the default: the panel's quiet button. Primary is
+   the one main action of a place, filled with the accent. Both have a 1px
+   border, so a primary and a secondary side by side are as tall. */
+.dojo-start,
+.dojo-restart,
+.dojo-home button:where(:not(.app-header *)),
+.resume-panel button,
+.tab-stopped button,
+.action-bar button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.new-game-form button,
+.tsumo-button,
+.next-round-button,
+.dojo-start,
+.dojo-home .shop-confirm-buy,
+.resume-panel .action-primary,
+.action-bar .action-primary,
+.tab-stopped .action-primary {
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: bold;
+  cursor: pointer;
+}
+.new-game-form input.input-narrow {
+  width: 3.5em;
+}
+.new-game-form button {
+  font-size: 0.85rem;
+}
+.new-game-form button:disabled,
+.tsumo-button:disabled,
+.next-round-button:disabled,
+.dojo-home button:disabled,
+.resume-panel button:disabled,
+.action-bar button:disabled,
+.error-banner button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Second row, under a divider: the round's status on the left (small label
+   over its value), the wall left and the dora indicators (boxed) at the
+   right end; a phone shows those two over the hand instead (PinnedStatus). */
+.header-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  flex-basis: 100%;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.game-status,
+.wall-status,
+.dora-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 20px;
+  margin: 0;
+}
+.dora-box {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+/* The wall left and the dora over the hand: phones only (below). */
+.pinned-status {
+  display: none;
+}
+/* The wall left sits just before the dora: together at the row's end,
+   wrapping as one. */
+.status-wall-dora {
+  display: flex;
+  align-items: center;
+  gap: 8px 18px;
+  margin-left: auto;
+}
+.status-wall-dora .dora-box {
+  margin-left: 0;
+}
+.game-status > div,
+.wall-status > div,
+.dora-box > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.game-status dt,
+.wall-status dt,
+.dora-box dt {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.game-status dd,
+.wall-status dd,
+.dora-box dd {
+  margin: 0;
+  font-weight: 600;
+}
+.dora-indicators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dora-arrow,
+.dora-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* The safe-area insets as lengths useYakuTop (hooks.ts) can read. */
+@property --safe-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --safe-bottom {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+.speed-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.speed-option select {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+}
+/* Every mode's 設定 (SettingsDialog): a modal dialog, its choices boxed one per row. */
+/* A modal dialog (showModal): a panel's colours and corners over the shared backdrop. */
+.settings-dialog,
+.help-dialog,
+.tab-stopped,
+.shop-confirm,
+.yaku-guide {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  color: var(--fg);
+}
+.settings-dialog::backdrop,
+.help-dialog::backdrop,
+.tab-stopped::backdrop,
+.shop-confirm::backdrop,
+.yaku-guide::backdrop {
+  background: var(--backdrop);
+}
+.settings-dialog {
+  width: min(28rem, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 16px 16px;
+}
+.settings-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.settings-dialog-head h2 {
+  margin: 0;
+}
+.settings-dialog-head button,
+.settings-button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.settings-button {
+  min-height: 24px;
+  padding: 2px 10px;
+}
+.settings-dialog .new-game-form {
+  gap: 8px;
+  margin: 0;
+}
+.settings-dialog .new-game-form .option-group {
+  flex-basis: 100%;
+}
+.settings-dialog .new-game-form button {
+  margin-left: auto;
+}
+/* A face-down tile shows its coloured back. */
+.tile.tile-back {
+  background: linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+  border-color: var(--tile-back);
+}
+/* The dojo's tile backs (tileThemes.ts): a light pattern over the same gradient. */
+:root[data-tile-back='shima'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+:root[data-tile-back='ichimatsu'] .tile.tile-back {
+  background:
+    conic-gradient(rgba(255, 255, 255, 0.24) 25%, transparent 0 50%, rgba(255, 255, 255, 0.24) 0 75%, transparent 0) 0 0 / 6px 6px,
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+/* 麻の葉: three crossing sets of lines, a lattice of six-pointed stars. */
+:root[data-tile-back='asanoha'] .tile.tile-back {
+  background:
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, var(--tile-back-hi) 0%, var(--tile-back) 100%);
+}
+
+.error-banner {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.error-banner,
+.save-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.error-message,
+.save-failed > span {
+  flex: 1 1 auto;
+}
+.error-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.error-banner button,
+.save-failed button {
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+/* Storage refused a save: a warning, not an error. */
+.save-failed {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font-size: 0.9rem;
+}
+
+/* The saved sessions or games offered when the page opens without one. */
+.resume-panel p {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+}
+.resume-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.resume-panel button {
+  text-align: left;
+}
+.resume-heading {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.resume-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Layout by width:
+   - above 1100px the page is exactly one viewport tall and never scrolls.
+     The columns are a flex row, each scrolling on its own, so a minimized
+     (hidden) column simply drops out and the others widen:
+     - 1100-1500px: main | tree | side (yaku table above the glossary).
+     - above 1500px: main | tree | yaku | glossary.
+   - up to 1100px: one column in reading order (header, hand, tree, yaku,
+     chart, glossary) and the page scrolls as usual.
+   .area-main (header, hand, chart) and .area-side (yaku, glossary) are
+   flex columns where they form a column, and dissolve (display: contents)
+   where their children must be placed individually. */
+.app {
+  display: grid;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+/* Minimized panels stay mounted (keeping their state) but take no space. */
+.app [hidden] {
+  display: none !important;
+}
+.area-main,
+.area-side,
+.area-header,
+.area-hand,
+.area-yaku,
+.area-notes,
+.area-advice,
+.area-gloss,
+.area-chart,
+.area-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+@media (width > 1100px) {
+  .app {
+    display: flex;
+    gap: 16px;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 12px 16px;
+  }
+  .area-main {
+    flex: 1 1 0;
+    overflow-y: auto;
+  }
+  /* Panels in the scrolling main column keep their natural height. */
+  .area-main > * { flex-shrink: 0; }
+  .area-tree {
+    flex: 0 0 190px;
+    overflow: auto;
+  }
+  .area-side { flex: 1 1 0; }
+  /* The yaku table and the advice + glossary share the side column 3:2;
+     without the glossary the advice keeps its own height. The advice
+     scrolls past 60% so the glossary under it stays in view. */
+  .area-yaku { flex: 3 1 0; }
+  .area-notes { flex: 2 1 0; }
+  .area-notes:has(> .area-gloss[hidden]) { flex: 0 1 auto; }
+  .area-advice {
+    flex: 0 1 auto;
+    max-height: 60%;
+    overflow-y: auto;
+  }
+  .area-notes:has(> .area-gloss[hidden]) .area-advice { max-height: none; }
+  .area-gloss {
+    flex: 1 1 0;
+    overflow-y: auto;
+  }
+  .yaku-table-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .yaku-table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+@media (width > 1500px) {
+  .app {
+    max-width: 1920px;
+  }
+  .area-side { display: contents; }
+  .area-yaku { flex: 1 1 0; }
+  .area-notes,
+  .area-notes:has(> .area-gloss[hidden]) { flex: 0 1 320px; min-width: 260px; }
+}
+/* One column: order the panels instead of naming areas, so a minimized
+   panel leaves no empty row behind. */
+@media (width <= 1100px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .area-main,
+  .area-side,
+  .area-notes { display: contents; }
+  .area-header { order: 1; }
+  .area-hand { order: 2; }
+  .area-advice { order: 2; }
+  .area-tree { order: 3; }
+  .area-yaku { order: 4; }
+  .area-chart { order: 5; }
+  .area-gloss { order: 6; }
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  .area-main,
+  .area-side,
+  .area-header,
+  .area-hand,
+  .area-yaku,
+  .area-notes,
+  .area-advice,
+  .area-gloss,
+  .area-chart,
+  .area-tree {
+    gap: 6px;
+  }
+  /* Header: the title with the version and help on its right, then the form
+     on a row of its own with the button at the end. 16px inputs keep iOS
+     from zooming in on focus. */
+  .app-header {
+    gap: 4px 10px;
+    padding: 6px 8px;
+  }
+  .app-header h1 {
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+  .new-game-form {
+    flex-basis: 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
+  .new-game-form input:not([type="checkbox"], [type="radio"]),
+  .new-game-form select {
+    font-size: 16px;
+    padding: 5px 6px;
+  }
+  .new-game-form input:not([type="checkbox"], [type="radio"]) {
+    width: 5.5em;
+  }
+  .new-game-form input.input-narrow {
+    width: 3em;
+  }
+  .new-game-form button {
+    min-height: 40px;
+    margin-left: auto;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+  /* The yaku panel fills the screen under the header and the hand (in a CPU
+     game, the table and the hand), down to the bottom padding or dock bar,
+     and scrolls on its own, so the page does not scroll. With more panels
+     open, or on a screen too short for a 200px panel, the page does scroll,
+     and the hand (with the table) then sticks to the top, once the header
+     has gone by - unless it would cover the panel (on a short screen), or
+     it holds a win or a round's result, which is too tall to pin.
+     useYakuTop (hooks.ts) sets --yaku-top, where the panel starts on the
+     page, and data-hand-fits. */
+  .app-practice,
+  .app-game {
+    --yaku-bottom: 32px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+/* A phone, upright or on its side: the header's status in short. */
+@media (width <= 760px), (height <= 500px) {
+  /* The header's status: each label beside its value (the obvious ones,
+     局 and 対局, read out only); the dora (in the header on a phone on its
+     side, over the hand upright) as two more items: no box, short labels,
+     smaller tiles, and just the arrow between indicator and dora (the tile's
+     label names it). */
+  .header-status {
+    gap: 4px 12px;
+    padding-top: 4px;
+  }
+  .game-status,
+  .wall-status {
+    gap: 2px 10px;
+  }
+  .game-status > div,
+  .wall-status > div {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 3px;
+  }
+  .game-status dd,
+  .wall-status dd {
+    font-size: 0.85rem;
+  }
+  .dora-box {
+    margin-left: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    gap: 4px 12px;
+  }
+  /* The wall left starts the dora's row, not pushed to its end. */
+  .status-wall-dora {
+    margin-left: 0;
+    gap: 4px 12px;
+  }
+  .dora-box > div {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+  .dora-indicators {
+    gap: 2px;
+  }
+  .dora-label {
+    display: none;
+  }
+  /* Just ドラ / 裏ドラ beside the tiles; 表示牌 is still read out. */
+  .status-dt-obvious,
+  .dora-dt-rest {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .event-seat,
+  .event-verb {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .event-verb:not(.event-verb-discard) {
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .event-verb-discard {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+/* A phone (up to 760px wide): the wall left and the dora leave the header for the top
+   of the hand's area, which sticks to the top of the screen there (see the
+   phone's sticky hand in win.css): always in sight (PinnedStatus). The dora row
+   keeps one line, scrolling sideways if a kan dora makes it too long, so the
+   pinned bar never grows mid-round. */
+@media (width <= 760px) {
+  .header-status .status-wall-dora {
+    display: none;
+  }
+  .pinned-status {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel-bg);
+  }
+  .pinned-status .status-wall-dora,
+  .pinned-status .dora-box {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .pinned-status .status-wall-dora {
+    overflow-x: auto;
+  }
+}
+.engine-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.spinner {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: spin 0.8s linear infinite;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* The narrowest phones (320px): the title row (title, the three modes, 設定
+   and ?) still fits on one line, the version giving way first. */
+@media (width <= 360px) {
+  .app-header h1 {
+    font-size: 1rem;
+  }
+}

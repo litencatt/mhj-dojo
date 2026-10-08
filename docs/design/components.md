@@ -2,7 +2,7 @@
 
 新しい要素は、まずここの部品に当てはめる。
 
-## ボタン(`style.css` の「Buttons」)
+## ボタン(`styles/base.css` の「Buttons」)
 - 副ボタン(既定): `.dojo-home button`、`.resume-panel button`、`.action-bar button`、`.tab-stopped button`。`--bg` 地、`--border`、`--radius-sm`、`0.9rem`。
 - 主ボタン(その場の主操作を1つだけ): 塗りは `--accent`、太字。`.action-primary`(アクションバー・復元パネル・TabStopped)、`.new-game-form button`(新規対局など)、`.tsumo-button`、`.next-round-button`、`.dojo-start`、`.shop-confirm-buy`。
 - 副・主とも 1px の枠があり、並べても同じ高さ。新しい主ボタンは上のセレクタ群に追加し、個別に色を書かない。

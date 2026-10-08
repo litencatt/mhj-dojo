@@ -128,7 +128,7 @@ export const YakuTable = memo(function YakuTable(props: YakuTableProps) {
   };
   // A phone has no 複合役 and no name search, so no search text either (the
   // saved one is kept for a wider screen).
-  const phone = useMediaQuery('(width <= 760px)'); // style.css's phone layout
+  const phone = useMediaQuery('(width <= 760px)'); // the phone layout (styles/*.css)
   const active = phone ? { ...filter, query: '' } : filter;
   // 条件をクリア on a phone keeps that hidden search text too. Its button
   // then goes away, so focus moves to 絞り込み rather than to the page.

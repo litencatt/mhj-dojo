@@ -1,0 +1,94 @@
+/* ---- Win panel ---- */
+.win-panel {
+  border-color: var(--success-border);
+}
+.win-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.win-yaku-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+.win-yaku-table th,
+.win-yaku-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.win-dora-ignored td:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.win-note {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.win-yaku-table tfoot th,
+.win-yaku-table tfoot td {
+  border-top: 2px solid var(--fg);
+  border-bottom: none;
+  font-weight: bold;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (max-width: 420px) {
+  .app,
+  .dojo-home {
+    padding: 8px 10px 32px;
+  }
+  .tile-md {
+    width: 28px;
+    height: 38px;
+    font-size: 0.9rem;
+  }
+}
+.tree-node-btn:disabled {
+  cursor: progress;
+}
+
+/* ---- Narrow screens and phones ---- */
+@media (width <= 760px) {
+  /* A phone keeps its height for the yaku table: tight gaps and paddings
+     throughout (the columns' 6px gaps, 8px panels). */
+  .app,
+  .dojo-home {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    row-gap: 6px;
+  }
+  .tsumo-button,
+  .next-round-button {
+    min-height: 44px;
+    padding: 8px 20px;
+    font-size: 1rem;
+  }
+  .tsumo-button {
+    width: 100%;
+  }
+  /* A win's 14 tiles on one row too. */
+  .win-panel,
+  .result-panel {
+    container-type: inline-size;
+  }
+  .win-tiles {
+    gap: 2px;
+  }
+  .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
+  .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--bg);
+    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
+  }
+}

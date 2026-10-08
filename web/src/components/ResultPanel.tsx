@@ -62,7 +62,7 @@ export function ResultPanel({ state, result, busy, onNext, dojoHan }: ResultPane
   const who = (s: number) => seatLabel(s, state.you);
   const winner = result.winner >= 0 ? state.seats[result.winner] : null;
   const yakuman = result.yaku.some((y) => y.han >= 13);
-  // Your win at 跳満 or above: the dojo's win effect plays over it (style.css; none unless one is chosen).
+  // Your win at 跳満 or above: the dojo's win effect plays over it (styles/*.css; none unless one is chosen).
   const high = result.winner === state.you && HIGH_LIMITS.includes(result.points.limit);
   let title = '流局';
   if (result.kind === 'abort') title = `途中流局（${result.reason ? ABORT_NAMES[result.reason] : ''}）`;

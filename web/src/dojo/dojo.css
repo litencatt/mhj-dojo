@@ -1,5 +1,5 @@
-/* The dojo hub and shop. The colours are style.css's tokens. */
-/* Its width and margins are the practice and CPU game pages' (style.css .app). */
+/* The dojo hub and shop. The colours are tokens.css's. */
+/* Its width and margins are the practice and CPU game pages' (styles/base.css .app). */
 .dojo-home {
   display: flex;
   flex-direction: column;
@@ -53,7 +53,7 @@
   height: 100%;
   background: var(--accent);
 }
-/* The hub's buttons are style.css's (secondary, and .dojo-start primary), not the
+/* The hub's buttons are styles/base.css's (secondary, and .dojo-start primary), not the
    shared header's (設定, ?), which look the same in every mode. */
 .dojo-yaku,
 .shop-list {

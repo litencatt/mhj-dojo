@@ -1,0 +1,98 @@
+/* ---- Action bar ---- */
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* A call (ロン/ポン/カン/チー/スキップ) at the right end, where the hand is
+   played from (its drawn tile): the pointer hardly moves to answer it. */
+.action-bar-call {
+  justify-content: flex-end;
+}
+.action-bar button {
+  font-weight: bold;
+}
+.action-bar .action-advice[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.action-riichi.active {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.action-call {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.call-tiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-weight: normal;
+}
+.cpu-summary {
+  /* Pulled into the column's gaps around it (12px), so the hand and the
+     action bar are only this line apart (still held, see min-height). */
+  margin: -12px 0;
+  padding: 0 4px;
+  min-height: 1.4em; /* held while empty, so the action bar never jumps */
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+/* Right under the CPU summary line, the action bar needs no space of its own. */
+.cpu-summary + .action-area .action-bar {
+  margin-top: 0;
+}
+.action-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---- Narrow screens and phones ---- */
+/* A touch screen (or pen) taps a tile twice to discard it
+   (components/Hand.tsx): a touch-only device says so instead of 「クリック」,
+   one with a mouse as well adds it. */
+@media (any-pointer: coarse) and (not (any-pointer: fine)) {
+  .hint-mouse { display: none; }
+  .hint-touch { display: inline; }
+}
+@media (any-pointer: coarse) and (any-pointer: fine) {
+  .hint-hybrid { display: inline; }
+}
+@media (width <= 760px) {
+  .cpu-summary {
+    margin: -6px 0; /* the column's gaps (base.css) */
+  }
+  .action-bar {
+    gap: 8px;
+  }
+  /* Focus lands on the action area after a CPU playback: no ring round it. */
+  .action-area:focus {
+    outline: none;
+  }
+  /* The buttons are the header's 設定 size (32px), so the yaku table keeps
+     the room; the row holds that height also with none (the playback, or a
+     dojo game's hint alone), so the page never jumps as a replay starts. */
+  .action-bar {
+    min-height: 32px;
+  }
+  .action-bar button,
+  .action-bar .action-primary {
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+  }
+  /* A call with its tiles (チー, カン) holds the same 32px. */
+  .action-bar .action-call {
+    padding-block: 3px;
+  }
+}
