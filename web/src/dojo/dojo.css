@@ -225,7 +225,7 @@
   margin-left: auto;
 }
 
-/* A dojo game's aids and cheats (GameApp). */
+/* A dojo game's aids and cheats (dojo/DojoAids.tsx, components/ActionBar.tsx). */
 .dojo-aid {
   display: flex;
   flex-wrap: wrap;

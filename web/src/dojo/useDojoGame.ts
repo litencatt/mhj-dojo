@@ -17,7 +17,7 @@ export function useDojoGame(dojo: boolean, state: GameState | null) {
   const [saveFailed, setSaveFailed] = useState(false);
   const [reward, setReward] = useState<Reward | null>(null);
   const has = (id: string) => dojo && (progress.ownedItems.includes(id) || progress.ownedYaku.includes(id));
-  // The dojo's yaku table and chart have the rows of the yaku learned only.
+  // The yaku learned, for the rows shown (useLearnedRows) and the aids.
   const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
 
   // The tile theme, back and other looks bought in the dojo, for the dojo's screens only.

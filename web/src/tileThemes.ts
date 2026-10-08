@@ -2,7 +2,7 @@
 // tokens.css under [data-tile-theme] and [data-table-cloth], the patterns and
 // the win effects in style.css under [data-tile-back], [data-riichi-stick] and
 // [data-win-effect]. The dojo applies one for the duration of a dojo game only
-// (GameApp applies it and removes it on leaving); the hub only offers the
+// (dojo/useDojoGame.ts applies it and removes it on leaving); the hub only offers the
 // purchase and the choice.
 
 export type TileThemeId = 'default' | 'wafuu' | 'mono' | 'yonshoku' | 'sakura' | 'hisui' | 'kogane';

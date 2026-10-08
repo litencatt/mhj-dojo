@@ -192,7 +192,6 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     void startGame(optionsInput, seedInput.trim() === '' ? undefined : Number(seedInput)).then((ok) => ok && setOptionsOpen(false));
   }
 
-
   // The dojo's yaku table and chart have the rows of the yaku learned only.
   const rows = useLearnedRows(dojo, learned, state);
   // After a call the analysis is empty; the chart keeps the rows from before.
