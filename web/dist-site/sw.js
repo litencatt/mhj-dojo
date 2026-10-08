@@ -12,13 +12,13 @@
 //
 // A new build's worker waits until a page of that build sends it
 // SKIP_WAITING (src/sw.ts).
-const BUILD = "11cb5d6c791fe802";
+const BUILD = "822b9a1576003dd2";
 const PRECACHE = [
   "./",
   "THIRD_PARTY_LICENSES.txt",
   "apple-touch-icon.png",
-  "assets/index-BICUAsod.css",
-  "assets/index-DNOwfyJy.js",
+  "assets/index-CIEsU6zh.js",
+  "assets/index-CvcvbXl2.css",
   "assets/info-B6CYBMkx.js",
   "assets/info-CCJucGY2.css",
   "favicon.ico",
@@ -28,9 +28,9 @@ const PRECACHE = [
   "icon.svg",
   "info/",
   "manifest.webmanifest",
-  "mhj-dojo.wasm?v=8f1f6d668d76",
-  "wasm_exec.js?v=8f1f6d668d76",
-  "worker.js?v=8f1f6d668d76"
+  "mhj-dojo.wasm?v=9a18e22bd643",
+  "wasm_exec.js?v=9a18e22bd643",
+  "worker.js?v=9a18e22bd643"
 ];
 const CACHE = `mhj-dojo-${BUILD}`;
 const NETWORK_TIMEOUT_MS = 4000;
