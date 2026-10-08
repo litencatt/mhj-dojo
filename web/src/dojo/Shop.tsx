@@ -3,6 +3,7 @@ import { useBackdropClose } from '../components/backdrop';
 import { CATALOG, findItem, type ItemKind, type ShopItem } from './catalog';
 import { level, owns, purchase, type DojoProgress } from './progress';
 import { rankName } from './rules';
+import { guideFor } from './yakuGuide';
 
 /** Why an item is not for sale yet; null when it is. */
 function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
@@ -28,10 +29,12 @@ interface ShopProps {
   progress: DojoProgress;
   // Applies a change to the progress as it is stored now (another tab may have paid a game since).
   onChange: (change: (current: DojoProgress) => DojoProgress) => void;
+  // A yaku (or 役牌) was bought: the hub shows its guide.
+  onLearned: (id: string) => void;
 }
 
 /** The dojo's shop: the items of the chosen tab by level, bought with coins. */
-export function Shop({ progress: p, onChange }: ShopProps) {
+export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
   const [tab, setTab] = useState(TABS[0].key);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const shown = CATALOG.filter((it) => TABS.find((t) => t.key === tab)!.kinds.includes(it.kind));
@@ -65,10 +68,14 @@ export function Shop({ progress: p, onChange }: ShopProps) {
     const id = pending?.id;
     confirmRef.current?.close();
     if (!id) return;
+    // The guide is for a purchase that went through (another tab may have spent the coins since).
+    let bought = false;
     onChange((cur) => {
       const r = purchase(cur, id);
+      bought = r.ok;
       return r.ok ? r.progress : cur;
     });
+    if (bought && guideFor(id)) onLearned(id);
   }
 
   return (

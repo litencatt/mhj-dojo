@@ -1,0 +1,94 @@
+{
+  "riichi": {
+    "han": 1, "openHan": null,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "riichi", "note": "立直をかけ、そのまま和了" }
+  },
+  "yakuhai": {
+    "han": 1, "openHan": 1,
+    "example": { "hand": "234m456p789s555z11p", "win": "4m", "evalKey": "haku", "note": "白の刻子で1翻（發・中も同じ。場風・自風の刻子も1翻ずつ）" }
+  },
+  "iipeikou": {
+    "han": 1, "openHan": null,
+    "example": { "hand": "223344m567p678s55s", "win": "2m" }
+  },
+  "ippatsu": {
+    "han": 1, "openHan": null,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "ippatsu", "note": "立直の次の自分の打牌までに和了" }
+  },
+  "haitei": {
+    "han": 1, "openHan": 1,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "haitei", "note": "山の最後の牌をツモって和了" }
+  },
+  "houtei": {
+    "han": 1, "openHan": 1,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "houtei", "ron": true, "note": "最後の捨て牌でロン" }
+  },
+  "rinshan": {
+    "han": 1, "openHan": 1,
+    "example": { "hand": "123m456m789s55z", "melds": ["2222p"], "win": "5m", "situation": "rinshan", "note": "2筒を暗槓し、嶺上牌をツモって和了" }
+  },
+  "chankan": {
+    "han": 1, "openHan": 1,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "chankan", "ron": true, "note": "他家の加槓した牌でロン" }
+  },
+  "sanshoku": {
+    "han": 2, "openHan": 1,
+    "example": { "hand": "123m123p123s456s99p", "win": "1m" }
+  },
+  "ittsu": {
+    "han": 2, "openHan": 1,
+    "example": { "hand": "123456789m234p55s", "win": "9m" }
+  },
+  "chanta": {
+    "han": 2, "openHan": 1,
+    "example": { "hand": "123m789m123p789s11z", "win": "3m" }
+  },
+  "chiitoitsu": {
+    "han": 2, "openHan": null,
+    "example": { "hand": "22m44m66p88p33s55s77s", "win": "7s" }
+  },
+  "toitoi": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "222m444p666s999s11z", "win": "2m", "ron": true, "note": "ロンで和了（ツモだと四暗刻になる）" }
+  },
+  "sanankou": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "222m444p666s789s55m", "win": "2m" }
+  },
+  "sanshoku_doukou": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "222m222p222s345s11z", "win": "2m" }
+  },
+  "sankantsu": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "456s77z", "melds": ["1111m", "9999p", "2222s"], "win": "7z", "note": "4枚ずつの組（槓子）が3つ" }
+  },
+  "shousangen": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "555z666z77z234m567p", "win": "7z" }
+  },
+  "honroutou": {
+    "han": 2, "openHan": 2,
+    "example": { "hand": "111m999p111s999s11z", "win": "1m", "ron": true, "note": "ロンで和了（ツモだと四暗刻になる）" }
+  },
+  "double_riichi": {
+    "han": 2, "openHan": null,
+    "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "double_riichi", "note": "最初の捨て牌で立直をかけ、そのまま和了" }
+  },
+  "honitsu": {
+    "han": 3, "openHan": 2,
+    "example": { "hand": "123456m777m555z22z", "win": "2z" }
+  },
+  "junchan": {
+    "han": 3, "openHan": 2,
+    "example": { "hand": "123m789m123p789s99p", "win": "3m" }
+  },
+  "ryanpeikou": {
+    "han": 3, "openHan": null,
+    "example": { "hand": "223344m556677p88s", "win": "2m" }
+  },
+  "chinitsu": {
+    "han": 6, "openHan": 5,
+    "example": { "hand": "223344567m789m55m", "win": "2m" }
+  }
+}
