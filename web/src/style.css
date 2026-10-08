@@ -142,7 +142,8 @@ h2 {
 }
 
 /* Second row, under a divider: the round's status on the left (small label
-   over its value), the dora indicators boxed at the right end. */
+   over its value), the wall left and the dora indicators (boxed) at the
+   right end; a phone shows those two over the hand instead (PinnedStatus). */
 .header-status {
   display: flex;
   flex-wrap: wrap;
@@ -2591,9 +2592,10 @@ section,
   }
 
   /* The header's status: each label beside its value (the obvious ones,
-     局 and 対局, read out only), and the dora right after them as two more
-     items: no box, short labels, smaller tiles, and just the arrow between
-     indicator and dora (the tile's label names it). */
+     局 and 対局, read out only); the dora (in the header on a phone on its
+     side, over the hand upright) as two more items: no box, short labels,
+     smaller tiles, and just the arrow between indicator and dora (the tile's
+     label names it). */
   .header-status {
     gap: 4px 12px;
     padding-top: 6px;
@@ -2623,20 +2625,6 @@ section,
   .status-wall-dora {
     margin-left: 0;
     gap: 4px 12px;
-  }
-  /* The wall left and the dora leave the header for the top of the hand's
-     area, which sticks to the top of the screen: always in sight
-     (PinnedStatus). */
-  .header-status .status-wall-dora {
-    display: none;
-  }
-  .pinned-status {
-    display: flex;
-    align-items: center;
-    padding: 4px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--panel-bg);
   }
   .dora-box > div {
     flex-direction: row;
@@ -2786,7 +2774,7 @@ section,
   }
 }
 /* A phone upright: the CPU seats one under another at the full width, 対面,
-   上家, 下家, then the round's row; a seat with no discards yet ends at its
+   上家, 下家, then the round's moves (with the rivers folded away); a seat with no discards yet ends at its
    head. Your seat moves into the hand panel: its wind, points, rank and
    riichi beside the heading, its river under the hand. The rivers show
    every discard, so the log of moves only stands in for them while they are
@@ -2858,9 +2846,36 @@ section,
   .game-table[data-rivers="shown"] .event-log {
     display: none;
   }
-  /* The round's row alone: 捨て牌 reaches down into the padding too. */
-  .game-table[data-rivers="shown"] .table-center {
-    padding-bottom: 0;
+  /* With the rivers shown and no deposit, the center holds nothing to show. */
+  .game-table[data-rivers="shown"] .table-center:not(:has(.table-deposit)) {
+    display: none;
+  }
+}
+
+/* A phone (up to 760px wide): the wall left and the dora leave the header for the top
+   of the hand's area, which sticks to the top of the screen there (see the
+   phone's sticky hand above): always in sight (PinnedStatus). The dora row
+   keeps one line, scrolling sideways if a kan dora makes it too long, so the
+   pinned bar never grows mid-round. */
+@media (width <= 760px) {
+  .header-status .status-wall-dora {
+    display: none;
+  }
+  .pinned-status {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel-bg);
+  }
+  .pinned-status .status-wall-dora,
+  .pinned-status .dora-box {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .pinned-status .status-wall-dora {
+    overflow-x: auto;
   }
 }
 

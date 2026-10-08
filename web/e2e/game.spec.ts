@@ -425,7 +425,7 @@ test('a phone folds the other seats\' rivers away with 設定\'s 他家の捨て
 });
 
 // An upright phone stacks the CPU seats at the table's full width, 対面,
-// 上家 then 下家, over the round's row; your seat is in the hand panel (see
+// 上家 then 下家; your seat is in the hand panel (see
 // below). A seat with nothing under its head (before its first discard)
 // ends at its head.
 test('an upright phone stacks the CPU seats at the full width', async ({ page }) => {
@@ -443,14 +443,19 @@ test('an upright phone stacks the CPU seats at the full width', async ({ page })
   for (let i = 0; i < 4; i++) await playOneStep(page);
   await waitForPlayback(page);
   const table = await box('.game-table');
-  const rows = await Promise.all(['.seat-top', '.seat-left', '.seat-right', '.table-center'].map(box));
+  // The center holds only the hidden log with the rivers shown (and no
+  // deposit), so it shows only when it has something.
+  const shown = ['.seat-top', '.seat-left', '.seat-right'];
+  if (await page.locator('.table-center').isVisible()) shown.push('.table-center');
+  const rows = await Promise.all(shown.map(box));
   expect(rows[0].width).toBeGreaterThan(table.width - 16);
   for (const r of rows) {
     expect(Math.abs(r.x - rows[0].x)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.width - rows[0].width)).toBeLessThanOrEqual(1);
   }
   for (let i = 1; i < rows.length; i++) expect(rows[i].y).toBeGreaterThanOrEqual(rows[i - 1].y + rows[i - 1].height);
-  expect(rows[3].y + rows[3].height).toBeLessThanOrEqual(table.y + table.height);
+  const last = rows[rows.length - 1];
+  expect(last.y + last.height).toBeLessThanOrEqual(table.y + table.height);
   expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
   // Your turn marks the hand panel, as your seat's box was marked.
   const hand = handPanel(page);
@@ -782,4 +787,26 @@ test('a second tab on the same game stops the first, until taken back', async ({
   await playOneStep(page);
   await expect.poll(() => savedGame(page)).not.toBe(save);
   await expect(page.locator('.error-banner')).toHaveCount(0);
+});
+
+// On a phone the wall left and the dora sit over the hand, which sticks to
+// the top of the screen: scrolled to the page's end, they are still in sight,
+// and the header's copy is not shown. A desktop shows the header's.
+test('a phone keeps the wall left and the dora in sight over the hand', async ({ page }) => {
+  // Tall enough for the hand to pin (style.css, useYakuTop's data-hand-fits).
+  await page.setViewportSize({ width: 390, height: 640 });
+  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await waitForPlayback(page);
+  const pinned = page.getByTestId('pinned-status');
+  await expect(pinned).toBeVisible();
+  await expect(page.locator('.header-status .status-wall-dora')).toBeHidden();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const box = (await pinned.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(640);
+  await expect(pinned.getByTestId('wall-remaining')).toHaveText(/^\d+$/);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(pinned).toBeHidden();
+  await expect(page.locator('.header-status .status-wall-dora')).toBeVisible();
 });

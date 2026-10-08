@@ -388,10 +388,10 @@ export async function finishPlayback(page: Page) {
   await expect(table).toHaveAttribute('data-playing', 'false');
 }
 
-/** Everything a game action changes: the table (rivers, points), the hand, the result panel and the wall left (in the header). */
+/** Everything a game action changes: the table (rivers, points), the hand, the result panel and the wall left (in the header, or over the hand on a phone). */
 export async function gameSnapshot(page: Page) {
-  const wall = wallRemaining(page);
-  return `${(await wall.count()) > 0 ? await wall.innerText() : ''}\n${await page.locator('.area-hand').innerText()}`;
+  const status = page.locator('.header-status');
+  return `${(await status.count()) > 0 ? await status.innerText() : ''}\n${await page.locator('.area-hand').innerText()}`;
 }
 
 /** Clicks and waits until the engine has answered, so the next step never
@@ -521,7 +521,8 @@ export async function toggleRivers(page: Page) {
   await expect(settingsDialog(page)).toBeHidden();
 }
 
-/** The wall left as shown: in the header, or on a phone over the hand (one of the two is displayed). */
+/** The wall left as shown: in the header, or on a phone over the hand. Both copies are in the page, one
+ * hidden: always look for the displayed one (this, or a `visible: true` filter for the dora). */
 export function wallRemaining(page: Page): Locator {
   return page.getByTestId('wall-remaining').filter({ visible: true });
 }
