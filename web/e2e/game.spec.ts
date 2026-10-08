@@ -98,9 +98,9 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
 
 // On a phone (360 and 390px wide) the table, the hand and the call buttons
 // fit the screen: no sideways page scroll, the hand on one row with the
-// called meld on a row of its own, and every action button at least 40px tall.
+// called meld on a row of its own, and every action button the header's 設定 size (32px).
 for (const width of [360, 390]) {
-  test(`a CPU game fits a ${width}px-wide phone: one-row hand, 40px action buttons`, async ({ page }) => {
+  test(`a CPU game fits a ${width}px-wide phone: one-row hand, 設定-size action buttons`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
     const hand = handPanel(page);
@@ -116,11 +116,14 @@ for (const width of [360, 390]) {
     await playUntilPonOffered(page);
     await noOverflow();
     expect(await rowsOf(hand.locator('.hand-tiles button.tile'))).toBe(1);
+    // The call's buttons are the header's 設定 size: compact, yet easy to tap.
     const buttons = page.locator('.action-bar button');
     expect(await buttons.count()).toBeGreaterThanOrEqual(2);
+    const settings = (await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).boundingBox())!;
     for (const b of await buttons.all()) {
       const bb = await b.boundingBox();
-      expect(bb!.height).toBeGreaterThanOrEqual(40);
+      expect(bb!.height).toBeGreaterThanOrEqual(32);
+      expect(Math.abs(bb!.height - settings.height)).toBeLessThanOrEqual(2);
     }
     // Each opponent's concealed hand is one back with a count (see below).
     for (const seat of ['.seat-top', '.seat-left', '.seat-right']) {

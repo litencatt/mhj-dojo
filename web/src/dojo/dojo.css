@@ -406,7 +406,7 @@
   display: inline-flex;
   align-items: center;
 }
-/* A phone's tap targets are 44px: every chip of 所持役 is as tall, button or not. */
+/* On a phone every chip of 所持役 is 44px tall, button or not (a roomy target in a short list). */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   /* Two and a half rows of 44px chips: the next row half shown, as on a wide screen. */
   .dojo-yaku {
