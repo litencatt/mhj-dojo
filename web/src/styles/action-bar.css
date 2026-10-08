@@ -57,11 +57,12 @@
   color: var(--muted);
 }
 
-/* ---- Narrow screens and phones ---- */
 .hint-touch,
 .hint-hybrid {
   display: none;
 }
+
+/* ---- Narrow screens and phones ---- */
 /* A touch screen (or pen) taps a tile twice to discard it
    (components/Hand.tsx): a touch-only device says so instead of 「クリック」,
    one with a mouse as well adds it. */

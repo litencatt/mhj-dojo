@@ -244,6 +244,27 @@
    to one back with the count on it, the rows of backs taking too much of
    the table. */
 @media (width <= 760px), (height <= 500px) {
+  /* The log's moves in short: a small seat and verb, a discard's verb read
+     out only. */
+  .event-seat,
+  .event-verb {
+    font-size: 0.6rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .event-verb:not(.event-verb-discard) {
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .event-verb-discard {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
   .seat-hand-hidden .seat-hand-backs {
     display: none;
   }
