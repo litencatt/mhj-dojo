@@ -6,7 +6,7 @@ import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Tile } from './components/Tile';
-import { DoraStatus } from './components/DoraStatus';
+import { PinnedStatus, WallDora } from './components/PinnedStatus';
 import { SidePanels } from './components/SidePanels';
 import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
@@ -14,7 +14,7 @@ import { ResultPanel } from './components/ResultPanel';
 import { FinalPanel } from './components/FinalPanel';
 import { AppShell } from './components/AppShell';
 import type { ResumeItem } from './components/ResumePanel';
-import { PANELS, focusGlossary, type PanelKey, optionalInt, useGameAdvice, useMinimized } from './panels';
+import { PANELS, focusGlossary, type PanelKey, optionalInt, useGameAdvice, useMinimized, useRiversShown } from './panels';
 import {
   useLastAnalysis,
   useMediaQuery,
@@ -53,6 +53,8 @@ const NO_ADVICE_PANELS = GAME_PANELS.filter((p) => p.key !== 'advice');
 // short window is a phone on its side only with a touch screen: a desktop
 // window made short keeps them.
 const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
+// Where the other seats' rivers can fold away (style.css).
+const RIVERS_FOLD = '(width <= 760px), (height <= 500px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
 const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -151,6 +153,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
   const phone = useMediaQuery(PHONE);
+  const rivers = useRiversShown();
+  const riversFold = useMediaQuery(RIVERS_FOLD);
   // Opened with no game, seed or options in the URL: the saved games, if
   // any, are offered instead of a new one.
   const offered = useOffered(() => (dojo ? [] : savedGames().map(savedItem)));
@@ -424,10 +428,17 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     />
   );
   // What the page shows: the advice and the danger (a CPU game's own choice; the dojo's
-  // are bought), and the dojo's 透視 once bought.
-  const viewGroup = (!dojo || has('cheat:peek')) && (
+  // are bought), the other seats' rivers where a phone can fold them away, and the
+  // dojo's 透視 once bought.
+  const viewGroup = (!dojo || riversFold || has('cheat:peek')) && (
     <fieldset class="dojo-settings-group option-group">
       <legend>表示</legend>
+      {riversFold && (
+        <label>
+          <input type="checkbox" checked={rivers.shown} onChange={rivers.toggle} />
+          他家の捨て牌
+        </label>
+      )}
       {!dojo && (
         <label>
           <input type="checkbox" checked={adviceOn} onChange={(e) => setAdviceOn((e.target as HTMLInputElement).checked)} />
@@ -526,7 +537,9 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                   <dd>{me && WIND_NAMES[me.wind]}</dd>
                 </div>
               </dl>
-              <DoraStatus
+              {/* The wall left as the playback stands, kept with the dora (on a phone, over the hand: PinnedStatus). */}
+              <WallDora
+                wallRemaining={table.wall_remaining}
                 doraIndicators={table.dora_indicators}
                 dora={table.dora}
                 uraDoraIndicators={table.ura_dora_indicators}
@@ -540,11 +553,19 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
         state && me && table && (
           <>
             <div class="area-hand">
+              <PinnedStatus
+                wallRemaining={table.wall_remaining}
+                doraIndicators={table.dora_indicators}
+                dora={table.dora}
+                uraDoraIndicators={table.ura_dora_indicators}
+                uraDora={table.ura_dora}
+              />
               <GameTable
                 state={table}
                 log={[...earlierEvents, ...table.events]}
                 highlight={playback.highlight}
                 playing={playback.playing}
+                riversShown={rivers.shown}
               />
               {dojo && !playback.playing && (
                 <DojoAids

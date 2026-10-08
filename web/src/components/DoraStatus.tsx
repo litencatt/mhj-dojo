@@ -9,7 +9,7 @@ export interface DoraStatusProps {
   uraDora: TileT[];
 }
 
-/** The dora and ura-dora indicators, boxed at the right of the header's status row. */
+/** The dora and ura-dora indicators: with the wall left in WallDora (PinnedStatus.tsx), in the header or over the hand on a phone. */
 export function DoraStatus({ doraIndicators, dora, uraDoraIndicators, uraDora }: DoraStatusProps) {
   return (
     <dl class="dora-box">
