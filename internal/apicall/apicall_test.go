@@ -92,7 +92,7 @@ func TestSessionErrors(t *testing.T) {
 }
 
 // TestRestoreBodyFitsFullTree checks that the largest restore body the site
-// sends, a tree of session.MaxNodes nodes written as web/src/wasm.ts writes
+// sends, a tree of session.MaxNodes nodes written as web/src/saves.ts writes
 // it, is within the body limit: it must fail on its moves, not on reading.
 func TestRestoreBodyFitsFullTree(t *testing.T) {
 	moves := make([]map[string]any, session.MaxNodes-1)

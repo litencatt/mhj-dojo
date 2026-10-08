@@ -19,7 +19,7 @@ import {
   useUrlResume,
 } from './hooks';
 import { claim } from './singleTab';
-import { savedSessions } from './wasm';
+import { savedSessions } from './saves';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);

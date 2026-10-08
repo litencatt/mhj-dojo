@@ -150,7 +150,7 @@
     padding: 1px;
     border-radius: 3px;
   }
-  /* The hand (with the pinned wall and dora, base.css) stays on screen as
+  /* The hand (with the pinned wall and dora, status.css) stays on screen as
      the page scrolls: not while a win or a result fills it, nor when its
      tiles don't fit on one row (hooks.ts). */
   .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
