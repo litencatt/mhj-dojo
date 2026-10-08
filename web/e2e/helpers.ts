@@ -390,7 +390,7 @@ export async function finishPlayback(page: Page) {
 
 /** Everything a game action changes: the table (rivers, points), the hand, the result panel and the wall left (in the header). */
 export async function gameSnapshot(page: Page) {
-  const wall = page.getByTestId('wall-remaining');
+  const wall = wallRemaining(page);
   return `${(await wall.count()) > 0 ? await wall.innerText() : ''}\n${await page.locator('.area-hand').innerText()}`;
 }
 
@@ -519,4 +519,9 @@ export async function toggleRivers(page: Page) {
   await riversOption(page).click();
   await page.keyboard.press('Escape');
   await expect(settingsDialog(page)).toBeHidden();
+}
+
+/** The wall left as shown: in the header, or on a phone over the hand (one of the two is displayed). */
+export function wallRemaining(page: Page): Locator {
+  return page.getByTestId('wall-remaining').filter({ visible: true });
 }

@@ -167,8 +167,12 @@ h2 {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
-/* The CPU game's wall left sits just before the dora: together at the row's
-   end, wrapping as one. */
+/* The wall left and the dora over the hand: phones only (below). */
+.pinned-status {
+  display: none;
+}
+/* The wall left sits just before the dora: together at the row's end,
+   wrapping as one. */
 .status-wall-dora {
   display: flex;
   align-items: center;
@@ -2619,6 +2623,20 @@ section,
   .status-wall-dora {
     margin-left: 0;
     gap: 4px 12px;
+  }
+  /* The wall left and the dora leave the header for the top of the hand's
+     area, which sticks to the top of the screen: always in sight
+     (PinnedStatus). */
+  .header-status .status-wall-dora {
+    display: none;
+  }
+  .pinned-status {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--panel-bg);
   }
   .dora-box > div {
     flex-direction: row;

@@ -561,13 +561,13 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(maxHeader);
     // The status stays in view, and 設定 is easy to tap.
     await expect(page.locator('.game-status')).toBeVisible();
-    await expect(page.locator('.dora-box')).toBeVisible();
+    await expect(page.locator('.dora-box').filter({ visible: true })).toBeVisible();
     expect((await toggle.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     // The title row's mode links never run under 設定 and ?, even at 320px.
     const title = (await page.locator('.app-header h1').boundingBox())!;
     const meta = (await page.locator('.header-meta').boundingBox())!;
     expect(title.x + title.width).toBeLessThanOrEqual(meta.x);
-    expect((await page.locator('.dora-indicators .tile').first().boundingBox())!.height).toBeLessThanOrEqual(24);
+    expect((await page.locator('.dora-indicators .tile').filter({ visible: true }).first().boundingBox())!.height).toBeLessThanOrEqual(24);
 
     // Open: the options in a dialog inside the screen, 新規対局 still a big button.
     await toggle.click();
@@ -704,7 +704,7 @@ test('a desktop has six-tile rivers', async ({ page }) => {
   await waitForPlayback(page);
   const river = page.locator('.seat-river').first();
   expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
-  await expect(page.locator('.dora-indicators .tile').first()).toHaveCSS('width', '26px');
+  await expect(page.locator('.dora-indicators .tile').filter({ visible: true }).first()).toHaveCSS('width', '26px');
   await expect(page.locator('.seat-box .tile-xs').first()).toHaveCSS('width', '18px');
   // The log of moves: one move to a row.
   const tops = await page

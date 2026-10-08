@@ -531,7 +531,7 @@ test('裏ドラ透視 shows the ura dora during the round, and only once bought'
   test.setTimeout(90_000);
   await newDojoGame(page, SEED, { ownedItems: ['cheat:ura'] });
   await waitForPlayback(page);
-  const dora = page.locator('.dora-box');
+  const dora = page.locator('.dora-box').filter({ visible: true });
   await expect(dora.locator('.tile-back')).toHaveCount(0);
   await expect(dora.getByLabel(/^裏ドラ /)).toHaveCount(1);
 

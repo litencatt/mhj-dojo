@@ -6,7 +6,7 @@ import { dangerMarks } from './danger';
 import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { Tile } from './components/Tile';
-import { DoraStatus } from './components/DoraStatus';
+import { PinnedStatus, WallDora } from './components/PinnedStatus';
 import { SidePanels } from './components/SidePanels';
 import { GameTable, LENGTH_NAMES, River, SeatStatus, WIND_NAMES, roundName, seatLabel } from './components/GameTable';
 import { Melds } from './components/Melds';
@@ -537,21 +537,14 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                   <dd>{me && WIND_NAMES[me.wind]}</dd>
                 </div>
               </dl>
-              {/* The wall left as the playback stands, kept with the dora (on a phone too). */}
-              <div class="status-wall-dora">
-                <dl class="wall-status">
-                  <div>
-                    <dt>残り牌</dt>
-                    <dd data-testid="wall-remaining">{table.wall_remaining}</dd>
-                  </div>
-                </dl>
-                <DoraStatus
-                  doraIndicators={table.dora_indicators}
-                  dora={table.dora}
-                  uraDoraIndicators={table.ura_dora_indicators}
-                  uraDora={table.ura_dora}
-                />
-              </div>
+              {/* The wall left as the playback stands, kept with the dora (on a phone, over the hand: PinnedStatus). */}
+              <WallDora
+                wallRemaining={table.wall_remaining}
+                doraIndicators={table.dora_indicators}
+                dora={table.dora}
+                uraDoraIndicators={table.ura_dora_indicators}
+                uraDora={table.ura_dora}
+              />
             </div>
           )}
         </>
@@ -560,6 +553,13 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
         state && me && table && (
           <>
             <div class="area-hand">
+              <PinnedStatus
+                wallRemaining={table.wall_remaining}
+                doraIndicators={table.dora_indicators}
+                dora={table.dora}
+                uraDoraIndicators={table.ura_dora_indicators}
+                uraDora={table.ura_dora}
+              />
               <GameTable
                 state={table}
                 log={[...earlierEvents, ...table.events]}
