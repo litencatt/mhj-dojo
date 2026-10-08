@@ -47,7 +47,7 @@ export interface GameTableProps {
 
 /** The table: each seat's river, points and (hidden) hand around the round
  * info and the round's moves. The skip control lives in the action bar
- * (GameApp), not here. */
+ * (components/ActionBar.tsx), not here. */
 export function GameTable({ state, log = state.events, highlight, playing = false, riversShown = true }: GameTableProps) {
   const at = (rel: number) => state.seats[(state.you + rel) % 4];
   const logRef = useRef<HTMLOListElement>(null);
