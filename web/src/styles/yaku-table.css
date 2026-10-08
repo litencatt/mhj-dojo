@@ -409,7 +409,8 @@
     display: none;
   }
   /* The effective tiles on one row: each shrinks (to 16px at most, 11px
-     at least) to share the row; past that many, the row scrolls sideways. */
+     at least) to share the row; once 11px tiles no longer fit, the row
+     scrolls sideways. */
   .ukeire-tiles {
     flex-wrap: nowrap;
     gap: 2px;
