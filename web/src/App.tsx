@@ -5,7 +5,7 @@ import { Hand } from './components/Hand';
 import { ShantenChart } from './components/ShantenChart';
 import { HistoryTree } from './components/HistoryTree';
 import { WinPanel } from './components/WinPanel';
-import { DoraStatus } from './components/DoraStatus';
+import { PinnedStatus, WallDora } from './components/PinnedStatus';
 import { SidePanels } from './components/SidePanels';
 import { AdvicePanel } from './components/AdvicePanel';
 import { AppShell } from './components/AppShell';
@@ -217,12 +217,10 @@ export function App() {
                   <dt>巡目</dt>
                   <dd>{state.turn} / {state.max_turns}</dd>
                 </div>
-                <div>
-                  <dt>残り牌</dt>
-                  <dd>{state.wall_remaining}</dd>
-                </div>
               </dl>
-              <DoraStatus
+              {/* On a phone, over the hand instead (PinnedStatus). */}
+              <WallDora
+                wallRemaining={state.wall_remaining}
                 doraIndicators={state.dora_indicators}
                 dora={state.dora}
                 uraDoraIndicators={state.ura_dora_indicators}
@@ -236,6 +234,13 @@ export function App() {
         state && (
           <>
             <div class="area-hand">
+              <PinnedStatus
+                wallRemaining={state.wall_remaining}
+                doraIndicators={state.dora_indicators}
+                dora={state.dora}
+                uraDoraIndicators={state.ura_dora_indicators}
+                uraDora={state.ura_dora}
+              />
               <Hand
                 hand={state.hand}
                 groups={state.hand_groups}

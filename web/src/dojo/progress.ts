@@ -103,7 +103,7 @@ export interface FinishedGame {
 
 export interface Reward {
   rank: number;
-  rankMultiplier: number; // of the rank's XP and coins: 半荘戦 x2, CPU 普通 x1.5 (rules.ts)
+  rankMultiplier: number; // of the rank's XP and coins: 半荘戦 x2, CPU 普通 x2 (rules.ts)
   rankXp: number;
   xp: number; // the game's whole XP, the rounds' won han paid before included
   coins: number; // the game's whole coins, before the floor at 0: may be negative

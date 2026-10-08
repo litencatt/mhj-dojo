@@ -13,7 +13,7 @@ export const NORMAL_CPU_LEVEL = 7;
  * chosen, by their product.
  */
 export const HANCHAN_RANK_MULTIPLIER = 2;
-export const NORMAL_CPU_RANK_MULTIPLIER = 1.5;
+export const NORMAL_CPU_RANK_MULTIPLIER = 2;
 
 export const DEFAULT_GAME_LENGTH: GameLength = 'tonpuu';
 export const DEFAULT_GAME_CPU: CpuLevel = 'weak';
@@ -22,7 +22,7 @@ export function rankMultiplier(length: GameLength, cpu: CpuLevel): number {
   return (length === 'hanchan' ? HANCHAN_RANK_MULTIPLIER : 1) * (cpu === 'normal' ? NORMAL_CPU_RANK_MULTIPLIER : 1);
 }
 
-/** 「半荘 ×2」「CPU 普通 ×1.5」「半荘・CPU 普通 ×3」, or '' for the plain game. */
+/** 「半荘 ×2」「CPU 普通 ×2」「半荘・CPU 普通 ×4」, or '' for the plain game. */
 export function rankMultiplierLabel(length: GameLength, cpu: CpuLevel): string {
   const names = [length === 'hanchan' && '半荘', cpu === 'normal' && 'CPU 普通'].filter(Boolean);
   return names.length === 0 ? '' : `${names.join('・')} ×${rankMultiplier(length, cpu)}`;

@@ -16,6 +16,7 @@ import {
   newDojoGame,
   nextEngineReply,
   openSettings,
+  playGameToEnd,
   playOneStep,
   playToResult,
   slowEngine,
@@ -24,6 +25,7 @@ import {
   watchEngine,
 } from './helpers';
 import { initialProgress, STORAGE_KEY, type DojoProgress } from '../src/dojo/progress.ts';
+import { guideFor } from '../src/dojo/yakuGuide.ts';
 
 // The dojo (?mode=dojo): the hub, the games' rewards and the shop. The
 // seeds are the ones internal/apicall/e2e_seeds_test.go guards.
@@ -529,7 +531,7 @@ test('裏ドラ透視 shows the ura dora during the round, and only once bought'
   test.setTimeout(90_000);
   await newDojoGame(page, SEED, { ownedItems: ['cheat:ura'] });
   await waitForPlayback(page);
-  const dora = page.locator('.dora-box');
+  const dora = page.locator('.dora-box').filter({ visible: true });
   await expect(dora.locator('.tile-back')).toHaveCount(0);
   await expect(dora.getByLabel(/^裏ドラ /)).toHaveCount(1);
 
@@ -604,7 +606,7 @@ test('a won round pays its 銭 as it ends, once, even after a reload', async ({ 
   expect(await dojoProgress(page)).toEqual(paid);
 });
 
-test('半荘戦 and the normal CPU unlock with the level, and their game pays the rank x3', async ({ page }) => {
+test('半荘戦 and the normal CPU unlock with the level, and their game pays the rank x4', async ({ page }) => {
   test.setTimeout(120_000);
   await watchEngine(page);
   const stored = (p: Partial<DojoProgress>) => JSON.stringify({ ...initialProgress(), firstGameBonus: true, ...p });
@@ -629,13 +631,13 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘 ×2');
   expect((await dojoProgress(page))?.gameLength).toBe('hanchan');
 
-  // 4級: the normal CPU too; both pay the rank x3.
+  // 4級: the normal CPU too; both pay the rank x4.
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [STORAGE_KEY, stored({ xp: 2100, gameLength: 'hanchan' })]);
   await page.reload();
   await page.getByRole('button', { name: '設定' }).click();
   await expect(hanchan).toBeChecked();
   await normal.check();
-  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×3');
+  await expect(page.getByTestId('dojo-multiplier')).toHaveText('順位の報酬 半荘・CPU 普通 ×4');
   expect((await dojoProgress(page))?.gameCpu).toBe('normal');
   await settings.getByRole('button', { name: '閉じる' }).click();
 
@@ -643,7 +645,7 @@ test('半荘戦 and the normal CPU unlock with the level, and their game pays th
   await expect(handPanel(page)).toBeVisible();
   await finishDojoGame(page);
   await expect(page.getByRole('heading', { name: '最終結果（半荘戦）' })).toBeVisible();
-  await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×3）/);
+  await expect(page.getByTestId('dojo-reward')).toContainText(/順位 \+\d+（半荘・CPU 普通 ×4）/);
 });
 
 test('a progress without the game choice plays 東風戦 against weak CPUs, and 半荘戦 is locked below 6級', async ({ page }) => {
@@ -715,4 +717,122 @@ test('a hub opened on a seed already settled starts a game on a random seed', as
   await expect(page.getByRole('link', { name: '対局開始' })).not.toHaveAttribute('href', /seed=/);
   await page.goto('./?mode=dojo&seed=43');
   await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('href', /seed=43/);
+});
+
+test('a whole dojo game played through the page ends on 最終結果 and pays its reward', async ({ page }) => {
+  test.setTimeout(120_000);
+  // The CPU moves land at once: the file's beforeEach reduces motion, which skips the playback.
+  await newDojoGame(page, SEED);
+  const before = await dojoProgress(page);
+  await playGameToEnd(page);
+  await expect(page.getByRole('region', { name: '最終結果' })).toBeVisible();
+  await expect(page.getByTestId('dojo-reward')).toContainText('稽古 +');
+  const paid = await dojoProgress(page);
+  expect(paid?.settled).toEqual([String(SEED)]);
+  expect(paid!.coins).toBeGreaterThan(before!.coins);
+  expect(paid!.xp).toBeGreaterThan(before!.xp);
+  // Paid once: a reload of the finished game pays nothing more.
+  await page.reload();
+  await expect(page.getByRole('region', { name: '最終結果' })).toBeVisible();
+  expect(await dojoProgress(page)).toEqual(paid);
+});
+
+test('a dojo game opened by the CPU game URL moves to the dojo page', async ({ page }) => {
+  await newDojoGame(page, SEED);
+  const id = new URL(page.url()).searchParams.get('game');
+  expect(id).toBeTruthy();
+  await page.goto(`./?mode=game&game=${id}`);
+  await expect(page).toHaveURL(/[?&]mode=dojo(&|$)/);
+  await expect(page).toHaveURL(new RegExp(`[?&]game=${id}(&|$)`));
+  await expect(handPanel(page)).toBeVisible();
+  await expect(page.getByRole('link', { name: '道場トップへ戻る' })).toBeVisible();
+});
+
+// A yaku's guide (GuideDialog): shown on buying, and again from the chip in 所持役.
+const shantenText = (s: number) => (s === 0 ? '聴牌' : `${s}向聴`);
+
+test('buying a yaku shows its guide: condition, han, an example hand and a way to practise it', async ({ page }) => {
+  await openHub(page, { xp: 5000, coins: 500, firstGameBonus: true });
+  const guide = guideFor('ittsu')!;
+  await page.locator('[data-item="ittsu"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+
+  const dialog = page.getByRole('dialog', { name: '一気通貫' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('修得しました')).toBeVisible();
+  await expect(dialog).toContainText('同じ色で123・456・789の順子');
+  await expect(dialog).toContainText('2翻（鳴くと1翻）');
+  // 13 tiles of the hand and the winning tile, drawn with the table's tiles.
+  const hand = dialog.getByRole('group', { name: '例の手' });
+  await expect(hand.locator('.tile')).toHaveCount(14);
+  await expect(hand.locator('.tile').last()).toHaveAccessibleName('和了牌 9萬');
+  await expect(page.getByTestId('dojo-coins')).toHaveText('420');
+
+  // 練習 opens practice mode on the seed whose hand is near the yaku: its row shows that shanten.
+  const seed = guide.practice!.seed;
+  await dialog.getByRole('link', { name: 'この役を練習する' }).click();
+  await expect(page).toHaveURL(new RegExp(`\\?seed=${seed}&turns=18$`));
+  await expect(handPanel(page)).toBeVisible();
+  const row = page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '一気通貫' });
+  await expect(row.locator('.shanten-cell')).toContainText(shantenText(guide.practice!.shanten));
+  expect(guide.practice!.shanten).toBeLessThanOrEqual(1);
+});
+
+test('closing the guide of a bought yaku leaves focus on its chip; a purchase that fails shows no guide', async ({ page }) => {
+  await openHub(page, { xp: 5000, coins: 500, firstGameBonus: true });
+  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+  const dialog = page.getByRole('dialog', { name: '立直' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('門前で聴牌するまでを練習します');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '立直' })).toBeFocused();
+
+  // Another tab spent the coins after the confirm dialog opened: nothing is bought, no guide.
+  await page.locator('[data-item="iipeikou"]').getByRole('button', { name: '購入' }).click();
+  await page.evaluate((key) => {
+    const p = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(key, JSON.stringify({ ...p, coins: 0 }));
+  }, STORAGE_KEY);
+  await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
+  await expect(page.getByRole('dialog', { name: '一盃口' })).toBeHidden();
+  await expect(page.getByText('修得しました')).toBeHidden();
+});
+
+test('an owned yaku in 所持役 opens its guide again; Esc and a click outside close it', async ({ page }) => {
+  await openHub(page, { ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei', 'haitei'] });
+  const dialog = page.getByRole('dialog', { name: '立直' });
+  await expect(dialog).toBeHidden();
+  // 断么九・平和・門前清自摸和 are not sold, so they have no guide: just chips.
+  await expect(page.getByTestId('dojo-yaku').getByRole('button')).toHaveText(['立直', '役牌', '海底摸月']);
+
+  const chip = page.getByTestId('dojo-yaku').getByRole('button', { name: '立直' });
+  await chip.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('1翻（門前限定）');
+  await expect(dialog.getByText('修得しました')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(chip).toBeFocused();
+
+  await chip.click();
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(dialog).toBeHidden();
+
+  await chip.click();
+  await dialog.getByRole('button', { name: '閉じる' }).click();
+  await expect(dialog).toBeHidden();
+
+  // The bundle shares one guide; a yaku practice mode cannot reach has no 練習 link.
+  await page.getByTestId('dojo-yaku').getByRole('button', { name: '役牌' }).click();
+  const bundle = page.getByRole('dialog', { name: '役牌' });
+  await expect(bundle).toContainText('白・發・中の刻子');
+  await expect(bundle.getByRole('link', { name: 'この役を練習する' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByTestId('dojo-yaku').getByRole('button', { name: '海底摸月' }).click();
+  const haitei = page.getByRole('dialog', { name: '海底摸月' });
+  await expect(haitei).toBeVisible();
+  await expect(haitei.getByRole('link', { name: 'この役を練習する' })).toHaveCount(0);
 });
