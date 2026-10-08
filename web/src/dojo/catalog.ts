@@ -11,6 +11,10 @@
 //     S2 + every 2-han yaku  24.5/24.5/24.2/26.8%,         2.0 han,  1.11 wins: about 69 XP, 66 coins
 //     S3 every yaku          27.8/23.5/23.5/25.2%,         2.37 han, 1.11 wins: about 75 XP, 71 coins
 //   (the rank's base, the won han x 10 and the 和了祝儀's 10 coins a win).
+//   That is the slow bound. Seat 0 played human-like (the normal CPU without
+//   calls, folding against a riichi; #273) is the fast one: about 61 / 88 / 96 /
+//   106 XP a game at S0 to S3, Lv10 in 40 to 60 games and the whole shop in 110
+//   to 150 (economy.test.ts checks both).
 //   The 和了祝儀 makes a win worth more than playing safe for a rank.
 // - 立直 is affordable within 1-2 games: the first-game bonus alone covers it.
 // - Lv10 (4500 XP) comes after about 70 games, by which time 80% or more of
