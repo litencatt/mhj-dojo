@@ -228,7 +228,7 @@ for (const [width, height] of [[390, 844], [360, 800]]) {
 // A CPU game on a phone (a touch screen), upright or on its side, leaves the
 // chart and the glossary to practice mode: no dock bar, even with a saved
 // layout that has them open, and upright the yaku panel reaches down to the
-// page's bottom padding (32px) instead of the dock bar's (60px). Widened to
+// page's bottom padding (8px) instead of the dock bar's (60px). Widened to
 // a desktop the saved layout is back, and narrowed again they are gone again.
 test.describe('a phone game', () => {
   test.use({ hasTouch: true });
@@ -253,7 +253,7 @@ test.describe('a phone game', () => {
         const yaku = (await page.locator('.area-yaku').boundingBox())!;
         return Math.round(844 - (yaku.y + yaku.height));
       })
-      .toBe(32);
+      .toBe(8); // no dock bar: the panel runs nearly to the screen's foot
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight))
       .toBe(0);

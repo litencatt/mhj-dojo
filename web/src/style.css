@@ -2141,24 +2141,41 @@ section,
 }
 
 @media (width <= 760px) {
+  /* A phone keeps its height for the yaku table: tight gaps and paddings
+     throughout (the columns' 6px gaps, 8px panels). */
   .app,
   .dojo-home {
-    padding-top: max(8px, env(safe-area-inset-top));
+    padding-top: max(6px, env(safe-area-inset-top));
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
     padding-bottom: calc(32px + env(safe-area-inset-bottom));
-    row-gap: 10px;
+    row-gap: 6px;
   }
   section {
-    padding: 10px;
+    padding: 8px;
+  }
+  .area-main,
+  .area-side,
+  .area-header,
+  .area-hand,
+  .area-yaku,
+  .area-notes,
+  .area-advice,
+  .area-gloss,
+  .area-chart,
+  .area-tree {
+    gap: 6px;
+  }
+  .cpu-summary {
+    margin: -6px 0; /* the column's gaps, as above */
   }
 
   /* Header: the title with the version and help on its right, then the form
      on a row of its own with the button at the end. 16px inputs keep iOS
      from zooming in on focus. */
   .app-header {
-    gap: 6px 10px;
-    padding: 8px;
+    gap: 4px 10px;
+    padding: 6px 8px;
   }
   .app-header h1 {
     font-size: 1.1rem;
@@ -2385,13 +2402,21 @@ section,
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* With no dock bar at the bottom (nothing minimized), the yaku panel runs
+     nearly to the screen's foot. (With one, an upright phone's has-dock rule
+     below makes room for the bar.) */
+  .app-practice:not(.has-dock),
+  .app-game:not(.has-dock) {
+    --yaku-bottom: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
   .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
   .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 5;
     background: var(--bg);
-    box-shadow: 0 0 0 8px var(--bg);
+    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
   }
   .app-practice .area-yaku,
   .app-game .area-yaku {
@@ -2449,11 +2474,12 @@ section,
     z-index: 2;
     background: var(--panel-bg);
   }
-  /* The panel is its own scroller: stick to its top edge, over its 10px
-     padding, so no row shows above the header. */
+  /* The panel is its own scroller: stick to its top edge, over its 8px
+     padding (the phone's section padding above), so no row shows above the
+     header. */
   .app-practice .yaku-table thead,
   .app-game .yaku-table thead {
-    top: -10px;
+    top: -8px;
   }
   .yaku-table th,
   .yaku-table td,
@@ -2511,10 +2537,10 @@ section,
   /* CPU game: a tighter table (its seats' tiles and log below). */
   .game-table {
     gap: 4px;
-    padding: 6px;
+    padding: 4px;
   }
   .seat-box {
-    padding: 5px;
+    padding: 4px;
   }
   .action-bar {
     gap: 8px;
@@ -2598,7 +2624,7 @@ section,
      label names it). */
   .header-status {
     gap: 4px 12px;
-    padding-top: 6px;
+    padding-top: 4px;
   }
   .game-status,
   .wall-status {
