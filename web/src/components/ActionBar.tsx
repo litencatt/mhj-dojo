@@ -12,6 +12,7 @@ interface ActionBarProps {
   riichiMode: boolean;
   onRiichiMode: (on: boolean) => void;
   onAction: (type: ActionType, tile?: TileT, tiles?: TileT[]) => void;
+  noCalls?: boolean; // dojo: 鳴きなし is on, no pon, chii or open kan offered
   canRedraw: boolean; // dojo: 引き直し is legal and affordable
   summonable?: TileT[]; // dojo: the kinds 牌寄せ may fetch, when legal and affordable
   /** On a phone, the advice to offer as a chip (no advice panel there). */
@@ -22,7 +23,7 @@ interface ActionBarProps {
 
 /** Your options right now: ron / pon / kan / chii / skip on a discard, or on
  * your turn tsumo, kan, riichi, 九種九牌, or a hint. */
-export function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, canRedraw, summonable, advice, highlight, onHighlight }: ActionBarProps) {
+export function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAction, noCalls = false, canRedraw, summonable, advice, highlight, onHighlight }: ActionBarProps) {
   const { legal } = state;
   // 牌寄せ opens a row of the kinds it may fetch; a new state closes it.
   const [summoning, setSummoning] = useState(false);
@@ -43,17 +44,17 @@ export function ActionBar({ state, busy, myTurn, riichiMode, onRiichiMode, onAct
             ロン
           </button>
         )}
-        {legal.pon && (
+        {legal.pon && !noCalls && (
           <button type="button" disabled={busy} onClick={() => onAction('pon')}>
             ポン
           </button>
         )}
-        {legal.kan.length > 0 && (
+        {legal.kan.length > 0 && !noCalls && (
           <button type="button" disabled={busy} onClick={() => onAction('kan')}>
             カン
           </button>
         )}
-        {legal.chii.map((pair) => (
+        {!noCalls && legal.chii.map((pair) => (
           <button
             key={pair.join()}
             type="button"

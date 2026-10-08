@@ -250,7 +250,7 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: '補助' })).toBeFocused();
-  await expect(panel.locator('[data-item^="assist:"]')).toHaveCount(8);
+  await expect(panel.locator('[data-item^="assist:"]')).toHaveCount(11);
   await page.keyboard.press('ArrowRight');
   await expect(panel.locator('[data-item^="cheat:"]')).toHaveCount(6);
 
@@ -835,4 +835,34 @@ test('an owned yaku in 所持役 opens its guide again; Esc and a click outside 
   const haitei = page.getByRole('dialog', { name: '海底摸月' });
   await expect(haitei).toBeVisible();
   await expect(haitei.getByRole('link', { name: 'この役を練習する' })).toHaveCount(0);
+});
+
+test('the automations show once bought, switch in the hand heading, and play a round by themselves', async ({ page }) => {
+  test.setTimeout(90_000);
+  // Not bought: no switches.
+  await newDojoGame(page, DOJO_WIN_SEED);
+  await waitForPlayback(page);
+  await expect(handPanel(page).getByRole('group', { name: '自動' })).toHaveCount(0);
+
+  // DOJO_WIN_SEED: tsumogiri wins the first round by tsumo. With 自動ツモ切り and
+  // 自動和了 on (and 鳴きなし passing any call), the round ends with no click on the hand.
+  await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
+  await page.evaluate(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), ownedItems: ['assist:autowin', 'assist:tsumogiri', 'assist:nocall'] })],
+  );
+  await page.reload();
+  await waitForPlayback(page);
+  const tools = handPanel(page).getByRole('group', { name: '自動' });
+  for (const name of ['自動和了', 'ツモ切り', '鳴きなし']) {
+    const chip = tools.getByRole('button', { name });
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  }
+  await expect(page.getByRole('region', { name: '結果' })).toContainText('自分のツモ和了', { timeout: 60_000 });
+
+  // The switches stay on for the next game.
+  await page.reload();
+  await expect(tools.getByRole('button', { name: '自動和了' })).toHaveAttribute('aria-pressed', 'true');
 });

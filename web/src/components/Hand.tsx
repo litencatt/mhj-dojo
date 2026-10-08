@@ -22,6 +22,8 @@ export interface HandProps {
   // where they stand in for your seat at the table.
   status?: ComponentChildren;
   river?: ComponentChildren;
+  // Switches at the heading's end (the dojo's automations).
+  tools?: ComponentChildren;
   acting?: boolean; // game mode: your turn, marked as your seat's box marks it
   highlight?: string | null; // tiles to mark (exact string), e.g. a hovered advice candidate
   // Game mode: a mark per tile (exact string), e.g. its danger against a
@@ -84,7 +86,7 @@ type Pick = number | 'drawn';
  * the keyboard still discard on the first click.
  */
 export function Hand(props: HandProps) {
-  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, acting = false, highlight, marks, badges, onDiscard, onPreview } = props;
+  const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, tools, acting = false, highlight, marks, badges, onDiscard, onPreview } = props;
   const mark = (t: string) =>
     classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className, badges?.[t]?.best ? 'tile-ukeire-best' : undefined);
   const label = (t: string) => {
@@ -230,6 +232,7 @@ export function Hand(props: HandProps) {
             面子表示
           </button>
         )}
+        {tools}
       </div>
       <div
         class="hand-row"

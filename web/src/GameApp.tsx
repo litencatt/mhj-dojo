@@ -31,6 +31,7 @@ import { savedGames } from './wasm';
 import { canAffordRedraw, canAffordSummon, loadProgress } from './dojo/progress';
 import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
+import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
 import { RadioGroup } from './components/RadioGroup';
 import { CPU_NAMES, DEALER_NAMES, dojoGameOptions, parseOptions, savedItem, urlOptions } from './gameOptions';
@@ -278,6 +279,36 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const badges = useMemo(() => (has('assist:ukeire') && myTurn && state ? ukeireBadges(state) : undefined), [state, myTurn, progress]);
   const danger = adviceOn && myTurn && (!dojo || has('assist:danger')) ? (state?.danger?.length ? state.danger : lateOf?.danger) : undefined;
   const marks = useMemo(() => (danger?.length && state ? dangerMarks(danger, state.you) : undefined), [danger, state]);
+
+  // The dojo's automations (dojo/autoPlay.ts): those bought, and of them those switched on.
+  const auto = useAutoPlay();
+  const autoOwned = AUTO_KEYS.filter((k) => has(AUTO_ITEMS[k].item));
+  const autoOn = useMemo(() => new Set<AutoKey>(autoOwned.filter((k) => auto.on.has(k))), [autoOwned.join(), auto.on]);
+  // Each state moves once, after its replay, while no request is out (the
+  // next state, or an error to retry by hand).
+  const autoPlayed = useRef<GameState | null>(null);
+  useEffect(() => {
+    if (!dojo || !state || busy || error || stopped || playback.playing || autoPlayed.current === state) return;
+    const move = autoMove(state, autoOn);
+    if (!move) return;
+    autoPlayed.current = state;
+    act(move.type, move.tile);
+  }, [state, busy, error, stopped, playback.playing, autoOn]);
+  const autoTools = autoOwned.length > 0 && (
+    <div class="hand-tools" role="group" aria-label="自動">
+      {autoOwned.map((k) => (
+        <button
+          key={k}
+          type="button"
+          class={`filter-chip ${auto.on.has(k) ? 'filter-chip-on' : ''}`}
+          aria-pressed={auto.on.has(k)}
+          onClick={() => auto.toggle(k)}
+        >
+          {AUTO_ITEMS[k].label}
+        </button>
+      ))}
+    </div>
+  );
   const minimizeAdvice = useCallback(() => minimize('advice'), [minimize]);
 
   const chooseSpeed = (v: PlaybackSpeed) => {
@@ -467,6 +498,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                     className="hand-river"
                   />
                 }
+                tools={autoTools}
                 acting={!playback.playing && table.actor === table.you}
                 onDiscard={(t) => act(riichiMode ? 'riichi' : 'discard', t)}
                 onPreview={setPreviewTile}
@@ -493,6 +525,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                     riichiMode={riichiMode}
                     onRiichiMode={setRiichiMode}
                     onAction={act}
+                    noCalls={autoOn.has('nocall')}
                     advice={phone && adviceOn && (!dojo || has('assist:advice')) ? advice : null}
                     canRedraw={canRedraw}
                     summonable={summonable}
