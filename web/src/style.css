@@ -1,7 +1,11 @@
 @import './tokens.css';
 /* The page's styles, one file a part, in this order (the cascade depends on
    it: a later file wins a tie). Tokens (colours, radii) are in tokens.css;
-   DESIGN.md says where things go. */
+   DESIGN.md says where things go. Each file ends with its own narrow-screen
+   and phone rules: on a phone (up to 760px wide) the one-column layout
+   tightens, the hand's 14 tiles on one row, the dock a tab bar along the
+   bottom, the yaku tables two-line rows instead of a sideways scroll.
+   Tablets and desktops are unchanged. */
 @import './styles/base.css';
 @import './styles/dock.css';
 @import './styles/advice.css';

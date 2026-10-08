@@ -57,7 +57,7 @@
   color: var(--muted);
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 /* A touch screen (or pen) taps a tile twice to discard it
    (components/Hand.tsx): a touch-only device says so instead of 「クリック」,
    one with a mouse as well adds it. */
@@ -70,7 +70,7 @@
 }
 @media (width <= 760px) {
   .cpu-summary {
-    margin: -6px 0; /* the column's gaps, as above */
+    margin: -6px 0; /* the column's gaps (base.css) */
   }
   .action-bar {
     gap: 8px;

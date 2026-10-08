@@ -115,7 +115,7 @@
   font-weight: bold;
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 /* No double-tap zoom on the hand: its tiles are tapped twice on purpose. */
 .hand-row {
   touch-action: manipulation;
@@ -187,13 +187,7 @@
     margin: calc(var(--hand-tile) / -6) calc(var(--hand-tile) / 6);
   }
 }
-/* A phone upright: the CPU seats one under another at the full width, 対面,
-   上家, 下家, then the round's moves (with the rivers folded away); a seat with no discards yet ends at its
-   head. Your seat moves into the hand panel: its wind, points, rank and
-   riichi beside the heading, its river under the hand. The rivers show
-   every discard, so the log of moves only stands in for them while they are
-   folded away (設定's 他家の捨て牌). On its side the phone keeps the grid above, your
-   seat and the log. */
+/* A phone upright: your seat in the hand panel (the seats' layout: table.css). */
 @media (width <= 760px) and (height > 500px) {
   /* Your turn: the hand panel marked as your seat's box was. */
   .hand-panel.hand-acting {

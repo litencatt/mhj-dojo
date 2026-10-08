@@ -207,7 +207,7 @@
   font-size: 1.1rem;
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   .mode-link {
     display: inline-block;

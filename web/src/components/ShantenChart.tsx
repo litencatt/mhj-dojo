@@ -95,7 +95,7 @@ export const ShantenChart = memo(function ShantenChart(props: ShantenChartProps)
 
   if (minimized) return null;
 
-  // Phones only (style.css's phone width): a narrow desktop column keeps the scaled drawing.
+  // Phones only (the phone width in styles/*.css): a narrow desktop column keeps the scaled drawing.
   const narrow = boxWidth > 0 && boxWidth < NARROW && typeof matchMedia === 'function' && matchMedia(PHONE).matches;
   const W = narrow ? boxWidth : WIDTH;
   const H = narrow ? Math.round(Math.max(200, boxWidth * 0.62)) : HEIGHT;

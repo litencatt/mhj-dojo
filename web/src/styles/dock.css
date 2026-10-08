@@ -68,12 +68,9 @@
   right: env(safe-area-inset-right, 0px);
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
-/* ---- Phones (up to 760px wide) ----
-   The one-column layout (above) tightened for a phone: the hand's 14 tiles on
-   one row, the dock as a tab bar along the bottom (clear of the page and of
-   the home indicator), the yaku tables as two-line rows instead of a sideways
-   scroll, and controls big enough to tap. Tablets and desktops are unchanged. */
+/* ---- Narrow screens and phones ---- */
+/* On a phone the dock is a tab bar along the bottom (clear of the page and
+   of the home indicator); a tab's icon and short name show there only. */
 .dock-tab-icon,
 .dock-tab-short,
 .hint-touch,

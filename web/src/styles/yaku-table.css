@@ -253,7 +253,7 @@
   color: var(--accent);
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   .filter-chip,
   .legend-item,

@@ -796,7 +796,7 @@ test('a second tab on the same game stops the first, until taken back', async ({
 // the top of the screen: scrolled to the page's end, they are still in sight,
 // and the header's copy is not shown. A desktop shows the header's.
 test('a phone keeps the wall left and the dora in sight over the hand', async ({ page }) => {
-  // Tall enough for the hand to pin (style.css, useYakuTop's data-hand-fits).
+  // Tall enough for the hand to pin (styles/*.css, useYakuTop's data-hand-fits).
   await page.setViewportSize({ width: 390, height: 640 });
   await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
   await waitForPlayback(page);

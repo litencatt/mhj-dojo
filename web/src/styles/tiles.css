@@ -115,7 +115,7 @@
   border: 1px solid var(--danger);
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   .win-tiles .tile-md {
     width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
@@ -124,9 +124,7 @@
     padding: 1.5px;
   }
 }
-/* A phone, upright or on its side: the CPU seats' face-down hands shrink
-   to one back with the count on it, the rows of backs taking too much of
-   the table. */
+/* A phone, upright or on its side: smaller dora tiles. */
 @media (width <= 760px), (height <= 500px) {
   .dora-indicators .tile-sm {
     width: 18px;

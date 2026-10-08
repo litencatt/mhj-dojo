@@ -12,7 +12,7 @@ mhj-dojo の UI を作る・直すときの入口。詳細は `docs/design/` に
 ## Source of truth
 
 - トークン(色・角丸): `web/src/tokens.css`(ライトの `:root` とダークの `@media`。`style.css` と更新情報の `info.css` が共有)。文書は役割の説明だけで、値は CSS が正
-- 部品の見た目: `web/src/styles/*.css`(部品ごと。各ファイルの末尾に、その部品の狭い画面・スマホ向けの `@media`)を `web/src/style.css` が決まった順に読み込む。ほかに `web/src/dojo/dojo.css`(道場)、`web/src/info.css`(更新情報)
+- 部品の見た目: `web/src/styles/*.css`(部品ごと。その部品の狭い画面・スマホ向けの `@media` も同じファイルの、主に末尾に)を `web/src/style.css` が決まった順に読み込む。ほかに `web/src/dojo/dojo.css`(道場)、`web/src/info.css`(更新情報)
 - 共通の部品: `web/src/components/SiteHeader.tsx`(ヘッダー)、`SettingsDialog.tsx`(設定)、`Help.tsx`(ヘルプ)
 - 文書と CSS が食い違ったら CSS が正。直した人が文書も直す
 

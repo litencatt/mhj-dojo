@@ -54,7 +54,7 @@
   cursor: progress;
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   /* A phone keeps its height for the yaku table: tight gaps and paddings
      throughout (the columns' 6px gaps, 8px panels). */

@@ -499,7 +499,7 @@ h2 {
   .area-gloss { order: 6; }
 }
 
-/* ---- Narrow screens and phones (from the responsive rules) ---- */
+/* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
   .area-main,
   .area-side,
@@ -562,9 +562,7 @@ h2 {
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
-/* A phone, upright or on its side: the CPU seats' face-down hands shrink
-   to one back with the count on it, the rows of backs taking too much of
-   the table. */
+/* A phone, upright or on its side: the header's status in short. */
 @media (width <= 760px), (height <= 500px) {
   /* The header's status: each label beside its value (the obvious ones,
      局 and 対局, read out only); the dora (in the header on a phone on its
@@ -645,7 +643,7 @@ h2 {
 }
 /* A phone (up to 760px wide): the wall left and the dora leave the header for the top
    of the hand's area, which sticks to the top of the screen there (see the
-   phone's sticky hand above): always in sight (PinnedStatus). The dora row
+   phone's sticky hand in win.css): always in sight (PinnedStatus). The dora row
    keeps one line, scrolling sideways if a kan dora makes it too long, so the
    pinned bar never grows mid-round. */
 @media (width <= 760px) {
