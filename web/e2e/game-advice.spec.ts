@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SEED, engineCalls, handPanel, openSettings, playOneStep, waitForPlayback } from './helpers';
+import { PHONE, engineCalls, handPanel, openGame, openSettings, playOneStep, waitForPlayback } from './helpers';
 
 // The CPU game's advice panel and the danger marks on your hand.
 
@@ -9,8 +9,7 @@ const RIICHI_SEED = 1;
 
 test('a desktop game offers the advice in the dock, and the option turns it off', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
   await dock.getByRole('button', { name: 'アドバイス' }).click();
   const panel = page.getByRole('region', { name: 'アドバイス' });
@@ -76,10 +75,9 @@ test.describe('a phone game', () => {
   test.use({ hasTouch: true });
 
   test('offers the best discard as a chip that marks its tile, and asks for the advice only while it is on', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     const calls = await engineCalls(page);
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     const chip = page.getByRole('button', { name: /^おすすめ: / });
     await expect(chip).toBeVisible();
     await expect(page.getByRole('region', { name: 'アドバイス' })).toHaveCount(0);

@@ -526,3 +526,38 @@ export async function toggleRivers(page: Page) {
 export function wallRemaining(page: Page): Locator {
   return page.getByTestId('wall-remaining').filter({ visible: true });
 }
+
+/** A CPU game's URL on SEED, 東風戦: the specs' usual game. */
+export const GAME_URL = `./?mode=game&seed=${SEED}&length=tonpuu`;
+
+/** An upright phone's screen (390 x 844), the specs' usual phone. */
+export const PHONE = { width: 390, height: 844 };
+
+/** Opens the usual CPU game (GAME_URL) and waits for the CPU moves to finish playing back. */
+export async function openGame(page: Page) {
+  await page.goto(GAME_URL);
+  await waitForPlayback(page);
+}
+
+/** Waits for the hand to show: the page has loaded and dealt. */
+export async function loaded(page: Page) {
+  await expect(handPanel(page)).toBeVisible();
+}
+
+/** How many moves the practice session in the URL has saved. */
+export function savedMoves(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
+      sessions: Record<string, { moves: unknown[] }>;
+    } | null;
+    return s?.sessions[id!]?.moves.length;
+  }, new URL(page.url()).searchParams.get('session'));
+}
+
+/** The saved form of the CPU game in the URL. */
+export function savedGame(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.games') ?? 'null') as { games: Record<string, { save: string }> } | null;
+    return s?.games[id!]?.save;
+  }, new URL(page.url()).searchParams.get('game'));
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, openSettings, stoppedDialog } from './helpers';
+import { PHONE, discardDrawn, discardsSent, engineCalls, expectStopped, handPanel, labels, openSettings, savedMoves, stoppedDialog } from './helpers';
 
 // Solo practice mode (the root page).
 
@@ -48,16 +48,6 @@ test('practice mode loads and a discard updates the table and analysis', async (
   await expect(yakuPanel.locator('.yaku-table tbody tr')).not.toHaveCount(0);
   await expect(analysisBody).not.toHaveText(analysisBefore);
 });
-
-/** The number of moves the site has saved for the page's session (localStorage). */
-function savedMoves(page: Page) {
-  return page.evaluate((id) => {
-    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
-      sessions: Record<string, { moves: unknown[] }>;
-    } | null;
-    return s?.sessions[id!]?.moves.length;
-  }, new URL(page.url()).searchParams.get('session'));
-}
 
 test('a second tab on the same session stops the first, until taken back', async ({ page, context }) => {
   const calls = await engineCalls(page);
@@ -199,7 +189,7 @@ test('advice panel: docked by default, three candidates, remembered, review afte
 });
 
 test('hand groups fit a 390px-wide viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./?seed=1&turns=18');
   const hand = handPanel(page);
   await hand.getByRole('button', { name: '面子表示' }).click();

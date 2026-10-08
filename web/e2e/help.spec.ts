@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { versionPattern } from './helpers';
+import { PHONE, versionPattern } from './helpers';
 
 // The header's version and the help dialog, in both modes.
 
@@ -102,7 +102,7 @@ test('game mode: the header shows the version, and the help links to the glossar
 
 // A phone game has no glossary: the help points to practice mode's instead.
 test('game mode on a phone: the help points to the glossary in practice mode', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./?mode=game&seed=1');
   const dialog = await openHelp(page);
   await expect(dialog.getByRole('button', { name: '用語表', exact: true })).toHaveCount(0);
@@ -110,7 +110,7 @@ test('game mode on a phone: the help points to the glossary in practice mode', a
 });
 
 test('the help fits a phone screen and scrolls', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./?seed=1&turns=18');
   const dialog = await openHelp(page);
   const box = await dialog.boundingBox();

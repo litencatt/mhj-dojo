@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { loaded } from './helpers';
 
 // The build's version: the header shows it, the help opens, and a
 // banner offers a reload once version.json names another build.
@@ -25,9 +26,6 @@ async function routeVersion(page: Page, build: () => Build) {
   return seen;
 }
 
-async function loaded(page: Page) {
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-}
 
 // A check the page makes on its own schedule: past the one-a-minute limit,
 // when the tab comes back into view.

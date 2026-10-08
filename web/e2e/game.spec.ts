@@ -1,15 +1,19 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
+  GAME_URL,
+  PHONE,
   SEED,
   clickAndWait,
   expectStopped,
   handPanel,
+  openGame,
   openSettings,
-  riversOption,
   pageOverflowX,
   playOneStep,
   playToResult,
   playUntilPonOffered,
+  riversOption,
+  savedGame,
   slowEngine,
   stoppedDialog,
   tableState,
@@ -59,7 +63,7 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   // It plays a whole round: about 17s locally, but over 30s on a busy CI runner.
   test.setTimeout(60_000);
   slowEngine();
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
 
   const hand = handPanel(page);
   await expect(hand).toBeVisible();
@@ -89,7 +93,7 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
   await expect(hand).toBeVisible();
 
   // The page stays usable at a 390px-wide mobile viewport.
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await expect(page.getByRole('heading', { name: /mhj-dojo/ })).toBeVisible();
   await expect(hand).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -102,7 +106,7 @@ test('a CPU game: pon offer, round result, next round, and a mobile viewport', a
 for (const width of [360, 390]) {
   test(`a CPU game fits a ${width}px-wide phone: one-row hand, 設定-size action buttons`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+    await page.goto(GAME_URL);
     const hand = handPanel(page);
     await expect(hand).toBeVisible();
     const noOverflow = async () =>
@@ -155,8 +159,7 @@ for (const width of [360, 390]) {
 for (const [width, height] of [[320, 640], [390, 844], [844, 390]]) {
   test(`a ${width}x${height} phone shows the CPU hands as a count`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     const seats = ['.seat-top', '.seat-left', '.seat-right'];
     for (const seat of seats) {
       const hand = page.locator(`${seat} .seat-hand`);
@@ -199,8 +202,7 @@ function yakuScroller(page: Page) {
 for (const [width, height] of [[390, 844], [360, 800]]) {
   test(`a ${width}x${height} phone scrolls the yaku panel on its own, the hand staying in sight`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     const hand = handPanel(page);
     const yaku = yakuScroller(page);
     await expect(hand).toBeInViewport({ ratio: 1 });
@@ -238,9 +240,8 @@ test.describe('a phone game', () => {
 
   test('has no chart, glossary or dock; the yaku panel takes the room', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('mhj-dojo.minimized.v2', '[]'));
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await page.setViewportSize(PHONE);
+    await openGame(page);
     const chart = page.getByRole('region', { name: '時系列チャート' });
     const glossary = page.getByRole('region', { name: '用語表' });
     const dock = page.getByRole('navigation', { name: '最小化したパネル' });
@@ -268,16 +269,15 @@ test.describe('a phone game', () => {
     await expect(chart).toBeVisible();
     await expect(glossary).toBeVisible();
 
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await expectPhone();
   });
 
   // The yaku panel can still be minimized: then (only then) the dock bar
   // holds its tab, which brings it back.
   test('docks a minimized yaku panel, and restores it', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await page.setViewportSize(PHONE);
+    await openGame(page);
     const dock = page.getByRole('navigation', { name: '最小化したパネル' });
     const yaku = page.getByRole('region', { name: '役別向聴テーブル' });
     await expect(dock).toHaveCount(0);
@@ -297,8 +297,7 @@ test.describe('a phone game', () => {
   // overflowing; Esc closes it, focus back on 設定.
   test('on its side at 667x375 has the options behind 設定', async ({ page }) => {
     await page.setViewportSize({ width: 667, height: 375 });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     const toggle = page.getByRole('button', { name: /^設定/ });
     const form = page.locator('.new-game-form');
     await expect(toggle).toBeVisible();
@@ -321,8 +320,7 @@ test.describe('a phone game', () => {
 // the chart, the advice and the glossary stay, in the dock.
 test('a short desktop window keeps the chart and the glossary', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 450 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
   await expect(dock.getByRole('button')).toHaveText([/チャート/, /アドバイス/, /用語表/]);
 });
@@ -331,8 +329,7 @@ test('a short desktop window keeps the chart and the glossary', async ({ page })
 // desktop game keeps them in the dock.
 test('a desktop game keeps the chart and the glossary in the dock', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const dock = page.getByRole('navigation', { name: '最小化したパネル' });
   await expect(dock.getByRole('button')).toHaveText([/時系列チャート/, /アドバイス/, /用語表/]);
   await dock.getByRole('button', { name: '用語表' }).click();
@@ -347,7 +344,7 @@ test('a 320x640 phone pins the hand only while it leaves the yaku panel room', a
   test.setTimeout(60_000);
   slowEngine();
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   const app = page.locator('.app');
   const yaku = yakuScroller(page);
   const check = async (fits: 'true' | 'false') => {
@@ -377,8 +374,8 @@ test('a 320x640 phone pins the hand only while it leaves the yaku panel room', a
 // in the hand panel, stays), leaving each seat its head, and the yaku panel the room; the log
 // of moves stands in for them meanwhile. The choice survives a reload.
 test('a phone folds the other seats\' rivers away with 設定\'s 他家の捨て牌, and remembers it', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.setViewportSize(PHONE);
+  await page.goto(GAME_URL);
   // A turn round the table: every river has a tile (an empty one isn't shown).
   await playOneStep(page);
   await waitForPlayback(page);
@@ -432,9 +429,8 @@ test('a phone folds the other seats\' rivers away with 設定\'s 他家の捨て
 // below). A seat with nothing under its head (before its first discard)
 // ends at its head.
 test('an upright phone stacks the CPU seats at the full width', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await page.setViewportSize(PHONE);
+  await openGame(page);
   const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
   await expect(page.locator('.seat-bottom')).toBeHidden();
   // SEED deals you the first turn: no CPU has discarded yet.
@@ -482,8 +478,8 @@ test('an upright phone stacks the CPU seats at the full width', async ({ page })
 // hidden while they are shown; with them folded away it stands in for them,
 // scrolled to the newest, moves made while it was hidden included.
 test('an upright phone shows the log of moves only with the rivers folded away', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.setViewportSize(PHONE);
+  await page.goto(GAME_URL);
   const log = page.getByRole('list', { name: 'この局の動き' });
   for (let i = 0; i < 6; i++) await playOneStep(page);
   await waitForPlayback(page);
@@ -508,7 +504,7 @@ test('an upright phone shows the log of moves only with the rivers folded away',
 for (const [width, height] of [[844, 390], [1280, 900]]) {
   test(`a ${width}x${height} screen keeps 上家 and 下家 side by side, your seat and the log`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+    await page.goto(GAME_URL);
     for (let i = 0; i < 2; i++) await playOneStep(page);
     await waitForPlayback(page);
     await expect(page.locator('.game-table')).toHaveAttribute('data-rivers', 'shown');
@@ -531,8 +527,7 @@ for (const [width, height] of [[844, 390], [1280, 900]]) {
 // phone's choice saved as hidden.
 test('a desktop always shows the rivers, with no 他家の捨て牌 option', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('mhj-dojo.rivers.v1', 'hidden'));
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   await openSettings(page);
   await expect(riversOption(page)).toHaveCount(0);
   await page.keyboard.press('Escape');
@@ -543,8 +538,7 @@ test('a desktop always shows the rivers, with no 他家の捨て牌 option', asy
 
 // A desktop keeps the row of backs.
 test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const hand = page.locator('.seat-top .seat-hand');
   await expect(hand.locator('.seat-hand-count')).toBeHidden();
   await expect(hand.locator('.seat-hand-backs .tile')).not.toHaveCount(0);
@@ -559,8 +553,7 @@ test('a desktop shows the CPU hands as rows of backs', async ({ page }) => {
 for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390, 844, 130]]) {
   test(`a ${width}px-wide phone has the new-game options behind 設定`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     const header = page.locator('.app-header');
     const form = page.locator('.new-game-form');
     const toggle = page.getByRole('button', { name: /^設定/ });
@@ -603,8 +596,7 @@ for (const [width, height, maxHeader] of [[320, 640, 150], [360, 800, 130], [390
 for (const [width, height] of [[1280, 900], [844, 390]]) {
   test(`a ${width}x${height} screen has the new-game options behind 設定 on the title row`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-    await waitForPlayback(page);
+    await openGame(page);
     await expect(page.locator('.new-game-form')).toBeHidden();
     const settings = (await page.locator('.app-header').getByRole('button', { name: '設定', exact: true }).boundingBox())!;
     const title = (await page.locator('.app-header h1').boundingBox())!;
@@ -620,7 +612,7 @@ for (const [width, height] of [[1280, 900], [844, 390]]) {
 // reading earlier moves isn't taken to the end by the next ones.
 test('the log of moves stays where a player scrolled it', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   const log = page.getByRole('list', { name: 'この局の動き' });
   const gap = () => log.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
   for (let i = 0; i < 4; i++) await playOneStep(page);
@@ -654,7 +646,7 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
   // It plays a whole round.
   test.setTimeout(60_000);
   slowEngine();
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto(`./?mode=game&seed=${WON_ROUND}&length=tonpuu`);
   await playToResult(page);
   const seats = ['.seat-top', '.seat-left', '.seat-right', '.seat-bottom'];
@@ -708,8 +700,7 @@ test('a phone fits the revealed hands and the rivers in their seats', async ({ p
 // A desktop keeps the rivers at six 18px tiles to a row.
 test('a desktop has six-tile rivers', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const river = page.locator('.seat-river').first();
   expect(await river.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
   await expect(page.locator('.dora-indicators .tile').filter({ visible: true }).first()).toHaveCSS('width', '26px');
@@ -747,18 +738,10 @@ test('game options from the URL: first dealer you and a weak CPU survive a reloa
   expect(page.url(), 'the reload resumes the same game').toBe(url);
 });
 
-/** The game's save (localStorage), for the game in the page's URL. */
-function savedGame(page: Page) {
-  return page.evaluate((id) => {
-    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.games') ?? 'null') as { games: Record<string, { save: string }> } | null;
-    return s?.games[id!]?.save;
-  }, new URL(page.url()).searchParams.get('game'));
-}
-
 test('a second tab on the same game stops the first, until taken back', async ({ page, context }) => {
   slowEngine();
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await waitForPlayback(page);
@@ -798,8 +781,7 @@ test('a second tab on the same game stops the first, until taken back', async ({
 test('a phone keeps the wall left and the dora in sight over the hand', async ({ page }) => {
   // Tall enough for the hand to pin (style.css, useYakuTop's data-hand-fits).
   await page.setViewportSize({ width: 390, height: 640 });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
-  await waitForPlayback(page);
+  await openGame(page);
   const pinned = page.getByTestId('pinned-status');
   await expect(pinned).toBeVisible();
   await expect(page.locator('.header-status .status-wall-dora')).toBeHidden();

@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import {
+  GAME_URL,
   SEED,
   clickAndWait,
   expectStopped,
@@ -40,7 +41,7 @@ test('a CPU game runs in the browser and a reload resumes it', async ({ page }) 
   page.on('request', (req) => {
     if (req.url().includes('/api/')) apiRequests.push(req.url());
   });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await expect(page.getByRole('link', { name: '練習', exact: true })).toBeVisible();
   // The table's log keeps the round's moves across your moves (events_from):
@@ -89,7 +90,7 @@ test('a reload shows the game as it stands without replaying the CPU moves', asy
   test.setTimeout(90_000);
   // Playback on (the other tests turn it off): a live move is replayed.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   await (await nextMove(page)).click();
@@ -113,7 +114,7 @@ test('a reload shows the game as it stands without replaying the CPU moves', asy
 test('a CPU game plays a round to its result and the next round, across a reload', async ({ page }) => {
   // A whole round of CPU turns in wasm.
   test.setTimeout(180_000);
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playToResult(page);
   const result = page.getByRole('region', { name: '結果' });
@@ -133,7 +134,7 @@ test('a CPU game plays a round to its result and the next round, across a reload
 
 // A game one step in, then a second tab on it.
 async function twoTabs(page: Page, context: BrowserContext): Promise<Page> {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await expect(page).toHaveURL(/[?&]game=/);
@@ -191,7 +192,7 @@ test('a save from a newer engine is kept when this tab takes the game back, and 
 
 test('a move answered after the tab stopped is neither shown nor saved', async ({ page, context }) => {
   test.setTimeout(90_000);
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await expect(page).toHaveURL(/[?&]game=/);
@@ -272,7 +273,7 @@ async function evictGames(page: Page, seedFrom: number) {
 
 test('a game evicted by the engine cap is rebuilt from its save, no reload', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await playOneStep(page);
@@ -292,7 +293,7 @@ test('a game evicted by the engine cap is rebuilt from its save, no reload', asy
 
 test('after the engine exits, the next move restarts it and rebuilds the game', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   const url = page.url();
@@ -309,7 +310,7 @@ test('after the engine exits, the next move restarts it and rebuilds the game', 
 });
 
 test('an unusable game save deals again from the seed in the URL', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   const start = await tableState(page);
@@ -359,7 +360,7 @@ test('practice saves survive playing CPU games, and only the last 5 games are ke
 // A save the engine fails on (500) is kept for another try, but the second
 // failure in a row drops it: it may be what breaks the engine.
 test('a save the engine fails on twice in a row is dropped', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   const id = gameId(page)!;
@@ -403,7 +404,7 @@ test('a full localStorage keeps the current game saved', async ({ page }) => {
       setItem.call(this, key, value);
     };
   });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await page.goto(`./?mode=game&seed=${SEED + 1}&length=tonpuu`);
   await expect(handPanel(page)).toBeVisible();
@@ -429,7 +430,7 @@ test('a localStorage refusing every write warns once', async ({ page }) => {
       setItem.call(this, key, value);
     };
   });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   await playOneStep(page);
@@ -441,7 +442,7 @@ test('a localStorage refusing every write warns once', async ({ page }) => {
 // wasm.ts's CALL_TIMEOUT_MS: the request fails, and the next one starts a new
 // engine that rebuilds the game from its save.
 test('a hung engine is given up and the next move restarts it', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await playOneStep(page);
   const id = gameId(page)!;

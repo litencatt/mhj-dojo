@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { loaded } from './helpers';
 
 // The Service Worker (src/sw.template.js; issue #192): the files it
 // precaches, the site offline after a first load, and a new build's page
@@ -6,9 +7,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 test.use({ serviceWorkers: 'allow' });
 
-async function loaded(page: Page) {
-  await expect(page.getByRole('region', { name: '手牌' })).toBeVisible();
-}
 
 // Waits for the page's worker to be active (it registers after load).
 async function swReady(page: Page) {
