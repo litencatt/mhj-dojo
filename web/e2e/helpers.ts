@@ -43,6 +43,11 @@ export function handPanel(page: Page) {
   return page.getByRole('region', { name: '手牌' });
 }
 
+/** Waits for the hand to show: the page has loaded and dealt. */
+export async function loaded(page: Page) {
+  await expect(handPanel(page)).toBeVisible();
+}
+
 /** A call the page made to its engine: fn 'request' with the method and path (with the engine's own ids), or 'restore' / 'restoreGame' rebuilding a save. */
 export interface EngineCall {
   id: number;
@@ -293,6 +298,12 @@ export function pageOverflowX(page: Page) {
 // logic changes and it fails, pick a new seed as its message says.
 export const SEED = 12;
 
+/** A CPU game's URL on SEED, 東風戦: the specs' usual game. */
+export const GAME_URL = `./?mode=game&seed=${SEED}&length=tonpuu`;
+
+/** An upright phone's screen (390 x 844), the specs' usual phone. */
+export const PHONE = { width: 390, height: 844 };
+
 // Dojo seeds (DOJO_RIICHI_SEED: riichi offered; DOJO_REDRAW_SEED: redraw
 // offered), guarded by internal/apicall/e2e_seeds_test.go.
 export const DOJO_RIICHI_SEED = 162;
@@ -377,6 +388,12 @@ export async function finishDojoGame(page: Page) {
  * the action bar shows only a hint. */
 export async function waitForPlayback(page: Page) {
   await expect(page.locator('.game-table')).toHaveAttribute('data-playing', 'false', { timeout: 15_000 });
+}
+
+/** Opens the usual CPU game (GAME_URL) and waits for the CPU moves to finish playing back. */
+export async function openGame(page: Page) {
+  await page.goto(GAME_URL);
+  await waitForPlayback(page);
 }
 
 /** With the page clock installed: runs it until the CPU moves have finished replaying. */
@@ -525,4 +542,22 @@ export async function toggleRivers(page: Page) {
  * hidden: always look for the displayed one (this, or a `visible: true` filter for the dora). */
 export function wallRemaining(page: Page): Locator {
   return page.getByTestId('wall-remaining').filter({ visible: true });
+}
+
+/** How many moves the practice session in the URL has saved. */
+export function savedMoves(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.practice') ?? 'null') as {
+      sessions: Record<string, { moves: unknown[] }>;
+    } | null;
+    return s?.sessions[id!]?.moves.length;
+  }, new URL(page.url()).searchParams.get('session'));
+}
+
+/** The saved form of the CPU game in the URL. */
+export function savedGame(page: Page) {
+  return page.evaluate((id) => {
+    const s = JSON.parse(localStorage.getItem('mhj-dojo.site.games') ?? 'null') as { games: Record<string, { save: string }> } | null;
+    return s?.games[id!]?.save;
+  }, new URL(page.url()).searchParams.get('game'));
 }

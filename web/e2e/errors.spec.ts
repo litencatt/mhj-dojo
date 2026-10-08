@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
-  SEED,
+  GAME_URL,
   discardDrawn,
   gameSnapshot,
   handPanel,
@@ -22,7 +22,7 @@ import {
 test('a move the engine failed partway: 再試行 makes it on the saved game', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await watchEngine(page);
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await playOneStep(page);
   let failed = false;
   const stop = onEngineReply(page, (call, reply) => {
@@ -111,7 +111,7 @@ test('a localStorage refusing every write is told once', async ({ page }) => {
       setItem.call(this, key, value);
     };
   });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   const notice = page.locator('.save-failed');
   await expect(notice).toHaveText(/このブラウザに保存できません。再読み込みすると最初からになります/);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SEED, handPanel, openSettings, playOneStep, settingsChoice, slowEngine, waitForPlayback } from './helpers';
+import { GAME_URL, handPanel, openSettings, playOneStep, settingsChoice, slowEngine, waitForPlayback } from './helpers';
 
 // The CPU game's 設定 form picks how fast the CPU moves are replayed, kept in
 // this browser.
@@ -7,7 +7,7 @@ import { SEED, handPanel, openSettings, playOneStep, settingsChoice, slowEngine,
 test('the playback speed is saved, and なし shows the CPU moves at once', async ({ page }) => {
   slowEngine();
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
 
@@ -41,7 +41,7 @@ test('the playback speed is saved, and なし shows the CPU moves at once', asyn
 test('a slow speed paces the CPU moves at least 600ms apart', async ({ page }) => {
   slowEngine();
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   await openSettings(page);

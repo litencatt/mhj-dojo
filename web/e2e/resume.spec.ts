@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SEED, discardDrawn, handPanel, openSettings, playOneStep, settingsDialog } from './helpers';
+import { GAME_URL, SEED, discardDrawn, handPanel, openSettings, playOneStep, settingsDialog } from './helpers';
 
 // Opened with nothing in the URL (issue #186), the page offers the saves:
 // 「続きから」 resumes the most recently used one, the list the others, and
@@ -63,7 +63,7 @@ test('a bare open with a saved session still starts a new one on 新しい練習
 });
 
 test('a bare open of the CPU game offers its save, and 新規対局 mid-game asks first', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await playOneStep(page);
   const id = param(page, 'game');
 
@@ -95,7 +95,7 @@ test('a bare open of the CPU game offers its save, and 新規対局 mid-game ask
 type SavedGames = Record<string, { save: string; used?: number; round?: { over: boolean } } | null>;
 
 test('old-format and unreadable saves: listed as far as they can be, never a crash', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await playOneStep(page);
   const id = param(page, 'game');
   // A save from before rounds were kept, with no used either, among broken ones.
@@ -126,7 +126,7 @@ test('old-format and unreadable saves: listed as far as they can be, never a cra
 });
 
 test('続きから skips a finished game, which stays in the list', async ({ page }) => {
-  await page.goto(`./?mode=game&seed=${SEED}&length=tonpuu`);
+  await page.goto(GAME_URL);
   await playOneStep(page);
   const unfinished = param(page, 'game');
   await page.goto(`./?mode=game&seed=${SEED + 1}&length=tonpuu`);
