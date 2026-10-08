@@ -1,5 +1,16 @@
 # Changelog
 
+## [v2026.1008.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1007.0...v2026.1008.0) - 2026-10-08
+
+### 新機能
+- 道場: 役の購入時の説明と練習モードへの導線 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/295
+- 捨て牌の切り替えを設定へ移し、残り牌をドラの隣に（スマホでは常に表示） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/296
+- スマホで縦の余白を詰め、役別向聴の欄を広くする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/297
+### CI・リポジトリ
+- 道場: 最後までUIで打つE2Eと、mode=game からの移動のE2Eを足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/292
+### その他
+- 道場の経済を人に近い打ち方で確かめ、CPU 普通の倍率を ×2 にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/294
+
 ## [v2026.1007.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1006.1...v2026.1007.0) - 2026-10-07
 
 ### 新機能
