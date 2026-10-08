@@ -716,3 +716,36 @@ test('a hub opened on a seed already settled starts a game on a random seed', as
   await page.goto('./?mode=dojo&seed=43');
   await expect(page.getByRole('link', { name: '対局開始' })).toHaveAttribute('href', /seed=43/);
 });
+
+test('a whole dojo game played through the page ends on 最終結果 and pays its reward', async ({ page }) => {
+  test.setTimeout(180_000);
+  // 速い・なし: the CPU moves land at once, as bought in the shop.
+  await page.addInitScript(([k]) => localStorage.setItem(k, 'none'), ['mhj-dojo.dojo.playback-speed.v1']);
+  await newDojoGame(page, SEED, { ownedItems: ['assist:speed-fast', 'assist:speed-instant'] });
+  const before = await dojoProgress(page);
+  // 結果 also matches 最終結果, which shows with the last round's result.
+  const result = page.getByRole('region', { name: '結果', exact: true });
+  const final = page.getByRole('region', { name: '最終結果' });
+  const next = result.getByRole('button', { name: '次の局へ' });
+  // No engine shortcut: every step, round and 次の局へ is played on the page.
+  for (let step = 0; step < 1500 && !(await final.isVisible()); step++) {
+    await waitForPlayback(page);
+    if (await next.isVisible()) await clickAndWait(page, next);
+    else if (!(await final.isVisible())) await playOneStep(page);
+  }
+  await expect(final).toBeVisible();
+  await expect(page.getByTestId('dojo-reward')).toContainText('稽古 +');
+  const paid = await dojoProgress(page);
+  expect(paid?.settled).toEqual([String(SEED)]);
+  expect(paid!.coins).toBeGreaterThan(before!.coins);
+  expect(paid!.xp).toBeGreaterThan(before!.xp);
+});
+
+test('a dojo game opened by the CPU game URL moves to the dojo page', async ({ page }) => {
+  await newDojoGame(page, SEED);
+  const id = new URL(page.url()).searchParams.get('game');
+  expect(id).toBeTruthy();
+  await page.goto(`./?mode=game&game=${id}`);
+  await expect(page).toHaveURL(new RegExp(`mode=dojo&game=${id}`));
+  await expect(handPanel(page)).toBeVisible();
+});
