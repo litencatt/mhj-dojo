@@ -1,4 +1,4 @@
-// The engine's requests + types mirroring docs/api.md. The engine is compiled
+// The engine's requests, mirroring docs/api.md (the types are in apiTypes.ts). The engine is compiled
 // to WebAssembly and runs in the browser (wasm.ts), on the public site and in
 // the local mhj-dojo alike (issue #147).
 

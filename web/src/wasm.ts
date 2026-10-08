@@ -1,10 +1,10 @@
-// The engine's transport (issues #67, #147): api.ts's requests go to the
-// engine compiled to WebAssembly, running in a Web Worker
-// (site-public/worker.js), on the public site and in the local mhj-dojo.
+// Routes api.ts's requests (issues #67, #147) to the engine compiled to
+// WebAssembly, running in a Web Worker (engine.ts, site-public/worker.js),
+// on the public site and in the local mhj-dojo.
 //
 // The engine keeps practice sessions and CPU games in the worker's memory,
 // which a reload loses (and it evicts all but a few), so each one is also
-// saved to localStorage (a session's moves, a game's save from the engine)
+// saved to localStorage (saves.ts: a session's moves, a game's save from the engine)
 // and replayed when the page asks for one the worker doesn't hold. The
 // replayed one keeps the id the page knows it by (its public id), whatever id
 // the engine gave it this time, so URLs and bookmarks keep working.
