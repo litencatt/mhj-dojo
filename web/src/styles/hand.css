@@ -121,6 +121,29 @@
   touch-action: manipulation;
 }
 @media (width <= 760px) {
+  /* Discards a little smaller than the hand's tiles, which shrink with the
+     screen, instead of a fixed 26px that dwarfs them on a phone. */
+  .discard-river {
+    gap: 2px;
+  }
+  .discard-river .tile-sm {
+    width: clamp(14px, calc((100cqw - var(--hand-fixed)) / 14 * 0.85), 26px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1px;
+    border-radius: 3px;
+  }
+  /* The hand (with the pinned wall and dora, base.css) stays on screen as
+     the page scrolls: not while a win or a result fills it, nor when its
+     tiles don't fit on one row (hooks.ts). */
+  .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
+  .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--bg);
+    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
+  }
   /* Hand: 14 tiles on one row. The tile width is what is left of the panel
      after the fixed gaps (12 of 2px, the drawn tile's 6px gap, 5px padding
      and 2px divider, rounded up; more for the 面子表示 brackets' gaps), so
@@ -237,6 +260,9 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+}
+.tile.tile-ukeire-best {
+  border-color: var(--accent);
 }
 .tile.tile-ukeire-best .tile-badge {
   background: var(--accent);

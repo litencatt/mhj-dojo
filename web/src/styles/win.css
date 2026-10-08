@@ -35,60 +35,19 @@
   font-weight: bold;
 }
 
-.muted {
-  color: var(--muted);
-}
-
-@media (max-width: 420px) {
-  .app,
-  .dojo-home {
-    padding: 8px 10px 32px;
-  }
-  .tile-md {
-    width: 28px;
-    height: 38px;
-    font-size: 0.9rem;
-  }
-}
-.tree-node-btn:disabled {
-  cursor: progress;
-}
-
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px) {
-  /* A phone keeps its height for the yaku table: tight gaps and paddings
-     throughout (the columns' 6px gaps, 8px panels). */
-  .app,
-  .dojo-home {
-    padding-top: max(6px, env(safe-area-inset-top));
-    padding-left: max(8px, env(safe-area-inset-left));
-    padding-right: max(8px, env(safe-area-inset-right));
-    padding-bottom: calc(32px + env(safe-area-inset-bottom));
-    row-gap: 6px;
-  }
-  .tsumo-button,
-  .next-round-button {
-    min-height: 44px;
-    padding: 8px 20px;
-    font-size: 1rem;
-  }
-  .tsumo-button {
-    width: 100%;
-  }
   /* A win's 14 tiles on one row too. */
-  .win-panel,
-  .result-panel {
+  .win-panel {
     container-type: inline-size;
   }
   .win-tiles {
     gap: 2px;
   }
-  .app-practice:not([data-hand-fits="false"]) .area-hand:not(:has(.win-panel)),
-  .app-game:not([data-hand-fits="false"]) .area-hand:not(:has(.result-panel)) {
-    position: sticky;
-    top: env(safe-area-inset-top, 0px);
-    z-index: 5;
-    background: var(--bg);
-    box-shadow: 0 0 0 6px var(--bg); /* the column's gap, not over the panels beside it */
+  .win-tiles .tile-md {
+    width: clamp(18px, calc((100cqw - 44px) / 14), 36px);
+    height: auto;
+    aspect-ratio: 3 / 4;
+    padding: 1.5px;
   }
 }

@@ -288,8 +288,7 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-  .yaku-filter select,
-  .glossary-search {
+  .yaku-filter select {
     font-size: 16px;
   }
   .yaku-tip {
