@@ -3,7 +3,7 @@
 ## [v2026.1009.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1009.0...v2026.1009.1) - 2026-10-09
 
 ### 修正
-- 更新情報で、PR の題の末尾にある issue 番号を出さない by @litencatt in https://github.com/litencatt/mhj-dojo/pull/327
+- 更新情報の表示を整える by @litencatt in https://github.com/litencatt/mhj-dojo/pull/327
 
 ## [v2026.1009.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.2...v2026.1009.0) - 2026-10-09
 
