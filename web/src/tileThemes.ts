@@ -1,9 +1,10 @@
 // Tile themes and backs, and the dojo's other looks: the colours live in
 // tokens.css under [data-tile-theme] and [data-table-cloth], the patterns and
 // the win effects in styles/*.css under [data-tile-back], [data-riichi-stick] and
-// [data-win-effect]. The dojo applies one for the duration of a dojo game only
-// (dojo/useDojoGame.ts applies it and removes it on leaving); the hub only offers the
-// purchase and the choice.
+// [data-win-effect]. They are bought in the dojo's shop, and the one chosen
+// (the dojo's progress, one choice for every mode) shows in every mode: the dojo's
+// hub and games, practice and CPU games (dojo/looks.tsx applies it, and removes it
+// on leaving). Each mode's 設定 offers the owned ones, once the dojo is started.
 
 export type TileThemeId = 'default' | 'wafuu' | 'mono' | 'yonshoku' | 'sakura' | 'hisui' | 'kogane';
 
@@ -60,7 +61,7 @@ export function applyTileBack(id: string): void {
   }
 }
 
-/** A look of the dojo's table: a shop item (null for the free default) and the label 設定 shows. */
+/** A look of the table: a shop item of the dojo (null for the free default) and the label 設定 shows. */
 export type Look = { id: string; label: string; item: string | null };
 
 export const TABLE_CLOTHS: readonly Look[] = [

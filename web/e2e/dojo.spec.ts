@@ -318,7 +318,7 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
   await expect(settings).toBeHidden();
 });
 
-test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game only', async ({ page }) => {
+test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game and a CPU game', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, ownedItems: ['back:shima', 'back:asanoha'], firstGameBonus: true });
   await page.getByRole('tab', { name: '見た目' }).click();
@@ -341,12 +341,12 @@ test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and p
   const back = page.locator('.seat-hand-backs .tile-back').first();
   expect(await back.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('repeating-linear-gradient');
 
-  // A CPU game keeps the plain back.
+  // A CPU game has the dojo's back too.
   await page.goto(`./?mode=game&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
-  expect(await htmlAttr(page, 'data-tile-back')).toBe(null);
-  const plain = page.locator('.seat-hand-backs .tile-back').first();
-  expect(await plain.evaluate((el) => getComputedStyle(el).backgroundImage)).not.toContain('repeating-linear-gradient');
+  await expect.poll(() => htmlAttr(page, 'data-tile-back')).toBe('shima');
+  const cpuBack = page.locator('.seat-hand-backs .tile-back').first();
+  expect(await cpuBack.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('repeating-linear-gradient');
 });
 
 /** The computed style of an element of the class (in a parent of its own, when given) added to the page for the check. */
@@ -368,7 +368,7 @@ function probe(page: Page, cls: string, prop: string, pseudo: string | null = nu
   );
 }
 
-test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chosen in 設定, and shown in a dojo game only', async ({ page }) => {
+test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chosen in 設定, and shown in a dojo game and a CPU game', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, coins: 500, firstGameBonus: true });
   await page.getByRole('tab', { name: '見た目' }).click();
@@ -419,13 +419,14 @@ test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chose
   expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('block');
   expect(await probe(page, 'win-effect', 'animation-name', null, 'result-panel')).toBe('win-fall');
 
-  // A CPU game keeps the plain table, badge and result.
+  // A CPU game has them too.
   await page.goto(`./?mode=game&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
-  for (const attr of ['data-table-cloth', 'data-riichi-stick', 'data-win-effect']) expect(await htmlAttr(page, attr)).toBe(null);
-  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  expect(await probe(page, 'seat-riichi', 'content', '::after')).toBe('none');
-  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('none');
+  await expect.poll(() => htmlAttr(page, 'data-table-cloth')).toBe('midori');
+  expect(await htmlAttr(page, 'data-riichi-stick')).toBe('tenbou');
+  expect(await htmlAttr(page, 'data-win-effect')).toBe('kamifubuki');
+  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
+  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('block');
 });
 
 test('the aids show only once bought: the ukeire per discard, the preview and the combos', async ({ page }) => {
