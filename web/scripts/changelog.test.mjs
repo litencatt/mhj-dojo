@@ -138,3 +138,17 @@ test("the repository's CHANGELOG.md parses: every release has a date and every i
   const items = releases.reduce((n, r) => n + r.sections.reduce((m, s) => m + s.items.length, 0), 0);
   assert.equal(items, (md.match(/^- /gm) ?? []).length);
 });
+
+test('a title loses the issue it names at its end', () => {
+  const md = `## [v2026.1009.0](https://github.com/litencatt/mhj-dojo/compare/a...b) - 2026-10-09
+
+### 新機能
+- CPU対戦の処理時間のベンチマークを足す (#233) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/313
+- 鳴きをブラウザで (#27, #28) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/42
+- 牌 (#1) の向き by @litencatt in https://github.com/litencatt/mhj-dojo/pull/43
+- 末尾に空白 (#5)  by @litencatt in https://github.com/litencatt/mhj-dojo/pull/44
+- (#6) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/45
+`;
+  const titles = parseChangelog(md)[0].sections[0].items.map((it) => it.title);
+  assert.deepEqual(titles, ['CPU対戦の処理時間のベンチマークを足す', '鳴きをブラウザで', '牌 (#1) の向き', '末尾に空白', '(#6)']);
+});
