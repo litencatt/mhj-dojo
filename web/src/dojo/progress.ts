@@ -354,6 +354,9 @@ export function dojoOptions(p: DojoProgress): {
 export const STORAGE_KEY = 'mhj-dojo.dojo.v1';
 export const CORRUPT_KEY = 'mhj-dojo.dojo.v1.corrupt';
 
+/** The price 立直 was sold at, refunded to those who bought it. */
+const RIICHI_REFUND = 40;
+
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string');
 
@@ -384,13 +387,16 @@ export function parseProgress(text: string): DojoProgress | null {
   const gameCpu = o.gameCpu ?? DEFAULT_GAME_CPU;
   if (gameLength !== 'tonpuu' && gameLength !== 'hanchan') return null;
   if (gameCpu !== 'weak' && gameCpu !== 'normal') return null;
+  // 立直 was sold before it joined the initial yaku: a bought one leaves the items and its price
+  // comes back, once (the next load finds it gone). A 平和 owned from before stays owned.
+  const boughtRiichi = o.ownedItems.includes('riichi');
   return {
     version: 1,
     xp: o.xp,
-    coins: o.coins,
-    // The yaku a new dojo owns are always owned (門前清自摸和 joined them later).
+    coins: boughtRiichi ? o.coins + RIICHI_REFUND : o.coins,
+    // The yaku a new dojo owns are always owned (門前清自摸和 and 立直 joined them later).
     ownedYaku: [...o.ownedYaku, ...INITIAL_YAKU.filter((k) => !(o.ownedYaku as string[]).includes(k))],
-    ownedItems: o.ownedItems,
+    ownedItems: boughtRiichi ? o.ownedItems.filter((id) => id !== 'riichi') : o.ownedItems,
     activeTheme: o.activeTheme,
     activeBack: o.activeBack ?? DEFAULT_BACK,
     activeCloth: (o.activeCloth as string | undefined) ?? DEFAULT_CLOTH,

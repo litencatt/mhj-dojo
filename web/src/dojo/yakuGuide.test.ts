@@ -11,9 +11,10 @@ import { GUIDE_KEYS, expandTiles, guideFor, guideKeyOf, practiceHref } from './y
 const NO_PRACTICE = ['haitei', 'houtei', 'rinshan', 'chankan', 'sankantsu'];
 
 const rawHand = (id: string) => (guideData as Record<string, { example: { hand: string } }>)[id].example.hand;
-const SOLD = CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id);
+// The yaku sold in the shop, and 立直: an initial yaku now, it keeps the guide it had when sold.
+const SOLD = [...CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id), 'riichi'];
 
-test('every yaku sold in the shop has a guide, and the guide has nothing else', () => {
+test('every yaku sold in the shop (and 立直) has a guide, and the guide has nothing else', () => {
   assert.deepEqual([...GUIDE_KEYS].sort(), [...SOLD].sort());
   for (const id of SOLD) {
     const g = guideFor(id);

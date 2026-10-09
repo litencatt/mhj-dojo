@@ -57,15 +57,39 @@ test('level is computed from the total XP', () => {
   assert.equal(level(4499), 9);
 });
 
-test('a new dojo owns 断么九, 平和 and 門前清自摸和 only', () => {
+test('a new dojo owns 立直, 門前清自摸和 and 断么九 only', () => {
   assert.deepEqual(initialProgress().ownedYaku, INITIAL_YAKU);
-  assert.deepEqual([...INITIAL_YAKU].sort(), ['pinfu', 'tanyao', 'tsumo']);
-  assert.equal(CATALOG.some((it) => it.id === 'tsumo'), false);
+  assert.deepEqual([...INITIAL_YAKU].sort(), ['riichi', 'tanyao', 'tsumo']);
+  for (const k of INITIAL_YAKU) assert.equal(CATALOG.some((it) => it.id === k), false, k);
+  assert.ok(CATALOG.some((it) => it.id === 'pinfu'));
 });
 
 test('a progress from before 門前清自摸和 was given owns it once loaded', () => {
   const old = { ...withFirstBonus(), ownedYaku: ['tanyao', 'pinfu', 'riichi'] };
   assert.deepEqual(parseProgress(JSON.stringify(old))?.ownedYaku, ['tanyao', 'pinfu', 'riichi', 'tsumo']);
+});
+
+test('a progress from before 立直 was given owns it, keeps 平和 and changes nothing else', () => {
+  const old = { ...withFirstBonus({ coins: 7 }), ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'haku'], ownedItems: ['yakuhai'] };
+  const p = parseProgress(JSON.stringify(old))!;
+  assert.deepEqual(p.ownedYaku, ['tanyao', 'pinfu', 'tsumo', 'haku', 'riichi']);
+  assert.deepEqual(p.ownedItems, ['yakuhai']);
+  assert.equal(p.coins, 7);
+});
+
+test('a bought 立直 is refunded its 40 coins once', () => {
+  const old = {
+    ...withFirstBonus({ coins: 7 }),
+    ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi', 'ippatsu'],
+    ownedItems: ['yakuhai', 'riichi', 'ippatsu'],
+  };
+  const store = memoryStore({ [STORAGE_KEY]: JSON.stringify(old) });
+  const p = loadProgress(store).progress;
+  assert.equal(p.coins, 47);
+  assert.deepEqual(p.ownedItems, ['yakuhai', 'ippatsu']);
+  assert.deepEqual(p.ownedYaku, ['tanyao', 'pinfu', 'tsumo', 'riichi', 'ippatsu']);
+  assert.equal(saveProgress(p, store), true);
+  assert.deepEqual(loadProgress(store).progress, p); // not refunded again
 });
 
 test('a won round pays its han and its 和了祝儀 at once, and only once', () => {
@@ -171,20 +195,21 @@ test('the redraw needs the balance less the finished rounds redraws', () => {
 test('a purchase is refused for the level, the prerequisite and the coins', () => {
   const rich = withFirstBonus({ coins: 5000 });
   assert.deepEqual(purchase(rich, 'sanshoku'), { ok: false, reason: 'level' }); // Lv3
-  assert.deepEqual(purchase({ ...rich, xp: 100 }, 'ippatsu'), { ok: false, reason: 'requires' }); // needs 立直
-  assert.deepEqual(purchase(withFirstBonus({ coins: 39 }), 'riichi'), { ok: false, reason: 'coins' });
+  assert.deepEqual(purchase({ ...rich, xp: 4500 }, 'yakuman-pack'), { ok: false, reason: 'requires' }); // needs 七対子
+  assert.deepEqual(purchase(withFirstBonus({ coins: 39 }), 'pinfu'), { ok: false, reason: 'coins' });
   assert.deepEqual(purchase(rich, 'nothing'), { ok: false, reason: 'unknown' });
   assert.deepEqual(purchase(rich, 'tanyao'), { ok: false, reason: 'unknown' }); // not for sale
+  assert.deepEqual(purchase(rich, 'riichi'), { ok: false, reason: 'unknown' }); // initial, not for sale
 });
 
 test('a purchase takes the coins and adds the item', () => {
-  const r = purchase(withFirstBonus({ coins: 100 }), 'riichi');
+  const r = purchase(withFirstBonus({ coins: 100 }), 'pinfu');
   assert.ok(r.ok);
   assert.equal(r.progress.coins, 60);
-  assert.ok(r.progress.ownedYaku.includes('riichi'));
-  assert.ok(r.progress.ownedItems.includes('riichi'));
-  assert.deepEqual(purchase(r.progress, 'riichi'), { ok: false, reason: 'owned' });
-  const after = purchase({ ...r.progress, xp: 100 }, 'ippatsu');
+  assert.ok(r.progress.ownedYaku.includes('pinfu'));
+  assert.ok(r.progress.ownedItems.includes('pinfu'));
+  assert.deepEqual(purchase(r.progress, 'pinfu'), { ok: false, reason: 'owned' });
+  const after = purchase({ ...r.progress, xp: 100 }, 'ippatsu'); // 立直, its prerequisite, is initial
   assert.ok(after.ok);
 });
 
@@ -212,7 +237,7 @@ test('役牌 is bought as one item that grants the dragons and the winds', () =>
 test('the catalog has unique ids and its prerequisites are in it', () => {
   const ids = CATALOG.map((it) => it.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const it of CATALOG) for (const r of it.requires ?? []) assert.ok(ids.includes(r), r);
+  for (const it of CATALOG) for (const r of it.requires ?? []) assert.ok(ids.includes(r) || INITIAL_YAKU.includes(r), r);
 });
 
 test('a theme is set only when it is owned', () => {
@@ -337,7 +362,7 @@ test('no saved progress is a fresh start, not a corruption', () => {
 
 test('saved progress loads back to the same state', () => {
   const p = settle(initialProgress(), game(77, 1, [{ han: 4, redraws: 1 }])).progress;
-  const bought = purchase({ ...p, coins: 500 }, 'riichi');
+  const bought = purchase({ ...p, coins: 500 }, 'pinfu');
   assert.ok(bought.ok);
   const store = memoryStore();
   assert.equal(saveProgress(bought.progress, store), true);
