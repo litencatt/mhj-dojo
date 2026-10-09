@@ -146,7 +146,9 @@ test('a title loses the issue it names at its end', () => {
 - CPU対戦の処理時間のベンチマークを足す (#233) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/313
 - 鳴きをブラウザで (#27, #28) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/42
 - 牌 (#1) の向き by @litencatt in https://github.com/litencatt/mhj-dojo/pull/43
+- 末尾に空白 (#5)  by @litencatt in https://github.com/litencatt/mhj-dojo/pull/44
+- (#6) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/45
 `;
   const titles = parseChangelog(md)[0].sections[0].items.map((it) => it.title);
-  assert.deepEqual(titles, ['CPU対戦の処理時間のベンチマークを足す', '鳴きをブラウザで', '牌 (#1) の向き']);
+  assert.deepEqual(titles, ['CPU対戦の処理時間のベンチマークを足す', '鳴きをブラウザで', '牌 (#1) の向き', '末尾に空白', '(#6)']);
 });

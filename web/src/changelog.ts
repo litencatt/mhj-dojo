@@ -41,7 +41,7 @@ const PR_URL = /^https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/(\d+)$/;
 const ISSUE_REFS = /\s*\((?:#\d+(?:,\s*)?)+\)\s*$/;
 
 function stripIssueRefs(title: string): string {
-  return title.replace(ISSUE_REFS, '');
+  return title.replace(ISSUE_REFS, '') || title; // a title that is only the reference stays
 }
 
 /** The releases in CHANGELOG.md, in its order (newest first). Any other
