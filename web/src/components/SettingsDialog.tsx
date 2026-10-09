@@ -23,7 +23,8 @@ export function SettingsDialog({ open, onClose, children }: SettingsDialogProps)
     if (open && !d.open) {
       d.showModal();
       const first = d.querySelector<HTMLInputElement | HTMLSelectElement>('input, select');
-      const checked = first?.type === 'radio' ? d.querySelector<HTMLElement>(`input[name="${first.name}"]:checked`) : null;
+      const checked =
+        first?.type === 'radio' && first.name ? d.querySelector<HTMLElement>(`input[name="${CSS.escape(first.name)}"]:checked`) : null;
       (checked ?? first)?.focus();
     } else if (!open && d.open) d.close();
   }, [open]);

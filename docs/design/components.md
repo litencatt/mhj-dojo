@@ -15,12 +15,12 @@
 - 背景(ダイアログの外)のクリック・タップで閉じる: `components/backdrop.ts` の `useBackdropClose` を `<dialog>` に付ける(ドラッグの終点やダイアログ自身のスクロールバーでは閉じない)。例外は、閉じると操作が止まったままになる `.tab-stopped`。
 - 見た目は `.settings-dialog`、`.help-dialog`、`.tab-stopped`、`.shop-confirm`、`.yaku-guide` が共通(`--panel-bg`、`--radius-lg`、`--backdrop`)。幅は `min(Npx, 100vw - 32px)` を基本にする。
 - 設定: `web/src/components/SettingsDialog.tsx`。各モードの設定をここに集め、ヘッダーの 設定 から開く。開いたら最初の入力(ラジオならその組の選択中のもの)にフォーカス。
-- 見た目の選択: `web/src/dojo/looks.tsx` の `LooksSettings`(牌テーマ・裏柄・卓布・リーチ棒・和了演出の `fieldset.dojo-settings-group` と見本 `.dojo-settings-sample`)。道場のハブ・道場の対局・練習・CPU対戦の 設定 で同じものを、モードの選択肢(新しく始めるフォームなど)の後に置く。選べるのは解放済みだけで、道場の進捗がないときは出さない。当てるのは `useDojoLooks`(ハブ)・`useSharedLooks`(ほかのモード、別タブの変更も `storage` イベントで追う)で、`<html>` の `data-*` に付ける。
+- 見た目の選択: `web/src/dojo/looks.tsx` の `LooksSettings`(牌テーマ・裏柄・卓布・リーチ棒・和了演出の `fieldset.dojo-settings-group` と見本 `.dojo-settings-sample`)。道場のハブ・道場の対局・練習・CPU対戦の 設定 で同じものを、モードの選択肢(新しく始めるフォームなど)の後に置く。選べるのは解放済みだけで、道場の進捗がないときは出さない。ハブ以外(`ownedOnly`)では、1つも持っていない種類の組を出さず、何も持っていなければ見た目の選択ごと出さない。保存に失敗したら `.save-failed` で知らせる。当てるのは `useDojoLooks`(ハブ)・`useSharedLooks`(ほかのモード、別タブの変更も `storage` イベントで追う)で、`<html>` の `data-*` に付ける。
 - ヘルプ: `Help.tsx`。スマホでは画面ほぼ全幅、閉じるボタンは大きくする。
 - 役の解説: `web/src/dojo/GuideDialog.tsx`(`.yaku-guide`)。役を買った直後(修得しました、`.dojo-aid-ok`)と、所持役のチップ(`.dojo-yaku-guide`、中身は枠なしのボタン)から開く。成立条件・翻・例の手(`Tile`、右端が和了牌)と、主ボタン `.dojo-start` の「この役を練習する」(練習モードへのリンク)、副ボタンの閉じる。
 
 ## 選択肢(ラジオ・チェック)
-`fieldset.option-group`(練習・CPU対戦)と `fieldset.dojo-settings-group`(道場)は同じ見た目の枠付き。`legend` が項目名、中の `label` は `--fg` のまま(muted にしない)。設定ダイアログでは1項目が1行。入力欄・select は `padding: 4px 6px`、`--border`、`--radius-sm`、`--bg` 地。
+`fieldset.option-group`(練習・CPU対戦)と `fieldset.dojo-settings-group`(道場。練習・CPU対戦の 設定 に出る見た目の選択 `LooksSettings` も)は同じ見た目の枠付き。`legend` が項目名、中の `label` は `--fg` のまま(muted にしない)。設定ダイアログでは1項目が1行。入力欄・select は `padding: 4px 6px`、`--border`、`--radius-sm`、`--bg` 地。
 
 ## パネル見出し
 `h2` を使い、右端にボタンを置くときは `.panel-heading`(`.panel-minimize` で最小化、最小化したパネルは右端の `.panel-dock` の `.dock-tab` に収まる)。

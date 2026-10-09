@@ -5,10 +5,10 @@ import { initialProgress, loadProgress, payRounds, saveProgress, settle, type Do
 /**
  * A dojo game's side of the dojo (GameApp with dojo): its progress, what it
  * owns and what it pays (its looks, as every mode's, are looks.tsx's). A won
- * round pays its han as it ends (progress.paidRounds keeps the rounds paid, by the game's id); a
- * finished game pays the rest once (progress.settle keeps the seeds paid).
- * Both read fresh from storage so that another tab's purchases are not lost.
- * Off (a CPU game) it owns nothing and does nothing.
+ * round pays its han as it ends (progress.paidRounds keeps the rounds paid,
+ * by the game's id); a finished game pays the rest once (progress.settle
+ * keeps the seeds paid). Both read fresh from storage so that another tab's
+ * purchases are not lost. Off (a CPU game) it owns nothing and does nothing.
  */
 export function useDojoGame(dojo: boolean, state: GameState | null) {
   // The dojo's growth: read at the start, kept as it changes (the payments below).

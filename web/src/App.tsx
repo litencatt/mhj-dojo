@@ -191,7 +191,7 @@ export function App() {
             </fieldset>
             <button type="submit" disabled={busy}>新しい練習</button>
           </form>
-          {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={settingsOpen} />}
+          {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={settingsOpen} ownedOnly saveFailed={looks.saveFailed} />}
         </>
       }
       settingsOpen={settingsOpen}

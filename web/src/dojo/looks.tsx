@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
 import { Tile } from '../components/Tile';
 import {
   RIICHI_STICKS,
@@ -18,6 +18,7 @@ import { parseProgress, saveProgress, setBack, setCloth, setEffect, setStick, se
 /**
  * Shows the looks a progress has chosen (tileThemes.ts) on <html>, the defaults
  * for null, and takes them off on leaving. Every mode shows the dojo's choice.
+ * Applied before the first paint, so that the default look never flashes.
  */
 export function useDojoLooks(progress: DojoProgress | null) {
   const theme = progress?.activeTheme ?? 'default';
@@ -25,7 +26,7 @@ export function useDojoLooks(progress: DojoProgress | null) {
   const cloth = progress?.activeCloth ?? 'default';
   const stick = progress?.activeStick ?? 'default';
   const effect = progress?.activeEffect ?? 'default';
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyTileTheme(TILE_THEMES.find((t) => t.item === theme)?.id ?? 'default');
     applyTileBack(TILE_BACKS.find((t) => t.item === back)?.id ?? 'default');
     applyTableCloth(cloth);
@@ -54,10 +55,12 @@ function storedProgress(): DojoProgress | null {
 /**
  * The dojo's looks outside the hub (practice, CPU and dojo games): the stored
  * progress (null without one), followed as other tabs change it, and shown.
- * `change` sets a look on what is stored now and stores it, as the hub does.
+ * `change` sets a look on what is stored now and stores it, as the hub does;
+ * `saveFailed` says the last change was not stored (it shows on this page only).
  */
 export function useSharedLooks() {
   const [progress, setProgress] = useState(storedProgress);
+  const [saveFailed, setSaveFailed] = useState(false);
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY || e.key === null) setProgress(storedProgress());
@@ -71,10 +74,9 @@ export function useSharedLooks() {
     if (!cur) return;
     const next = apply(cur);
     setProgress(next);
-    // A failed save keeps the choice on this page only.
-    if (next !== cur) saveProgress(next);
+    if (next !== cur) setSaveFailed(!saveProgress(next));
   }
-  return { progress, change };
+  return { progress, change, saveFailed };
 }
 
 // 設定's choices of the looks: the free default and the ones owned.
@@ -96,19 +98,31 @@ interface LooksSettingsProps {
   progress: DojoProgress;
   onChange: (apply: (current: DojoProgress) => DojoProgress) => void;
   open: boolean; // 設定 is open: the win effect chosen plays over the sample
+  // Outside the hub: only the kinds with a look owned, none at all without one, and the save's failure.
+  ownedOnly?: boolean;
+  saveFailed?: boolean;
 }
 
+const owned = (progress: DojoProgress, l: Look) => l.item !== null && progress.ownedItems.includes(l.item);
+
 /** 設定's looks (the hub's, a practice's and a game's): the owned ones of each kind, and a sample of them. */
-export function LooksSettings({ progress, onChange, open }: LooksSettingsProps) {
+export function LooksSettings({ progress, onChange, open, ownedOnly = false, saveFailed = false }: LooksSettingsProps) {
   // The win effect on the sample plays again on each change of it (its key), and on 演出を見る.
   const [effectPlays, setEffectPlays] = useState(0);
+  const groups = ownedOnly ? GROUPS.filter((g) => g.looks.some((l) => owned(progress, l))) : GROUPS;
+  if (groups.length === 0) return null;
   return (
     <>
-      {GROUPS.map((g) => (
+      {saveFailed && (
+        <p class="save-failed" role="status">
+          道場のデータを保存できませんでした（ブラウザの保存領域を確認してください）。この画面にだけ反映しています。
+        </p>
+      )}
+      {groups.map((g) => (
         <fieldset key={g.name} class="dojo-settings-group">
           <legend>{g.legend}</legend>
           {g.looks
-            .filter((l) => l.item === null || progress.ownedItems.includes(l.item))
+            .filter((l) => l.item === null || owned(progress, l))
             .map((l) => (
               <label key={l.id}>
                 <input

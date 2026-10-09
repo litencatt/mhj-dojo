@@ -47,7 +47,8 @@ for (const { name, url } of [
     await expect(themes.getByRole('radio')).toHaveCount(2); // 標準 and 和風
     await expect(themes.getByRole('radio', { name: '和風' })).toBeChecked();
     await expect(settings.getByRole('group', { name: '裏柄' }).getByRole('radio')).toHaveCount(2); // 無地 and 縞
-    await expect(settings.getByRole('group', { name: '卓布' }).getByRole('radio')).toHaveCount(1); // 標準 only
+    // A kind with nothing owned is not offered.
+    await expect(settings.getByRole('group', { name: '卓布' })).toHaveCount(0);
     await themes.getByRole('radio', { name: '標準' }).check();
     await expect.poll(() => htmlAttr(page, 'data-tile-theme')).toBe(null);
     await settings.getByRole('group', { name: '裏柄' }).getByRole('radio', { name: '無地' }).check();
@@ -57,9 +58,11 @@ for (const { name, url } of [
     // The dojo shows the choice made here.
     await page.goto('./?mode=dojo');
     await expect(page.getByTestId('dojo-level')).toBeVisible();
+    // The win effect still chosen marks the looks applied: then the default theme is too.
+    await expect.poll(() => htmlAttr(page, 'data-win-effect')).toBe('kamifubuki');
+    expect(await htmlAttr(page, 'data-tile-theme')).toBe(null);
     await page.getByRole('button', { name: '設定' }).click();
     await expect(page.getByRole('dialog', { name: '設定' }).getByRole('group', { name: '牌テーマ' }).getByRole('radio', { name: '標準' })).toBeChecked();
-    expect(await htmlAttr(page, 'data-tile-theme')).toBe(null);
   });
 
   test(`${name} without a dojo keeps the default looks and offers none in 設定`, async ({ page }) => {
@@ -71,6 +74,30 @@ for (const { name, url } of [
     const settings = await openSettings(page);
     await expect(settings.getByRole('group', { name: '牌テーマ' })).toHaveCount(0);
     await expect(settings.getByLabel('見本')).toHaveCount(0);
+  });
+
+  test(`${name} with a dojo that owns no look offers none in 設定`, async ({ page }) => {
+    await seedDojo(page, { ownedItems: ['assist:advice'] });
+    await page.goto(url);
+    await loaded(page);
+    const settings = await openSettings(page);
+    await expect(settings.getByRole('group', { name: '牌テーマ' })).toHaveCount(0);
+    await expect(settings.getByLabel('見本')).toHaveCount(0);
+  });
+
+  test(`${name}'s 設定 says when the choice could not be stored`, async ({ page }) => {
+    await seedDojo(page, OWNED);
+    await page.goto(url);
+    await loaded(page);
+    await page.evaluate(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException('full', 'QuotaExceededError');
+      };
+    });
+    const settings = await openSettings(page);
+    await settings.getByRole('group', { name: '牌テーマ' }).getByRole('radio', { name: '標準' }).check();
+    await expect(settings.locator('.save-failed')).toContainText('保存できませんでした');
+    await expect.poll(() => htmlAttr(page, 'data-tile-theme')).toBe(null);
   });
 }
 

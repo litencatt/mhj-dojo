@@ -385,7 +385,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const settings = (
     <>
       {options}
-      {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={optionsOpen} />}
+      {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={optionsOpen} ownedOnly saveFailed={looks.saveFailed} />}
     </>
   );
   return (
