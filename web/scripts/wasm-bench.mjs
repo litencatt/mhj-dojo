@@ -9,11 +9,12 @@
 //
 // Game mode (issue #233): for each seed it starts a game against the CPU
 // players (POST /api/games, --length) and plays it to game_over: ron or skip
-// in the call phase, tsumo or the drawn tile on its own turn, next at a
-// round's end. Every action is timed, including the CPU seats' play it
-// triggers.
+// in the call phase, tsumo or the last legal tile on its own turn (never
+// riichi, as internal/match's BenchmarkGameStep plays), next at a round's
+// end. Every action is timed, including the CPU seats' play it triggers.
 //
-// It prints p50/p95/max per request kind. --dump writes every response body
+// It prints p50/p95/max per request kind (the first create includes the
+// engine's warm-up). --dump writes every response body
 // (session_id / game_id removed) as one JSON line, so two builds can be
 // compared byte for byte with cmp.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -32,12 +33,12 @@ const { values: opt } = parseArgs({
   },
 });
 
+if (opt.mode !== 'practice' && opt.mode !== 'game') throw new Error(`--mode: ${opt.mode}`);
+
 await import(pathToFileURL(join(opt.dir, 'wasm_exec.js')).href);
 const go = new globalThis.Go();
 const { instance } = await WebAssembly.instantiate(readFileSync(join(opt.dir, 'mhj-dojo.wasm')), go.importObject);
 go.run(instance); // returns once main blocks, with the functions defined
-
-if (opt.mode !== 'practice' && opt.mode !== 'game') throw new Error(`--mode: ${opt.mode}`);
 
 const times = {};
 const dump = [];
@@ -79,10 +80,7 @@ function playGame(seed) {
     else if (lg.ron) act = { type: 'ron' };
     else if (lg.tsumo) act = { type: 'tsumo' };
     else if (st.phase === 'call' && lg.skip) act = { type: 'skip' };
-    else {
-      const drawn = st.seats[st.you].drawn;
-      act = { type: 'discard', tile: drawn && lg.discards.includes(drawn) ? drawn : lg.discards[0] };
-    }
+    else act = { type: 'discard', tile: lg.discards.at(-1) };
     st = request(act.type, 'POST', path, act);
   }
 }
