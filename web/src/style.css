@@ -7,6 +7,7 @@
    bottom, the yaku tables two-line rows instead of a sideways scroll.
    Tablets and desktops are unchanged. */
 @import './styles/base.css';
+@import './styles/status.css';
 @import './styles/dock.css';
 @import './styles/advice.css';
 @import './styles/glossary.css';

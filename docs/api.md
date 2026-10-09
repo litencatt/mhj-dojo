@@ -1,7 +1,7 @@
 # mhj-dojo engine requests
 
 The page talks to its engine, the Go code built as WebAssembly (`cmd/mhj-dojo-wasm`), in a Web
-Worker (`web/site-public/worker.js`, driven by `web/src/wasm.ts`). A request is an HTTP-style
+Worker (`web/site-public/worker.js`, started by `web/src/engine.ts`, with `web/src/wasm.ts` routing the requests). A request is an HTTP-style
 method, path and JSON body — practice (`/api/sessions…`) or game (`/api/games…`), below — which
 the worker's `mhjDojoRequest(method, path, body)` hands to `apicall.Route` (`internal/apicall`). It
 returns `{status, body, save}`: an HTTP status code and a JSON body, the error ones
@@ -12,7 +12,7 @@ moves in one call after a page reload (`body` is `{"seed", "max_turns", "moves",
 `query`, which may be left out, holds view options as a request's query does, see "View options"),
 and `mhjDojoRestoreGame(save, query)`, which rebuilds a game from its save (see "Game saves").
 
-The TypeScript types for these shapes are in `web/src/api.ts`.
+The TypeScript types for these shapes are in `web/src/apiTypes.ts` (the page imports them from `web/src/api.ts`, with the requests).
 
 ## Tile notation
 

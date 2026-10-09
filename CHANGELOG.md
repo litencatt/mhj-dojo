@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2026.1009.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.2...v2026.1009.0) - 2026-10-09
+
+### 新機能
+- CPU対戦の処理時間のベンチマークを足す (#233) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/313
+### CI・リポジトリ
+- CI: Go 1.27.2 での lint の失敗と Nightly のタイムアウトを直す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/315
+### その他
+- base.css と wasm.ts / api.ts を分割する (#311) by @litencatt in https://github.com/litencatt/mhj-dojo/pull/312
+
 ## [v2026.1008.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1008.1...v2026.1008.2) - 2026-10-08
 
 ### 新機能

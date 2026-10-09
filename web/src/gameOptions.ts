@@ -2,7 +2,7 @@ import type { GameOptions } from './api';
 import type { ResumeItem } from './components/ResumePanel';
 import { LENGTH_NAMES, WIND_NAMES, roundName } from './components/GameTable';
 import { dojoGame, dojoOptions, type DojoProgress } from './dojo/progress';
-import type { GameSummary } from './wasm';
+import type { GameSummary } from './saves';
 
 export const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
 export const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
