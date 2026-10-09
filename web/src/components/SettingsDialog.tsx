@@ -10,8 +10,8 @@ interface SettingsDialogProps {
 
 /**
  * A mode's 設定, as a modal dialog (the page behind is inert). It opens with
- * the focus on the first choice (the checked radio button, else the first
- * field); closed (閉じる, Esc or a click on the backdrop), the dialog gives
+ * the focus on the first field (of a group of radio buttons, the checked
+ * one); closed (閉じる, Esc or a click on the backdrop), the dialog gives
  * the focus back to 設定.
  */
 export function SettingsDialog({ open, onClose, children }: SettingsDialogProps) {
@@ -22,7 +22,10 @@ export function SettingsDialog({ open, onClose, children }: SettingsDialogProps)
     if (!d) return;
     if (open && !d.open) {
       d.showModal();
-      (d.querySelector<HTMLElement>('input:checked') ?? d.querySelector<HTMLElement>('input, select'))?.focus();
+      const first = d.querySelector<HTMLInputElement | HTMLSelectElement>('input, select');
+      const checked =
+        first?.type === 'radio' && first.name ? d.querySelector<HTMLElement>(`input[name="${CSS.escape(first.name)}"]:checked`) : null;
+      (checked ?? first)?.focus();
     } else if (!open && d.open) d.close();
   }, [open]);
   return (

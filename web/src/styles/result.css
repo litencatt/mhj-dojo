@@ -4,7 +4,7 @@
   margin-top: 10px;
 }
 /* The dojo's win effects (tileThemes.ts): played once over a win of yours at
-   跳満 or above (ResultPanel), never when motion is reduced. */
+   跳満 or above (ResultPanel, a practice's WinPanel), never when motion is reduced. */
 .win-effect {
   display: none;
 }
