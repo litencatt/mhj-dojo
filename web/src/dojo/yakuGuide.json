@@ -5,7 +5,7 @@
   },
   "pinfu": {
     "han": 1, "openHan": null,
-    "example": { "hand": "234m567m345p678s22s", "win": "4m", "ron": true, "note": "2・3萬の両面待ちで4萬をロン（ツモでも付く）" }
+    "example": { "hand": "123m678m345p789s55p", "win": "8m", "ron": true, "note": "6・7萬の両面待ちで8萬をロン（ツモでも付く）" }
   },
   "yakuhai": {
     "han": 1, "openHan": 1,

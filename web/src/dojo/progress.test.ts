@@ -84,12 +84,13 @@ test('a bought 立直 is refunded its 40 coins once', () => {
     ownedItems: ['yakuhai', 'riichi', 'ippatsu'],
   };
   const store = memoryStore({ [STORAGE_KEY]: JSON.stringify(old) });
-  const p = loadProgress(store).progress;
+  const { progress: p, refunded } = loadProgress(store);
+  assert.equal(refunded, 40);
   assert.equal(p.coins, 47);
   assert.deepEqual(p.ownedItems, ['yakuhai', 'ippatsu']);
   assert.deepEqual(p.ownedYaku, ['tanyao', 'pinfu', 'tsumo', 'riichi', 'ippatsu']);
   assert.equal(saveProgress(p, store), true);
-  assert.deepEqual(loadProgress(store).progress, p); // not refunded again
+  assert.deepEqual(loadProgress(store), { progress: p, corrupted: false, refunded: 0 }); // not refunded again
 });
 
 test('a won round pays its han and its 和了祝儀 at once, and only once', () => {
@@ -356,7 +357,7 @@ test('another version is kept aside too', () => {
 
 test('no saved progress is a fresh start, not a corruption', () => {
   const store = memoryStore();
-  assert.deepEqual(loadProgress(store), { progress: initialProgress(), corrupted: false });
+  assert.deepEqual(loadProgress(store), { progress: initialProgress(), corrupted: false, refunded: 0 });
   assert.equal(store.data.has(CORRUPT_KEY), false);
 });
 

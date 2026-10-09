@@ -45,6 +45,10 @@ test('a first game pays its reward once, buys 平和, and the next game offers �
   await expect(page.getByTestId('dojo-coins')).toHaveText('0');
   await page.getByRole('link', { name: '対局開始' }).click();
   await expect(handPanel(page)).toBeVisible();
+  // The yaku table has rows for the learned yaku only: no 平和 before it is bought.
+  const pinfuRow = page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '平和' });
+  await expect(page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '断么九' })).toHaveCount(1);
+  await expect(pinfuRow).toHaveCount(0);
   // A reload keeps the dojo, not a plain game.
   await expect(page).toHaveURL(/mode=dojo/);
   await expect(page).toHaveURL(/[?&]game=/);
@@ -76,6 +80,8 @@ test('a first game pays its reward once, buys 平和, and the next game offers �
 
   await page.goto(`./?mode=dojo&play=1&seed=${DOJO_RIICHI_SEED}`);
   await expect(handPanel(page)).toBeVisible();
+  // The 平和 bought reaches the game: its row shows in the yaku table.
+  await expect(pinfuRow).toHaveCount(1);
   const riichi = page.getByRole('button', { name: 'リーチ', exact: true });
   for (let i = 0; i < 4 && !(await riichi.isVisible()); i++) await playOneStep(page);
   await expect(riichi).toBeVisible();
@@ -474,20 +480,21 @@ async function noYakuGame(page: Page, progress: Partial<DojoProgress> = {}) {
 
 test('役なし警告 and 待ち牌表示: a closed tenpai with no learned yaku row wins with 立直', async ({ page }) => {
   test.setTimeout(90_000);
-  const waits = await noYakuGame(page, { ownedItems: ['assist:noyaku', 'assist:waits'] });
+  const waits = await noYakuGame(page, { ownedItems: ['assist:noyaku'] });
   const aid = page.getByTestId('dojo-waits');
+  await expect(aid).toContainText('役なし：立直で和了れます');
+  await expect(aid.locator('.tile')).toHaveCount(0); // no 待ち牌表示 bought
+
+  await page.evaluate((key) => {
+    const p = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(key, JSON.stringify({ ...p, ownedItems: ['assist:noyaku', 'assist:waits'] }));
+  }, STORAGE_KEY);
+  await page.reload();
+  await waitForPlayback(page);
   await expect(aid).toContainText('役なし：立直で和了れます');
   await expect(aid).toContainText('待ち');
   await expect(aid.locator('.tile')).toHaveCount(waits.length);
   await expect(aid.locator('.tile').first()).toHaveAttribute('aria-label', / 残り\d+枚$/);
-});
-
-test('役なし警告 without 待ち牌表示: 立直で和了れます and no waits', async ({ page }) => {
-  test.setTimeout(90_000);
-  await noYakuGame(page, { ownedItems: ['assist:noyaku'] });
-  const aid = page.getByTestId('dojo-waits');
-  await expect(aid).toContainText('立直で和了れます');
-  await expect(aid.locator('.tile')).toHaveCount(0); // no 待ち牌表示 bought
 });
 
 test('without the aids, a tenpai without yaku shows nothing', async ({ page }) => {
@@ -672,6 +679,21 @@ test('the owned yaku list shows the dragons and the winds once, as 役牌', asyn
   await page.locator('[data-item="yakuhai"]').getByRole('button', { name: '購入' }).click();
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   await expect(owned).toHaveText(['立直', '門前清自摸和', '断么九', '役牌']);
+});
+
+test('a bought 立直 is refunded once, and the hub says so', async ({ page }) => {
+  await page.goto('./?mode=dojo');
+  await page.evaluate(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), coins: 10, firstGameBonus: true, ownedItems: ['riichi'] })],
+  );
+  await page.reload();
+  const notice = page.getByText('立直が初期の役になったため、立直の代金40銭を返しました。');
+  await expect(notice).toBeVisible();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('50');
+  await page.reload();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('50');
+  await expect(notice).toBeHidden();
 });
 
 test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', async ({ page }) => {

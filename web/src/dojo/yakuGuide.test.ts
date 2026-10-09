@@ -3,7 +3,7 @@
 // internal/session/yakuguide_test.go; this checks the data is whole and well-formed.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATALOG, YAKUHAI_KEYS } from './catalog.ts';
+import { CATALOG, INITIAL_YAKU, YAKUHAI_KEYS } from './catalog.ts';
 import guideData from './yakuGuide.json' with { type: 'json' };
 import { GUIDE_KEYS, expandTiles, guideFor, guideKeyOf, practiceHref } from './yakuGuide.ts';
 
@@ -11,10 +11,14 @@ import { GUIDE_KEYS, expandTiles, guideFor, guideKeyOf, practiceHref } from './y
 const NO_PRACTICE = ['haitei', 'houtei', 'rinshan', 'chankan', 'sankantsu'];
 
 const rawHand = (id: string) => (guideData as Record<string, { example: { hand: string } }>)[id].example.hand;
-// The yaku sold in the shop, and 立直: an initial yaku now, it keeps the guide it had when sold.
-const SOLD = [...CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id), 'riichi'];
+// The initial yaku with a guide: 立直 kept the one it had when it was sold (#321), so its chip in
+// 所持役 still opens it. 断么九 and 門前清自摸和 never had one. Listed by hand on purpose: a guide
+// for an initial yaku is a choice, and this is where it is made.
+const GUIDED_INITIAL = ['riichi'];
+const SOLD = [...CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id), ...GUIDED_INITIAL];
 
-test('every yaku sold in the shop (and 立直) has a guide, and the guide has nothing else', () => {
+test('every yaku sold in the shop (and the guided initial ones) has a guide, and the guide has nothing else', () => {
+  for (const k of GUIDED_INITIAL) assert.ok(INITIAL_YAKU.includes(k), k);
   assert.deepEqual([...GUIDE_KEYS].sort(), [...SOLD].sort());
   for (const id of SOLD) {
     const g = guideFor(id);
