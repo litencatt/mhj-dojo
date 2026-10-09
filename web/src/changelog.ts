@@ -36,6 +36,14 @@ const ITEM = /^- (.+?) by @(\S+) in (\S+)\s*$/;
 // Only this repository's pull requests count; any other URL gives `pr: null`.
 const PR_URL = /^https:\/\/github\.com\/litencatt\/mhj-dojo\/pull\/(\d+)$/;
 
+// The issue a pull request's title names at its end, as in "… (#233)" or
+// "… (#27, #28)": a reference for the repository, not for the page's readers.
+const ISSUE_REFS = /\s*\((?:#\d+(?:,\s*)?)+\)\s*$/;
+
+function stripIssueRefs(title: string): string {
+  return title.replace(ISSUE_REFS, '') || title; // a title that is only the reference stays
+}
+
 /** The releases in CHANGELOG.md, in its order (newest first). Any other
  * ## section (such as New Contributors) is left out up to the next release,
  * and so are the lines that are not a release note's item. */
@@ -66,7 +74,7 @@ export function parseChangelog(md: string): Release[] {
       release.sections.push(section);
     }
     const pr = PR_URL.exec(m[3]);
-    section.items.push({ title: m[1], author: m[2], pr: pr ? { number: Number(pr[1]), url: m[3] } : null });
+    section.items.push({ title: stripIssueRefs(m[1]), author: m[2], pr: pr ? { number: Number(pr[1]), url: m[3] } : null });
   }
   return releases;
 }
