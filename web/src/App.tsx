@@ -20,6 +20,7 @@ import {
 } from './hooks';
 import { claim } from './singleTab';
 import { savedSessions } from './saves';
+import { LooksSettings, useSharedLooks } from './dojo/looks';
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -30,6 +31,8 @@ export function App() {
   // 設定 (the header's button) opens the new-practice form in a modal dialog; a new session started from it closes it.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
+  // The dojo's looks, chosen in 設定 too once the dojo has a progress.
+  const looks = useSharedLooks();
   // Opened with no session or seed in the URL: the saved sessions, if any,
   // are offered instead of a new one.
   const offered = useOffered(() =>
@@ -163,30 +166,33 @@ export function App() {
     <AppShell
       mode="practice"
       settings={
-        <form class="new-game-form" onSubmit={handleNewGame}>
-          <fieldset class="dojo-settings-group option-group">
-            <legend>シード</legend>
-            <input
-              type="number"
-              aria-label="シード"
-              value={seedInput}
-              placeholder="ランダム"
-              onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
-            />
-          </fieldset>
-          <fieldset class="dojo-settings-group option-group">
-            <legend>最大巡目</legend>
-            <input
-              type="number"
-              aria-label="最大巡目"
-              class="input-narrow"
-              min={1}
-              value={maxTurnsInput}
-              onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
-            />
-          </fieldset>
-          <button type="submit" disabled={busy}>新しい練習</button>
-        </form>
+        <>
+          <form class="new-game-form" onSubmit={handleNewGame}>
+            <fieldset class="dojo-settings-group option-group">
+              <legend>シード</legend>
+              <input
+                type="number"
+                aria-label="シード"
+                value={seedInput}
+                placeholder="ランダム"
+                onInput={(e) => setSeedInput((e.target as HTMLInputElement).value)}
+              />
+            </fieldset>
+            <fieldset class="dojo-settings-group option-group">
+              <legend>最大巡目</legend>
+              <input
+                type="number"
+                aria-label="最大巡目"
+                class="input-narrow"
+                min={1}
+                value={maxTurnsInput}
+                onInput={(e) => setMaxTurnsInput((e.target as HTMLInputElement).value)}
+              />
+            </fieldset>
+            <button type="submit" disabled={busy}>新しい練習</button>
+          </form>
+          {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={settingsOpen} />}
+        </>
       }
       settingsOpen={settingsOpen}
       onSettingsOpen={setSettingsOpen}

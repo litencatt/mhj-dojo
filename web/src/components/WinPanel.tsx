@@ -13,9 +13,12 @@ export function WinPanel(props: WinPanelProps) {
   // reaches that; with a yakuman, dora are reported but not added to the total.
   const yakuman = win.yaku.some((y) => y.han >= 13);
   const doraIgnored = yakuman && win.dora > 0;
+  // At 跳満 (6 han) or above, the dojo's win effect plays over it, as over a game's result (ResultPanel).
+  const high = win.han_total >= 6;
   return (
     <section class="win-panel" aria-label="和了">
       <h2>ツモ和了</h2>
+      {high && <div class="win-effect" data-testid="win-effect" aria-hidden="true" />}
       <div class="win-tiles" role="group" aria-label="和了形14枚">
         {win.tiles.map((t, i) => (
           <Tile key={`${t}-${i}`} tile={t} />

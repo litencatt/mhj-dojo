@@ -1,5 +1,6 @@
 /* ---- Win panel ---- */
 .win-panel {
+  position: relative; /* the win effect's ground (result.css) */
   border-color: var(--success-border);
 }
 .win-tiles {
