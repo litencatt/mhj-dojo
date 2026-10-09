@@ -72,6 +72,13 @@ export function DojoHome() {
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
   const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
 
+  // A bought 立直 was refunded on reading: said once, when the refund is stored (the next reading finds none).
+  useEffect(() => {
+    if (loaded.refunded > 0 && saveProgress(loaded.progress)) {
+      setNotice(`立直が初期の役になったため、立直の代金${loaded.refunded}銭を返しました。`);
+    }
+  }, [loaded]);
+
   useEffect(() => {
     document.title = 'mhj-dojo - 道場';
     // Follows the progress another tab has stored.

@@ -172,13 +172,13 @@ func newDojoGameWith(c *client, seed int, dojo string) (match.State, string) {
 	return st, "/api/games/" + st.GameID + "/action"
 }
 
-// DOJO_RIICHI_SEED: a dojo game with the initial yaku and riichi offers you
-// riichi within 3 tsumogiri moves (dojo.spec.ts: the riichi bought after the
-// first game shows in the next game).
+// DOJO_RIICHI_SEED: a dojo game with the initial yaku (riichi among them) and
+// pinfu offers you riichi within 3 tsumogiri moves (dojo.spec.ts: the next game
+// after the first, with the pinfu it bought).
 func TestE2ESeedDojoRiichi(t *testing.T) {
 	seed := tsConst(t, "helpers.ts", "DOJO_RIICHI_SEED")
 	c := newClient(t, session.NewStore(256))
-	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(append(initialYaku(t), "riichi"))+`}`)
+	st, path := newDojoGameWith(c, seed, `{"yaku":`+jsonList(append(initialYaku(t), "pinfu"))+`}`)
 	for i := 0; i < 3 && st.Result == nil && len(st.Legal.Riichi) == 0; i++ {
 		st, _ = c.game("POST", path, tsumogiriMove(st))
 	}

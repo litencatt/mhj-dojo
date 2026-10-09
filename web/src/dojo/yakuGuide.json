@@ -3,6 +3,10 @@
     "han": 1, "openHan": null,
     "example": { "hand": "234m567m345p678s22s", "win": "4m", "situation": "riichi", "note": "立直をかけ、そのまま和了" }
   },
+  "pinfu": {
+    "han": 1, "openHan": null,
+    "example": { "hand": "123m678m345p789s55p", "win": "8m", "ron": true, "note": "6・7萬の両面待ちで8萬をロン（ツモでも付く）" }
+  },
   "yakuhai": {
     "han": 1, "openHan": 1,
     "example": { "hand": "234m456p789s555z11p", "win": "4m", "evalKey": "haku", "note": "白の刻子で1翻（發・中も同じ。場風・自風の刻子も1翻ずつ）" }

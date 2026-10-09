@@ -19,12 +19,12 @@ import (
 // doc is the MHJDOJO_FULL=1 run.
 
 // simStages returns the yaku you own at each stage, read from the shop
-// (web/src/dojo/catalog.ts): the initial yaku, then 立直 and 役牌, then the
-// level-3 yaku (the 2-han ones), then every yaku.
+// (web/src/dojo/catalog.ts): the initial yaku, then 平和 and 役牌 (the first
+// purchases), then the level-3 yaku (the 2-han ones), then every yaku.
 func simStages(t *testing.T) []simStage {
 	const catalog = "src/dojo/catalog.ts"
 	s0 := webts.Strings(t, catalog, "INITIAL_YAKU")
-	s1 := slices.Concat(s0, []string{"riichi"}, webts.Strings(t, catalog, "YAKUHAI_KEYS"))
+	s1 := slices.Concat(s0, []string{"pinfu"}, webts.Strings(t, catalog, "YAKUHAI_KEYS"))
 	s2 := slices.Clone(s1)
 	for _, m := range regexp.MustCompile(`yaku\('(\w+)', '[^']*', 3,`).FindAllStringSubmatch(webts.Read(t, catalog), -1) {
 		s2 = append(s2, m[1])
@@ -32,7 +32,7 @@ func simStages(t *testing.T) []simStage {
 	if len(s2) == len(s1) {
 		t.Fatalf("%s: no level-3 yaku found", catalog)
 	}
-	return []simStage{{"S0 初期", s0}, {"S1 +立直・役牌", s1}, {"S2 +2翻役", s2}, {"S3 全役", allYaku}}
+	return []simStage{{"S0 初期", s0}, {"S1 +平和・役牌", s1}, {"S2 +2翻役", s2}, {"S3 全役", allYaku}}
 }
 
 // simStage is a stage of the shop and the yaku you own at it.

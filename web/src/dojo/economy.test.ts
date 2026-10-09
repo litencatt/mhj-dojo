@@ -2,8 +2,8 @@
 // engine measured (docs/dojo-economy.md: seat 0 played by the weak CPU, 400
 // 東風戦 a stage). The stage goes up as the yaku are bought, and each stage
 // has its own ranks, won han and wins a game:
-//   S0 the initial yaku (断么九・平和・門前清自摸和)
-//   S1 S0 and 立直, 役牌
+//   S0 the initial yaku (立直・門前清自摸和・断么九)
+//   S1 S0 and 平和, 役牌 (the first purchases)
 //   S2 S1 and every 2-han yaku
 //   S3 every yaku
 // The games are spread evenly over the measured ranks and pay the measured
@@ -27,7 +27,7 @@ interface Stage {
 }
 
 const STAGES: readonly Stage[] = [
-  { ranks: [0.08, 0.255, 0.29, 0.375], han: 0.74, wins: 0.58 },
+  { ranks: [0.1975, 0.23, 0.265, 0.3075], han: 1.36, wins: 1.03 },
   { ranks: [0.222, 0.228, 0.26, 0.29], han: 1.66, wins: 1.02 },
   { ranks: [0.245, 0.245, 0.242, 0.268], han: 2.0, wins: 1.11 },
   { ranks: [0.278, 0.235, 0.235, 0.252], han: 2.37, wins: 1.11 },
@@ -36,7 +36,7 @@ const STAGES: readonly Stage[] = [
 // The same stages with seat 0 played human-like (docs/dojo-economy.md: the
 // normal CPU without calls, which folds against a riichi): the faster bound.
 const HUMAN_STAGES: readonly Stage[] = [
-  { ranks: [0.175, 0.3175, 0.335, 0.1725], han: 1.23, wins: 1.01 },
+  { ranks: [0.3375, 0.28, 0.24, 0.1425], han: 2.08, wins: 1.54 },
   { ranks: [0.3725, 0.28, 0.22, 0.1275], han: 2.61, wins: 1.53 },
   { ranks: [0.4175, 0.27, 0.2025, 0.11], han: 3.1, wins: 1.65 },
   { ranks: [0.47, 0.2625, 0.165, 0.1025], han: 3.75, wins: 1.63 },
@@ -48,7 +48,7 @@ const ALL_YAKU = CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id);
 function stage(p: DojoProgress, stages: readonly Stage[]): Stage {
   const has = (keys: readonly string[]) => keys.every((k) => p.ownedYaku.includes(k));
   if (has(ALL_YAKU) && p.ownedItems.includes(YAKUMAN_PACK)) return stages[3];
-  if (!has(['riichi', ...YAKUHAI_KEYS])) return stages[0];
+  if (!has(['pinfu', ...YAKUHAI_KEYS])) return stages[0];
   return has(TWO_HAN) ? stages[2] : stages[1];
 }
 
@@ -103,16 +103,17 @@ const packless = core.filter((it) => it.id !== YAKUMAN_PACK);
 const packlessCost = packless.reduce((n, it) => n + it.price, 0);
 const spent = (p: DojoProgress) => packless.filter((it) => p.ownedItems.includes(it.id)).reduce((n, it) => n + it.price, 0);
 
-test('立直 is affordable in the first game, even for a 4th place without a win', () => {
+test('平和 or 役牌 is affordable in the first game, even for a 4th place without a win', () => {
   const { progress } = settle(initialProgress(), {
     seed: 1, you: 0, game_over: true, standings: [{ seat: 0, rank: 4 }], rounds: [],
   });
-  assert.ok(purchase(progress, 'riichi').ok);
+  assert.ok(purchase(progress, 'pinfu').ok);
+  assert.ok(purchase(progress, 'yakuhai').ok);
 });
 
-test('立直 is bought within 2 measured games', () => {
+test('平和 and 役牌 are bought within 2 measured games', () => {
   const r = start();
-  while (!r.p.ownedItems.includes('riichi')) play(r);
+  while (!['pinfu', 'yakuhai'].every((id) => r.p.ownedItems.includes(id)) && r.games < 10) play(r);
   assert.ok(r.games <= 2, `${r.games} games`);
 });
 
@@ -137,9 +138,9 @@ test('the whole shop, cheats and every look included, is bought in about 175 gam
   assert.ok(r.games >= 160 && r.games <= 190, `${r.games} games`);
 });
 
-test('human-like: 立直 and 役牌 are bought within 2 games', () => {
+test('human-like: 平和 and 役牌 are bought within 2 games', () => {
   const r = start(HUMAN_STAGES);
-  while (!['riichi', ...YAKUHAI_KEYS].every((k) => r.p.ownedYaku.includes(k)) && r.games < 10) play(r);
+  while (!['pinfu', ...YAKUHAI_KEYS].every((k) => r.p.ownedYaku.includes(k)) && r.games < 10) play(r);
   assert.ok(r.games <= 2, `${r.games} games`);
 });
 
