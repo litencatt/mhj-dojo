@@ -1,6 +1,6 @@
 // The page's side of the Service Worker (src/sw.template.js; issue #192).
 
-// The measure src/wasm.ts records once the engine has started.
+// The measure src/engine.ts records once the engine has started.
 const ENGINE_READY = 'mhj-dojo:wasm-init';
 
 /**

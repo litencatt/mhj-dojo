@@ -24,7 +24,7 @@ import {
 import { LENGTH_NAMES, roundName } from '../components/GameTable';
 import type { CpuLevel, GameLength } from '../api';
 import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
-import { discardUnfinishedDojoGames, savedGames } from '../wasm';
+import { discardUnfinishedDojoGames, savedGames } from '../saves';
 import { Shop } from './Shop';
 import { GuideDialog } from './GuideDialog';
 import { guideFor } from './yakuGuide';

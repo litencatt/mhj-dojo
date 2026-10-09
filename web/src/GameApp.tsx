@@ -27,7 +27,7 @@ import {
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, setDojoSpeeds, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { summarizeMoves } from './summary';
-import { savedGames } from './wasm';
+import { savedGames } from './saves';
 import { canAffordRedraw, canAffordSummon, loadProgress } from './dojo/progress';
 import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';

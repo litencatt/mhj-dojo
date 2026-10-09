@@ -12,7 +12,7 @@
 
 - ページの幅と余白: `.app` と `.dojo-home` が共通(`max-width: 1280px`、`padding: 12px 16px 48px`、ノッチの安全領域を考慮)。新しいページもこのどちらかのクラスを使う。
 - ヘッダー: 必ず `web/src/components/SiteHeader.tsx`。タイトル(`h1`)、3モードのリンク(現在のモードは `aria-current="page"`)、バージョン、`設定`、`?` ヘルプ(`Help.tsx`)。下にモード固有の状態(`children`)を置ける。モードの中のページ(道場の対局)は `back` でそのモードのトップへ戻るリンク(`.header-back`、タイトルの下の1行)を出す。モードのリンクは3つとも全画面で同じ順序(練習・CPU対戦・道場)。
-- 残り牌とドラ: 練習・CPU対戦・道場の対局とも `components/PinnedStatus.tsx` の `WallDora`(`.status-wall-dora`、残り牌の直後にドラ)。PC ではヘッダーの状態の行の右端、スマホ(`width <= 760px`)ではヘッダーから外し、上端に固定される手牌の欄の先頭(`PinnedStatus`、`.pinned-status`)に出して、スクロールしても常に見えるようにする。どちらか一方だけを表示する。
+- 残り牌とドラ: 練習・CPU対戦・道場の対局とも `components/PinnedStatus.tsx` の `WallDora`(`.status-wall-dora`、残り牌の直後にドラ)。PC ではヘッダーの状態の行の右端、スマホ(`width <= 760px`)ではヘッダーから外し、上端に固定される手牌の欄の先頭(`PinnedStatus`、`.pinned-status`)に出して、スクロールしても常に見えるようにする。どちらか一方だけを表示する。スタイルは `styles/status.css`。
 - パネル: `section`、`.resume-panel`、`.dojo-panel` は同じ見た目(`styles/base.css` の「A panel」)。`.release`(更新情報)も同じ寸法。新しいパネルは `section`(盤面側)か `.dojo-panel`(ハブ側)を使い、個別に border や radius を書かない。
 - 更新情報(`web/info/index.html`)は静的ページで SiteHeader を使わず、`.info-header` + `.info-nav`。色・角丸・パネルはトークンと共通。
 

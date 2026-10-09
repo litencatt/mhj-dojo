@@ -23,7 +23,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: go test -count=1 ./...
+      # The dojo's economy sims take minutes on a runner, more on a slow one:
+      # past go test's default 10m, inside the job's 30.
+      - run: go test -count=1 -timeout 25m ./...
         env:
           MHJDOJO_FULL: "1"
 
