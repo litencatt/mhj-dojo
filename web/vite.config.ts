@@ -105,7 +105,7 @@ export default defineConfig(({ command }) => {
   }
   // One version for the three engine files, which keep fixed names: the
   // page loads them with ?v=<it> so a deploy never mixes cached and new
-  // copies (src/wasm.ts, site-public/worker.js).
+  // copies (src/engine.ts, site-public/worker.js).
   const engineHash = createHash('sha256');
   for (const f of engine) if (existsSync(f)) engineHash.update(readFileSync(f));
   // The site's build, which the page compares with version.json (written

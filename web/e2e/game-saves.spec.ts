@@ -436,7 +436,7 @@ test('a localStorage refusing every write warns once', async ({ page }) => {
 });
 
 // A call the engine never answers (it hung, or looped) is given up after
-// wasm.ts's CALL_TIMEOUT_MS: the request fails, and the next one starts a new
+// engine.ts's CALL_TIMEOUT_MS: the request fails, and the next one starts a new
 // engine that rebuilds the game from its save.
 test('a hung engine is given up and the next move restarts it', async ({ page }) => {
   await page.goto(GAME_URL);

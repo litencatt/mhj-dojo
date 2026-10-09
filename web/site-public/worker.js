@@ -1,7 +1,7 @@
 // The static site's Web Worker (issue #67): runs the engine (practice and CPU
 // games), the Go program cmd/mhj-dojo-wasm compiled to WebAssembly, off the
 // main thread so the analysis and the CPU turns don't freeze the page.
-// src/wasm.ts starts it and talks to it:
+// src/engine.ts starts it and talks to it:
 //
 //   worker → page  {type: 'ready', initMs} | {type: 'failed', error} (at start, or later if the engine exits)
 //   page → worker  {id, fn: 'request', args: [method, path, body]}   an engine request (docs/api.md)
