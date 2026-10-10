@@ -406,6 +406,55 @@
   display: inline-flex;
   align-items: center;
 }
+/* The hub's 課程 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
+   (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
+   marked as the notice is. */
+.dojo-lesson-stage > summary {
+  min-height: 32px;
+  line-height: 32px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.dojo-lesson-next {
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: var(--radius-md);
+  background: var(--row-best-bg);
+}
+.dojo-lesson-badge {
+  margin-left: 8px;
+  font-size: 0.8rem;
+}
+.dojo-lesson-more {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}
+.dojo-lesson-more > summary {
+  min-height: 24px;
+  line-height: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dojo-lesson-more p {
+  margin: 4px 0;
+}
+.dojo-lesson-example {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-bottom: 4px;
+}
+.dojo-lesson-later {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dojo-lesson-later .dojo-muted {
+  margin-left: 8px;
+  white-space: nowrap;
+}
 /* A lesson's lines over the hand (LessonBar), a .dojo-notice as tall whatever its state: the
    lesson, its stage and the last success's note on one line (cut short, never wrapped), then the
    folded hint, opened only by the player. */
@@ -421,24 +470,23 @@
   overflow: hidden;
   white-space: nowrap;
 }
-.lesson-title,
-.lesson-note {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.lesson-title {
-  min-width: 0;
-}
 .lesson-stage {
   flex-shrink: 0;
   color: var(--muted);
 }
-/* The title gives way first: the note says what just happened. */
+/* Both are cut short rather than pushed out of the line; the title gives way first (by far), as
+   the note says what just happened. */
+.lesson-title,
+.lesson-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .lesson-title {
-  flex-shrink: 1;
+  flex-shrink: 100;
 }
 .lesson-note {
-  flex-shrink: 0;
+  flex-shrink: 1;
 }
 .lesson-hint summary {
   min-height: 24px;
@@ -473,9 +521,17 @@
   .yaku-guide .dojo-actions > * {
     min-height: 44px;
   }
-  .lesson-hint summary {
+  .lesson-hint summary,
+  .dojo-lesson-more > summary {
     min-height: 32px;
     line-height: 32px;
+  }
+  .dojo-lesson a,
+  .dojo-lesson button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 32px;
   }
   .lesson-status button {
     min-height: 32px;

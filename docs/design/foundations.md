@@ -13,7 +13,7 @@
 | `--accent` / `--accent-fg` | 主操作の塗り、リンク、選択・フォーカスの強調 / その上の文字 |
 | `--danger` / `--danger-bg` | 警告・危険・失点 |
 | `--success` / `--success-bg` / `--success-border` | 成功・獲得・加点 |
-| `--row-best-bg` / `--row-tenpai-bg` | 表の強調行(推奨・聴牌) |
+| `--row-best-bg` / `--row-tenpai-bg` | 表の強調行(推奨・聴牌)。`--row-best-bg` は課程の次の課題の行にも使う |
 | `--chart-grid` | グラフの罫線、道場の経験値バーの地 |
 | `--group-taatsu` | 面子表示の搭子 |
 | `--backdrop` | モーダルダイアログの背後(`::backdrop`) |

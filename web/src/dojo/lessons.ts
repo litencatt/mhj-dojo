@@ -358,12 +358,12 @@ export function lessonActive(p: DojoProgress, id: string): boolean {
 }
 
 /**
- * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=) or practice
- * mode (?seed=&turns=18&lesson=, a random seed if none is given: #320 picks them).
+ * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=[&seed=]) or
+ * practice mode (?seed=&turns=18&lesson=); a random seed if none is given (#320 picks them).
  */
 export function lessonHref(lesson: Lesson, seed?: number): string {
   const id = encodeURIComponent(lesson.id);
-  if (lesson.form === 'game') return `?mode=dojo&play=1&lesson=${id}`;
+  if (lesson.form === 'game') return `?mode=dojo&play=1&lesson=${id}${seed === undefined ? '' : `&seed=${seed}`}`;
   return `?${seed === undefined ? '' : `seed=${seed}&`}turns=18&lesson=${id}`;
 }
 
