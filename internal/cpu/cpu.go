@@ -3,7 +3,8 @@
 // a yaku (see calls.go), discards for tile efficiency (lowest shanten, then
 // most unseen accepting tiles) and folds against a riichi (folds) by the
 // danger of each tile (Danger). It is deterministic. The weak player
-// (NewWeak) plays worse on purpose.
+// (NewWeak) plays worse on purpose; the master (NewMaster, master.go)
+// better.
 package cpu
 
 import (
@@ -54,14 +55,16 @@ func kokushiShanten(v game.View) int {
 // Player decides moves for CPU seats. It keeps a shanten memo, so use one
 // Player per game (it is not safe for concurrent use).
 type Player struct {
-	eng  *shanten.Engine
-	weak bool
+	eng    *shanten.Engine
+	weak   bool
+	master bool
 }
 
 // Levels of play.
 const (
 	Weak   = "weak"   // 弱い: NewWeak
 	Normal = "normal" // 普通: New
+	Master = "master" // 師範: NewMaster
 )
 
 // weakStray is the share, in percent, of the weak player's discards picked
@@ -77,6 +80,9 @@ func New() *Player { return &Player{eng: shanten.NewEngineGen(memoGen)} }
 // shanten instead of the one with the most ukeire. That pick is a hash of
 // what the seat sees, not a random draw, so a game replays exactly.
 func NewWeak() *Player { return &Player{eng: shanten.NewEngineGen(memoGen), weak: true} }
+
+// NewMaster returns a stronger player with an empty memo (see master.go).
+func NewMaster() *Player { return &Player{eng: shanten.NewEngineGen(memoGen), master: true} }
 
 // Decide implements game.Decider.
 func (p *Player) Decide(v game.View, l game.Legal) game.Action {
@@ -111,13 +117,23 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	if !p.weak && needsRoute(v, me.Melds) {
 		p.byYaku(v, best, tiles, &visible)
 	}
+	if p.master {
+		if !needsRoute(v, me.Melds) {
+			p.shape(v, best, tiles, len(me.Melds), &visible)
+		}
+		byValue(v, best)
+	}
+	pick := best[0]
 	if !p.weak {
-		if threats := riichiThreats(v); p.folds(v, best[0].shanten, len(threats)) {
+		threats, riichi := p.threats(v)
+		if p.folds(v, best[0].shanten, best[0].ukeire, riichi) {
 			choice := safest(best, threats, &visible)
 			return game.Action{Type: game.Discard, Tile: choice}
 		}
+		if p.master && len(threats) > 0 {
+			pick = guarded(best, threats, &visible)
+		}
 	}
-	pick := best[0]
 	if p.weak {
 		pick.tile = stray(v, best)
 	} else if pick.shanten == 0 && pick.ukeire == 0 {
@@ -132,6 +148,13 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 	// declares anyway).
 	live := pick.ukeire > 0 || p.weak
 	if pick.shanten == 0 && live && slices.Contains(l.Riichi, choice) {
+		if p.master && len(me.Melds) == 0 {
+			c := tile.CountsOf(tiles)
+			c[pick.kind]--
+			if _, waits := p.shanten(c, 0); dama(v, tiles, choice, waits) {
+				return game.Action{Type: game.Discard, Tile: choice}
+			}
+		}
 		return game.Action{Type: game.Riichi, Tile: choice}
 	}
 	return game.Action{Type: game.Discard, Tile: choice}
@@ -260,8 +283,12 @@ func kindsOf(set *[tile.NumKinds]bool) []tile.Kind {
 
 // folds reports whether a hand at shanten sh folds against threats riichi
 // seats: always from foldShanten, and one step from tenpai against two or
-// more of them or with a cheap hand.
-func (p *Player) folds(v game.View, sh, threats int) bool {
+// more of them or with a cheap hand. The master decides by masterFolds,
+// with the hand's ukeire (< 0 when not known).
+func (p *Player) folds(v game.View, sh, ukeire, threats int) bool {
+	if p.master {
+		return p.masterFolds(v, sh, ukeire, threats)
+	}
 	switch {
 	case p.weak || threats == 0 || sh <= 0:
 		return false
@@ -325,6 +352,18 @@ func safeKinds(v game.View, seat int) [tile.NumKinds]bool {
 		}
 	}
 	return safe
+}
+
+// threats returns the safe kinds of the seats the player defends against,
+// every other seat in riichi first (riichi of them) and for the master
+// open hands after them (see openThreats).
+func (p *Player) threats(v game.View) (safe [][tile.NumKinds]bool, riichi int) {
+	safe = riichiThreats(v)
+	riichi = len(safe)
+	if p.master {
+		safe = openThreats(v, safe)
+	}
+	return safe, riichi
 }
 
 // riichiThreats returns the safe kinds of every other seat in riichi.

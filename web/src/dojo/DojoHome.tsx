@@ -69,7 +69,7 @@ const LOOKS: {
   { name: 'dojo-effect', legend: '和了演出', looks: WIN_EFFECTS, field: 'activeEffect', set: setEffect },
 ];
 
-const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通' };
+const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通', master: '師範' };
 const LENGTHS: { value: GameLength; level: number }[] = [
   { value: 'tonpuu', level: 1 },
   { value: 'hanchan', level: HANCHAN_LEVEL },
