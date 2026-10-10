@@ -10,13 +10,8 @@ import {
   loadProgress,
   lengthUnlocked,
   saveProgress,
-  setBack,
-  setCloth,
-  setEffect,
   setGameCpu,
   setGameLength,
-  setStick,
-  setTheme,
   STORAGE_KEY,
   xpForLevel,
   type DojoProgress,
@@ -28,20 +23,7 @@ import { discardUnfinishedDojoGames, savedGames } from '../saves';
 import { Shop } from './Shop';
 import { GuideDialog } from './GuideDialog';
 import { guideFor } from './yakuGuide';
-import { Tile } from '../components/Tile';
-import {
-  RIICHI_STICKS,
-  TABLE_CLOTHS,
-  TILE_BACKS,
-  TILE_THEMES,
-  WIN_EFFECTS,
-  applyRiichiStick,
-  applyTableCloth,
-  applyTileBack,
-  applyTileTheme,
-  applyWinEffect,
-  type Look,
-} from '../tileThemes';
+import { LooksSettings, useDojoLooks } from './looks';
 import './dojo.css';
 
 /**
@@ -55,19 +37,6 @@ function playHref(settled: readonly string[]): string {
   if (seed && !settled.includes(seed)) params.set('seed', seed);
   return `?${params}`;
 }
-
-// 設定's choices of the other looks, after the theme and the back: the free default and the ones owned.
-const LOOKS: {
-  name: string;
-  legend: string;
-  looks: readonly Look[];
-  field: 'activeCloth' | 'activeStick' | 'activeEffect';
-  set: (p: DojoProgress, item: string) => DojoProgress;
-}[] = [
-  { name: 'dojo-cloth', legend: '卓布', looks: TABLE_CLOTHS, field: 'activeCloth', set: setCloth },
-  { name: 'dojo-stick', legend: 'リーチ棒', looks: RIICHI_STICKS, field: 'activeStick', set: setStick },
-  { name: 'dojo-effect', legend: '和了演出', looks: WIN_EFFECTS, field: 'activeEffect', set: setEffect },
-];
 
 const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通', master: '師範' };
 const LENGTHS: { value: GameLength; level: number }[] = [
@@ -99,11 +68,16 @@ export function DojoHome() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The yaku guide shown (a yaku just bought, or an owned one chosen in 所持役).
   const [guide, setGuide] = useState<{ key: string; learned: boolean } | null>(null);
-  // The win effect on the sample plays again on each change of it (its key), and on 演出を見る.
-  const [effectPlays, setEffectPlays] = useState(0);
   // The dojo's own unfinished games (the CPU game's list never has them).
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
   const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
+
+  // A bought 立直 was refunded on reading: said once, when the refund is stored (the next reading finds none).
+  useEffect(() => {
+    if (loaded.refunded > 0 && saveProgress(loaded.progress)) {
+      setNotice(`立直が初期の役になったため、立直の代金${loaded.refunded}銭を返しました。`);
+    }
+  }, [loaded]);
 
   useEffect(() => {
     document.title = 'mhj-dojo - 道場';
@@ -115,25 +89,8 @@ export function DojoHome() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  // The theme and the back chosen show on the settings' sample tiles (and in the dojo's games).
-  useEffect(() => {
-    applyTileTheme(TILE_THEMES.find((t) => t.item === progress.activeTheme)?.id ?? 'default');
-    applyTileBack(TILE_BACKS.find((t) => t.item === progress.activeBack)?.id ?? 'default');
-    return () => {
-      applyTileTheme('default');
-      applyTileBack('default');
-    };
-  }, [progress.activeTheme, progress.activeBack]);
-  useEffect(() => {
-    applyTableCloth(progress.activeCloth);
-    applyRiichiStick(progress.activeStick);
-    applyWinEffect(progress.activeEffect);
-    return () => {
-      applyTableCloth('default');
-      applyRiichiStick('default');
-      applyWinEffect('default');
-    };
-  }, [progress.activeCloth, progress.activeStick, progress.activeEffect]);
+  // The looks chosen show on the settings' sample (and in every mode).
+  useDojoLooks(progress);
 
   // Another tab may have changed the progress (paid a game): apply to what is stored now.
   function change(apply: (current: DojoProgress) => DojoProgress) {
@@ -272,72 +229,7 @@ export function DojoHome() {
             </p>
           )}
         </div>
-        <fieldset class="dojo-settings-group">
-          <legend>牌テーマ</legend>
-          {TILE_THEMES.filter((t) => t.item === null || progress.ownedItems.includes(t.item)).map((t) => (
-            <label key={t.id}>
-              <input
-                type="radio"
-                name="dojo-theme"
-                checked={(t.item ?? 'default') === progress.activeTheme}
-                onChange={() => change((cur) => setTheme(cur, t.item ?? 'default'))}
-              />
-              {t.label}
-            </label>
-          ))}
-        </fieldset>
-        <fieldset class="dojo-settings-group">
-          <legend>裏柄</legend>
-          {TILE_BACKS.filter((t) => t.item === null || progress.ownedItems.includes(t.item)).map((t) => (
-            <label key={t.id}>
-              <input
-                type="radio"
-                name="dojo-back"
-                checked={(t.item ?? 'default') === progress.activeBack}
-                onChange={() => change((cur) => setBack(cur, t.item ?? 'default'))}
-              />
-              {t.label}
-            </label>
-          ))}
-        </fieldset>
-        {LOOKS.map((g) => (
-          <fieldset key={g.name} class="dojo-settings-group">
-            <legend>{g.legend}</legend>
-            {g.looks
-              .filter((l) => l.item === null || progress.ownedItems.includes(l.item))
-              .map((l) => (
-                <label key={l.id}>
-                  <input
-                    type="radio"
-                    name={g.name}
-                    checked={(l.item ?? 'default') === progress[g.field]}
-                    onChange={() => change((cur) => g.set(cur, l.item ?? 'default'))}
-                  />
-                  {l.label}
-                </label>
-              ))}
-          </fieldset>
-        ))}
-        {/* On the cloth chosen: the tiles, a back and the riichi badge with its stick. */}
-        <div class="dojo-settings-sample" aria-label="見本">
-          <Tile tile="5m" size="sm" />
-          <Tile tile="5p" size="sm" />
-          <Tile tile="5s" size="sm" />
-          <Tile tile="7z" size="sm" />
-          <Tile tile="" size="sm" faceDown />
-          <span class="seat-riichi">リーチ</span>
-          {progress.activeEffect !== 'default' && (
-            <>
-              <button type="button" class="dojo-effect-replay" onClick={() => setEffectPlays((n) => n + 1)}>
-                演出を見る
-              </button>
-              {/* Shown while the dialog is open only, so it plays as 設定 opens too. */}
-              {settingsOpen && (
-                <div key={`${progress.activeEffect}-${effectPlays}`} class="win-effect" data-testid="win-effect" aria-hidden="true" />
-              )}
-            </>
-          )}
-        </div>
+        <LooksSettings progress={progress} onChange={change} open={settingsOpen} />
       </SettingsDialog>
     </div>
   );

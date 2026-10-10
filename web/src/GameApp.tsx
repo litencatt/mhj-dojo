@@ -31,6 +31,7 @@ import { savedGames } from './saves';
 import { canAffordRedraw, canAffordSummon, loadProgress } from './dojo/progress';
 import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
+import { LooksSettings, useSharedLooks } from './dojo/looks';
 import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
 import { RadioGroup } from './components/RadioGroup';
@@ -62,6 +63,8 @@ const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const [state, setState] = useState<GameState | null>(null);
   const { progress, has, learned, reward, saveFailed } = useDojoGame(dojo, state);
+  // The dojo's looks, chosen in 設定 too once the dojo has a progress.
+  const looks = useSharedLooks();
   const [peek, setPeek] = useState(false);
   const [previewTile, setPreviewTile] = useState<string | null>(null);
   // A hovered advice candidate, marked in the hand.
@@ -352,8 +355,9 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       )}
     </fieldset>
   );
-  // The 設定 dialog: a CPU game's new-game form, the dojo's game only how it is shown.
-  const settings = dojo ? (
+  // The 設定 dialog: a CPU game's new-game form, the dojo's game only how it is shown;
+  // then the dojo's looks, applied as chosen.
+  const options = dojo ? (
     <div class="new-game-form">
       {speedGroup}
       {viewGroup}
@@ -377,6 +381,12 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       {viewGroup}
       <button type="submit" disabled={busy}>新規対局</button>
     </form>
+  );
+  const settings = (
+    <>
+      {options}
+      {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={optionsOpen} ownedOnly saveFailed={looks.saveFailed} />}
+    </>
   );
   return (
     <AppShell

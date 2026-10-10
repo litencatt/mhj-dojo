@@ -37,7 +37,7 @@ test.beforeEach(async ({ page }) => {
 
 const LEARNED = ['tanyao', 'pinfu', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei', 'riichi'];
 
-test('a first game pays its reward once, and the 立直 it buys is offered in the next game', async ({ page }) => {
+test('a first game pays its reward once, buys 平和, and the next game offers 立直, an initial yaku', async ({ page }) => {
   slowEngine();
   await watchEngine(page);
   await page.goto(`./?mode=dojo&seed=${SEED}`);
@@ -45,6 +45,10 @@ test('a first game pays its reward once, and the 立直 it buys is offered in th
   await expect(page.getByTestId('dojo-coins')).toHaveText('0');
   await page.getByRole('link', { name: '対局開始' }).click();
   await expect(handPanel(page)).toBeVisible();
+  // The yaku table has rows for the learned yaku only: no 平和 before it is bought.
+  const pinfuRow = page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '平和' });
+  await expect(page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '断么九' })).toHaveCount(1);
+  await expect(pinfuRow).toHaveCount(0);
   // A reload keeps the dojo, not a plain game.
   await expect(page).toHaveURL(/mode=dojo/);
   await expect(page).toHaveURL(/[?&]game=/);
@@ -69,13 +73,15 @@ test('a first game pays its reward once, and the 立直 it buys is offered in th
 
   await page.getByRole('button', { name: '道場へ戻る' }).click();
   await expect(page.getByTestId('dojo-coins')).toHaveText(String(paid!.coins));
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
-  await expect(page.locator('[data-item="riichi"]')).toContainText('所持');
-  await expect(page.getByTestId('dojo-yaku')).toContainText('立直');
+  await expect(page.locator('[data-item="pinfu"]')).toContainText('所持');
+  await expect(page.getByTestId('dojo-yaku')).toContainText('平和');
 
   await page.goto(`./?mode=dojo&play=1&seed=${DOJO_RIICHI_SEED}`);
   await expect(handPanel(page)).toBeVisible();
+  // The 平和 bought reaches the game: its row shows in the yaku table.
+  await expect(pinfuRow).toHaveCount(1);
   const riichi = page.getByRole('button', { name: 'リーチ', exact: true });
   for (let i = 0; i < 4 && !(await riichi.isVisible()); i++) await playOneStep(page);
   await expect(riichi).toBeVisible();
@@ -86,7 +92,7 @@ test('a redraw is restored by a reload and costs its coins once, when the game e
   await watchEngine(page);
   await newDojoGame(page, DOJO_REDRAW_SEED, {
     ownedYaku: LEARNED,
-    ownedItems: ['riichi', 'cheat:redraw'],
+    ownedItems: ['cheat:redraw'],
     coins: 200,
     xp: 4500,
     firstGameBonus: true,
@@ -225,7 +231,7 @@ test('the hub follows what another tab has stored, and buys on top of it', async
     localStorage.setItem(key, JSON.stringify({ ...p, coins: 500, xp: 100 }));
   });
   await expect(page.getByTestId('dojo-coins')).toHaveText('500');
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="iipeikou"]').getByRole('button', { name: '購入' }).click();
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   await expect(page.getByTestId('dojo-coins')).toHaveText('460');
   expect((await dojoProgress(page))?.xp).toBe(100);
@@ -246,7 +252,7 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   await expect(panel.locator('[data-item^="cloth:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="stick:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="effect:"]')).toHaveCount(3);
-  await expect(panel.locator('[data-item="riichi"]')).toHaveCount(0);
+  await expect(panel.locator('[data-item="pinfu"]')).toHaveCount(0);
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: '補助' })).toBeFocused();
@@ -318,7 +324,7 @@ test('設定 opens a dialog with the game choice, the theme and the back, closed
   await expect(settings).toBeHidden();
 });
 
-test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game only', async ({ page }) => {
+test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and patterns the backs of a dojo game and a CPU game', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, ownedItems: ['back:shima', 'back:asanoha'], firstGameBonus: true });
   await page.getByRole('tab', { name: '見た目' }).click();
@@ -341,12 +347,12 @@ test('an owned tile back shows as 所持 in the shop, is chosen in 設定, and p
   const back = page.locator('.seat-hand-backs .tile-back').first();
   expect(await back.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('repeating-linear-gradient');
 
-  // A CPU game keeps the plain back.
+  // A CPU game has the dojo's back too.
   await page.goto(`./?mode=game&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
-  expect(await htmlAttr(page, 'data-tile-back')).toBe(null);
-  const plain = page.locator('.seat-hand-backs .tile-back').first();
-  expect(await plain.evaluate((el) => getComputedStyle(el).backgroundImage)).not.toContain('repeating-linear-gradient');
+  await expect.poll(() => htmlAttr(page, 'data-tile-back')).toBe('shima');
+  const cpuBack = page.locator('.seat-hand-backs .tile-back').first();
+  expect(await cpuBack.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('repeating-linear-gradient');
 });
 
 /** The computed style of an element of the class (in a parent of its own, when given) added to the page for the check. */
@@ -368,7 +374,7 @@ function probe(page: Page, cls: string, prop: string, pseudo: string | null = nu
   );
 }
 
-test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chosen in 設定, and shown in a dojo game only', async ({ page }) => {
+test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chosen in 設定, and shown in a dojo game and a CPU game', async ({ page }) => {
   test.setTimeout(90_000);
   await openHub(page, { xp: 1000, coins: 500, firstGameBonus: true });
   await page.getByRole('tab', { name: '見た目' }).click();
@@ -419,18 +425,20 @@ test('the looks (cloth, riichi stick, win effect) are bought in 見た目, chose
   expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('block');
   expect(await probe(page, 'win-effect', 'animation-name', null, 'result-panel')).toBe('win-fall');
 
-  // A CPU game keeps the plain table, badge and result.
+  // A CPU game has them too.
   await page.goto(`./?mode=game&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
-  for (const attr of ['data-table-cloth', 'data-riichi-stick', 'data-win-effect']) expect(await htmlAttr(page, attr)).toBe(null);
-  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  expect(await probe(page, 'seat-riichi', 'content', '::after')).toBe('none');
-  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('none');
+  await expect.poll(() => htmlAttr(page, 'data-table-cloth')).toBe('midori');
+  expect(await htmlAttr(page, 'data-riichi-stick')).toBe('tenbou');
+  expect(await htmlAttr(page, 'data-win-effect')).toBe('kamifubuki');
+  expect(await page.locator('.game-table').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(211, 232, 214)');
+  expect(await probe(page, 'win-effect', 'display', null, 'result-panel')).toBe('block');
 });
 
 test('the aids show only once bought: the ukeire per discard, the preview and the combos', async ({ page }) => {
   test.setTimeout(90_000);
-  await newDojoGame(page, SEED);
+  // A combo takes two rows of learned yaku: 平和 joins 断么九 (立直 and 門前清自摸和 have no row).
+  await newDojoGame(page, SEED, { ownedYaku: [...initialProgress().ownedYaku, 'pinfu'] });
   await waitForPlayback(page);
   const hand = handPanel(page);
   await expect(hand.locator('.hand-drawn button')).toBeEnabled();
@@ -456,8 +464,8 @@ test('the aids show only once bought: the ukeire per discard, the preview and th
 });
 
 // DOJO_NOYAKU_SEED deals a closed hand tenpai in the general form at once,
-// with no row of the initial yaku at shanten 0: no yaku for a ron, but a tsumo
-// wins with 門前清自摸和.
+// with no row of the initial yaku at shanten 0: no yaku for a ron, but a riichi
+// (an initial yaku) wins.
 
 /** Opens a dojo game on DOJO_NOYAKU_SEED and returns the waits the engine sends (the normal row's ukeire). */
 async function noYakuGame(page: Page, progress: Partial<DojoProgress> = {}) {
@@ -471,23 +479,23 @@ async function noYakuGame(page: Page, progress: Partial<DojoProgress> = {}) {
   return normal.ukeire as string[];
 }
 
-test('役なし警告 and 待ち牌表示: a closed tenpai with no learned yaku row wins by tsumo only', async ({ page }) => {
+test('役なし警告 and 待ち牌表示: a closed tenpai with no learned yaku row wins with 立直', async ({ page }) => {
   test.setTimeout(90_000);
-  const waits = await noYakuGame(page, { ownedItems: ['assist:noyaku', 'assist:waits'] });
+  const waits = await noYakuGame(page, { ownedItems: ['assist:noyaku'] });
   const aid = page.getByTestId('dojo-waits');
-  await expect(aid).toContainText('ロンでは和了れません（ツモなら門前清自摸和）');
-  await expect(aid).not.toContainText('役なし');
+  await expect(aid).toContainText('役なし：立直で和了れます');
+  await expect(aid.locator('.tile')).toHaveCount(0); // no 待ち牌表示 bought
+
+  await page.evaluate((key) => {
+    const p = JSON.parse(localStorage.getItem(key)!);
+    localStorage.setItem(key, JSON.stringify({ ...p, ownedItems: ['assist:noyaku', 'assist:waits'] }));
+  }, STORAGE_KEY);
+  await page.reload();
+  await waitForPlayback(page);
+  await expect(aid).toContainText('役なし：立直で和了れます');
   await expect(aid).toContainText('待ち');
   await expect(aid.locator('.tile')).toHaveCount(waits.length);
   await expect(aid.locator('.tile').first()).toHaveAttribute('aria-label', / 残り\d+枚$/);
-});
-
-test('役なし警告 with 立直 learned: 立直で和了れます', async ({ page }) => {
-  test.setTimeout(90_000);
-  await noYakuGame(page, { ownedItems: ['assist:noyaku', 'riichi'], ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi'] });
-  const aid = page.getByTestId('dojo-waits');
-  await expect(aid).toContainText('立直で和了れます');
-  await expect(aid.locator('.tile')).toHaveCount(0); // no 待ち牌表示 bought
 });
 
 test('without the aids, a tenpai without yaku shows nothing', async ({ page }) => {
@@ -558,7 +566,7 @@ test('牌寄せ fetches a chosen kind into the drawn tile once a round, and cost
   await watchEngine(page);
   await newDojoGame(page, DOJO_SUMMON_SEED, {
     ownedYaku: LEARNED,
-    ownedItems: ['riichi', 'cheat:summon'],
+    ownedItems: ['cheat:summon'],
     coins: 200,
     xp: 4500,
     firstGameBonus: true,
@@ -668,10 +676,25 @@ test('the owned yaku list shows the dragons and the winds once, as 役牌', asyn
   );
   await page.goto('./?mode=dojo');
   const owned = page.getByTestId('dojo-yaku').getByRole('listitem');
-  await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和']);
+  await expect(owned).toHaveText(['立直', '門前清自摸和', '断么九']);
   await page.locator('[data-item="yakuhai"]').getByRole('button', { name: '購入' }).click();
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
-  await expect(owned).toHaveText(['断么九', '平和', '門前清自摸和', '役牌']);
+  await expect(owned).toHaveText(['立直', '門前清自摸和', '断么九', '役牌']);
+});
+
+test('a bought 立直 is refunded once, and the hub says so', async ({ page }) => {
+  await page.goto('./?mode=dojo');
+  await page.evaluate(
+    ([key, value]) => localStorage.setItem(key, value),
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), coins: 10, firstGameBonus: true, ownedItems: ['riichi'] })],
+  );
+  await page.reload();
+  const notice = page.getByText('立直が初期の役になったため、立直の代金40銭を返しました。');
+  await expect(notice).toBeVisible();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('50');
+  await page.reload();
+  await expect(page.getByTestId('dojo-coins')).toHaveText('50');
+  await expect(notice).toBeHidden();
 });
 
 test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', async ({ page }) => {
@@ -681,31 +704,31 @@ test('購入 asks in a dialog: キャンセル keeps the coins, 購入 buys', as
   );
   await page.goto('./?mode=dojo');
   const confirm = page.getByRole('dialog', { name: '購入しますか？' });
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeVisible();
   await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
-  await expect(confirm).toContainText('立直');
+  await expect(confirm).toContainText('平和');
   await expect(confirm).toContainText('残り 100 → 60 銭');
   await confirm.getByRole('button', { name: 'キャンセル' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm.getByRole('button', { name: '購入' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
   // A click outside it does not buy either.
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeVisible();
   await page.mouse.click(5, 5);
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('100');
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeVisible();
   await confirm.getByRole('button', { name: '購入' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId('dojo-coins')).toHaveText('60');
-  await expect(page.locator('[data-item="riichi"]')).toContainText('所持');
+  await expect(page.locator('[data-item="pinfu"]')).toContainText('所持');
 });
 
 test('a hub opened on a seed already settled starts a game on a random seed', async ({ page }) => {
@@ -780,14 +803,14 @@ test('buying a yaku shows its guide: condition, han, an example hand and a way t
 
 test('closing the guide of a bought yaku leaves focus on its chip; a purchase that fails shows no guide', async ({ page }) => {
   await openHub(page, { xp: 5000, coins: 500, firstGameBonus: true });
-  await page.locator('[data-item="riichi"]').getByRole('button', { name: '購入' }).click();
+  await page.locator('[data-item="pinfu"]').getByRole('button', { name: '購入' }).click();
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
-  const dialog = page.getByRole('dialog', { name: '立直' });
+  const dialog = page.getByRole('dialog', { name: '平和' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('門前で聴牌するまでを練習します');
+  await expect(dialog).toContainText(`配牌が平和${shantenText(guideFor('pinfu')!.practice!.shanten)}のシード`);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
-  await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '立直' })).toBeFocused();
+  await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '平和' })).toBeFocused();
 
   // Another tab spent the coins after the confirm dialog opened: nothing is bought, no guide.
   await page.locator('[data-item="iipeikou"]').getByRole('button', { name: '購入' }).click();
@@ -804,13 +827,14 @@ test('an owned yaku in 所持役 opens its guide again; Esc and a click outside 
   await openHub(page, { ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei', 'haitei'] });
   const dialog = page.getByRole('dialog', { name: '立直' });
   await expect(dialog).toBeHidden();
-  // 断么九・平和・門前清自摸和 are not sold, so they have no guide: just chips.
-  await expect(page.getByTestId('dojo-yaku').getByRole('button')).toHaveText(['立直', '役牌', '海底摸月']);
+  // 断么九 and 門前清自摸和 have no guide: just chips. 立直, an initial yaku now, keeps its guide.
+  await expect(page.getByTestId('dojo-yaku').getByRole('button')).toHaveText(['平和', '立直', '役牌', '海底摸月']);
 
   const chip = page.getByTestId('dojo-yaku').getByRole('button', { name: '立直' });
   await chip.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('1翻（門前限定）');
+  await expect(dialog).toContainText('門前で聴牌するまでを練習します');
   await expect(dialog.getByText('修得しました')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

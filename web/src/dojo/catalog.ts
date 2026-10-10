@@ -6,17 +6,18 @@
 // the table cloths, the riichi sticks and the win effects) are left out.
 // - What a game is worth goes up as the yaku are bought. The engine measured
 //   it (docs/dojo-economy.md: seat 0 played by the weak CPU, 400 東風戦 a stage):
-//     S0 the initial yaku    1st-4th 8.0/25.5/29.0/37.5%, 0.74 han, 0.58 wins: about 43 XP, 41 coins
-//     S1 + 立直・役牌          22.2/22.8/26.0/29.0%,         1.66 han, 1.02 wins: about 63 XP, 60 coins
-//     S2 + every 2-han yaku  24.5/24.5/24.2/26.8%,         2.0 han,  1.11 wins: about 69 XP, 66 coins
-//     S3 every yaku          27.8/23.5/23.5/25.2%,         2.37 han, 1.11 wins: about 75 XP, 71 coins
+//     S0 the initial yaku    1st-4th 19.8/23.0/26.5/30.8%, 1.36 han, 1.03 wins: about 58 XP, 56 coins
+//     S1 + 平和・役牌          22.2/22.8/26.0/29.0%,          1.66 han, 1.02 wins: about 63 XP, 60 coins
+//     S2 + every 2-han yaku  24.5/24.5/24.2/26.8%,          2.0 han,  1.11 wins: about 69 XP, 66 coins
+//     S3 every yaku          27.8/23.5/23.5/25.2%,          2.37 han, 1.11 wins: about 75 XP, 71 coins
 //   (the rank's base, the won han x 10 and the 和了祝儀's 10 coins a win).
 //   The 和了祝儀 makes a win worth more than playing safe for a rank.
 //   The measurement above is the slow bound. Seat 0 played human-like (the
 //   normal CPU without calls, folding against a riichi; #273) is the fast one:
-//   about 61 / 88 / 96 / 106 XP a game at S0 to S3, Lv10 in 40 to 60 games and
+//   about 80 / 88 / 96 / 106 XP a game at S0 to S3, Lv10 in 40 to 60 games and
 //   the whole shop in 110 to 150 (economy.test.ts checks both).
-// - 立直 is affordable within 1-2 games: the first-game bonus alone covers it.
+// - 平和 and 役牌, the first purchases, are affordable within 1-2 games: the
+//   first-game bonus alone covers one of them.
 // - Lv10 (4500 XP) comes after about 70 games, by which time 80% or more of
 //   the core's coin cost (the yakuman pack aside) has been bought.
 // - The yakuman pack costs at most 40 more games after Lv10, the core bought first.
@@ -37,9 +38,9 @@ export const SUMMON_COST = 50;
 /** Coins for the first finished game. */
 export const FIRST_GAME_BONUS = 40;
 
-/** The yaku a new dojo owns: 断么九, 平和 and 門前清自摸和. 役牌 is bought. */
+/** The yaku a new dojo owns: 立直, 門前清自摸和 and 断么九. 平和 and 役牌 are bought. */
 export const WIND_KEYS = ['ton', 'nan', 'shaa', 'pei'] as const; // internal/yaku WindKeys
-export const INITIAL_YAKU: readonly string[] = ['tanyao', 'pinfu', 'tsumo'];
+export const INITIAL_YAKU: readonly string[] = ['riichi', 'tsumo', 'tanyao'];
 
 /** The keys the 役牌 item grants: the dragons and the value winds. */
 export const YAKUHAI_KEYS: readonly string[] = ['haku', 'hatsu', 'chun', ...WIND_KEYS];
@@ -77,7 +78,7 @@ function yaku(id: string, name: string, level: number, price: number, requires?:
 }
 
 export const CATALOG: readonly ShopItem[] = [
-  yaku('riichi', '立直', 1, 40),
+  yaku('pinfu', '平和', 1, 40),
   { id: 'yakuhai', kind: 'yaku', name: '役牌（白・發・中・場風・自風）', price: 40, level: 1, grants: YAKUHAI_KEYS },
   yaku('iipeikou', '一盃口', 1, 40),
   { id: 'assist:noyaku', kind: 'assist', name: '補助: 役なし警告', price: 40, level: 1 },
@@ -154,7 +155,7 @@ export function findItem(id: string): ShopItem | undefined {
 }
 
 const BASE_NAMES: Record<string, string> = {
-  tanyao: '断么九', pinfu: '平和', tsumo: '門前清自摸和', haku: '役牌 白', hatsu: '役牌 發', chun: '役牌 中',
+  riichi: '立直', tsumo: '門前清自摸和', tanyao: '断么九', haku: '役牌 白', hatsu: '役牌 發', chun: '役牌 中',
   ton: '役牌 東', nan: '役牌 南', shaa: '役牌 西', pei: '役牌 北',
   kokushi: '国士無双', suuankou: '四暗刻', daisangen: '大三元', tsuuiisou: '字一色',
   shousuushii: '小四喜', daisuushii: '大四喜', ryuuiisou: '緑一色', chinroutou: '清老頭',

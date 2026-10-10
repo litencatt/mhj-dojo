@@ -354,11 +354,19 @@ export function dojoOptions(p: DojoProgress): {
 export const STORAGE_KEY = 'mhj-dojo.dojo.v1';
 export const CORRUPT_KEY = 'mhj-dojo.dojo.v1.corrupt';
 
+/** The price 立直 was sold at, refunded to those who bought it. */
+const RIICHI_REFUND = 40;
+
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string');
 
 /** The progress in a JSON text, or null for anything that is not a version 1 progress. */
 export function parseProgress(text: string): DojoProgress | null {
+  return parse(text)?.progress ?? null;
+}
+
+/** parseProgress, with the coins the reading refunded (a bought 立直's; 0 for none). */
+function parse(text: string): { progress: DojoProgress; refunded: number } | null {
   let v: unknown;
   try {
     v = JSON.parse(text);
@@ -384,13 +392,16 @@ export function parseProgress(text: string): DojoProgress | null {
   const gameCpu = o.gameCpu ?? DEFAULT_GAME_CPU;
   if (gameLength !== 'tonpuu' && gameLength !== 'hanchan') return null;
   if (gameCpu !== 'weak' && gameCpu !== 'normal') return null;
-  return {
+  // 立直 was sold before it joined the initial yaku: a bought one leaves the items and its price
+  // comes back, once (the next load finds it gone). A 平和 owned from before stays owned.
+  const refunded = o.ownedItems.includes('riichi') ? RIICHI_REFUND : 0;
+  const progress: DojoProgress = {
     version: 1,
     xp: o.xp,
-    coins: o.coins,
-    // The yaku a new dojo owns are always owned (門前清自摸和 joined them later).
+    coins: o.coins + refunded,
+    // The yaku a new dojo owns are always owned (門前清自摸和 and 立直 joined them later).
     ownedYaku: [...o.ownedYaku, ...INITIAL_YAKU.filter((k) => !(o.ownedYaku as string[]).includes(k))],
-    ownedItems: o.ownedItems,
+    ownedItems: refunded ? o.ownedItems.filter((id) => id !== 'riichi') : o.ownedItems,
     activeTheme: o.activeTheme,
     activeBack: o.activeBack ?? DEFAULT_BACK,
     activeCloth: (o.activeCloth as string | undefined) ?? DEFAULT_CLOTH,
@@ -402,6 +413,7 @@ export function parseProgress(text: string): DojoProgress | null {
     gameLength,
     gameCpu,
   };
+  return { progress, refunded };
 }
 
 /** The part of localStorage the dojo uses. */
@@ -420,24 +432,25 @@ function defaultStore(): KeyValueStore | null {
 
 /**
  * The saved progress. A text that does not parse is kept under CORRUPT_KEY and
- * the dojo starts over, with `corrupted` set so the page can say so.
+ * the dojo starts over, with `corrupted` set so the page can say so. `refunded`
+ * is the coins the reading gave back (a bought 立直's), until the progress is saved.
  */
-export function loadProgress(store: KeyValueStore | null = defaultStore()): { progress: DojoProgress; corrupted: boolean } {
+export function loadProgress(store: KeyValueStore | null = defaultStore()): { progress: DojoProgress; corrupted: boolean; refunded: number } {
   let raw: string | null = null;
   try {
     raw = store?.getItem(STORAGE_KEY) ?? null;
   } catch {
-    return { progress: initialProgress(), corrupted: false };
+    return { progress: initialProgress(), corrupted: false, refunded: 0 };
   }
-  if (raw === null) return { progress: initialProgress(), corrupted: false };
-  const progress = parseProgress(raw);
-  if (progress) return { progress, corrupted: false };
+  if (raw === null) return { progress: initialProgress(), corrupted: false, refunded: 0 };
+  const parsed = parse(raw);
+  if (parsed) return { ...parsed, corrupted: false };
   try {
     store?.setItem(CORRUPT_KEY, raw);
   } catch {
     // Nothing more to do: the start over goes on.
   }
-  return { progress: initialProgress(), corrupted: true };
+  return { progress: initialProgress(), corrupted: true, refunded: 0 };
 }
 
 /** Whether the progress was stored (storage may be full or blocked). */
