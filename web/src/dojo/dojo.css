@@ -406,22 +406,57 @@
   display: inline-flex;
   align-items: center;
 }
-/* A lesson's line over the hand (LessonBar): a .dojo-notice of the lesson, its stage and what the last success did, then the hint. */
+/* A lesson's lines over the hand (LessonBar), a .dojo-notice as tall whatever its state: the
+   lesson, its stage and the last success's note on one line (cut short, never wrapped), then the
+   folded hint, opened only by the player. */
 .lesson-status {
   margin: 6px 0;
 }
-.lesson-status p {
+.lesson-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lesson-title,
+.lesson-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lesson-title {
+  min-width: 0;
+}
+.lesson-stage {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+/* The title gives way first: the note says what just happened. */
+.lesson-title {
+  flex-shrink: 1;
+}
+.lesson-note {
+  flex-shrink: 0;
+}
+.lesson-hint summary {
+  min-height: 24px;
+  line-height: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lesson-hint-nudge {
+  margin-left: 8px;
+  color: var(--danger);
+  font-weight: bold;
+}
+.lesson-hint p {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  margin: 0;
-}
-.lesson-status .lesson-hint {
-  margin-top: 6px;
-}
-.lesson-stage {
-  color: var(--muted);
+  margin: 4px 0 0;
 }
 /* On a phone every chip of 所持役 is 44px tall, button or not (a roomy target in a short list). */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
@@ -437,6 +472,10 @@
   .dojo-home .dojo-yaku-guide,
   .yaku-guide .dojo-actions > * {
     min-height: 44px;
+  }
+  .lesson-hint summary {
+    min-height: 32px;
+    line-height: 32px;
   }
   .lesson-status button {
     min-height: 32px;

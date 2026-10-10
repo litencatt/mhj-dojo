@@ -183,6 +183,11 @@ export function setGameLesson(publicId: string, lesson: string) {
   storeGames(DOJO_GAMES_KEY, games, publicId);
 }
 
+/** Whether a dojo game has a save (its first save may have failed: storage full or blocked). */
+export function dojoGameSaved(publicId: string): boolean {
+  return publicId in loadGames(DOJO_GAMES_KEY);
+}
+
 /** The lesson a saved dojo game is played for, if any. */
 export function gameLesson(publicId: string): string | null {
   const lesson = loadGames(DOJO_GAMES_KEY)[publicId]?.lesson;

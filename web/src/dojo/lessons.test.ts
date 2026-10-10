@@ -166,7 +166,7 @@ test('shape-win: a tsumo win in practice mode', () => {
   const j = practice('shape-win').judge;
   assert.equal(j(step(session({ status: 'tsumo', win: { tiles: [], yaku: [], dora: 0, han_total: 0 } }))), true);
   assert.equal(j(step(session({ status: 'exhausted' }))), false);
-  assert.equal(j(step(session({ can_tsumo: true }))), false); // a win offered is not a win made
+  assert.equal(j(step(session({ can_tsumo: true }))), null); // a win offered is not a win made; a discard is not judged
 });
 
 test('ryanmen-tenpai: tenpai on a two-sided wait, reached by a discard', () => {
@@ -175,8 +175,8 @@ test('ryanmen-tenpai: tenpai on a two-sided wait, reached by a discard', () => {
   const at = (shanten: number, type: 'ryanmen' | 'kanchan') => session({ analysis: [row('normal', shanten)], hand_groups: groups(type) });
   assert.equal(j(step(at(0, 'ryanmen'), session(), '9s')), true);
   assert.equal(j(step(at(0, 'kanchan'), session(), '9s')), false);
-  assert.equal(j(step(at(1, 'ryanmen'), session(), '9s')), false);
-  assert.equal(j(step(at(0, 'ryanmen'))), false); // dealt at tenpai: not made
+  assert.equal(j(step(at(1, 'ryanmen'), session(), '9s')), null); // not tenpai: not judged
+  assert.equal(j(step(at(0, 'ryanmen'))), null); // dealt at tenpai: not made
 });
 
 test('max-ukeire: the discard keeps the shanten and the most ukeire', () => {
@@ -187,7 +187,7 @@ test('max-ukeire: the discard keeps the shanten and the most ukeire', () => {
   assert.equal(j(step(session(), before, '5s')), true);
   assert.equal(j(step(session(), before, '1m')), false);
   assert.equal(j(step(session(), before, '9s')), false); // more ukeire, but a step back
-  assert.equal(j(step(session())), false); // the start: no discard yet
+  assert.equal(j(step(session())), null); // the start: no discard yet
 });
 
 test('furiten: of the discards taking tenpai, one whose waits are not in your river', () => {
@@ -346,6 +346,7 @@ test('a lesson of N successes counts them in each stage', () => {
 test('a success is counted once for its key: the same practice position or game round adds nothing', () => {
   const at = session({ seed: 9, discards: ['1m', '0p'] });
   assert.equal(practiceKey(at), 'practice:9:1m5p');
+  assert.equal(practiceKey(session({ seed: 9, discards: ['1m', '0p'], status: 'tsumo' })), 'practice:9:1m5p:tsumo'); // a tsumo from there
   assert.equal(practiceKey(session({ seed: 9, discards: ['1m', '5p'], node_id: 7 })), practiceKey(at)); // another node, the same position
   const p = passed(['shape-win']);
   const once = recordSuccess(p, 'max-ukeire', practiceKey(at)).progress;
@@ -368,7 +369,9 @@ test('a locked or done lesson records nothing; a failure is simply not recorded'
 
 test('the temporary yaku of a lesson are those it teaches', () => {
   assert.deepEqual(lessonAids(passed(['riichi-win', 'tanyao-win']), 'yakuhai-pon').yaku, ['haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei']);
-  assert.deepEqual(lessonAids(initialProgress(), 'kan-win').yaku, ['rinshan']);
+  assert.deepEqual(lessonAids(passed(['yakuhai-pon']), 'kan-win').yaku, ['rinshan']);
+  assert.deepEqual(lessonAids(initialProgress(), 'kan-win'), { yaku: [], assists: [] }); // locked
+  assert.deepEqual(lessonAids(passed(['yakuhai-pon', 'kan-win']), 'kan-win'), { yaku: [], assists: [] }); // done
 });
 
 /** Passes a lesson whose prerequisites are done, through both of its stages. */

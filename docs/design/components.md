@@ -29,7 +29,7 @@
 - 役名のチップ: 枠のみの `--radius-pill`(`.advice-yaku li`、`.dojo-yaku li`)。解説のある所持役は、チップの中に枠なしのボタン(`.dojo-yaku-guide`)を置く。スマホではチップ全部を 44px の高さにそろえる。絞り込みの `.filter-chip` はオン時に `--accent` の塗り。オン・オフの切り替え(手牌の見出しの 面子表示、道場の自動和了・自動ツモ切り・鳴きなしの `.hand-tools`)も `.filter-chip` に `aria-pressed` を付けて使う。`.hand-tools` は見出しの右端(面子表示の後)に置き、スマホでは見出しの下の行に右寄せで並べる。
 - 状態バッジ: 成功は `--success*`、警告は `--danger*`(`.dojo-aid-ok` / `.dojo-aid-warn`)。
 - 通知: `.dojo-notice`(情報)、`.error-banner`(エラー、`--danger`)、`.save-failed`(警告)。
-- 課題の行: `web/src/dojo/LessonBar.tsx`(`.dojo-notice.lesson-status`)。課題の対局と練習モードの課題で、手牌の欄の上(対局は卓の上)に置く。`課題` のラベル(`.dojo-aid-label`)、題、段階と回数(`.lesson-stage`、`--muted`)、直前の達成(`.dojo-aid-ok`)、保存の失敗(`.dojo-aid-warn`)。失敗が続いたら2行目にヒント(`.lesson-hint`)と、役の解説(`GuideDialog`)を開く副ボタン。
+- 課題の行: `web/src/dojo/LessonBar.tsx`(`.dojo-notice.lesson-status`)。課題の対局と練習モードの課題で、手牌の欄の上(対局は卓の上)に置く。状態が変わっても高さを変えない2行: 1行目は `課題` のラベル(`.dojo-aid-label`)・題(`.lesson-title`、狭いと省略)・段階と回数(`.lesson-stage`、`data-stage`)・直前の達成(`.dojo-aid-ok.lesson-note`、短い文言で省略しない)を折り返さずに並べる。2行目は折りたたんだヒント(`details.lesson-hint`)で、失敗が続くと見出しに促し(`.lesson-hint-nudge`)が付くが、開くのは利用者だけ。中は課題の説明と、役の解説(`GuideDialog` の `inLesson`、練習モードへのリンクなし)を開く副ボタン。
 
 ## 牌
 `.tile`(`tile-md` 36x48、`tile-sm` 26x35、`tile-xs` 18x24)。面は `TileFace.tsx` の SVG。選択可能な牌は `.tile-interactive`、選択中は `.tile-picked`、裏は `.tile-back`。色は `--tile-*` のみで、テーマ・裏柄は `<html>` の `data-tile-theme` / `data-tile-back` で切り替える(道場で選んだものを全モードで当てる)。スマホの手牌は 14 枚が1行に収まるよう `--hand-tile` で幅を決める。スマホの役別向聴・複合役の有効牌は折り返さず1行(1枚 最大16px・最小11px で行に収め、それでも入らなければ横スクロール)。

@@ -79,7 +79,8 @@ function kind(t: Tile): Tile {
 
 /** The key a practice success is counted under: the seed and the discards that reach the position. */
 export function practiceKey(s: SessionState): string {
-  return `practice:${s.seed}:${s.discards.map(kind).join('')}`;
+  // A tsumo keeps the discards of the position it was made from: told apart by its status.
+  return `practice:${s.seed}:${s.discards.map(kind).join('')}${s.status === 'tsumo' ? ':tsumo' : ''}`;
 }
 
 /** The key a game success is counted under: the game and the round's index in it. */
@@ -207,7 +208,8 @@ export const LESSONS: readonly Lesson[] = [
     text: '和了の形は4面子1雀頭（3+3+3+3+2）。面子は順子（123のような続き）か刻子（同じ牌3枚）、雀頭は同じ牌2枚。練習モードで、シャンテン数を見ながらツモ和了まで手を進めよう。',
     example: '123m456p789s111z55p',
     assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: [],
-    judge: (s) => s.after.status === 'tsumo' && s.after.win !== null,
+    // Judged when the practice ends: won by tsumo, or not (exhausted). A discard that goes on is not judged.
+    judge: (s) => (s.after.status === 'playing' ? null : s.after.status === 'tsumo' && s.after.win !== null),
   },
   {
     id: 'ryanmen-tenpai', stage: 1, title: '両面で聴牌する', form: 'practice',
@@ -215,13 +217,16 @@ export const LESSONS: readonly Lesson[] = [
     example: '123m456p789s34m55z',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['shape-win'],
     // At the start (no step yet) a hand dealt at tenpai was not made by you.
-    judge: (s) => s.before !== null && normalShanten(s.after) === 0 && s.after.hand_groups.some((g) => g.type === 'ryanmen'),
+    // Judged on a discard that leaves the hand at tenpai; others (and a hand dealt at tenpai) are not.
+    judge: (s) =>
+      s.before === null || s.discard === null || normalShanten(s.after) !== 0 ? null : s.after.hand_groups.some((g) => g.type === 'ryanmen'),
   },
   {
     id: 'max-ukeire', stage: 1, title: '受け入れの多い方を残す', form: 'practice', times: 5,
     text: '有効牌（引けばシャンテン数が進む牌）が多いほど、早く聴牌できる。シャンテン数を下げず、有効牌が最も多く残る牌を切ろう（5回）。',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['shape-win'],
-    judge: (s) => s.before !== null && s.discard !== null && bestDiscards(s.before).includes(kind(s.discard)),
+    // Judged on each discard (a tsumo or the start is not one).
+    judge: (s) => (s.before === null || s.discard === null ? null : bestDiscards(s.before).includes(kind(s.discard))),
   },
   {
     id: 'furiten', stage: 1, title: '振聴を避けて聴牌する', form: 'practice',
@@ -362,10 +367,13 @@ export function lessonHref(lesson: Lesson, seed?: number): string {
   return `?${seed === undefined ? '' : `seed=${seed}&`}turns=18&lesson=${id}`;
 }
 
-/** The yaku and the assists a lesson's game or practice adds for now, at the lesson's stage. */
+/**
+ * The yaku and the assists a lesson's game or practice adds for now: none
+ * unless the lesson is being learned, its assists at the assisted stage only.
+ */
 export function lessonAids(p: DojoProgress, id: string): { yaku: string[]; assists: string[] } {
   const lesson = findLesson(id);
-  if (!lesson) return { yaku: [], assists: [] };
+  if (!lesson || !lessonActive(p, id)) return { yaku: [], assists: [] };
   return { yaku: [...lesson.tempYaku], assists: lessonStage(p, id) === 'assisted' ? [...lesson.assists] : [] };
 }
 

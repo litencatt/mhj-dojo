@@ -1,14 +1,11 @@
 import { useState } from 'preact/hooks';
-import { findItem } from './catalog';
 import { GuideDialog } from './GuideDialog';
 import type { Lesson, LessonStage } from './lessons';
+import type { LessonNote } from './useLesson';
 import { guideFor } from './yakuGuide';
 import './dojo.css';
 
-/** What the last success did: counted one of several, passed the assisted stage, or passed the lesson. */
-export type LessonNote = 'counted' | 'passed' | 'completed';
-
-// Failures in a row before the hint (the lesson's text and its yaku's guide) shows.
+// Failures in a row before the hint asks to be opened.
 export const HINT_AFTER = 3;
 
 const STAGE_NAMES: Record<LessonStage, string> = {
@@ -27,18 +24,19 @@ interface LessonBarProps {
   saveFailed?: boolean;
 }
 
-function noteText(lesson: Lesson, note: LessonNote, stage: LessonStage): string {
-  if (note === 'counted') return '達成！';
-  if (note === 'passed' && stage === 'unassisted') return '補助ありで達成！ 次は補助なしで';
-  const item = lesson.reward.item === undefined ? undefined : findItem(lesson.reward.item);
-  const reward = [item?.name, lesson.reward.coins > 0 ? `${lesson.reward.coins}銭` : ''].filter(Boolean).join('・');
-  return `合格！ ${reward ? `${reward}を授かりました` : ''}`.trim();
+/** The note's text, short enough for a phone's line. */
+function noteText(note: LessonNote): string {
+  if (note.kind === 'counted') return '達成！';
+  if (note.kind === 'passed') return '達成！ 次は補助なし';
+  if (note.item) return `合格！ ${note.item}を授かりました`;
+  return note.coins > 0 ? `合格！ ${note.coins}銭を受け取りました` : '合格！';
 }
 
 /**
- * A lesson's line over the hand (a dojo game's or practice mode's): its title,
- * its stage and count, what the last success did, and after failures in a
- * row a hint: the lesson's text and its yaku's guide.
+ * A lesson's lines over the hand (a dojo game's or practice mode's), as tall
+ * whatever happens: the lesson's title, its stage and count and what the
+ * last success did, on one line; then its hint, folded, the lesson's text and
+ * its yaku's guide, which asks to be opened after failures in a row.
  */
 export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: LessonBarProps) {
   const [guideOpen, setGuideOpen] = useState(false);
@@ -49,25 +47,29 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
     <div class="dojo-notice lesson-status" data-testid="lesson-status">
       <p class="lesson-status-line" role="status" aria-live="polite">
         <span class="dojo-aid-label">課題</span>
-        <b>{lesson.title}</b>
+        <b class="lesson-title">{lesson.title}</b>
         <span class="lesson-stage" data-stage={stage}>
           {STAGE_NAMES[stage]}
           {active && times > 1 && ` ${count}/${times}`}
         </span>
-        {note && <span class="dojo-aid-ok">{noteText(lesson, note, stage)}</span>}
-        {saveFailed && <span class="dojo-aid-warn">保存できませんでした</span>}
+        {note && <span class="dojo-aid-ok lesson-note">{noteText(note)}</span>}
+        {saveFailed && <span class="dojo-aid-warn lesson-note">保存できませんでした</span>}
       </p>
-      {active && failures >= HINT_AFTER && (
-        <p class="lesson-hint">
-          <span class="dojo-aid-label">ヒント</span> {lesson.text}
+      <details class="lesson-hint">
+        <summary>
+          ヒント
+          {active && failures >= HINT_AFTER && <span class="lesson-hint-nudge">うまくいかないときは開いてみよう</span>}
+        </summary>
+        <p>
+          {lesson.text}
           {guide && (
             <button type="button" aria-haspopup="dialog" onClick={() => setGuideOpen(true)}>
               役の解説
             </button>
           )}
         </p>
-      )}
-      <GuideDialog yakuKey={guideOpen ? guide : null} learned={false} onClose={() => setGuideOpen(false)} />
+      </details>
+      <GuideDialog yakuKey={guideOpen ? guide : null} inLesson learned={false} onClose={() => setGuideOpen(false)} />
     </div>
   );
 }
