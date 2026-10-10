@@ -7,7 +7,11 @@ import { guideFor } from './yakuGuide';
 
 /** Why an item is not for sale yet; null when it is. */
 function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
-  if (level(p.xp) < item.level) return `${rankName(item.level)}で解禁`;
+  if (item.kind === 'cheat') {
+    if (!p.masterMatch.uraOpen) return '師範戦に勝つと解禁';
+  } else if (level(p.xp) < item.level) {
+    return `${rankName(item.level)}で解禁`;
+  }
   const missing = (item.requires ?? []).find((r) => !owns(p, r));
   if (missing) return `${findItem(missing)?.name ?? missing}が必要`;
   return null;
@@ -102,7 +106,13 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
         ))}
       </div>
       <div id="shop-tabpanel" class="shop-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`shop-tab-${tab}`}>
-          {/* In unlock order; a locked item says its rank where its button would be. */}
+          {tab === 'cheat' && (
+            <p class="dojo-muted shop-note" data-testid="shop-cheat-note">
+              {p.masterMatch.uraOpen ? 'イカサマはウラ面の対局で使えます（師範戦では使えません）。' : 'イカサマは師範戦に勝つと開くウラ面で解禁され、ウラ面の対局で使えます。'}
+              {p.legacyCheats.length > 0 && 'ウラ面ができる前から持っているイカサマは、師範戦を除く表の対局でも使えます。'}
+            </p>
+          )}
+          {/* In unlock order; a locked item says its rank (a cheat, the 師範戦) where its button would be. */}
           <ul class="shop-list">
             {[...shown].sort((a, b) => a.level - b.level).map((it) => {
               const have = owns(p, it.id);

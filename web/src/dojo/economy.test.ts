@@ -11,7 +11,9 @@
 // The targets count the core of the shop: the yaku, the assists and the tile
 // themes. The cheats and the other looks (the tile backs, the table cloths, the
 // riichi sticks and the win effects) are extras for the long run, bought apart
-// (the last test). The curriculum's rewards (lessons.ts) are left out for now:
+// (the whole-shop tests). The cheats are sold only once the ウラ面 is open
+// (#323): those tests open it from the start, an optimistic bound, as the
+// 師範戦 takes some games to win (docs/dojo-economy.md). The curriculum's rewards (lessons.ts) are left out for now:
 // their values are provisional until #320 puts them into the economy.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -72,8 +74,10 @@ interface Run {
   stages: readonly Stage[];
 }
 
-function start(stages: readonly Stage[] = STAGES): Run {
-  return { p: initialProgress(), games: 0, han: 0, wins: 0, stages };
+/** A run from a new dojo; `uraOpen` opens the ウラ面 from the start (optimistic), so the cheats are sold by their price alone. */
+function start(stages: readonly Stage[] = STAGES, uraOpen = false): Run {
+  const p = initialProgress();
+  return { p: uraOpen ? { ...p, masterMatch: { ...p.masterMatch, uraOpen } } : p, games: 0, han: 0, wins: 0, stages };
 }
 
 /** One game at the run's stage, then buys the cheapest thing it can of `shop` (the core by default). */
@@ -134,7 +138,7 @@ test('the yakuman pack is bought within 40 games of Lv10, the core shop bought f
 });
 
 test('the whole shop, cheats and every look included, is bought in about 175 games', () => {
-  const r = start();
+  const r = start(STAGES, true);
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 160 && r.games <= 190, `${r.games} games`);
 });
@@ -152,7 +156,7 @@ test('human-like: Lv10 comes after 40 to 60 games', () => {
 });
 
 test('human-like: the whole shop is bought in 110 to 150 games', () => {
-  const r = start(HUMAN_STAGES);
+  const r = start(HUMAN_STAGES, true);
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 110 && r.games <= 150, `${r.games} games`);
 });

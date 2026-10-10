@@ -14,18 +14,34 @@ export const NORMAL_CPU_LEVEL = 7;
  */
 export const HANCHAN_RANK_MULTIPLIER = 2;
 export const NORMAL_CPU_RANK_MULTIPLIER = 2;
+/**
+ * The 師範戦 (against the master) and the ウラ面's games (against the urashihan), by the CPU
+ * alone: the master is harder than the normal CPU (1st about 22% of the time, docs/dojo-economy.md),
+ * and the urashihan is beaten with the cheats, whose costs the game pays. Provisional until #320.
+ */
+// A won 師範戦 played again pays the same: #320 decides whether it should pay less.
+export const MASTER_CPU_RANK_MULTIPLIER = 3;
+export const URA_CPU_RANK_MULTIPLIER = 2;
+
+const CPU_RANK_MULTIPLIERS: Record<CpuLevel, number> = {
+  weak: 1,
+  normal: NORMAL_CPU_RANK_MULTIPLIER,
+  master: MASTER_CPU_RANK_MULTIPLIER,
+  ura: URA_CPU_RANK_MULTIPLIER,
+};
+
+const CPU_LABELS: Record<CpuLevel, string> = { weak: '', normal: 'CPU 普通', master: 'CPU 師範', ura: 'CPU 裏師範' };
 
 export const DEFAULT_GAME_LENGTH: GameLength = 'tonpuu';
 export const DEFAULT_GAME_CPU: CpuLevel = 'weak';
 
-// The master (師範) and the urashihan (裏師範) are not offered in the dojo yet: they pay as a plain game here, and #323 gives the 師範戦 and the ウラ面 their own rules.
 export function rankMultiplier(length: GameLength, cpu: CpuLevel): number {
-  return (length === 'hanchan' ? HANCHAN_RANK_MULTIPLIER : 1) * (cpu === 'normal' ? NORMAL_CPU_RANK_MULTIPLIER : 1);
+  return (length === 'hanchan' ? HANCHAN_RANK_MULTIPLIER : 1) * CPU_RANK_MULTIPLIERS[cpu];
 }
 
-/** 「半荘 ×2」「CPU 普通 ×2」「半荘・CPU 普通 ×4」, or '' for the plain game. */
+/** 「半荘 ×2」「CPU 普通 ×2」「半荘・CPU 普通 ×4」「半荘・CPU 師範 ×6」, or '' for the plain game. */
 export function rankMultiplierLabel(length: GameLength, cpu: CpuLevel): string {
-  const names = [length === 'hanchan' && '半荘', cpu === 'normal' && 'CPU 普通'].filter(Boolean);
+  const names = [length === 'hanchan' && '半荘', CPU_LABELS[cpu]].filter(Boolean);
   return names.length === 0 ? '' : `${names.join('・')} ×${rankMultiplier(length, cpu)}`;
 }
 
