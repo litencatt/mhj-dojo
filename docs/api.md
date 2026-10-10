@@ -651,12 +651,24 @@ most of the accepting tiles, and it guards against open hands with two or
 more calls as well. Against three `"normal"` CPUs in 半荘戦 its average rank
 is 0.09 lower than the normal CPU's in the same seat (2.42 against 2.51
 over 4000 games; `TestMasterStronger`, [docs/dojo-economy.md](dojo-economy.md)).
+`"ura"` (裏師範, dojo games only) is the master with two cheats of its own,
+for its decisions only: it sees the other seats' concealed tiles (it counts
+them as seen, never folds, and never discards a tile a tenpai hand would
+ron, unless every discard would), and its live-wall draws are biased: out of
+riichi, a draw that does not bring it closer to tenpai is, 5% of the time
+(`cpu.UraDrawBias`), swapped with the next live-wall tile that does. The
+swap is a hash of the wall's seed, the draw and the seat, so a game replays
+exactly; it is not an event, and it can change the draws your wall peek
+showed. The response never shows the other hands to you because of it.
+Against three of them in 半荘戦, a human-like player finishes first 7–8% of
+the time without cheats and 31% with the dojo's cheats (`TestUraSim`,
+[docs/dojo-economy.md](dojo-economy.md)).
 
 ### `POST /api/games`
 Body (optional): `{"seed": 42, "length": "hanchan", "first_dealer": "you",
 "cpu": "weak"}`. `length` is `"tonpuu"` (the default) or `"hanchan"`;
 `first_dealer` is `"random"` (the default: `seed mod 4`) or `"you"`; `cpu` is
-`"normal"` (the default), `"weak"` or `"master"`. Any other value is a `400`. Returns a
+`"normal"` (the default), `"weak"`, `"master"` or, in a dojo game, `"ura"`. Any other value is a `400`. Returns a
 `GameState`. Optional `"dojo"` makes it a [dojo game](#dojo-games). Every round's wall is
 derived one-way from the seed. Without a seed a random seed in `[0, 2^53)` is used and `seed` stays `null`
 until the game ends, because the seed rebuilds every wall.
@@ -776,7 +788,7 @@ The save (`match.Save`):
   "seed_known": false,       // the player chose the seed (GameState shows it)
   "length": "tonpuu",        // the options, filled in: tonpuu|hanchan
   "first_dealer": "random",  // random|you
-  "cpu": "normal",           // normal|weak|master
+  "cpu": "normal",           // normal|weak|master|ura
   "dojo": {"yaku": ["tanyao"]}, // the dojo options of a dojo game; omitted otherwise
   "actions": [               // the human's successful moves in order, "next" included
     {"type": "discard", "tile": "5m"},
@@ -808,7 +820,7 @@ under the 64 KiB body limit.
   "seed": 42,                   // null until the game ends for a random seed
   "length": "tonpuu",           // "tonpuu" | "hanchan"
   "first_dealer_mode": "random", // the first_dealer asked for: "random" | "you"
-  "cpu": "normal",              // "normal" | "weak" | "master"
+  "cpu": "normal",              // "normal" | "weak" | "master" | "ura"
   "dojo": true,                 // a dojo game (omitted otherwise)
   "you": 0,
   "first_dealer": 2,            // 起家: the seat

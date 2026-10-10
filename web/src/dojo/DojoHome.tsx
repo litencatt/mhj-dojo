@@ -43,7 +43,7 @@ const LENGTHS: { value: GameLength; level: number }[] = [
   { value: 'tonpuu', level: 1 },
   { value: 'hanchan', level: HANCHAN_LEVEL },
 ];
-// The master (師範) is not offered yet: the dojo's 師範戦 comes with #323.
+// The master (師範) and the urashihan (裏師範) are not offered yet: the 師範戦 and the ウラ面 come with #323.
 const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'weak', level: 1 },
   { value: 'normal', level: NORMAL_CPU_LEVEL },

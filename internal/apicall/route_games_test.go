@@ -141,6 +141,18 @@ func TestGameOptions(t *testing.T) {
 	if _, raw = c.game("POST", "/api/games", `{"seed":42,"cpu":"master"}`); raw["cpu"] != "master" {
 		t.Fatalf("master: cpu %v", raw["cpu"])
 	}
+	// The urashihan plays only in dojo games, and its peek at your hand
+	// never reaches the response.
+	c.wantError("POST", "/api/games", `{"seed":42,"cpu":"ura"}`, http.StatusBadRequest)
+	st, raw = c.game("POST", "/api/games", `{"seed":42,"cpu":"ura","dojo":{"yaku":["tanyao"]}}`)
+	if raw["cpu"] != "ura" {
+		t.Fatalf("ura: cpu %v", raw["cpu"])
+	}
+	for _, s := range st.Seats[1:] {
+		if len(s.Hand) > 0 {
+			t.Fatalf("seat %d's hand in the response: %v", s.Seat, s.Hand)
+		}
+	}
 }
 
 func TestGameActionErrors(t *testing.T) {
