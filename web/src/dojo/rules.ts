@@ -18,6 +18,7 @@ export const NORMAL_CPU_RANK_MULTIPLIER = 2;
 export const DEFAULT_GAME_LENGTH: GameLength = 'tonpuu';
 export const DEFAULT_GAME_CPU: CpuLevel = 'weak';
 
+// The master (師範) is not offered in the dojo yet: it pays as a plain game here, and #323 gives the 師範戦 its own rules.
 export function rankMultiplier(length: GameLength, cpu: CpuLevel): number {
   return (length === 'hanchan' ? HANCHAN_RANK_MULTIPLIER : 1) * (cpu === 'normal' ? NORMAL_CPU_RANK_MULTIPLIER : 1);
 }

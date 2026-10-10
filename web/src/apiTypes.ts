@@ -169,7 +169,7 @@ export type GamePhase = 'discard' | 'call' | 'ended';
 export type ActionType = 'discard' | 'riichi' | 'tsumo' | 'ron' | 'skip' | 'kyuushu' | 'pon' | 'chii' | 'kan' | 'redraw' | 'summon' | 'next';
 export type GameLength = 'tonpuu' | 'hanchan'; // 東風戦 | 半荘戦
 export type FirstDealerMode = 'random' | 'you'; // 起家: ランダム | 自分
-export type CpuLevel = 'weak' | 'normal'; // 弱い | 普通
+export type CpuLevel = 'weak' | 'normal' | 'master'; // 弱い | 普通 | 師範
 export type AbortReason = 'kyuushu' | 'suufon' | 'suucha' | 'suukaikan'; // 九種九牌 | 四風連打 | 四家立直 | 四開槓
 
 export interface RiverTile {

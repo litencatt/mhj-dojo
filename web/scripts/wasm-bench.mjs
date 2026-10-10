@@ -1,14 +1,14 @@
 // Practice-request latency of the engine's WebAssembly build under Node
 // (issue #197). Build it first with `make wasm`, then:
 //
-//	node web/scripts/wasm-bench.mjs [--mode practice|game] [--seeds N] [--first S] [--length tonpuu|hanchan] [--dump FILE] [--dir DIR]
+//	node web/scripts/wasm-bench.mjs [--mode practice|game] [--seeds N] [--first S] [--length tonpuu|hanchan] [--cpu weak|normal|master] [--dump FILE] [--dir DIR]
 //
 // Practice mode (the default): for each seed it starts a practice session
 // (POST /api/sessions, with the advice) and plays it to the end, discarding
 // the advice's best tile (or declaring tsumo), timing every request.
 //
 // Game mode (issue #233): for each seed it starts a game against the CPU
-// players (POST /api/games, --length) and plays it to game_over: ron or skip
+// players (POST /api/games, --length, --cpu) and plays it to game_over: ron or skip
 // in the call phase, tsumo or the last legal tile on its own turn (never
 // riichi, as internal/match's BenchmarkGameStep plays), next at a round's
 // end. Every action is timed, including the CPU seats' play it triggers.
@@ -26,6 +26,7 @@ const { values: opt } = parseArgs({
   options: {
     mode: { type: 'string', default: 'practice' },
     length: { type: 'string', default: 'tonpuu' },
+    cpu: { type: 'string', default: 'normal' },
     seeds: { type: 'string', default: '30' },
     first: { type: 'string', default: '1' },
     dump: { type: 'string' },
@@ -70,7 +71,7 @@ function playPractice(seed) {
 }
 
 function playGame(seed) {
-  let st = request('create', 'POST', '/api/games', { seed, length: opt.length });
+  let st = request('create', 'POST', '/api/games', { seed, length: opt.length, cpu: opt.cpu });
   const path = `/api/games/${st.game_id}/action`;
   for (let steps = 0; !st.game_over; steps++) {
     if (steps >= MAX_STEPS) throw new Error(`seed ${seed}: no game_over after ${MAX_STEPS} actions`);
