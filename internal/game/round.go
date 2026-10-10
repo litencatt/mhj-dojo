@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/litencatt/mhj-dojo/internal/score"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
@@ -199,6 +200,17 @@ type SeatConfig struct {
 	// SummonsPerRound is how many Summon moves each seat may make in a
 	// round (0: none).
 	SummonsPerRound [4]int
+	// Peek shows a seat's view (ViewFor) the other seats' concealed tiles:
+	// a CPU's cheat, for its decisions only (the human's peek is the
+	// match's).
+	Peek [4]bool
+	// DrawBias is the chance, in percent, that a seat's live-wall draw
+	// which does not lower its shanten is swapped for the next live-wall
+	// tile that does (see biasDraw): a CPU's cheat, out of riichi only.
+	DrawBias [4]int
+	// WallPeek is how many of its next draws a seat is shown (the dojo's
+	// wall peek, see NextDraws): DrawBias never moves them.
+	WallPeek [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.
@@ -232,6 +244,8 @@ type Round struct {
 	seats   SeatConfig
 	redraws [4]int // Redraw moves made this round
 	summons [4]int // Summon moves made this round
+
+	biasEng *shanten.Engine // DrawBias's shanten memo, made on its first use
 
 	log    []Action    // every applied action, for replay
 	events []Action    // the moves that happened, without skips and unused claims
@@ -374,6 +388,7 @@ func (r *Round) draw(seat int) {
 	p := &r.players[seat]
 	p.drawn = &t
 	p.rinshan = false
+	r.biasDraw(seat)
 	r.startTurn(seat)
 }
 

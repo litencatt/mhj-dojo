@@ -14,13 +14,18 @@ import (
 // Creating a game and starting a round are not timed. steps/game, the
 // length of a 半荘, averages the ones finished: -benchtime 6000x goes round
 // all 30 seeds. BenchmarkGameStepMaster is the same against three masters
-// (cpu.Master).
+// (cpu.Master), BenchmarkGameStepUra against three urashihan (cpu.Ura, in a
+// dojo game with every yaku).
 //
 //	go test ./internal/match -run '^$' -bench BenchmarkGameStep -benchtime 6000x
 func BenchmarkGameStep(b *testing.B) { benchGameStep(b, Options{Length: Hanchan}) }
 
 func BenchmarkGameStepMaster(b *testing.B) {
 	benchGameStep(b, Options{Length: Hanchan, CPU: cpu.Master})
+}
+
+func BenchmarkGameStepUra(b *testing.B) {
+	benchGameStep(b, Options{Length: Hanchan, CPU: cpu.Ura, Dojo: &DojoOptions{Yaku: allYaku}})
 }
 
 func benchGameStep(b *testing.B, o Options) {

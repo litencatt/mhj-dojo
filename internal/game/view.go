@@ -81,7 +81,7 @@ func (r *Round) ViewFor(viewer int) View {
 		if p.drawn != nil {
 			sv.HandCount++
 		}
-		if s == viewer || ended {
+		if s == viewer || ended || r.seats.Peek[viewer] {
 			sv.Hand = slices.Clone(p.hand)
 			if p.drawn != nil {
 				d := *p.drawn

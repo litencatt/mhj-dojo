@@ -53,7 +53,7 @@ const (
 type Options struct {
 	Length      string // Tonpuu or Hanchan
 	FirstDealer string // DealerRandom or DealerYou
-	CPU         string // cpu.Normal, cpu.Weak or cpu.Master
+	CPU         string // cpu.Normal, cpu.Weak, cpu.Master or cpu.Ura
 	Dojo        *DojoOptions
 }
 
@@ -127,9 +127,12 @@ func (o Options) normalize() (Options, game.Rules, error) {
 	switch o.CPU {
 	case "":
 		o.CPU = cpu.Normal
-	case cpu.Normal, cpu.Weak, cpu.Master:
+	case cpu.Normal, cpu.Weak, cpu.Master, cpu.Ura:
 	default:
-		return o, rules, fmt.Errorf("%w: cpu must be %q, %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak, cpu.Master)
+		return o, rules, fmt.Errorf("%w: cpu must be %q, %q, %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak, cpu.Master, cpu.Ura)
+	}
+	if o.CPU == cpu.Ura && o.Dojo == nil {
+		return o, rules, fmt.Errorf("%w: cpu %q is for dojo games only", game.ErrInvalid, cpu.Ura)
 	}
 	if d := o.Dojo; d != nil {
 		for _, k := range d.Yaku {
@@ -165,6 +168,14 @@ func deal(seed int64, rules game.Rules, o Options) *game.Hanchan {
 		seats.Restrict[Human] = yaku.NewKeySet(d.Yaku...)
 		seats.RedrawsPerRound[Human] = d.RedrawsPerRound
 		seats.SummonsPerRound[Human] = d.SummonsPerRound
+		seats.WallPeek[Human] = d.WallPeek
+	}
+	if o.CPU == cpu.Ura { // the urashihan's cheats (cpu.NewUra)
+		for s := range seats.Peek {
+			if s != Human {
+				seats.Peek[s], seats.DrawBias[s] = true, cpu.UraDrawBias
+			}
+		}
 	}
 	return game.NewHanchanWith(seed, rules, first, seats)
 }
@@ -182,6 +193,8 @@ func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 		p = cpu.NewWeak()
 	case cpu.Master:
 		p = cpu.NewMaster()
+	case cpu.Ura:
+		p = cpu.NewUra()
 	}
 	m.game = game.StartHanchan(h, p)
 	m.game.OnHumanDiscard = m.recordHand

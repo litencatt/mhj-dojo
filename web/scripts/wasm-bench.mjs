@@ -1,14 +1,15 @@
 // Practice-request latency of the engine's WebAssembly build under Node
 // (issue #197). Build it first with `make wasm`, then:
 //
-//	node web/scripts/wasm-bench.mjs [--mode practice|game] [--seeds N] [--first S] [--length tonpuu|hanchan] [--cpu weak|normal|master] [--dump FILE] [--dir DIR]
+//	node web/scripts/wasm-bench.mjs [--mode practice|game] [--seeds N] [--first S] [--length tonpuu|hanchan] [--cpu weak|normal|master|ura] [--dump FILE] [--dir DIR]
 //
 // Practice mode (the default): for each seed it starts a practice session
 // (POST /api/sessions, with the advice) and plays it to the end, discarding
 // the advice's best tile (or declaring tsumo), timing every request.
 //
 // Game mode (issue #233): for each seed it starts a game against the CPU
-// players (POST /api/games, --length, --cpu) and plays it to game_over: ron or skip
+// players (POST /api/games, --length, --cpu; a dojo game with every yaku for
+// ura, which plays only there) and plays it to game_over: ron or skip
 // in the call phase, tsumo or the last legal tile on its own turn (never
 // riichi, as internal/match's BenchmarkGameStep plays), next at a round's
 // end. Every action is timed, including the CPU seats' play it triggers.
@@ -55,6 +56,14 @@ function request(kind, method, path, body) {
 
 const first = Number(opt.first);
 const MAX_STEPS = 2000; // a bug must not loop forever
+// Every yaku key, for the dojo game the urashihan plays in (internal/match's allYaku).
+const ALL_YAKU = [
+  'riichi', 'double_riichi', 'ippatsu', 'tsumo', 'haitei', 'houtei', 'rinshan', 'chankan', 'tanyao', 'pinfu',
+  'iipeikou', 'ryanpeikou', 'sanshoku', 'sanshoku_doukou', 'ittsu', 'chanta', 'junchan', 'honroutou', 'honitsu',
+  'chinitsu', 'toitoi', 'sanankou', 'sankantsu', 'shousangen', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei',
+  'chiitoitsu', 'tenhou', 'chiihou', 'kokushi', 'suuankou', 'daisangen', 'tsuuiisou', 'shousuushii', 'daisuushii',
+  'ryuuiisou', 'chinroutou', 'chuuren', 'suukantsu',
+];
 for (let seed = first; seed < first + Number(opt.seeds); seed++) {
   if (opt.mode === 'game') playGame(seed);
   else playPractice(seed);
@@ -71,7 +80,8 @@ function playPractice(seed) {
 }
 
 function playGame(seed) {
-  let st = request('create', 'POST', '/api/games', { seed, length: opt.length, cpu: opt.cpu });
+  const dojo = opt.cpu === 'ura' ? { dojo: { yaku: ALL_YAKU } } : {};
+  let st = request('create', 'POST', '/api/games', { seed, length: opt.length, cpu: opt.cpu, ...dojo });
   const path = `/api/games/${st.game_id}/action`;
   for (let steps = 0; !st.game_over; steps++) {
     if (steps >= MAX_STEPS) throw new Error(`seed ${seed}: no game_over after ${MAX_STEPS} actions`);
