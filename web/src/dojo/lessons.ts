@@ -54,6 +54,8 @@ interface LessonBase {
   reward: { item?: string; coins: number };
   /** Lessons that must be passed first, of any stage. */
   requires: readonly string[];
+  /** The yaku (a key of the yaku guide, yakuGuide.ts) the lesson's hint links to; none for a lesson about no yaku. */
+  guide?: string;
 }
 
 export type Lesson =
@@ -194,7 +196,7 @@ function handYaku(
 ): Lesson {
   return {
     id, stage, title, text, example, form: 'game', assists: stage === 2 ? NOYAKU : [],
-    tempYaku: stage === 5 ? [keys[0]] : [], reward, requires,
+    tempYaku: stage === 5 ? [keys[0]] : [], reward, requires, guide: keys[0],
     judge: (r) => wonWith(r, keys),
   };
 }
@@ -246,7 +248,7 @@ export const LESSONS: readonly Lesson[] = [
     id: 'yakuhai-pon', stage: 3, title: '役牌をポンして和了する', form: 'game',
     text: '白・發・中と、場風・自風の刻子は1翻。ポンしても役が残るので、鳴くならまず役牌から。鳴くと立直はできなくなる。',
     example: '234m567p789s22p555z',
-    assists: NOYAKU, tempYaku: YAKUHAI_KEYS, reward: { item: 'yakuhai', coins: 0 }, requires: ['riichi-win', 'tanyao-win'],
+    assists: NOYAKU, tempYaku: YAKUHAI_KEYS, reward: { item: 'yakuhai', coins: 0 }, requires: ['riichi-win', 'tanyao-win'], guide: 'yakuhai',
     judge: (r) => wonWithCalledYakuhai(r),
   },
   {
@@ -259,7 +261,7 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'kan-win', stage: 3, title: 'カンして和了する', form: 'game',
     text: '同じ牌4枚でカンすると、嶺上牌を引き、ドラが1枚増える。カンした局で和了しよう。嶺上牌で和了すれば嶺上開花。',
-    assists: NOYAKU, tempYaku: ['rinshan'], reward: { item: 'rinshan', coins: 0 }, requires: ['yakuhai-pon'],
+    assists: NOYAKU, tempYaku: ['rinshan'], reward: { item: 'rinshan', coins: 0 }, requires: ['yakuhai-pon'], guide: 'rinshan',
     judge: (r) => called(r, 'kan') && won(r),
   },
   {
@@ -342,6 +344,22 @@ export function lessonStage(p: DojoProgress, id: string): LessonStage {
   if (l?.done) return 'done';
   if (!lesson.requires.every((r) => p.lessons[r]?.done)) return 'locked';
   return l?.assisted || lesson.assists.length === 0 ? 'unassisted' : 'assisted';
+}
+
+/** Whether the lesson is being learned: unlocked and not done. Only then does its game or practice judge it and add its aids. */
+export function lessonActive(p: DojoProgress, id: string): boolean {
+  const stage = lessonStage(p, id);
+  return stage === 'assisted' || stage === 'unassisted';
+}
+
+/**
+ * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=) or practice
+ * mode (?seed=&turns=18&lesson=, a random seed if none is given: #320 picks them).
+ */
+export function lessonHref(lesson: Lesson, seed?: number): string {
+  const id = encodeURIComponent(lesson.id);
+  if (lesson.form === 'game') return `?mode=dojo&play=1&lesson=${id}`;
+  return `?${seed === undefined ? '' : `seed=${seed}&`}turns=18&lesson=${id}`;
 }
 
 /** The yaku and the assists a lesson's game or practice adds for now, at the lesson's stage. */

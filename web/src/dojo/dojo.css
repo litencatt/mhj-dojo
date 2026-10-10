@@ -406,6 +406,23 @@
   display: inline-flex;
   align-items: center;
 }
+/* A lesson's line over the hand (LessonBar): a .dojo-notice of the lesson, its stage and what the last success did, then the hint. */
+.lesson-status {
+  margin: 6px 0;
+}
+.lesson-status p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+}
+.lesson-status .lesson-hint {
+  margin-top: 6px;
+}
+.lesson-stage {
+  color: var(--muted);
+}
 /* On a phone every chip of 所持役 is 44px tall, button or not (a roomy target in a short list). */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   /* Two and a half rows of 44px chips: the next row half shown, as on a wide screen. */
@@ -420,6 +437,11 @@
   .dojo-home .dojo-yaku-guide,
   .yaku-guide .dojo-actions > * {
     min-height: 44px;
+  }
+  .lesson-status button {
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
   }
 }
 
