@@ -459,6 +459,15 @@ function defaultStore(): KeyValueStore | null {
   }
 }
 
+/** Whether the dojo has a saved progress (it has been opened): practice mode offers its lessons only then. */
+export function progressSaved(store: KeyValueStore | null = defaultStore()): boolean {
+  try {
+    return store?.getItem(STORAGE_KEY) != null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The saved progress. A text that does not parse is kept under CORRUPT_KEY and
  * the dojo starts over, with `corrupted` set so the page can say so. `refunded`

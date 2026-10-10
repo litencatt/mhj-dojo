@@ -3,7 +3,7 @@ import { Tile } from '../components/Tile';
 import { tileName } from '../tiles';
 
 /** Each hand tile's ukeire once discarded (the normal row of by_discard); the best (lowest shanten, then most) marked. */
-export function ukeireBadges(state: GameState): Record<string, { count: number; text: string; best: boolean }> {
+export function ukeireBadges(state: Pick<GameState, 'by_discard'>): Record<string, { count: number; text: string; best: boolean }> {
   const rows = Object.entries(state.by_discard).flatMap(([t, rs]) => {
     const n = rs.find((r) => r.key === 'normal');
     return n && n.shanten !== null ? [{ t, shanten: n.shanten, count: n.ukeire_total }] : [];
