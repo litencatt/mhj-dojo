@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { SettingsDialog } from '../components/SettingsDialog';
 import { SiteHeader } from '../components/SiteHeader';
 import { YAKUHAI_KEYS, yakuName } from './catalog';
@@ -19,6 +19,7 @@ import {
 import { LENGTH_NAMES, roundName } from '../components/GameTable';
 import type { CpuLevel, GameLength } from '../api';
 import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
+import { MASTER_MATCH_LENGTH } from './masterMatch';
 import { discardUnfinishedDojoGames, savedGames } from '../saves';
 import { CPU_LEVEL_NAMES } from '../gameOptions';
 import { Shop } from './Shop';
@@ -29,12 +30,13 @@ import { LooksSettings, useDojoLooks } from './looks';
 import './dojo.css';
 
 /**
- * ?mode=dojo&play=1[&seed=]: the page that starts a dojo game. The seed of this
- * page's URL is kept unless that game was settled already: it would pay its
- * rounds again but never settle (no rank, no redraw or summon cost).
+ * ?mode=dojo&play=1[&match=ura][&seed=]: the page that starts a dojo game (match=ura: a ウラ面
+ * game). The seed of this page's URL is kept unless that game was settled already: it would pay
+ * its rounds again but never settle (no rank, no redraw or summon cost).
  */
-function playHref(settled: readonly string[]): string {
+function playHref(settled: readonly string[], ura = false): string {
   const params = new URLSearchParams({ mode: 'dojo', play: '1' });
+  if (ura) params.set('match', 'ura');
   const seed = hubSeed(settled);
   if (seed !== undefined) params.set('seed', String(seed));
   return `?${params}`;
@@ -46,11 +48,18 @@ function hubSeed(settled: readonly string[]): number | undefined {
   return seed && !settled.includes(seed) && Number.isSafeInteger(Number(seed)) ? Number(seed) : undefined;
 }
 
+// The hub's two faces once the 師範戦 is won: the 表's game and the ウラ面's (against the urashihan).
+const SIDES = [
+  { key: 'omote', label: '表' },
+  { key: 'ura', label: 'ウラ面' },
+] as const;
+
 const LENGTHS: { value: GameLength; level: number }[] = [
   { value: 'tonpuu', level: 1 },
   { value: 'hanchan', level: HANCHAN_LEVEL },
 ];
-// The master (師範) and the urashihan (裏師範) are not offered yet: the 師範戦 and the ウラ面 come with #323.
+// The master (師範) and the urashihan (裏師範) are not the hub's game: they play the 師範戦 (課程) and
+// the ウラ面's games (its tab).
 const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'weak', level: 1 },
   { value: 'normal', level: NORMAL_CPU_LEVEL },
@@ -79,6 +88,19 @@ export function DojoHome() {
   // The dojo's own unfinished games (the CPU game's list never has them).
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
   const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
+  // The 表 or the ウラ面 (?side=ura, as a ウラ面 game's 道場へ戻る opens it), once the 師範戦 is won.
+  const [side, setSide] = useState<'omote' | 'ura'>(() => (new URLSearchParams(location.search).get('side') === 'ura' ? 'ura' : 'omote'));
+  const ura = progress.masterMatch.uraOpen && side === 'ura';
+  const sideRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Arrow keys, Home and End move between the two tabs (the WAI-ARIA tabs pattern, as the shop's).
+  function onSideKey(e: KeyboardEvent, i: number) {
+    const to = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: 1 } as Record<string, number>)[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const j = (to + 2) % 2;
+    setSide(SIDES[j].key);
+    sideRefs.current[j]?.focus();
+  }
 
   // A bought 立直 was refunded on reading: said once, when the refund is stored (the next reading finds none).
   useEffect(() => {
@@ -111,8 +133,10 @@ export function DojoHome() {
   const lv = level(progress.xp);
   const next = xpForLevel(lv + 1);
   const bar = Math.round(levelProgress(progress.xp) * 100);
+  // The 表's game (設定 chooses it) and the game 対局開始 plays: the 表's or, on the ウラ面, the urashihan's.
   const game = dojoGame(progress);
   const multiplier = rankMultiplierLabel(game.length, game.cpu);
+  const play = ura ? { length: MASTER_MATCH_LENGTH, cpu: 'ura' as const } : game;
 
   return (
     <div class="dojo-home">
@@ -145,7 +169,39 @@ export function DojoHome() {
             <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 銭
           </span>
         </div>
-        <div class="dojo-play">
+        {progress.masterMatch.uraOpen && (
+          <div class="shop-tabs dojo-sides" role="tablist" aria-label="道場の面">
+            {SIDES.map((s, i) => (
+              <button
+                key={s.key}
+                ref={(el) => {
+                  sideRefs.current[i] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`dojo-side-${s.key}`}
+                aria-selected={side === s.key}
+                aria-controls="dojo-side-panel"
+                tabIndex={side === s.key ? 0 : -1}
+                onClick={() => setSide(s.key)}
+                onKeyDown={(e) => onSideKey(e, i)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div
+          class="dojo-play"
+          id="dojo-side-panel"
+          role={progress.masterMatch.uraOpen ? 'tabpanel' : undefined}
+          aria-labelledby={progress.masterMatch.uraOpen ? `dojo-side-${side}` : undefined}
+        >
+          {ura && (
+            <p class="dojo-muted dojo-side-note" data-testid="dojo-ura-note">
+              裏師範（イカサマを使う CPU）3人と半荘戦。持っているイカサマが使えます。順位の報酬 {rankMultiplierLabel(play.length, play.cpu)}
+            </p>
+          )}
           {resume ? (
             <>
               <a
@@ -155,13 +211,13 @@ export function DojoHome() {
               >
                 続きから
               </a>
-              <a class="dojo-restart" href={playHref(progress.settled)} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
+              <a class="dojo-restart" href={playHref(progress.settled, ura)} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
                 新しく始める
               </a>
             </>
           ) : (
-            <a class="dojo-start" href={playHref(progress.settled)} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_LEVEL_NAMES[game.cpu]}`}>
-              対局開始
+            <a class="dojo-start" href={playHref(progress.settled, ura)} title={`${LENGTH_NAMES[play.length]}、CPU は${CPU_LEVEL_NAMES[play.cpu]}`}>
+              {ura ? 'ウラ面で対局' : '対局開始'}
             </a>
           )}
         </div>

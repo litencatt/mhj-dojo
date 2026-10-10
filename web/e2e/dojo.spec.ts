@@ -92,7 +92,7 @@ test('a redraw is restored by a reload and costs its coins once, when the game e
   await watchEngine(page);
   await newDojoGame(page, DOJO_REDRAW_SEED, {
     ownedYaku: LEARNED,
-    ownedItems: ['cheat:redraw'],
+    ownedItems: ['cheat:redraw'], legacyCheats: true,
     coins: 200,
     xp: 4500,
     firstGameBonus: true,
@@ -205,7 +205,7 @@ test('a broken progress is set aside and the dojo starts over', async ({ page })
 
 test('透視 shows the other seats hands only while it is on', async ({ page }) => {
   test.setTimeout(90_000);
-  await newDojoGame(page, SEED, { ownedItems: ['cheat:peek'] });
+  await newDojoGame(page, SEED, { ownedItems: ['cheat:peek'], legacyCheats: true });
   const hands = page.locator('.seat-hand[aria-label="手牌"]');
   await expect(hands).toHaveCount(0);
   // 透視 is in 設定's 表示.
@@ -526,7 +526,7 @@ test('役なし警告 on a called hand: 役なし', async ({ page }) => {
 test('リーチ者の待ち透視: a CPU in riichi shows its waits', async ({ page }) => {
   test.setTimeout(90_000);
   // DOJO_RIICHIWAITS_SEED: the seat across is in riichi at once, waiting on 4m and 西 (3z).
-  await newDojoGame(page, DOJO_RIICHIWAITS_SEED, { ownedItems: ['cheat:riichiwaits'] });
+  await newDojoGame(page, DOJO_RIICHIWAITS_SEED, { ownedItems: ['cheat:riichiwaits'], legacyCheats: true });
   await waitForPlayback(page);
   const waits = page.locator('.seat-top').getByTestId('seat-waits');
   await expect(waits.locator('.tile')).toHaveCount(2);
@@ -537,7 +537,7 @@ test('リーチ者の待ち透視: a CPU in riichi shows its waits', async ({ pa
 
 test('裏ドラ透視 shows the ura dora during the round, and only once bought', async ({ page }) => {
   test.setTimeout(90_000);
-  await newDojoGame(page, SEED, { ownedItems: ['cheat:ura'] });
+  await newDojoGame(page, SEED, { ownedItems: ['cheat:ura'], legacyCheats: true });
   await waitForPlayback(page);
   const dora = page.locator('.dora-box').filter({ visible: true });
   await expect(dora.locator('.tile-back')).toHaveCount(0);
@@ -554,7 +554,7 @@ test('裏ドラ透視 shows the ura dora during the round, and only once bought'
 
 test('山読み shows the next three draws', async ({ page }) => {
   test.setTimeout(90_000);
-  await newDojoGame(page, SEED, { ownedItems: ['cheat:wallpeek'] });
+  await newDojoGame(page, SEED, { ownedItems: ['cheat:wallpeek'], legacyCheats: true });
   await waitForPlayback(page);
   const next = page.getByTestId('dojo-next-draws');
   await expect(next.locator('.tile')).toHaveCount(3);
@@ -566,7 +566,7 @@ test('牌寄せ fetches a chosen kind into the drawn tile once a round, and cost
   await watchEngine(page);
   await newDojoGame(page, DOJO_SUMMON_SEED, {
     ownedYaku: LEARNED,
-    ownedItems: ['cheat:summon'],
+    ownedItems: ['cheat:summon'], legacyCheats: true,
     coins: 200,
     xp: 4500,
     firstGameBonus: true,

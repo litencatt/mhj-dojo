@@ -16,9 +16,11 @@ export interface FinalPanelProps {
 /** 道場の報酬: XP, coins, the redraws' and summons' cost, the level-up and what it unlocked. */
 function DojoReward({ reward, state }: { reward: Reward | null; state: GameState }) {
   if (!reward) return <p class="muted dojo-reward">この対局の報酬は受け取り済みです。</p>;
+  // The cheats unlock with the ウラ面, not the level.
   const unlocked = reward.levelAfter > reward.levelBefore
-    ? CATALOG.filter((it) => it.level > reward.levelBefore && it.level <= reward.levelAfter)
+    ? CATALOG.filter((it) => it.kind !== 'cheat' && it.level > reward.levelBefore && it.level <= reward.levelAfter)
     : [];
+  const master = reward.masterMatch;
   const multiplier = reward.rankMultiplier !== 1 ? `（${rankMultiplierLabel(state.length, state.cpu)}）` : '';
   return (
     <div class="dojo-reward" data-testid="dojo-reward">
@@ -39,6 +41,12 @@ function DojoReward({ reward, state }: { reward: Reward | null; state: GameState
           <li class="dojo-levelup">{reward.levelAfter > 10 ? '昇段' : '昇級'}！ {rankName(reward.levelBefore)} → {rankName(reward.levelAfter)}</li>
         )}
         {unlocked.length > 0 && <li>ショップに解禁: {unlocked.map((it) => it.name).join('、')}</li>}
+        {master && (
+          <li class={master.won ? 'dojo-levelup' : undefined} data-testid="dojo-master-result">
+            {master.won ? '師範戦に勝ちました！' : `師範戦は${reward.rank}位でした。1位で勝ちです。何度でも挑戦できます。`}
+            {master.uraOpened && ' ウラ面が開きました。道場の「ウラ面」で裏師範と対局でき、ショップでイカサマが買えます。'}
+          </li>
+        )}
       </ul>
     </div>
   );

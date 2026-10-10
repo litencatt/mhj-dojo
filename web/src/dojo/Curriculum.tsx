@@ -1,6 +1,8 @@
 import { Tile } from '../components/Tile';
 import { LESSONS, findLesson, lessonActive, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
-import { progressSaved, saveProgress, type DojoProgress } from './progress';
+import { MASTER_MATCH_LEVEL, curriculumDone, masterMatchOpen } from './masterMatch';
+import { level, progressSaved, saveProgress, type DojoProgress } from './progress';
+import { rankName } from './rules';
 import { expandTiles, guideFor } from './yakuGuide';
 
 // The curriculum's stages (#316), 0 to 5.
@@ -28,8 +30,8 @@ interface CurriculumProps {
 /**
  * The hub's 課程 panel: the lessons stage by stage (the stage of the next
  * lesson open, the others folded), each with its state, a way to start it
- * and, folded, its text and example hand; the next lesson marked. What comes
- * after (段6 and the 師範戦) is announced at the end.
+ * and, folded, its text and example hand; the next lesson marked. Then the
+ * 師範戦 (MasterMatchRow), and 段6 announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const next = nextLesson(progress);
@@ -59,12 +61,18 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           </details>
         );
       })}
+      <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
+        <summary>
+          師範戦
+          <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '段0〜5の後'}</span>
+        </summary>
+        <ul class="shop-list">
+          <MasterMatchRow progress={progress} seed={seed} />
+        </ul>
+      </details>
       <ul class="dojo-lesson-later">
         <li>
           段6 中級（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
-        </li>
-        <li>
-          師範戦（段0〜5に合格すると挑戦できます）<span class="dojo-muted">準備中</span>
         </li>
       </ul>
     </section>
@@ -125,6 +133,53 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
             ))}
           </div>
         )}
+      </details>
+    </li>
+  );
+}
+
+/** The 師範戦's URL: a dojo game dealt as the 師範戦 (GameApp's ?match=master), on the hub's seed if any. */
+export function masterMatchHref(seed?: number): string {
+  const params = new URLSearchParams({ mode: 'dojo', play: '1', match: 'master' });
+  if (seed !== undefined) params.set('seed', String(seed));
+  return `?${params}`;
+}
+
+/**
+ * The 師範戦's row: its state (locked until masterMatchOpen, then the tries and wins), 挑戦する
+ * (the primary button until it is won: the curriculum is passed by then, so no lesson is next)
+ * and, folded, its rules and what is still missing.
+ */
+function MasterMatchRow({ progress, seed }: { progress: DojoProgress; seed?: number }) {
+  const open = masterMatchOpen(progress);
+  const { tries, wins, uraOpen } = progress.masterMatch;
+  const left = LESSONS.filter((l) => lessonStage(progress, l.id) !== 'done').length;
+  const lv = level(progress.xp);
+  const missing = [
+    !curriculumDone(progress) && `段0〜5の課題に合格する（あと${left}）`,
+    lv < MASTER_MATCH_LEVEL && `${rankName(MASTER_MATCH_LEVEL)}になる（いま${rankName(lv)}）`,
+  ].filter((m): m is string => !!m);
+  const keep = () => {
+    if (!progressSaved()) saveProgress(progress);
+  };
+  return (
+    <li class="shop-item dojo-lesson" data-state={!open ? 'locked' : uraOpen ? 'done' : 'open'} data-testid="dojo-master-match">
+      <span class="shop-name">師範戦（半荘・師範×3）</span>
+      <span class={uraOpen ? 'shop-owned' : open ? 'shop-price' : 'shop-locked'}>
+        {!open ? 'ロック' : `挑戦 ${tries}回・勝利 ${wins}回`}
+      </span>
+      {open && (
+        <a class={uraOpen ? 'dojo-restart' : 'dojo-start'} href={masterMatchHref(seed)} onClick={keep} onAuxClick={keep}
+          aria-label={uraOpen ? '師範戦にもう一度挑戦する' : '師範戦に挑戦する'}
+        >
+          {uraOpen ? 'もう一度挑戦する' : '挑戦する'}
+        </a>
+      )}
+      <details class="dojo-lesson-more" open={open && !uraOpen}>
+        <summary>{missing.length > 0 ? `説明（先に: ${missing.join('、')}）` : '説明'}</summary>
+        <p>
+          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。勝つとウラ面が開き、裏師範との対局とイカサマ（ショップ）が解禁されます。
+        </p>
       </details>
     </li>
   );

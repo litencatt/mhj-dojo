@@ -27,6 +27,19 @@
 .dojo-play {
   margin-top: 8px;
 }
+/* The cheats' tab says where they work (Shop). */
+.shop-note {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+/* The 表 / ウラ面 tabs (the shop's .shop-tabs) over the game to start, once the 師範戦 is won. */
+.dojo-sides {
+  margin: 8px 0 0;
+}
+.dojo-side-note {
+  flex-basis: 100%;
+  margin: 0;
+}
 .dojo-level {
   font-size: 1.1rem;
   font-weight: bold;

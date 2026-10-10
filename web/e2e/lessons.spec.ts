@@ -252,12 +252,13 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(locked).toHaveAttribute('data-state', 'locked');
   await expect(locked.getByRole('link')).toHaveCount(0);
   await expect(locked.locator('.dojo-lesson-more summary')).toContainText('先に: 和了形を作る');
-  // A lesson's yaku has its guide; what comes after stage 5 is announced.
+  // A lesson's yaku has its guide; stage 6 is announced, the 師範戦 locked (master-match.spec.ts).
   await openStage(panel.locator('.dojo-lesson-stage').nth(2));
   await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
   await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/段6.*準備中/, /師範戦.*準備中/]);
+  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/段6.*準備中/]);
+  await expect(page.getByTestId('dojo-master-match')).toHaveAttribute('data-state', 'locked');
 });
 
 test('a lesson started from the hub and passed shows so after a reload; its yaku is granted and owned in the shop', async ({ page }) => {
