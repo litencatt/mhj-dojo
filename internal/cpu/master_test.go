@@ -34,6 +34,12 @@ func TestMasterDama(t *testing.T) {
 	if a := NewMaster().Decide(v, l); a.Type != game.Discard || a.Tile != "1z" {
 		t.Errorf("master: got %+v, want a dama discard of 1z", a)
 	}
+	// On a furiten wait (5m in its river) it declares: dama wins only by
+	// tsumo then.
+	v.Seats[0].River = []game.RiverTile{{Tile: mustTile("5m")}}
+	if a := NewMaster().Decide(v, l); a.Type != game.Riichi {
+		t.Errorf("master on a furiten wait: got %+v, want riichi", a)
+	}
 }
 
 // Whole games with four masters: legal moves only, and the same seed

@@ -118,10 +118,7 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 		p.byYaku(v, best, tiles, &visible)
 	}
 	if p.master {
-		if !needsRoute(v, me.Melds) {
-			p.shape(v, best, tiles, len(me.Melds), &visible)
-		}
-		byValue(v, best)
+		p.rankMaster(v, best, tiles, &visible)
 	}
 	pick := best[0]
 	if !p.weak {
@@ -187,12 +184,16 @@ func stray(v game.View, opts []option) string {
 }
 
 // option is a discard with the shanten and unseen accepting tiles it leaves.
+// base is the shanten byEfficiency gave it (byYaku may change shanten), and
+// weight the master's ranking of it (rankMaster).
 type option struct {
 	tile    string
 	kind    tile.Kind
 	red     bool
 	shanten int
 	ukeire  int
+	base    int
+	weight  int
 }
 
 // byEfficiency ranks the discards: lowest shanten, most ukeire, then honors
@@ -205,7 +206,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, v
 		o := option{tile: s, kind: tiles[i].Kind, red: tiles[i].Red}
 		// A red five and a plain one leave the same hand.
 		if j := slices.IndexFunc(opts, func(x option) bool { return x.kind == o.kind }); j >= 0 {
-			o.shanten, o.ukeire = opts[j].shanten, opts[j].ukeire
+			o.shanten, o.ukeire, o.base = opts[j].shanten, opts[j].ukeire, opts[j].base
 			opts = append(opts, o)
 			continue
 		}
@@ -215,7 +216,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, v
 		for _, k := range acc {
 			o.ukeire += max(0, 4-visible[k])
 		}
-		o.shanten = sh
+		o.shanten, o.base = sh, sh
 		opts = append(opts, o)
 	}
 	sortx.Func(opts, func(a, b option) int {

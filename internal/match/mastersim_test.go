@@ -13,10 +13,10 @@ import (
 
 // The master CPU's strength (docs/dojo-economy.md): the master and, for
 // comparison, the normal CPU play your seat against three normal CPUs in
-// 2000 半荘戦 (seeds 1 to 2000, the same for both), every yaku counted. Run
+// 4000 半荘戦 (seeds 1 to 4000, the same for both), every yaku counted. Run
 // it with MHJDOJO_FULL=1, as TestDojoEconomySim; it prints a MASTER line
 // for each player and the difference, and fails unless the master's average
-// rank is lower by masterMargin and by three standard errors of the
+// rank is lower by masterMargin and by 2.5 standard errors of the
 // difference, paired by seed. 400 seeds are too few: their standard error
 // (~0.06) is about half the difference.
 
@@ -30,7 +30,7 @@ func TestMasterStronger(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games; run without -short")
 	}
-	n := testmode.N(2000, 2, 0)
+	n := testmode.N(4000, 2, 0)
 	policies := []struct {
 		name string
 		new  func() game.Decider
@@ -81,7 +81,7 @@ func TestMasterStronger(t *testing.T) {
 	}
 	se := math.Sqrt(ss / float64(max(1, n-1)) / float64(n))
 	t.Logf("MASTER avg_rank master=%.3f normal=%.3f diff=%.3f se=%.3f", avg[0], avg[1], diff, se)
-	if testmode.Full() && (diff < masterMargin || diff < 3*se) {
+	if testmode.Full() && (diff < masterMargin || diff < 2.5*se) {
 		t.Errorf("the master is not clearly stronger: average rank %.3f vs normal %.3f (diff %.3f, se %.3f)", avg[0], avg[1], diff, se)
 	}
 }

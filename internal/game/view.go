@@ -26,6 +26,7 @@ type View struct {
 	Viewer         int
 	Seed           int64
 	Dealer         int
+	FirstDealer    int // ties in the standings go to the seat nearer it
 	RoundWind      tile.Kind
 	Phase          Phase
 	Actor          int
@@ -48,6 +49,7 @@ func (r *Round) ViewFor(viewer int) View {
 		Viewer:         viewer,
 		Seed:           r.wall.Seed(),
 		Dealer:         r.dealer,
+		FirstDealer:    r.firstDealer,
 		RoundWind:      r.roundWind,
 		Phase:          r.phase,
 		Actor:          r.Actor(),

@@ -641,15 +641,16 @@ same. `"master"` (師範) plays as `"normal"` and sees no more than it does, but
 plays stronger: one step from tenpai it ranks discards by the waits each
 draw leads to (and a furiten wait at half), keeps dora and value honors over
 a few accepting tiles, stays dama on a closed tenpai worth 4 han or more
-without riichi, and folds by the hand's value and its standing (one step
-from tenpai it pushes with a dora, a value triplet or the deal against a
-single riichi; tenpai it folds only a cheap hand on a thin wait, or any cheap
-hand with a big lead; last in the South round it pushes further). Pushing
+without riichi (not on a furiten wait), and folds by the hand's value and
+its standing (one step from tenpai it pushes with a dora, a value triplet or
+the deal against a single riichi; tenpai it folds only a cheap hand on a
+thin wait, or any cheap hand with a big lead; last in the South round it
+pushes further). Pushing
 against a riichi, it discards the safest tile that keeps the shanten and
 most of the accepting tiles, and it guards against open hands with two or
 more calls as well. Against three `"normal"` CPUs in 半荘戦 its average rank
-is 0.10 lower than the normal CPU's in the same seat (2.41 against 2.51
-over 2000 games; `TestMasterStronger`, [docs/dojo-economy.md](dojo-economy.md)).
+is 0.09 lower than the normal CPU's in the same seat (2.42 against 2.51
+over 4000 games; `TestMasterStronger`, [docs/dojo-economy.md](dojo-economy.md)).
 
 ### `POST /api/games`
 Body (optional): `{"seed": 42, "length": "hanchan", "first_dealer": "you",

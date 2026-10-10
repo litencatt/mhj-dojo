@@ -306,7 +306,7 @@ export function lengthUnlocked(p: DojoProgress, length: GameLength): boolean {
   return length === DEFAULT_GAME_LENGTH || level(p.xp) >= HANCHAN_LEVEL;
 }
 
-/** Whether the CPU level is unlocked at the progress's level. */
+/** Whether the CPU level is unlocked at the progress's level (the master as the normal one until #323, which the hub does not offer). */
 export function cpuUnlocked(p: DojoProgress, cpu: CpuLevel): boolean {
   return cpu === DEFAULT_GAME_CPU || level(p.xp) >= NORMAL_CPU_LEVEL;
 }

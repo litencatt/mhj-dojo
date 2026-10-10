@@ -20,6 +20,7 @@ import { LENGTH_NAMES, roundName } from '../components/GameTable';
 import type { CpuLevel, GameLength } from '../api';
 import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
 import { discardUnfinishedDojoGames, savedGames } from '../saves';
+import { CPU_LEVEL_NAMES } from '../gameOptions';
 import { Shop } from './Shop';
 import { GuideDialog } from './GuideDialog';
 import { guideFor } from './yakuGuide';
@@ -38,11 +39,11 @@ function playHref(settled: readonly string[]): string {
   return `?${params}`;
 }
 
-const CPU_NAMES: Record<CpuLevel, string> = { weak: '弱い', normal: '普通', master: '師範' };
 const LENGTHS: { value: GameLength; level: number }[] = [
   { value: 'tonpuu', level: 1 },
   { value: 'hanchan', level: HANCHAN_LEVEL },
 ];
+// The master (師範) is not offered yet: the dojo's 師範戦 comes with #323.
 const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'weak', level: 1 },
   { value: 'normal', level: NORMAL_CPU_LEVEL },
@@ -152,7 +153,7 @@ export function DojoHome() {
               </a>
             </>
           ) : (
-            <a class="dojo-start" href={playHref(progress.settled)} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_NAMES[game.cpu]}`}>
+            <a class="dojo-start" href={playHref(progress.settled)} title={`${LENGTH_NAMES[game.length]}、CPU は${CPU_LEVEL_NAMES[game.cpu]}`}>
               対局開始
             </a>
           )}
@@ -218,7 +219,7 @@ export function DojoHome() {
                   disabled={!cpuUnlocked(progress, o.value)}
                   onChange={() => change((cur) => setGameCpu(cur, o.value))}
                 />
-                {CPU_NAMES[o.value]}
+                {CPU_LEVEL_NAMES[o.value]}
                 {!cpuUnlocked(progress, o.value) && <small class="dojo-muted">（{rankName(o.level)}で解禁）</small>}
               </label>
             ))}

@@ -5,7 +5,7 @@ import { dojoGame, dojoOptions, type DojoProgress } from './dojo/progress';
 import type { GameSummary } from './saves';
 
 export const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
-/** The CPU levels the game options offer (the master is the dojo's). */
+/** The CPU levels the game options offer (the master is the dojo's, #323: parseOptions reads it as normal). */
 export const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
 /** Every CPU level's name, for a game's. */
 export const CPU_LEVEL_NAMES: Record<CpuLevel, string> = { ...CPU_NAMES, master: '師範' };

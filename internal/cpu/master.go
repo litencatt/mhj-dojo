@@ -17,22 +17,22 @@ import (
 //     included) and value honors unless dropping them gains doraUkeire
 //     unseen accepting tiles each (byValue).
 //   - Dama: it does not declare riichi on a closed tenpai worth damaHan
-//     without it.
+//     without it, unless the wait is furiten.
 //   - Folding: it folds by the hand's value and its standing (masterFolds)
 //     instead of the normal player's fixed steps.
 //   - Pushing: against a riichi or an open hand of openMelds calls, it
 //     discards the safest tile that keeps the shanten and pushRatio of the
-//     ukeire (guarded).
+//     weight (guarded).
 // TestMasterStronger in internal/match measures it against the normal one.
 
-// doraUkeire is the ukeire a dora (or value honor, at half) is worth when
-// ranking discards.
+// doraUkeire is the unseen accepting tiles a dora (or value honor, at half)
+// is worth when ranking discards.
 const doraUkeire = 4
 
 // bigLead is the lead over second place from which the master folds more.
 const bigLead = 12000
 
-// pushRatio is the share, in percent, of the best ukeire a discard must
+// pushRatio is the share, in percent, of the best weight a discard must
 // keep to be chosen for safety while pushing against a riichi.
 const pushRatio = 75
 
@@ -47,24 +47,42 @@ func doraOf(v game.View, t tile.Tile) int {
 	return n
 }
 
-// byValue reorders the discards of the lowest shanten (the head of opts)
-// by ukeire less doraUkeire for each dora the discard gives away and half
-// that for a value honor, keeping the order among equals.
+// rankMaster ranks the discards, as byEfficiency and byYaku left them, the
+// master's way: each one's weight is its ukeire in units of 1/tenpaiWait,
+// reweighed by shape unless the hand needsRoute, then byValue.
+func (p *Player) rankMaster(v game.View, opts []option, tiles []tile.Tile, visible *tile.Counts) {
+	for i := range opts {
+		opts[i].weight = opts[i].ukeire * tenpaiWait
+	}
+	melds := v.Seats[v.Viewer].Melds
+	if !needsRoute(v, melds) {
+		p.shape(v, opts, tiles, len(melds), visible)
+	}
+	byValue(v, opts)
+}
+
+// byValue reorders the discards of the lowest shanten (the head of opts) by
+// their shanten before byYaku (base), then by weight less doraUkeire tiles
+// for each dora the discard gives away and half that for a value honor,
+// keeping the order among equals.
 func byValue(v game.View, opts []option) {
 	n := 1
 	for n < len(opts) && opts[n].shanten == opts[0].shanten {
 		n++
 	}
 	score := func(o option) int {
-		t := tile.Tile{Kind: o.kind, Red: o.red}
-		s := 2 * o.ukeire
-		s -= 2 * doraUkeire * doraOf(v, t)
+		s := o.weight - doraUkeire*tenpaiWait*doraOf(v, tile.Tile{Kind: o.kind, Red: o.red})
 		if o.kind.IsHonor() && isValue(v, o.kind) {
-			s -= doraUkeire
+			s -= doraUkeire * tenpaiWait / 2
 		}
 		return s
 	}
-	sortx.Func(opts[:n], func(a, b option) int { return score(b) - score(a) })
+	sortx.Func(opts[:n], func(a, b option) int {
+		if a.base != b.base {
+			return a.base - b.base
+		}
+		return score(b) - score(a)
+	})
 }
 
 // handValue estimates the han the viewer's hand has without riichi or its
@@ -97,15 +115,17 @@ func handValue(v game.View) int {
 	return n
 }
 
-// standing returns the viewer's rank by points (1 to 4, ties to the lower
-// seat) and its lead over the nearest seat below it (0 when last).
+// standing returns the viewer's rank by points (1 to 4, ties to the seat
+// nearer the first dealer, as Hanchan.Standings) and its lead over the
+// nearest seat below it (0 when last).
 func standing(v game.View) (rank, lead int) {
 	me := v.Seats[v.Viewer].Points
+	near := func(s int) int { return (s - v.FirstDealer + 4) % 4 }
 	rank, lead = 1, -1
 	for _, s := range v.Seats {
 		switch {
 		case s.Seat == v.Viewer:
-		case s.Points > me || s.Points == me && s.Seat < v.Viewer:
+		case s.Points > me || s.Points == me && near(s.Seat) < near(v.Viewer):
 			rank++
 		case lead < 0 || me-s.Points < lead:
 			lead = me - s.Points
@@ -130,6 +150,8 @@ func (p *Player) masterFolds(v game.View, sh, ukeire, threats int) bool {
 	}
 	rank, lead := standing(v)
 	safeLead := rank == 1 && lead >= bigLead
+	// Last place pushes further only in the South round: in a 東風戦,
+	// where every round is East, it folds as any other rank does.
 	behind := rank == 4 && v.RoundWind != tile.East
 	switch {
 	case sh >= 2:
@@ -140,7 +162,8 @@ func (p *Player) masterFolds(v game.View, sh, ukeire, threats int) bool {
 		return safeLead || threats >= 2 || value < 1
 	}
 	// Tenpai: fold a cheap hand on a thin wait, or any cheap hand when
-	// well ahead.
+	// well ahead. Without the ukeire (a call offer, see decideCall) a
+	// tenpai hand never folds: the call is judged on its own.
 	if ukeire < 0 || behind {
 		return false
 	}
@@ -151,12 +174,12 @@ func (p *Player) masterFolds(v game.View, sh, ukeire, threats int) bool {
 }
 
 // guarded returns, from the ranked opts of a hand pushing against threats,
-// the safest discard that keeps the lowest shanten and pushRatio of the
-// best ukeire.
+// the safest discard that keeps the shanten of the best (before and after
+// byYaku) and pushRatio of its weight.
 func guarded(opts []option, threats [][tile.NumKinds]bool, visible *tile.Counts) option {
 	best, bestDanger := opts[0], -1
 	for _, o := range opts {
-		if o.shanten != opts[0].shanten || o.ukeire*100 < opts[0].ukeire*pushRatio {
+		if o.shanten != opts[0].shanten || o.base != opts[0].base || o.weight*100 < opts[0].weight*pushRatio {
 			continue
 		}
 		d := 0
@@ -191,23 +214,22 @@ func openThreats(v game.View, riichi [][tile.NumKinds]bool) [][tile.NumKinds]boo
 	return out
 }
 
-// shape reweighs the ukeire of the discards of the lowest shanten (the head
-// of opts) of a hand with melds calls by what the draws lead to: one step
-// from tenpai, each accepting tile counts the unseen tiles of the best wait
-// it reaches over tenpaiWait; at tenpai, a furiten wait counts half.
+// shape reweighs the discards of the lowest shanten (the head of opts) of a
+// hand with melds calls by what the draws lead to: one step from tenpai,
+// the weight is the unseen tiles of each accepting kind times those of the
+// best wait it reaches (a two-sided wait of tenpaiWait tiles keeps the
+// weight of the plain ukeire); at tenpai, a furiten wait counts half its
+// ukeire, rounded up.
 func (p *Player) shape(v game.View, opts []option, tiles []tile.Tile, melds int, visible *tile.Counts) {
 	sh := opts[0].shanten
 	if sh > 1 {
 		return
 	}
-	var river [tile.NumKinds]bool
-	for _, rt := range v.Seats[v.Viewer].River {
-		river[rt.Tile.Kind] = true
-	}
+	river := ownRiver(v)
 	all := tile.CountsOf(tiles)
 	for i := 0; i < len(opts) && opts[i].shanten == sh; i++ {
 		if j := slices.IndexFunc(opts[:i], func(x option) bool { return x.kind == opts[i].kind }); j >= 0 {
-			opts[i].ukeire = opts[j].ukeire
+			opts[i].ukeire, opts[i].weight = opts[j].ukeire, opts[j].weight
 			continue
 		}
 		c := all
@@ -215,7 +237,8 @@ func (p *Player) shape(v game.View, opts []option, tiles []tile.Tile, melds int,
 		_, acc := p.shanten(c, melds)
 		if sh == 0 {
 			if slices.ContainsFunc(acc, func(k tile.Kind) bool { return river[k] }) {
-				opts[i].ukeire /= 2
+				opts[i].ukeire = (opts[i].ukeire + 1) / 2
+				opts[i].weight = opts[i].ukeire * tenpaiWait
 			}
 			continue
 		}
@@ -229,13 +252,13 @@ func (p *Player) shape(v game.View, opts []option, tiles []tile.Tile, melds int,
 			sum += left * p.bestNext(&c, melds, sh-1, visible, k)
 			c[k]--
 		}
-		opts[i].ukeire = sum / tenpaiWait
+		opts[i].weight = sum
 	}
 	sortx.Func(opts, func(a, b option) int {
 		if a.shanten != b.shanten {
 			return a.shanten - b.shanten
 		}
-		return b.ukeire - a.ukeire
+		return b.weight - a.weight
 	})
 }
 
@@ -269,9 +292,16 @@ func (p *Player) bestNext(c *tile.Counts, melds, sh int, visible *tile.Counts, d
 // whose every wait wins by ron without riichi with at least this many han.
 const damaHan = 4
 
-// dama reports whether the master stays dama discarding s from tiles.
+// dama reports whether the master stays dama discarding s from tiles: not
+// on a furiten wait (one of waits in its river, s included), which wins
+// only by tsumo.
 func dama(v game.View, tiles []tile.Tile, s string, waits []tile.Kind) bool {
 	i := slices.IndexFunc(tiles, func(t tile.Tile) bool { return t.String() == s })
+	river := ownRiver(v)
+	river[tiles[i].Kind] = true
+	if slices.ContainsFunc(waits, func(k tile.Kind) bool { return river[k] }) {
+		return false
+	}
 	rest := slices.Delete(slices.Clone(tiles), i, i+1)
 	ctx := yaku.Context{Ron: true, Winds: yaku.Winds{Round: v.RoundWind, Seat: v.Seats[v.Viewer].Wind}, DoraIndicators: v.DoraIndicators}
 	for _, k := range waits {
@@ -282,4 +312,13 @@ func dama(v game.View, tiles []tile.Tile, s string, waits []tile.Kind) bool {
 		}
 	}
 	return len(waits) > 0
+}
+
+// ownRiver returns the kinds in the viewer's river.
+func ownRiver(v game.View) [tile.NumKinds]bool {
+	var river [tile.NumKinds]bool
+	for _, rt := range v.Seats[v.Viewer].River {
+		river[rt.Tile.Kind] = true
+	}
+	return river
 }

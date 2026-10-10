@@ -1,6 +1,10 @@
 package match
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/litencatt/mhj-dojo/internal/cpu"
+)
 
 // BenchmarkGameStep times one human action in a CPU game — the action
 // itself plus the CPU turns that follow it, up to the next human decision.
@@ -9,16 +13,23 @@ import "testing"
 // when one ends, and a new 半荘 with the next seed (1 to 30) when one ends.
 // Creating a game and starting a round are not timed. steps/game, the
 // length of a 半荘, averages the ones finished: -benchtime 6000x goes round
-// all 30 seeds.
+// all 30 seeds. BenchmarkGameStepMaster is the same against three masters
+// (cpu.Master).
 //
 //	go test ./internal/match -run '^$' -bench BenchmarkGameStep -benchtime 6000x
-func BenchmarkGameStep(b *testing.B) {
+func BenchmarkGameStep(b *testing.B) { benchGameStep(b, Options{Length: Hanchan}) }
+
+func BenchmarkGameStepMaster(b *testing.B) {
+	benchGameStep(b, Options{Length: Hanchan, CPU: cpu.Master})
+}
+
+func benchGameStep(b *testing.B, o Options) {
 	if testing.Short() {
 		b.Skip("plays whole games on one goroutine; run without -short")
 	}
 	s := NewStore(1)
 	newGame := func(seed int64) *Match {
-		m, err := s.Create(&seed, Options{Length: Hanchan})
+		m, err := s.Create(&seed, o)
 		if err != nil {
 			b.Fatal(err)
 		}
