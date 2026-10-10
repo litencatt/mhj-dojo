@@ -50,6 +50,7 @@ export interface LessonProgress {
   assisted: boolean; // passed with the assists (a lesson without assists starts past them)
   count: number; // successes in the current stage
   done: boolean; // passed without the assists; its reward was paid
+  seen: string[]; // the keys of the successes counted (lessons.ts), none counted twice; [] once done
 }
 
 export function initialProgress(): DojoProgress {
@@ -369,10 +370,13 @@ const RIICHI_REFUND = 40;
 
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === 'string');
-function isLessonProgress(v: unknown): v is LessonProgress {
-  if (typeof v !== 'object' || v === null) return false;
+/** A stored lesson's progress, or null if out of shape (seen came later: none counted). */
+function lessonProgress(v: unknown): LessonProgress | null {
+  if (typeof v !== 'object' || v === null) return null;
   const l = v as Record<string, unknown>;
-  return typeof l.assisted === 'boolean' && isCount(l.count) && typeof l.done === 'boolean';
+  if (typeof l.assisted !== 'boolean' || !isCount(l.count) || typeof l.done !== 'boolean') return null;
+  if (l.seen !== undefined && !isStrings(l.seen)) return null;
+  return { assisted: l.assisted, count: l.count, done: l.done, seen: l.seen ?? [] };
 }
 
 /** The progress in a JSON text, or null for anything that is not a version 1 progress. */
@@ -407,10 +411,15 @@ function parse(text: string): { progress: DojoProgress; refunded: number } | nul
   const gameCpu = o.gameCpu ?? DEFAULT_GAME_CPU;
   if (gameLength !== 'tonpuu' && gameLength !== 'hanchan') return null;
   if (gameCpu !== 'weak' && gameCpu !== 'normal') return null;
-  // lessons came later still: a progress without them has begun none.
-  const lessons = o.lessons ?? {};
-  if (typeof lessons !== 'object' || lessons === null || Array.isArray(lessons)) return null;
-  if (!Object.values(lessons).every(isLessonProgress)) return null;
+  // lessons came later still: a progress without them has begun none. A lessons
+  // part out of shape loses only its entries out of shape, not the whole progress.
+  const lessons: Record<string, LessonProgress> = {};
+  if (typeof o.lessons === 'object' && o.lessons !== null && !Array.isArray(o.lessons)) {
+    for (const [id, l] of Object.entries(o.lessons)) {
+      const lp = lessonProgress(l);
+      if (lp) lessons[id] = lp;
+    }
+  }
   // 立直 was sold before it joined the initial yaku: a bought one leaves the items and its price
   // comes back, once (the next load finds it gone). A 平和 owned from before stays owned.
   const refunded = o.ownedItems.includes('riichi') ? RIICHI_REFUND : 0;
@@ -431,7 +440,7 @@ function parse(text: string): { progress: DojoProgress; refunded: number } | nul
     paidRounds: paidRounds as Record<string, number>,
     gameLength,
     gameCpu,
-    lessons: lessons as Record<string, LessonProgress>,
+    lessons,
   };
   return { progress, refunded };
 }
