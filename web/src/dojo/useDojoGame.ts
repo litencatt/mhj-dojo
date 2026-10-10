@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import type { GameState, YakuRow } from '../api';
-import { cheatsUsable, gameKind, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './progress';
+import { cheatUsable, gameKind, initialProgress, loadProgress, payRounds, saveProgress, settle, type DojoProgress, type Reward } from './progress';
 
 /**
  * A dojo game's side of the dojo (GameApp with dojo): its progress, what it
@@ -19,7 +19,7 @@ export function useDojoGame(dojo: boolean, state: GameState | null) {
   const has = (id: string) =>
     dojo &&
     (progress.ownedItems.includes(id) || progress.ownedYaku.includes(id)) &&
-    (!id.startsWith('cheat:') || (state !== null && cheatsUsable(progress, gameKind(state.cpu))));
+    (!id.startsWith('cheat:') || (state !== null && cheatUsable(progress, id, gameKind(state.cpu))));
   // The yaku learned, for the rows shown (useLearnedRows) and the aids.
   const learned = useMemo(() => new Set(progress.ownedYaku), [progress.ownedYaku]);
 

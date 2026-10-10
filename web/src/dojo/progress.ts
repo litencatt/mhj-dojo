@@ -45,12 +45,17 @@ export interface DojoProgress {
   lessons: Record<string, LessonProgress>;
   // The 師範戦 (masterMatch.ts). Data from before had none: not tried, the ウラ面 closed.
   masterMatch: MasterMatchRecord;
-  // Cheats bought before they moved to the ウラ面 (#323): they stay usable in the 表's games but the 師範戦 (cheatsUsable).
-  // Data from before had no such flag: set when it owned a cheat.
-  legacyCheats: boolean;
+  // The cheats (ids) owned when they moved to the ウラ面 (#323): those stay usable in the 表's games but
+  // the 師範戦 (cheatUsable); a cheat bought later works in the ウラ面 only. Data from before had none:
+  // the cheats it owned then (an early save's boolean: the cheats owned when read, if true).
+  legacyCheats: string[];
 }
 
-/** The 師範戦's record: games tried and won; the ウラ面 opens with the first win and stays open. */
+/**
+ * The 師範戦's record: games tried (dealt) and won; the ウラ面 opens with the first win and stays open.
+ * A won 師範戦 may be played again, its rank paying the master's multiplier all the same: #320
+ * decides whether a won one should pay less.
+ */
 export interface MasterMatchRecord {
   tries: number;
   wins: number;
@@ -84,7 +89,7 @@ export function initialProgress(): DojoProgress {
     gameCpu: DEFAULT_GAME_CPU,
     lessons: {},
     masterMatch: { tries: 0, wins: 0, uraOpen: false },
-    legacyCheats: false,
+    legacyCheats: [],
   };
 }
 
@@ -123,7 +128,7 @@ export interface FinishedGame {
   standings: { seat: number; rank: number }[];
   rounds: RoundLite[];
   length?: GameLength; // a game without them is a 東風戦 against weak CPUs
-  cpu?: CpuLevel; // 'master' is the 師範戦: settling it records the try (and the win, 1st place)
+  cpu?: CpuLevel; // 'master' is the 師範戦: settling it records the win (1st place)
 }
 
 export interface Reward {
@@ -246,6 +251,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   const coinsAfter = Math.max(0, p.coins + coins - paidCoins);
   const paidRounds = { ...p.paidRounds };
   if (gameId !== undefined) delete paidRounds[gameId];
+  // The 師範戦's try was counted as it was dealt (recordMasterTry); its win counts here.
   const master = g.cpu === 'master' ? { won: rank === 1, uraOpened: rank === 1 && !p.masterMatch.uraOpen } : undefined;
   const progress: DojoProgress = {
     ...p,
@@ -255,7 +261,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
     firstGameBonus: true,
     paidRounds,
     masterMatch: master
-      ? { tries: p.masterMatch.tries + 1, wins: p.masterMatch.wins + (master.won ? 1 : 0), uraOpen: p.masterMatch.uraOpen || master.won }
+      ? { ...p.masterMatch, wins: p.masterMatch.wins + (master.won ? 1 : 0), uraOpen: p.masterMatch.uraOpen || master.won }
       : p.masterMatch,
   };
   return {
@@ -352,6 +358,11 @@ export function cpuUnlocked(p: DojoProgress, cpu: CpuLevel): boolean {
   return cpu === DEFAULT_GAME_CPU || level(p.xp) >= NORMAL_CPU_LEVEL;
 }
 
+/** Counts a try of the 師範戦, as its game is dealt (an abandoned one counts too). */
+export function recordMasterTry(p: DojoProgress): DojoProgress {
+  return { ...p, masterMatch: { ...p.masterMatch, tries: p.masterMatch.tries + 1 } };
+}
+
 /** The kind of a dojo game: the 表's games, the 師範戦, or the ウラ面's games. */
 export type DojoGameKind = 'omote' | 'master' | 'ura';
 
@@ -361,18 +372,20 @@ export function gameKind(cpu: CpuLevel | undefined): DojoGameKind {
 }
 
 /**
- * Whether the owned cheats may be used in a game of the kind: never in the 師範戦 (the 表's last
- * trial is played straight); in the ウラ面's games once it is open; and in the 表's other games for
- * the cheats bought before they moved to the ウラ面 (legacyCheats: never taken away).
+ * Whether the owned cheat `id` may be used in a game of the kind: never in the 師範戦 (the 表's last
+ * trial is played straight); in the ウラ面's games once it is open; and in the 表's other games only
+ * if it was owned when the cheats moved to the ウラ面 (legacyCheats: never taken away).
  */
-export function cheatsUsable(p: DojoProgress, kind: DojoGameKind): boolean {
+export function cheatUsable(p: DojoProgress, id: string, kind: DojoGameKind): boolean {
+  if (!p.ownedItems.includes(id)) return false;
+  const legacy = p.legacyCheats.includes(id);
   switch (kind) {
     case 'master':
       return false;
     case 'ura':
-      return p.legacyCheats || p.masterMatch.uraOpen;
+      return legacy || p.masterMatch.uraOpen;
   }
-  return p.legacyCheats;
+  return legacy;
 }
 
 export function setGameLength(p: DojoProgress, length: GameLength): DojoProgress {
@@ -391,7 +404,7 @@ export function dojoGame(p: DojoProgress): { length: GameLength; cpu: CpuLevel }
   };
 }
 
-/** The dojo options of CreateGame (the engine's DojoOptions) for what is owned, the cheats as cheatsUsable says for the kind of game. */
+/** The dojo options of CreateGame (the engine's DojoOptions) for what is owned, the cheats as cheatUsable says for the kind of game. */
 export function dojoOptions(p: DojoProgress, kind: DojoGameKind = 'omote'): {
   yaku: string[];
   peek: boolean;
@@ -401,7 +414,7 @@ export function dojoOptions(p: DojoProgress, kind: DojoGameKind = 'omote'): {
   wall_peek: number;
   summons_per_round: number;
 } {
-  const has = (id: string) => cheatsUsable(p, kind) && p.ownedItems.includes(id);
+  const has = (id: string) => cheatUsable(p, id, kind);
   return {
     yaku: [...p.ownedYaku],
     peek: has('cheat:peek'),
@@ -479,8 +492,12 @@ function parse(text: string): { progress: DojoProgress; refunded: number } | nul
   if (typeof mm !== 'object' || mm === null) return null;
   const m = mm as Record<string, unknown>;
   if (!isCount(m.tries) || !isCount(m.wins) || typeof m.uraOpen !== 'boolean') return null;
-  if (o.legacyCheats !== undefined && typeof o.legacyCheats !== 'boolean') return null;
-  const legacyCheats = o.legacyCheats ?? o.ownedItems.some((id) => id.startsWith('cheat:'));
+  const owned = o.ownedItems.filter((id) => id.startsWith('cheat:'));
+  let legacyCheats: string[];
+  if (o.legacyCheats === undefined || o.legacyCheats === true) legacyCheats = owned;
+  else if (o.legacyCheats === false) legacyCheats = [];
+  else if (isStrings(o.legacyCheats)) legacyCheats = o.legacyCheats;
+  else return null;
   // 立直 was sold before it joined the initial yaku: a bought one leaves the items and its price
   // comes back, once (the next load finds it gone). A 平和 owned from before stays owned.
   const refunded = o.ownedItems.includes('riichi') ? RIICHI_REFUND : 0;

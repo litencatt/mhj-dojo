@@ -25,7 +25,8 @@ import {
   setStick,
   setTheme,
   settle,
-  cheatsUsable,
+  cheatUsable,
+  recordMasterTry,
   cpuUnlocked,
   type DojoProgress,
   type FinishedGame,
@@ -251,7 +252,7 @@ test('a theme is set only when it is owned', () => {
 });
 
 test('the dojo options follow what is owned (cheats bought before the ウラ面: usable in every game)', () => {
-  const p = withFirstBonus({ ownedItems: ['cheat:peek', 'cheat:redraw'], ownedYaku: ['tanyao', 'riichi'], legacyCheats: true });
+  const p = withFirstBonus({ ownedItems: ['cheat:peek', 'cheat:redraw'], ownedYaku: ['tanyao', 'riichi'], legacyCheats: ['cheat:peek', 'cheat:redraw'] });
   assert.deepEqual(dojoOptions(p), {
     yaku: ['tanyao', 'riichi'], peek: true, redraws_per_round: 1,
     ura_peek: false, riichi_waits: false, wall_peek: 0, summons_per_round: 0,
@@ -260,7 +261,7 @@ test('the dojo options follow what is owned (cheats bought before the ウラ面:
     yaku: [...INITIAL_YAKU], peek: false, redraws_per_round: 0,
     ura_peek: false, riichi_waits: false, wall_peek: 0, summons_per_round: 0,
   });
-  const cheats = withFirstBonus({ ownedItems: ['cheat:ura', 'cheat:riichiwaits', 'cheat:wallpeek', 'cheat:summon'], legacyCheats: true });
+  const cheats = withFirstBonus({ ownedItems: ['cheat:ura', 'cheat:riichiwaits', 'cheat:wallpeek', 'cheat:summon'], legacyCheats: ['cheat:ura', 'cheat:riichiwaits', 'cheat:wallpeek', 'cheat:summon'] });
   assert.deepEqual(dojoOptions(cheats), {
     yaku: [...INITIAL_YAKU], peek: false, redraws_per_round: 0,
     ura_peek: true, riichi_waits: true, wall_peek: 3, summons_per_round: 1,
@@ -451,8 +452,8 @@ const opened = (over: Partial<DojoProgress> = {}): DojoProgress =>
 test('a new dojo has not tried the 師範戦 and owns no legacy cheats', () => {
   const p = initialProgress();
   assert.deepEqual(p.masterMatch, { tries: 0, wins: 0, uraOpen: false });
-  assert.equal(p.legacyCheats, false);
-  for (const kind of ['omote', 'master', 'ura'] as const) assert.equal(cheatsUsable(p, kind), false, kind);
+  assert.deepEqual(p.legacyCheats, []);
+  for (const kind of ['omote', 'master', 'ura'] as const) assert.equal(cheatUsable(p, 'cheat:peek', kind), false, kind);
 });
 
 test('the cheats are sold once the ウラ面 is open, whatever the level', () => {
@@ -472,7 +473,8 @@ test('cheats bought in the ウラ面 work only in its games; legacy ones in the 
   assert.equal(dojoOptions(p, 'ura').peek, true);
   assert.equal(dojoOptions(p, 'ura').summons_per_round, 1);
   assert.equal(dojoOptions(p, 'master').peek, false);
-  const legacy = withFirstBonus({ ownedItems: ['cheat:peek', 'cheat:redraw', 'cheat:ura', 'cheat:riichiwaits', 'cheat:wallpeek', 'cheat:summon'], legacyCheats: true });
+  const all = ['cheat:peek', 'cheat:redraw', 'cheat:ura', 'cheat:riichiwaits', 'cheat:wallpeek', 'cheat:summon'];
+  const legacy = withFirstBonus({ ownedItems: all, legacyCheats: all });
   assert.equal(dojoOptions(legacy).peek, true);
   assert.equal(dojoOptions(legacy, 'ura').peek, true);
   // The 師範戦 is played straight: no cheat, legacy or not; the yaku stay.
@@ -482,36 +484,49 @@ test('cheats bought in the ウラ面 work only in its games; legacy ones in the 
   });
 });
 
-test('data from before: owned cheats become legacy ones, the 師範戦 untried', () => {
-  const { masterMatch: _m, legacyCheats: _l, ...old } = withFirstBonus({ ownedItems: ['cheat:wallpeek'] });
+test('data from before: the cheats owned then become the legacy ones, the 師範戦 untried', () => {
+  const { masterMatch: _m, legacyCheats: _l, ...old } = withFirstBonus({ ownedItems: ['cheat:wallpeek', 'theme:wafuu'] });
   const p = parseProgress(JSON.stringify(old));
   assert.ok(p);
   assert.deepEqual(p.masterMatch, { tries: 0, wins: 0, uraOpen: false });
-  assert.equal(p.legacyCheats, true);
+  assert.deepEqual(p.legacyCheats, ['cheat:wallpeek']);
   assert.equal(dojoOptions(p).wall_peek, 3);
   const { masterMatch: _m2, legacyCheats: _l2, ...plain } = withFirstBonus();
-  assert.equal(parseProgress(JSON.stringify(plain))?.legacyCheats, false);
-  // Saved again, the flags stay as they were read.
+  assert.deepEqual(parseProgress(JSON.stringify(plain))?.legacyCheats, []);
+  // An early save's boolean: true for the cheats owned when read, false for none.
+  assert.deepEqual(parseProgress(JSON.stringify({ ...p, legacyCheats: true }))?.legacyCheats, ['cheat:wallpeek']);
+  assert.deepEqual(parseProgress(JSON.stringify({ ...p, legacyCheats: false }))?.legacyCheats, []);
+  // Saved again, the list stays as it was read.
   assert.deepEqual(parseProgress(JSON.stringify(p)), p);
   assert.equal(parseProgress(JSON.stringify({ ...p, masterMatch: { tries: -1, wins: 0, uraOpen: false } })), null);
   assert.equal(parseProgress(JSON.stringify({ ...p, legacyCheats: 'yes' })), null);
 });
 
-test('settling a 師範戦 records the try, and the first win opens the ウラ面 for good', () => {
+test('a cheat bought after the ウラ面 opened works there only, even for one with legacy cheats', () => {
+  const p = opened({ ownedItems: ['cheat:wallpeek', 'cheat:peek'], legacyCheats: ['cheat:wallpeek'] });
+  assert.equal(dojoOptions(p).wall_peek, 3); // legacy: the 表 too
+  assert.equal(dojoOptions(p).peek, false); // bought in the ウラ面: not in the 表
+  assert.equal(dojoOptions(p, 'ura').peek, true);
+  assert.equal(dojoOptions(p, 'master').wall_peek, 0);
+  assert.equal(cheatUsable(p, 'cheat:summon', 'ura'), false); // not owned
+});
+
+test('a 師範戦 counts its try when dealt and its win when settled; the first win opens the ウラ面 for good', () => {
   const master = (seed: number, rank: number): FinishedGame => ({ ...game(seed, rank, []), length: 'hanchan', cpu: 'master' });
-  let p = withFirstBonus();
+  // Each try counts as its game is dealt; the win as it is settled.
+  let p = recordMasterTry(withFirstBonus());
   let r = settle(p, master(1, 2));
   p = r.progress;
   assert.deepEqual(p.masterMatch, { tries: 1, wins: 0, uraOpen: false });
   assert.deepEqual(r.reward?.masterMatch, { won: false, uraOpened: false });
-  r = settle(p, master(2, 1));
+  r = settle(recordMasterTry(p), master(2, 1));
   p = r.progress;
   assert.deepEqual(p.masterMatch, { tries: 2, wins: 1, uraOpen: true });
   assert.deepEqual(r.reward?.masterMatch, { won: true, uraOpened: true });
   assert.equal(r.reward?.rankMultiplier, 6);
-  r = settle(p, master(3, 4));
+  r = settle(recordMasterTry(p), master(3, 4));
   assert.deepEqual(r.progress.masterMatch, { tries: 3, wins: 1, uraOpen: true });
-  // A game settled twice counts once; another CPU's game is no try.
+  // A game settled twice counts once; another CPU's game counts nothing.
   assert.equal(settle(r.progress, master(3, 1)).reward, null);
   assert.deepEqual(settle(p, { ...game(9, 1, []), cpu: 'normal' }).progress.masterMatch, p.masterMatch);
 });

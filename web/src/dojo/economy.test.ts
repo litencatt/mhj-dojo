@@ -11,8 +11,9 @@
 // The targets count the core of the shop: the yaku, the assists and the tile
 // themes. The cheats and the other looks (the tile backs, the table cloths, the
 // riichi sticks and the win effects) are extras for the long run, bought apart
-// (the whole-shop tests, which open the ウラ面 from the start: the cheats are
-// sold only there, #323). The curriculum's rewards (lessons.ts) are left out for now:
+// (the whole-shop tests). The cheats are sold only once the ウラ面 is open
+// (#323): those tests open it from the start, an optimistic bound, as the
+// 師範戦 takes some games to win (docs/dojo-economy.md). The curriculum's rewards (lessons.ts) are left out for now:
 // their values are provisional until #320 puts them into the economy.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -73,7 +74,7 @@ interface Run {
   stages: readonly Stage[];
 }
 
-/** A run from a new dojo; `uraOpen` opens the ウラ面 from the start, so the cheats are sold by their price alone. */
+/** A run from a new dojo; `uraOpen` opens the ウラ面 from the start (optimistic), so the cheats are sold by their price alone. */
 function start(stages: readonly Stage[] = STAGES, uraOpen = false): Run {
   const p = initialProgress();
   return { p: uraOpen ? { ...p, masterMatch: { ...p.masterMatch, uraOpen } } : p, games: 0, han: 0, wins: 0, stages };

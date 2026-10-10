@@ -109,7 +109,7 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
           {tab === 'cheat' && (
             <p class="dojo-muted shop-note" data-testid="shop-cheat-note">
               {p.masterMatch.uraOpen ? 'イカサマはウラ面の対局で使えます（師範戦では使えません）。' : 'イカサマは師範戦に勝つと開くウラ面で解禁され、ウラ面の対局で使えます。'}
-              {p.legacyCheats && '前から持っているイカサマは、師範戦を除く表の対局でも使えます。'}
+              {p.legacyCheats.length > 0 && 'ウラ面ができる前から持っているイカサマは、師範戦を除く表の対局でも使えます。'}
             </p>
           )}
           {/* In unlock order; a locked item says its rank (a cheat, the 師範戦) where its button would be. */}

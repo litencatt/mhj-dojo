@@ -39,6 +39,15 @@
 .dojo-side-note {
   flex-basis: 100%;
   margin: 0;
+  /* As tall on both tabs: a line here, three on a phone (the ウラ面's note and where a game left
+     unfinished on the other tab is, at their longest). */
+  min-height: 1.5em;
+  line-height: 1.5;
+}
+@media (width <= 760px), (height <= 500px) and (pointer: coarse) {
+  .dojo-side-note {
+    min-height: 4.5em;
+  }
 }
 .dojo-level {
   font-size: 1.1rem;

@@ -11,9 +11,10 @@ import (
 
 // The 師範戦's difficulty (docs/dojo-economy.md): a human-like player
 // (menzen or normal, see dojosim_human_test.go) plays your seat against
-// three masters in 半荘戦, every yaku counted, seeds 1 to 1000. Run it with
-// MHJDOJO_FULL=1, as TestDojoEconomySim; it prints a MASTERMATCH line a
-// player (the 師範戦 is won by finishing first).
+// three masters in 半荘戦, every yaku counted, seeds 1 to 1000. The 師範戦
+// is won by finishing first, so the first-place rate is its win rate. Run it
+// with MHJDOJO_FULL=1, as TestDojoEconomySim; it prints one MASTERMATCH line
+// for each player and asserts nothing.
 func TestMasterMatchSim(t *testing.T) {
 	if testing.Short() {
 		t.Skip("plays whole games; run without -short")

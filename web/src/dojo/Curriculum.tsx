@@ -67,7 +67,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '段0〜5の後'}</span>
         </summary>
         <ul class="shop-list">
-          <MasterMatchRow progress={progress} seed={seed} />
+          <MasterMatchRow progress={progress} />
         </ul>
       </details>
       <ul class="dojo-lesson-later">
@@ -138,19 +138,15 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
   );
 }
 
-/** The 師範戦's URL: a dojo game dealt as the 師範戦 (GameApp's ?match=master), on the hub's seed if any. */
-export function masterMatchHref(seed?: number): string {
-  const params = new URLSearchParams({ mode: 'dojo', play: '1', match: 'master' });
-  if (seed !== undefined) params.set('seed', String(seed));
-  return `?${params}`;
-}
+/** The 師範戦's URL: a dojo game dealt as the 師範戦 (GameApp's ?match=master, on a random seed). */
+export const MASTER_MATCH_HREF = '?mode=dojo&play=1&match=master';
 
 /**
  * The 師範戦's row: its state (locked until masterMatchOpen, then the tries and wins), 挑戦する
  * (the primary button until it is won: the curriculum is passed by then, so no lesson is next)
  * and, folded, its rules and what is still missing.
  */
-function MasterMatchRow({ progress, seed }: { progress: DojoProgress; seed?: number }) {
+function MasterMatchRow({ progress }: { progress: DojoProgress }) {
   const open = masterMatchOpen(progress);
   const { tries, wins, uraOpen } = progress.masterMatch;
   const left = LESSONS.filter((l) => lessonStage(progress, l.id) !== 'done').length;
@@ -169,7 +165,7 @@ function MasterMatchRow({ progress, seed }: { progress: DojoProgress; seed?: num
         {!open ? 'ロック' : `挑戦 ${tries}回・勝利 ${wins}回`}
       </span>
       {open && (
-        <a class={uraOpen ? 'dojo-restart' : 'dojo-start'} href={masterMatchHref(seed)} onClick={keep} onAuxClick={keep}
+        <a class={uraOpen ? 'dojo-restart' : 'dojo-start'} href={MASTER_MATCH_HREF} onClick={keep} onAuxClick={keep}
           aria-label={uraOpen ? '師範戦にもう一度挑戦する' : '師範戦に挑戦する'}
         >
           {uraOpen ? 'もう一度挑戦する' : '挑戦する'}

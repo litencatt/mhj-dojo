@@ -28,7 +28,7 @@ import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, setDojoSpeeds, t
 import { claim } from './singleTab';
 import { summarizeMoves } from './summary';
 import { dojoGameSaved, gameLesson, savedGames, setGameLesson } from './saves';
-import { canAffordRedraw, canAffordSummon, loadProgress, type DojoProgress } from './dojo/progress';
+import { canAffordRedraw, canAffordSummon, loadProgress, recordMasterTry, saveProgress, type DojoProgress } from './dojo/progress';
 import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
 import { LessonBar } from './dojo/LessonBar';
@@ -190,11 +190,19 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       const p = loadProgress().progress;
       // A 師範戦 or ウラ面 game is never a lesson's.
       const forLesson = dojo && !params.get('match') ? openLesson(params, p) : undefined;
-      return asked(api.createGame({ seed: optionalInt(params.get('seed')), ...createOptions(params, p, forLesson?.id) }, adviceOn)).then((game) => {
+      const options = createOptions(params, p, forLesson?.id);
+      // The 師範戦 is dealt on a random seed, never the URL's: one played before (settled) would pay nothing.
+      const master = dojo && options.cpu === 'master';
+      return asked(api.createGame({ seed: master ? undefined : optionalInt(params.get('seed')), ...options }, adviceOn)).then((game) => {
         // Marked once created (its first save is made by then): the lesson it was dealt for.
         if (forLesson) {
           setGameLesson(game.game_id, forLesson.id);
           setCreatedFor({ game: game.game_id, lesson: forLesson.id });
+        }
+        // A 師範戦 counts as tried once dealt (its win counts when it is settled).
+        if (master) {
+          const tried = recordMasterTry(loadProgress().progress);
+          if (saveProgress(tried)) update(tried);
         }
         return game;
       });

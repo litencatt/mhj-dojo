@@ -19,6 +19,7 @@ export const NORMAL_CPU_RANK_MULTIPLIER = 2;
  * alone: the master is harder than the normal CPU (1st about 22% of the time, docs/dojo-economy.md),
  * and the urashihan is beaten with the cheats, whose costs the game pays. Provisional until #320.
  */
+// A won 師範戦 played again pays the same: #320 decides whether it should pay less.
 export const MASTER_CPU_RANK_MULTIPLIER = 3;
 export const URA_CPU_RANK_MULTIPLIER = 2;
 

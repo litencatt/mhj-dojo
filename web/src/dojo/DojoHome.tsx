@@ -14,6 +14,8 @@ import {
   setGameLength,
   STORAGE_KEY,
   xpForLevel,
+  gameKind,
+  type DojoGameKind,
   type DojoProgress,
 } from './progress';
 import { LENGTH_NAMES, roundName } from '../components/GameTable';
@@ -47,6 +49,9 @@ function hubSeed(settled: readonly string[]): number | undefined {
   const seed = new URLSearchParams(location.search).get('seed');
   return seed && !settled.includes(seed) && Number.isSafeInteger(Number(seed)) ? Number(seed) : undefined;
 }
+
+// What an unfinished game is called, by its kind (progress.ts gameKind).
+const KIND_NAMES: Record<DojoGameKind, string> = { omote: '対局', master: '師範戦', ura: 'ウラ面の対局' };
 
 // The hub's two faces once the 師範戦 is won: the 表's game and the ウラ面's (against the urashihan).
 const SIDES = [
@@ -137,6 +142,11 @@ export function DojoHome() {
   const game = dojoGame(progress);
   const multiplier = rankMultiplierLabel(game.length, game.cpu);
   const play = ura ? { length: MASTER_MATCH_LENGTH, cpu: 'ura' as const } : game;
+  // The unfinished game belongs to a face: a 表 game or the 師範戦 to the 表, a ウラ面 game to the ウラ面.
+  const resumeKind = resume ? gameKind(resume.cpu as CpuLevel) : null;
+  const resumeSide = resumeKind === 'ura' ? 'ura' : 'omote';
+  const resumeHere = resume !== null && resumeSide === (ura ? 'ura' : 'omote');
+  const discardTitle = resumeKind ? `中断中の${KIND_NAMES[resumeKind]}は破棄され、報酬はもらえません` : undefined;
 
   return (
     <div class="dojo-home">
@@ -197,26 +207,36 @@ export function DojoHome() {
           role={progress.masterMatch.uraOpen ? 'tabpanel' : undefined}
           aria-labelledby={progress.masterMatch.uraOpen ? `dojo-side-${side}` : undefined}
         >
-          {ura && (
-            <p class="dojo-muted dojo-side-note" data-testid="dojo-ura-note">
-              裏師範（イカサマを使う CPU）3人と半荘戦。持っているイカサマが使えます。順位の報酬 {rankMultiplierLabel(play.length, play.cpu)}
+          {/* With the tabs, each says what its game is, in the same box: switching them keeps the height. */}
+          {progress.masterMatch.uraOpen && (
+            <p class="dojo-muted dojo-side-note" data-testid="dojo-side-note">
+              {ura
+                ? `裏師範（イカサマを使う CPU）3人と半荘戦。イカサマが使えます。順位の報酬：${rankMultiplierLabel(play.length, play.cpu)}`
+                : `${LENGTH_NAMES[play.length]}・CPU ${CPU_LEVEL_NAMES[play.cpu]}。順位の報酬：${rankMultiplierLabel(play.length, play.cpu) || '×1'}`}
+              {resume && !resumeHere && `（中断中の${KIND_NAMES[resumeKind!]}は${resumeSide === 'ura' ? 'ウラ面' : '表'}のタブに）`}
             </p>
           )}
-          {resume ? (
+          {resume && resumeHere ? (
             <>
               <a
                 class="dojo-start"
                 href={`?mode=dojo&game=${encodeURIComponent(resume.id)}`}
                 title={resume.round ? roundName(resume.round.wind, resume.round.number, resume.round.honba) : undefined}
               >
-                続きから
+                {resumeKind === 'master' ? '続きから（師範戦）' : '続きから'}
               </a>
-              <a class="dojo-restart" href={playHref(progress.settled, ura)} title="中断中の対局は破棄され、報酬はもらえません" onClick={discardUnfinishedDojoGames}>
+              <a class="dojo-restart" href={playHref(progress.settled, ura)} title={discardTitle} onClick={discardUnfinishedDojoGames}>
                 新しく始める
               </a>
             </>
           ) : (
-            <a class="dojo-start" href={playHref(progress.settled, ura)} title={`${LENGTH_NAMES[play.length]}、CPU は${CPU_LEVEL_NAMES[play.cpu]}`}>
+            // A game unfinished on the other face is dropped by a new start here too (one game at a time).
+            <a
+              class="dojo-start"
+              href={playHref(progress.settled, ura)}
+              title={resume ? discardTitle : `${LENGTH_NAMES[play.length]}、CPU は${CPU_LEVEL_NAMES[play.cpu]}`}
+              onClick={resume ? discardUnfinishedDojoGames : undefined}
+            >
               {ura ? 'ウラ面で対局' : '対局開始'}
             </a>
           )}

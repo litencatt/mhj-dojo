@@ -22,7 +22,7 @@
 //   the core's coin cost (the yakuman pack aside) has been bought.
 // - The yakuman pack costs at most 40 more games after Lv10, the core bought first.
 // - The cheats and the other looks too: the whole shop is bought in about 175 games
-//   (the cheats once the ウラ面 is open, which the measurement takes as open from the start).
+//   (the cheats once the ウラ面 is open: an optimistic count, taking it as open from the start).
 
 /** XP and coins by final rank (1st to 4th). */
 export const RANK_XP = [100, 60, 30, 10] as const;
