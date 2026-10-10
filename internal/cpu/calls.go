@@ -36,7 +36,7 @@ func (p *Player) decideCall(v game.View, l game.Legal) (game.Action, bool) {
 			cur = p.routeDist(c, ms, routes)
 		}
 	}
-	if p.folds(v, cur, len(riichiThreats(v))) {
+	if _, riichi := p.threats(v); p.folds(v, cur, -1, riichi) {
 		return game.Action{}, false
 	}
 	t := *v.LastDiscard

@@ -180,6 +180,10 @@ type RoundConfig struct {
 	Honba     int
 	Deposit   int
 	Points    [4]int
+
+	// FirstDealer is the game's first dealer (起家): ties in the standings
+	// go to the seat nearer it.
+	FirstDealer int
 	SeatConfig
 }
 
@@ -210,6 +214,8 @@ type Round struct {
 	deposit   int
 	honba     int
 	start     [4]int // points at the start of the round
+
+	firstDealer int // the game's (RoundConfig.FirstDealer)
 
 	// kanDora counts the kan dora indicators turned over; pendingDora the
 	// open or added kans whose indicator waits for the discard after them.
@@ -242,7 +248,7 @@ func New(seed int64) *Round {
 // NewWithWall is New with a given wall and dealer (used by tests).
 func NewWithWall(w *wall.Wall, dealer int) *Round {
 	return NewRound(RoundConfig{
-		Wall: w, Dealer: dealer, RoundWind: tile.East,
+		Wall: w, Dealer: dealer, FirstDealer: dealer, RoundWind: tile.East,
 		Points: [4]int{StartPoints, StartPoints, StartPoints, StartPoints},
 	})
 }
@@ -251,7 +257,7 @@ func NewWithWall(w *wall.Wall, dealer int) *Round {
 func NewRound(cfg RoundConfig) *Round {
 	r := &Round{
 		wall: cfg.Wall, dealer: cfg.Dealer, roundWind: cfg.RoundWind, turn: cfg.Dealer,
-		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points, seats: cfg.SeatConfig,
+		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points, seats: cfg.SeatConfig, firstDealer: cfg.FirstDealer,
 	}
 	for s := range r.players {
 		r.players[s].hand = cfg.Wall.HandOf(s)

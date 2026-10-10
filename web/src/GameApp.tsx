@@ -38,7 +38,7 @@ import { LooksSettings, useSharedLooks } from './dojo/looks';
 import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
 import { RadioGroup } from './components/RadioGroup';
-import { CPU_NAMES, DEALER_NAMES, dojoGameOptions, parseOptions, savedItem, urlOptions } from './gameOptions';
+import { CPU_LEVEL_NAMES, CPU_NAMES, DEALER_NAMES, dojoGameOptions, parseOptions, savedItem, urlOptions } from './gameOptions';
 import './dojo/dojo.css';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -471,7 +471,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                 </div>
                 <div>
                   <dt>CPU</dt>
-                  <dd>{CPU_NAMES[state.cpu]}</dd>
+                  <dd>{CPU_LEVEL_NAMES[state.cpu]}</dd>
                 </div>
                 <div>
                   <dt class="status-dt-obvious">局</dt>

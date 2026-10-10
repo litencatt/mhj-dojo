@@ -1,11 +1,14 @@
-import type { GameOptions } from './api';
+import type { CpuLevel, GameOptions } from './api';
 import type { ResumeItem } from './components/ResumePanel';
 import { LENGTH_NAMES, WIND_NAMES, roundName } from './components/GameTable';
 import { dojoGame, dojoOptions, type DojoProgress } from './dojo/progress';
 import type { GameSummary } from './saves';
 
 export const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
+/** The CPU levels the game options offer (the master is the dojo's, #323: parseOptions reads it as normal). */
 export const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
+/** Every CPU level's name, for a game's. */
+export const CPU_LEVEL_NAMES: Record<CpuLevel, string> = { ...CPU_NAMES, master: '師範' };
 
 /** The game options in the URL (or a form), unknown values as the defaults. */
 export function parseOptions(get: (key: string) => string | null): GameOptions {

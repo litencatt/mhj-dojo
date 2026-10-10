@@ -53,7 +53,7 @@ const (
 type Options struct {
 	Length      string // Tonpuu or Hanchan
 	FirstDealer string // DealerRandom or DealerYou
-	CPU         string // cpu.Normal or cpu.Weak
+	CPU         string // cpu.Normal, cpu.Weak or cpu.Master
 	Dojo        *DojoOptions
 }
 
@@ -127,9 +127,9 @@ func (o Options) normalize() (Options, game.Rules, error) {
 	switch o.CPU {
 	case "":
 		o.CPU = cpu.Normal
-	case cpu.Normal, cpu.Weak:
+	case cpu.Normal, cpu.Weak, cpu.Master:
 	default:
-		return o, rules, fmt.Errorf("%w: cpu must be %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak)
+		return o, rules, fmt.Errorf("%w: cpu must be %q, %q or %q", game.ErrInvalid, cpu.Normal, cpu.Weak, cpu.Master)
 	}
 	if d := o.Dojo; d != nil {
 		for _, k := range d.Yaku {
@@ -177,8 +177,11 @@ func newMatch(h *game.Hanchan, o Options, seedKnown bool) *Match {
 		m.learned = yaku.NewKeySet(o.Dojo.Yaku...)
 	}
 	p := cpu.New()
-	if o.CPU == cpu.Weak {
+	switch o.CPU {
+	case cpu.Weak:
 		p = cpu.NewWeak()
+	case cpu.Master:
+		p = cpu.NewMaster()
 	}
 	m.game = game.StartHanchan(h, p)
 	m.game.OnHumanDiscard = m.recordHand

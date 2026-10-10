@@ -138,6 +138,9 @@ func TestGameOptions(t *testing.T) {
 	if again.CPU != "weak" || again.FirstDealerMode != "you" {
 		t.Fatalf("GET lost the options: %s %s", again.CPU, again.FirstDealerMode)
 	}
+	if _, raw = c.game("POST", "/api/games", `{"seed":42,"cpu":"master"}`); raw["cpu"] != "master" {
+		t.Fatalf("master: cpu %v", raw["cpu"])
+	}
 }
 
 func TestGameActionErrors(t *testing.T) {
