@@ -11,7 +11,8 @@
 // The targets count the core of the shop: the yaku, the assists and the tile
 // themes. The cheats and the other looks (the tile backs, the table cloths, the
 // riichi sticks and the win effects) are extras for the long run, bought apart
-// (the last test).
+// (the last test). The curriculum's rewards (lessons.ts) are left out for now:
+// their values are provisional until #320 puts them into the economy.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CATALOG, YAKUHAI_KEYS, YAKUMAN_PACK, type ShopItem } from './catalog.ts';
