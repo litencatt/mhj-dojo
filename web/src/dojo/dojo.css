@@ -453,6 +453,7 @@
 }
 .dojo-lesson-later .dojo-muted {
   margin-left: 8px;
+  white-space: nowrap;
 }
 /* A lesson's lines over the hand (LessonBar), a .dojo-notice as tall whatever its state: the
    lesson, its stage and the last success's note on one line (cut short, never wrapped), then the

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   DOJO_NOYAKU_SEED,
   DOJO_WIN_SEED,
@@ -49,6 +49,11 @@ const stageOf = (page: Page) => page.getByTestId('lesson-status').locator('.less
 
 const yakuRow = (page: Page, name: string) =>
   page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: name });
+
+// Opens a stage of the curriculum whatever it starts as (clicking its summary would toggle it).
+async function openStage(stage: Locator) {
+  await stage.evaluate((el) => ((el as HTMLDetailsElement).open = true));
+}
 
 test('a lesson\'s yaku count in its game only, a resumed one included; its game has no automations', async ({ page }) => {
   test.setTimeout(90_000);
@@ -242,13 +247,13 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(panel.locator('.dojo-lesson-stage').nth(1)).not.toHaveAttribute('open', '');
   await expect(panel.locator('[aria-current="step"]')).toHaveCount(1);
   // Locked: no way to start it, and what comes first is named.
-  await panel.locator('.dojo-lesson-stage').nth(1).locator('summary').first().click();
+  await openStage(panel.locator('.dojo-lesson-stage').nth(1));
   const locked = lessonRow(page, 'ryanmen-tenpai');
   await expect(locked).toHaveAttribute('data-state', 'locked');
   await expect(locked.getByRole('link')).toHaveCount(0);
   await expect(locked.locator('.dojo-lesson-more summary')).toContainText('先に: 和了形を作る');
   // A lesson's yaku has its guide; what comes after stage 5 is announced.
-  await panel.locator('.dojo-lesson-stage').nth(2).locator('summary').first().click();
+  await openStage(panel.locator('.dojo-lesson-stage').nth(2));
   await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
   await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -268,7 +273,7 @@ test('a lesson started from the hub and passed shows so after a reload; its yaku
   });
   await storeProgress(page, { lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done } });
   await page.goto(`./?mode=dojo&seed=${DOJO_WIN_SEED}`);
-  await page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5).locator('summary').first().click();
+  await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
   const row = lessonRow(page, 'pinfu-win');
   await expect(row).toHaveAttribute('data-state', 'unassisted');
   await row.getByRole('link', { name: '始める' }).click();
@@ -282,7 +287,7 @@ test('a lesson started from the hub and passed shows so after a reload; its yaku
   for (const step of ['hub', 'reload']) {
     if (step === 'hub') await page.goto('./?mode=dojo');
     else await page.reload();
-    await page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5).locator('summary').first().click();
+    await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
     await expect(row, step).toHaveAttribute('data-state', 'done');
     await expect(row.getByRole('link'), step).toHaveCount(0);
     await expect(row.locator('.shop-owned'), step).toContainText('合格');

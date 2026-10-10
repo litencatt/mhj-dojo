@@ -1,5 +1,5 @@
 import { Tile } from '../components/Tile';
-import { LESSONS, findLesson, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
+import { LESSONS, findLesson, lessonActive, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
 import { progressSaved, saveProgress, type DojoProgress } from './progress';
 import { expandTiles, guideFor } from './yakuGuide';
 
@@ -15,10 +15,7 @@ const STATE_NAMES: Record<LessonStage, string> = {
 
 /** The lesson to do next: the first being learned, in the curriculum's order. */
 export function nextLesson(p: DojoProgress): Lesson | undefined {
-  return LESSONS.find((l) => {
-    const s = lessonStage(p, l.id);
-    return s === 'assisted' || s === 'unassisted';
-  });
+  return LESSONS.find((l) => lessonActive(p, l.id));
 }
 
 interface CurriculumProps {
@@ -84,7 +81,7 @@ interface LessonRowProps {
 
 function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
   const state = lessonStage(progress, lesson.id);
-  const active = state === 'assisted' || state === 'unassisted';
+  const active = lessonActive(progress, lesson.id);
   const times = lesson.times ?? 1;
   const count = progress.lessons[lesson.id]?.count ?? 0;
   const guide = lesson.guide !== undefined && guideFor(lesson.guide) ? lesson.guide : null;
@@ -105,12 +102,16 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
         {lesson.form === 'practice' ? '・練習' : '・対局'}
       </span>
       {guide && (
-        <button type="button" aria-haspopup="dialog" onClick={() => onGuide(guide)}>
+        <button type="button" aria-haspopup="dialog" aria-label={`${lesson.title}：役の解説`} onClick={() => onGuide(guide)}>
           役の解説
         </button>
       )}
       {active && (
-        <a class={next ? 'dojo-start' : 'dojo-restart'} href={lessonHref(lesson, lesson.form === 'game' ? seed : undefined)} onClick={keep}>
+        <a class={next ? 'dojo-start' : 'dojo-restart'} href={lessonHref(lesson, lesson.form === 'game' ? seed : undefined)}
+          onClick={keep}
+          onAuxClick={keep}
+          aria-label={`${lesson.title}を${progress.lessons[lesson.id] ? '続ける' : '始める'}`}
+        >
           {progress.lessons[lesson.id] ? '続ける' : '始める'}
         </a>
       )}
