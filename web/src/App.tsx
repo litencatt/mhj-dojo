@@ -21,6 +21,17 @@ import {
 import { claim } from './singleTab';
 import { savedSessions } from './saves';
 import { LooksSettings, useSharedLooks } from './dojo/looks';
+import { LessonBar } from './dojo/LessonBar';
+import { useLesson } from './dojo/useLesson';
+import { findLesson, practiceKey } from './dojo/lessons';
+import { progressSaved } from './dojo/progress';
+import { ukeireBadges } from './dojo/DojoAids';
+
+/** The practice lesson the URL asks for (?lesson=), once the dojo has a progress to keep it in. */
+function askedLesson(): string | null {
+  const lesson = findLesson(new URLSearchParams(location.search).get('lesson') ?? '');
+  return lesson?.form === 'practice' && progressSaved() ? lesson.id : null;
+}
 
 export function App() {
   const [state, setState] = useState<SessionState | null>(null);
@@ -31,6 +42,9 @@ export function App() {
   // 設定 (the header's button) opens the new-practice form in a modal dialog; a new session started from it closes it.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { minimized, isMin, minimize, restore } = useMinimized();
+  // A dojo lesson played in practice mode (dojo/lessons.ts): each step judged as it is made.
+  const [lessonId] = useState(askedLesson);
+  const lesson = useLesson(lessonId);
   // The dojo's looks, chosen in 設定 too once the dojo has a progress.
   const looks = useSharedLooks();
   // Opened with no session or seed in the URL: the saved sessions, if any,
@@ -121,7 +135,7 @@ export function App() {
           api.createSession({ seed: optionalInt(params.get('seed')), max_turns: optionalInt(params.get('turns')) ?? 18 }, v),
         null,
       ),
-    sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns) },
+    sync: state && { session: state.session_id, seed: String(state.seed), turns: String(state.max_turns), lesson: lessonId },
   });
 
   useEffect(() => {
@@ -136,14 +150,22 @@ export function App() {
     void startGame(seed, maxTurns).then((ok) => ok && setSettingsOpen(false));
   }
 
+  // A lesson's step: the state before, the discard (none for a tsumo) and the state reached.
+  function judged(before: SessionState, discard: string | null) {
+    return (after: SessionState) => {
+      if (lesson?.lesson.form === 'practice') lesson.record(lesson.lesson.judge({ before, discard, after }), practiceKey(after));
+      return after;
+    };
+  }
+
   function handleDiscard(tile: string) {
     if (!state) return;
-    void request(() => load((v) => api.discard(state.session_id, tile, state.node_id, v), state));
+    void request(() => load((v) => api.discard(state.session_id, tile, state.node_id, v), state).then(judged(state, tile)));
   }
 
   function handleTsumo() {
     if (!state) return;
-    void request(() => load((v) => api.tsumo(state.session_id, state.node_id, v), state));
+    void request(() => load((v) => api.tsumo(state.session_id, state.node_id, v), state).then(judged(state, null)));
   }
 
   const handleGoto = useStableCallback((nodeId: number) => {
@@ -247,6 +269,16 @@ export function App() {
                 uraDoraIndicators={state.ura_dora_indicators}
                 uraDora={state.ura_dora}
               />
+              {lesson && (
+                <LessonBar
+                  lesson={lesson.lesson}
+                  stage={lesson.stage}
+                  count={lesson.count}
+                  note={lesson.note}
+                  failures={lesson.failures}
+                  saveFailed={lesson.saveFailed}
+                />
+              )}
               <Hand
                 hand={state.hand}
                 groups={state.hand_groups}
@@ -254,6 +286,7 @@ export function App() {
                 discards={state.discards}
                 disabled={busy || state.status !== 'playing'}
                 highlight={highlightTile}
+                badges={lesson?.assist('assist:ukeire') && state.status === 'playing' ? ukeireBadges(state) : undefined}
                 onDiscard={handleDiscard}
                 onPreview={setPreviewTile}
               />

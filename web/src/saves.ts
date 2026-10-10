@@ -138,6 +138,7 @@ interface SavedGame {
   save: string;
   used: number; // Date.now() of the last save
   round?: SavedRound; // where the game stood, for the page's list of saves
+  lesson?: string; // a dojo game played for a lesson (dojo/lessons.ts): its id, which a resumed game is judged by
 }
 
 export interface SavedRound {
@@ -167,9 +168,30 @@ export function saveGame(publicId: string, save: string, st: GameState) {
   const key = st.dojo ? DOJO_GAMES_KEY : GAMES_KEY;
   const games = loadGames(key);
   const round = { wind: st.round_wind, number: st.round_number, honba: st.honba, over: st.game_over };
-  games[publicId] = { save, used: Date.now(), round };
+  const lesson = games[publicId]?.lesson;
+  games[publicId] = { save, used: Date.now(), round, ...(lesson === undefined ? {} : { lesson }) };
   trim(games, MAX_SAVED_GAMES);
   storeGames(key, games, publicId);
+}
+
+/** Marks a saved dojo game as played for a lesson (its first save is made before the page sees the game). */
+export function setGameLesson(publicId: string, lesson: string) {
+  const games = loadGames(DOJO_GAMES_KEY);
+  const g = games[publicId];
+  if (!g) return;
+  games[publicId] = { ...g, lesson };
+  storeGames(DOJO_GAMES_KEY, games, publicId);
+}
+
+/** Whether a dojo game has a save (its first save may have failed: storage full or blocked). */
+export function dojoGameSaved(publicId: string): boolean {
+  return publicId in loadGames(DOJO_GAMES_KEY);
+}
+
+/** The lesson a saved dojo game is played for, if any. */
+export function gameLesson(publicId: string): string | null {
+  const lesson = loadGames(DOJO_GAMES_KEY)[publicId]?.lesson;
+  return typeof lesson === 'string' ? lesson : null;
 }
 
 /** Drops the dojo's unfinished games: the dojo plays one game at a time, and a new one abandons the old (unpaid). */

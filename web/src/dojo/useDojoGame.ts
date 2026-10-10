@@ -35,7 +35,10 @@ export function useDojoGame(dojo: boolean, state: GameState | null) {
     setReward(paid);
   }, [state]);
 
-  return { progress, has, learned, reward, saveFailed };
+  // A lesson's success (useLesson) saved the progress: shown here too, its reward with it.
+  const update = useCallback((p: DojoProgress) => setProgress(p), []);
+
+  return { progress, has, learned, reward, saveFailed, update };
 }
 
 /**
