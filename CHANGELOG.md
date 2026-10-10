@@ -1,5 +1,17 @@
 # Changelog
 
+## [v2026.1010.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1009.2...v2026.1010.0) - 2026-10-10
+
+### 新機能
+- 道場で解放した見た目を練習と CPU 対戦でも使えるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/329
+- 道場の初期の役を立直・門前ツモ・断么九にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/330
+- 道場の課程: 課題の定義・判定・進捗の保存 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/338
+- 道場: 師範 CPU（普通より強い打ち手）を足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/337
+- 道場の課程: 課題を遊ぶ場所（実戦の課題・練習モードの課題） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/339
+- 道場: 裏師範 CPU（ウラ面の最強の相手）を足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/340
+- 道場の課程: ハブの課程パネルとドキュメント by @litencatt in https://github.com/litencatt/mhj-dojo/pull/341
+- 道場: 師範戦とウラ面（イカサマを師範戦の後に解放する） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/342
+
 ## [v2026.1009.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1009.1...v2026.1009.2) - 2026-10-09
 
 ### CI・リポジトリ
