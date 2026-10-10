@@ -22,6 +22,7 @@ import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from '
 import { discardUnfinishedDojoGames, savedGames } from '../saves';
 import { CPU_LEVEL_NAMES } from '../gameOptions';
 import { Shop } from './Shop';
+import { Curriculum } from './Curriculum';
 import { GuideDialog } from './GuideDialog';
 import { guideFor } from './yakuGuide';
 import { LooksSettings, useDojoLooks } from './looks';
@@ -34,9 +35,15 @@ import './dojo.css';
  */
 function playHref(settled: readonly string[]): string {
   const params = new URLSearchParams({ mode: 'dojo', play: '1' });
-  const seed = new URLSearchParams(location.search).get('seed');
-  if (seed && !settled.includes(seed)) params.set('seed', seed);
+  const seed = hubSeed(settled);
+  if (seed !== undefined) params.set('seed', String(seed));
   return `?${params}`;
+}
+
+/** The seed of the hub's URL that a game started here is dealt on, unless that game was settled already. */
+function hubSeed(settled: readonly string[]): number | undefined {
+  const seed = new URLSearchParams(location.search).get('seed');
+  return seed && !settled.includes(seed) && Number.isSafeInteger(Number(seed)) ? Number(seed) : undefined;
 }
 
 const LENGTHS: { value: GameLength; level: number }[] = [
@@ -59,7 +66,7 @@ function ownedYaku(owned: readonly string[]): { name: string; guide?: string }[]
   return out;
 }
 
-/** The dojo hub (?mode=dojo): level, coins, the yaku owned, the shop, and the settings (game choice, theme, back, looks). */
+/** The dojo hub (?mode=dojo): level, coins, the curriculum, the yaku owned, the shop, and the settings (game choice, theme, back, looks). */
 export function DojoHome() {
   const [loaded] = useState(() => loadProgress());
   const [progress, setProgress] = useState<DojoProgress>(loaded.progress);
@@ -159,6 +166,8 @@ export function DojoHome() {
           )}
         </div>
       </section>
+
+      <Curriculum progress={progress} seed={hubSeed(progress.settled)} onGuide={(key) => setGuide({ key, learned: false })} />
 
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
         <h2 id="dojo-yaku-heading">所持役（{ownedYaku(progress.ownedYaku).length}）</h2>

@@ -89,7 +89,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     const saved = gameLesson(state.game_id);
     if (saved !== null) return saved;
     if (createdFor?.game === state.game_id) return createdFor.lesson;
-    return dojoGameSaved(state.game_id) ? null : (urlGameLesson(new URLSearchParams(location.search))?.id ?? null);
+    // The URL's, being learned (as when the game was dealt for it), for a game with no save at all.
+    return dojoGameSaved(state.game_id) ? null : (openLesson(new URLSearchParams(location.search), loadProgress().progress)?.id ?? null);
   }, [dojo, state?.game_id, createdFor]);
   const lesson = useLesson(lessonId, update);
   // The lesson's assists are on at its assisted stage and off at the other, owned or not.
