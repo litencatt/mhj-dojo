@@ -142,16 +142,25 @@ func TestGameOptions(t *testing.T) {
 		t.Fatalf("master: cpu %v", raw["cpu"])
 	}
 	// The urashihan plays only in dojo games, and its peek at your hand
-	// never reaches the response.
+	// never reaches the response: not after it has played either, in the
+	// seats or the events.
 	c.wantError("POST", "/api/games", `{"seed":42,"cpu":"ura"}`, http.StatusBadRequest)
 	st, raw = c.game("POST", "/api/games", `{"seed":42,"cpu":"ura","dojo":{"yaku":["tanyao"]}}`)
 	if raw["cpu"] != "ura" {
 		t.Fatalf("ura: cpu %v", raw["cpu"])
 	}
-	for _, s := range st.Seats[1:] {
-		if len(s.Hand) > 0 {
-			t.Fatalf("seat %d's hand in the response: %v", s.Seat, s.Hand)
+	for moves := 0; moves < 20 && st.Result == nil; moves++ {
+		for _, s := range st.Seats[1:] {
+			if len(s.Hand) > 0 || s.Drawn != nil {
+				t.Fatalf("after %d moves, seat %d's tiles in the response: %v %v", moves, s.Seat, s.Hand, s.Drawn)
+			}
 		}
+		for _, e := range raw["events"].([]any) {
+			if _, ok := e.(map[string]any)["hand"]; ok {
+				t.Fatalf("after %d moves, an event shows a hand: %v", moves, e)
+			}
+		}
+		st, raw = c.game("POST", "/api/games/"+st.GameID+"/action", nextMove(st))
 	}
 }
 

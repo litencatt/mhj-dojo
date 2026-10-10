@@ -69,7 +69,9 @@ const (
 )
 
 // UraDrawBias is the urashihan's draw bias (game.SeatConfig.DrawBias), in
-// percent: its strength, set by the match with its peek.
+// percent: its strength, set by the match with its peek. Changing it
+// changes the games the urashihan plays, so their saves no longer replay
+// (their check fails); TestUraSim measures it.
 const UraDrawBias = 5
 
 // weakStray is the share, in percent, of the weak player's discards picked

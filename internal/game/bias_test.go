@@ -80,3 +80,33 @@ func TestPeekView(t *testing.T) {
 		t.Fatal("another seat sees hands")
 	}
 }
+
+// The draws a seat's wall peek showed stay its draws: the other seats'
+// bias never moves them.
+func TestDrawBiasKeepsShownDraws(t *testing.T) {
+	for seed := range int64(20) {
+		r := dojoRound(seed, SeatConfig{DrawBias: [4]int{1: 100, 2: 100, 3: 100}, WallPeek: [4]int{0: 3}})
+		var got []tile.Tile
+		shown := map[int]tile.Tile{} // seat 0's draws by number, as first shown
+		for steps := 0; r.Actor() >= 0; steps++ {
+			if steps > 1000 {
+				t.Fatal("round does not end")
+			}
+			seat := r.Actor()
+			if p := &r.players[0]; seat == 0 && r.phase == PhaseDiscard && p.drawn != nil && !p.rinshan {
+				if want, ok := shown[len(got)]; ok && want != *p.drawn {
+					t.Fatalf("seed %d: draw %d was shown as %v, drew %v", seed, len(got), want, *p.drawn)
+				}
+				got = append(got, *p.drawn)
+				for i, x := range r.NextDraws(0, 3) {
+					if _, ok := shown[len(got)+i]; !ok {
+						shown[len(got)+i] = x
+					}
+				}
+			}
+			a := Tsumogiri{}.Decide(r.ViewFor(seat), r.LegalFor(seat))
+			a.Seat = seat
+			mustApply(t, r, a)
+		}
+	}
+}

@@ -654,14 +654,17 @@ over 4000 games; `TestMasterStronger`, [docs/dojo-economy.md](dojo-economy.md)).
 `"ura"` (裏師範, dojo games only) is the master with two cheats of its own,
 for its decisions only: it sees the other seats' concealed tiles (it counts
 them as seen, never folds, and never discards a tile a tenpai hand would
-ron, unless every discard would), and its live-wall draws are biased: out of
-riichi, a draw that does not bring it closer to tenpai is, 5% of the time
-(`cpu.UraDrawBias`), swapped with the next live-wall tile that does. The
-swap is a hash of the wall's seed, the draw and the seat, so a game replays
-exactly; it is not an event, and it can change the draws your wall peek
-showed. The response never shows the other hands to you because of it.
-Against three of them in 半荘戦, a human-like player finishes first 7–8% of
-the time without cheats and 31% with the dojo's cheats (`TestUraSim`,
+ron, unless every discard would), and its live-wall draws are biased: after
+the first go-around and out of riichi, a draw that does not bring it closer
+to tenpai is, 5% of the time (`cpu.UraDrawBias`), swapped with the next
+live-wall tile that does, never one of the draws your wall peek shows (so
+they stay your draws unless someone calls or makes a kan). The swap is a
+hash of the wall's seed, the draw and the seat, so a game replays exactly;
+it is not an event. Changing the hash or the bias changes the games, so
+saves of earlier ones fail their `check`. The response never shows the
+other hands to you because of the peek. Against three of them in 半荘戦, a
+human-like player finishes first about 7% of the time without cheats and
+27–32% with the dojo's cheats (`TestUraSim`,
 [docs/dojo-economy.md](dojo-economy.md)).
 
 ### `POST /api/games`

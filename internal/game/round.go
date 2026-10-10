@@ -208,6 +208,9 @@ type SeatConfig struct {
 	// which does not lower its shanten is swapped for the next live-wall
 	// tile that does (see biasDraw): a CPU's cheat, out of riichi only.
 	DrawBias [4]int
+	// WallPeek is how many of its next draws a seat is shown (the dojo's
+	// wall peek, see NextDraws): DrawBias never moves them.
+	WallPeek [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.

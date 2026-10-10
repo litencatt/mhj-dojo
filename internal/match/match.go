@@ -168,6 +168,7 @@ func deal(seed int64, rules game.Rules, o Options) *game.Hanchan {
 		seats.Restrict[Human] = yaku.NewKeySet(d.Yaku...)
 		seats.RedrawsPerRound[Human] = d.RedrawsPerRound
 		seats.SummonsPerRound[Human] = d.SummonsPerRound
+		seats.WallPeek[Human] = d.WallPeek
 	}
 	if o.CPU == cpu.Ura { // the urashihan's cheats (cpu.NewUra)
 		for s := range seats.Peek {

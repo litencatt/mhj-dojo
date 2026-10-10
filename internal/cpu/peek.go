@@ -56,7 +56,8 @@ func (p *Player) deadly(v game.View) [tile.NumKinds]bool {
 		if sh != 0 {
 			continue
 		}
-		ctx := yaku.Context{Ron: true, Riichi: s.Riichi, Winds: yaku.Winds{Round: v.RoundWind, Seat: s.Wind}, DoraIndicators: v.DoraIndicators}
+		// The last discard of the round wins by 河底撈魚 too.
+		ctx := yaku.Context{Ron: true, Riichi: s.Riichi, Houtei: v.DrawsLeft == 0, Winds: yaku.Winds{Round: v.RoundWind, Seat: s.Wind}, DoraIndicators: v.DoraIndicators}
 		for _, m := range s.Melds {
 			ctx.Melds = append(ctx.Melds, m.Meld)
 			ctx.MeldTiles = append(ctx.MeldTiles, m.Tiles...)

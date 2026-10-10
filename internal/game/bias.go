@@ -13,14 +13,18 @@ import (
 const biasMemo = 1_000
 
 // biasDraw applies SeatConfig.DrawBias to seat's live-wall draw just taken:
-// when the seat is not in riichi, the draw does not lower its shanten and
-// the chance hits, the drawn tile swaps places with the next live-wall tile
-// that does, as a summon does. The chance is a hash of the wall's seed, the
-// draw and the seat, so a round replays exactly; nothing of it is logged.
+// after the first go-around, when the seat is not in riichi, the draw does
+// not lower its shanten and the chance hits, the drawn tile swaps places
+// with the next live-wall tile that does, as a summon does, leaving alone
+// the draws another seat is shown (SeatConfig.WallPeek). The chance is a
+// hash of the wall's seed, the draw and the seat, so a round replays
+// exactly; nothing of it is logged. Changing the hash's input (or a CPU
+// level's bias, such as cpu.UraDrawBias) changes the games it plays, so
+// their saves no longer replay (their check fails).
 func (r *Round) biasDraw(seat int) {
 	p := &r.players[seat]
 	bias := r.seats.DrawBias[seat]
-	if bias <= 0 || p.riichi || r.draws >= wall.LiveDraws4-r.kans {
+	if bias <= 0 || p.riichi || r.firstGoAround(seat) || r.draws >= wall.LiveDraws4-r.kans {
 		return
 	}
 	var b [24]byte
@@ -47,12 +51,29 @@ func (r *Round) biasDraw(seat int) {
 	if useful[p.drawn.Kind] {
 		return
 	}
+	shown := r.shownDraws(seat)
 	for k := r.draws; k < wall.LiveDraws4-r.kans; k++ {
-		if t, _ := r.wall.Draw4(k); useful[t.Kind] {
+		if t, _ := r.wall.Draw4(k); useful[t.Kind] && !shown[k] {
 			r.wall = r.wall.Swapped(r.draws-1, k)
 			t, _ = r.wall.Draw4(r.draws - 1)
 			p.drawn = &t
 			return
 		}
 	}
+}
+
+// shownDraws returns the live-wall draws, by index, that the seats other
+// than seat are shown (SeatConfig.WallPeek) right after seat's draw: each
+// one's next draws, if nobody calls or makes a kan.
+func (r *Round) shownDraws(seat int) [wall.LiveDraws4]bool {
+	var out [wall.LiveDraws4]bool
+	for s, n := range r.seats.WallPeek {
+		if s == seat {
+			continue
+		}
+		for k := r.draws + (s-seat+3)%4; k < wall.LiveDraws4 && n > 0; k, n = k+4, n-1 {
+			out[k] = true
+		}
+	}
+	return out
 }
