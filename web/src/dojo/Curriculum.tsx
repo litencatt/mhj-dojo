@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import { Tile } from '../components/Tile';
-import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
+import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, singleStage, type Lesson, type LessonStage } from './lessons';
 import { curriculumDone, masterMatchOpen } from './masterMatch';
 import { progressSaved, saveProgress, type DojoProgress } from './progress';
 import { expandTiles, guideFor } from './yakuGuide';
@@ -21,9 +21,8 @@ const STATE_NAMES: Record<LessonStage, string> = {
   done: '習得',
 };
 
-// A lesson without assists has one stage: it is not learned yet rather than being 見極め.
 function stateName(lesson: Lesson, state: LessonStage): string {
-  return state === 'unassisted' && lesson.assists.length === 0 ? '未習得' : STATE_NAMES[state];
+  return state === 'unassisted' && singleStage(lesson) ? '未習得' : STATE_NAMES[state];
 }
 
 /** The lesson to do next: the first being learned, in the curriculum's order. */

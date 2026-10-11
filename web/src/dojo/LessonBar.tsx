@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { GuideDialog } from './GuideDialog';
-import type { Lesson, LessonStage } from './lessons';
+import { singleStage, type Lesson, type LessonStage } from './lessons';
 import type { LessonNote } from './useLesson';
 import { guideFor } from './yakuGuide';
 import './dojo.css';
@@ -10,8 +10,8 @@ export const HINT_AFTER = 3;
 
 const STAGE_NAMES: Record<LessonStage, string> = {
   locked: 'まだ挑戦できません',
-  assisted: '手ほどき',
-  unassisted: '見極め',
+  assisted: '手ほどき中',
+  unassisted: '見極め中',
   done: '習得済み',
 };
 
@@ -49,7 +49,7 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
         <span class="dojo-aid-label">課題</span>
         <b class="lesson-title">{lesson.title}</b>
         <span class="lesson-stage" data-stage={stage}>
-          {stage === 'unassisted' && lesson.assists.length === 0 ? '未習得' : STAGE_NAMES[stage]}
+          {stage === 'unassisted' && singleStage(lesson) ? '未習得' : STAGE_NAMES[stage]}
           {active && times > 1 && ` ${count}/${times}`}
         </span>
         {note && <span class="dojo-aid-ok lesson-note">{noteText(note)}</span>}

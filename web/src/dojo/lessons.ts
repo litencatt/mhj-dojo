@@ -213,7 +213,7 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'shape-win', stage: 0, title: '和了形を作る', form: 'practice',
     goal: 'ツモ和了まで手を進める',
-    text: '和了の形は4面子1雀頭（3+3+3+3+2）。面子は順子（123のような続き）か刻子（同じ牌3枚）、雀頭は同じ牌2枚。シャンテン数（聴牌まであと何枚か）を見ながら進めよう。',
+    text: '和了の形は4面子1雀頭（3+3+3+3+2）。面子は順子（123のような続き）か刻子（同じ牌3枚）、雀頭は同じ牌2枚。シャンテン数（聴牌まであと何手か）を見ながら進めよう。',
     example: '123m 456p 789s 111z 55p',
     assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: [],
     // Judged when the practice ends: won by tsumo, or not (exhausted). A discard that goes on is not judged.
@@ -232,7 +232,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'max-ukeire', stage: 1, title: '受け入れの多い方を残す', form: 'practice', times: 5,
-    goal: '有効牌が最も多く残る牌を切る（5回）',
+    goal: 'シャンテン数を下げずに、有効牌が最も多く残る牌を切る（5回）',
     text: '有効牌（引けばシャンテン数が進む牌）が多いほど、早く聴牌できる。シャンテン数を下げない打牌のうち、有効牌が最も多く残るものを選ぶ。',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['shape-win'],
     // Judged on each discard (a tsumo or the start is not one).
@@ -288,7 +288,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'genbutsu', stage: 4, title: '現物を切る', form: 'game',
-    goal: '他家のリーチの後、現物だけを切って局を終える',
+    goal: '他家のリーチの後、現物だけを切り、放銃せずに局を終える',
     text: 'リーチした人の捨て牌と、リーチの後に誰かが捨てて通った牌（現物）では、その人にロンされない。字牌が4枚見えているなど、現物でなくても安全な牌はここでは数えない。',
     assists: DANGER, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['riichi-win'],
     judge: (r) => {
@@ -298,7 +298,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'suji', stage: 4, title: 'スジを使う', form: 'game',
-    goal: '他家のリーチの後、現物かスジだけを切り、スジを1枚以上使って局を終える',
+    goal: '他家のリーチの後、現物かスジだけを切り、スジを1枚以上使って、放銃せずに局を終える',
     text: '両面待ちは、現物に4があれば1・7では待てない（スジ）。現物がないときは、スジの牌が比較的安全。壁（見えている4枚）や字牌の見え方はここでは数えない。',
     assists: DANGER, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['genbutsu', 'ryanmen-tenpai'],
     judge: (r) => {
@@ -367,6 +367,11 @@ export function findLesson(id: string): Lesson | undefined {
 // ---- Progress ----
 
 export type LessonStage = 'locked' | 'assisted' | 'unassisted' | 'done';
+
+/** Whether a lesson has one stage only (no assists): it is then 未習得 until passed, never 見極め. */
+export function singleStage(lesson: Lesson): boolean {
+  return lesson.assists.length === 0;
+}
 
 /** Where the lesson stands: locked until its prerequisites are passed, then with the assists, without, and done. */
 export function lessonStage(p: DojoProgress, id: string): LessonStage {
