@@ -1,4 +1,4 @@
-/** A choice of the new-game form as radio buttons, one per name, boxed like the dojo's 設定. */
+/** A choice of the new-game form as radio buttons, one per name (values without a name are not offered), boxed like the dojo's 設定. */
 export function RadioGroup<T extends string>({
   label,
   name,
@@ -9,7 +9,7 @@ export function RadioGroup<T extends string>({
   label: string;
   name: string;
   value: T;
-  names: Record<T, string>;
+  names: Partial<Record<T, string>>;
   onChange: (value: T) => void;
 }) {
   return (

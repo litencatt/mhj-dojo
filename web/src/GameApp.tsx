@@ -27,15 +27,18 @@ import {
 import { PLAYBACK_SPEEDS, loadPlaybackSpeed, savePlaybackSpeed, setDojoSpeeds, type PlaybackSpeed } from './playback';
 import { claim } from './singleTab';
 import { summarizeMoves } from './summary';
-import { savedGames } from './saves';
-import { canAffordRedraw, canAffordSummon, loadProgress } from './dojo/progress';
+import { dojoGameSaved, gameLesson, savedGames, setGameLesson } from './saves';
+import { canAffordRedraw, canAffordSummon, loadProgress, recordMasterTry, saveProgress, type DojoProgress } from './dojo/progress';
 import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
+import { LessonBar } from './dojo/LessonBar';
+import { useLesson } from './dojo/useLesson';
+import { findLesson, gameRoundKey, lessonActive, lessonAids } from './dojo/lessons';
 import { LooksSettings, useSharedLooks } from './dojo/looks';
 import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
 import { RadioGroup } from './components/RadioGroup';
-import { CPU_NAMES, DEALER_NAMES, dojoGameOptions, parseOptions, savedItem, urlOptions } from './gameOptions';
+import { CPU_LEVEL_NAMES, CPU_NAMES, DEALER_NAMES, dojoGameOptions, masterMatchOptions, parseOptions, savedItem, uraGameOptions, urlOptions } from './gameOptions';
 import './dojo/dojo.css';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -59,10 +62,41 @@ const PHONE = '(width <= 760px), (height <= 500px) and (pointer: coarse)';
 const RIVERS_FOLD = '(width <= 760px), (height <= 500px)';
 const PHONE_GAME_PANELS = GAME_PANELS.filter((p) => p.key === 'yaku');
 
+/** A game lesson's id in the URL (?lesson=), if it names one. */
+function urlGameLesson(params: URLSearchParams) {
+  const lesson = findLesson(params.get('lesson') ?? '');
+  return lesson?.form === 'game' ? lesson : undefined;
+}
+
+/** The lesson a new dojo game's URL asks for, if it is being learned (neither locked nor done). */
+function openLesson(params: URLSearchParams, p: DojoProgress) {
+  const lesson = urlGameLesson(params);
+  return lesson && lessonActive(p, lesson.id) ? lesson : undefined;
+}
+
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game), or a dojo game (?mode=dojo). */
 export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const [state, setState] = useState<GameState | null>(null);
-  const { progress, has, learned, reward, saveFailed } = useDojoGame(dojo, state);
+  const { progress, has: owns, learned: owned, reward, saveFailed, update } = useDojoGame(dojo, state);
+  // A dojo game played for a lesson (dojo/lessons.ts): the one it was created for, kept with its save
+  // so that a resumed game is judged by it. A lesson asked for in the URL makes it one when it is
+  // created, if the lesson is being learned; the hub's own games are never one. Should its save
+  // have failed, the game created here, and else the URL (which keeps the lesson), tell it.
+  const [askedLesson] = useState(() => (dojo ? new URLSearchParams(location.search).get('lesson') : null));
+  const [createdFor, setCreatedFor] = useState<{ game: string; lesson: string } | null>(null);
+  const lessonId = useMemo(() => {
+    if (!dojo || !state) return null;
+    const saved = gameLesson(state.game_id);
+    if (saved !== null) return saved;
+    if (createdFor?.game === state.game_id) return createdFor.lesson;
+    // The URL's, being learned (as when the game was dealt for it), for a game with no save at all.
+    return dojoGameSaved(state.game_id) ? null : (openLesson(new URLSearchParams(location.search), loadProgress().progress)?.id ?? null);
+  }, [dojo, state?.game_id, createdFor]);
+  const lesson = useLesson(lessonId, update);
+  // The lesson's assists are on at its assisted stage and off at the other, owned or not.
+  const has = (id: string) => lesson?.assist(id) ?? owns(id);
+  // The lesson's yaku count in its game (created with them): its rows show too.
+  const learned = useMemo(() => (lesson ? new Set([...owned, ...lesson.lesson.tempYaku]) : owned), [owned, lesson?.lesson]);
   // The dojo's looks, chosen in 設定 too once the dojo has a progress.
   const looks = useSharedLooks();
   const [peek, setPeek] = useState(false);
@@ -123,9 +157,16 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     return request(() => asked(api.createGame({ seed, ...options }, adviceOn)));
   }
 
-  // The dojo's options come from what is bought now, not from the URL.
-  function createOptions(params: URLSearchParams): GameOptions {
-    return dojo ? dojoGameOptions(loadProgress().progress) : parseOptions((k) => params.get(k));
+  // The dojo's options come from what is bought now (p), not from the URL; a lesson's game adds its yaku.
+  // ?match=master is the 師範戦 and ?match=ura a ウラ面 game, each once open (else the hub's game).
+  function createOptions(params: URLSearchParams, p: DojoProgress, lessonId?: string): GameOptions {
+    if (!dojo) return parseOptions((k) => params.get(k));
+    const match = params.get('match');
+    const special = match === 'master' ? masterMatchOptions(p) : match === 'ura' ? uraGameOptions(p) : null;
+    if (special) return special;
+    const options = dojoGameOptions(p);
+    const extra = lessonId === undefined ? [] : lessonAids(p, lessonId).yaku;
+    return options.dojo ? { ...options, dojo: { ...options.dojo, yaku: [...new Set([...options.dojo.yaku, ...extra])] } } : options;
   }
 
   // One choice of the new-game form changed.
@@ -145,8 +186,27 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
       claim(api.gameKey(id));
       return asked(api.getGame(id, adviceOn)).then((game) => (reopened.current = game));
     },
-    create: (params) =>
-      asked(api.createGame({ seed: optionalInt(params.get('seed')), ...createOptions(params) }, adviceOn)),
+    create: (params) => {
+      const p = loadProgress().progress;
+      // A 師範戦 or ウラ面 game is never a lesson's.
+      const forLesson = dojo && !params.get('match') ? openLesson(params, p) : undefined;
+      const options = createOptions(params, p, forLesson?.id);
+      // The 師範戦 is dealt on a random seed, never the URL's: one played before (settled) would pay nothing.
+      const master = dojo && options.cpu === 'master';
+      return asked(api.createGame({ seed: master ? undefined : optionalInt(params.get('seed')), ...options }, adviceOn)).then((game) => {
+        // Marked once created (its first save is made by then): the lesson it was dealt for.
+        if (forLesson) {
+          setGameLesson(game.game_id, forLesson.id);
+          setCreatedFor({ game: game.game_id, lesson: forLesson.id });
+        }
+        // A 師範戦 counts as tried once dealt (its win counts when it is settled).
+        if (master) {
+          const tried = recordMasterTry(loadProgress().progress);
+          if (saveProgress(tried)) update(tried);
+        }
+        return game;
+      });
+    },
     // A random seed is hidden until the end: drop any seed of a previous game.
     // The dojo's game has its options fixed (dojoGameOptions): none in its URL, and the hub's play= is done.
     sync:
@@ -157,6 +217,10 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
             game: state.game_id,
             seed: state.seed !== null ? String(state.seed) : null,
             play: null,
+            // Kept so that a game whose save is gone (404) is dealt again for its lesson, or as the
+            // 師範戦 or a ウラ面 game.
+            lesson: lessonId,
+            match: state.cpu === 'master' || state.cpu === 'ura' ? state.cpu : null,
             length: null,
             first_dealer: null,
             cpu: null,
@@ -217,6 +281,19 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     return { ...view, seats: view.seats.map((s) => (s.seat === view.you ? s : { ...s, hand: undefined, drawn: undefined })) };
   }, [playback.view, peeking]);
   const earlierEvents = useRoundLog(state);
+  // A lesson's game is judged as each round ends, once its replay is over, on
+  // the round's every move: the round's earlier moves (earlierEvents) must
+  // reach back to its start, which a game reopened mid-round lacks.
+  useEffect(() => {
+    if (!lesson || lesson.lesson.form !== 'game' || !state?.result || playback.playing) return;
+    if (earlierEvents.length !== state.events_from) return;
+    const record = { you: state.you, result: state.result, events: [...earlierEvents, ...state.events] };
+    lesson.record(lesson.lesson.judge(record), gameRoundKey(state.game_id, state.rounds.length - 1));
+  }, [state, playback.playing, lesson?.lesson]);
+  // The note of a round's success stays until the next round begins.
+  useEffect(() => {
+    if (state && !state.result) lesson?.clearNote();
+  }, [state?.result]);
   const summary = !playback.playing && state && state !== reopened.current ? summarizeMoves(state, (seat) => seatLabel(seat, state.you)) : '';
   const actionAreaRef = useRef<HTMLDivElement>(null);
   const wasPlaying = useRef(false);
@@ -285,7 +362,8 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
 
   // The dojo's automations (dojo/autoPlay.ts): those bought, and of them those switched on.
   const auto = useAutoPlay();
-  const autoOwned = AUTO_KEYS.filter((k) => has(AUTO_ITEMS[k].item));
+  // A lesson's game has none: the player must make its moves.
+  const autoOwned = lesson ? [] : AUTO_KEYS.filter((k) => has(AUTO_ITEMS[k].item));
   const autoOn = useMemo(() => new Set<AutoKey>(autoOwned.filter((k) => auto.on.has(k))), [autoOwned.join(), auto.on]);
   // Each state moves once, after its replay, while no request is out (the
   // next state, or an error to retry by hand).
@@ -431,7 +509,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                 </div>
                 <div>
                   <dt>CPU</dt>
-                  <dd>{CPU_NAMES[state.cpu]}</dd>
+                  <dd>{CPU_LEVEL_NAMES[state.cpu]}</dd>
                 </div>
                 <div>
                   <dt class="status-dt-obvious">局</dt>
@@ -468,6 +546,21 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                 uraDoraIndicators={table.ura_dora_indicators}
                 uraDora={table.ura_dora}
               />
+              {lesson && (
+                <LessonBar
+                  lesson={lesson.lesson}
+                  stage={lesson.stage}
+                  count={lesson.count}
+                  note={lesson.note}
+                  failures={lesson.failures}
+                  saveFailed={lesson.saveFailed}
+                />
+              )}
+              {!lesson && askedLesson !== null && (
+                <p class="dojo-notice" data-testid="lesson-closed">
+                  この課題はまだ挑戦できないか、合格済みです。課題のない対局になります。
+                </p>
+              )}
               <GameTable
                 state={table}
                 log={[...earlierEvents, ...table.events]}
@@ -560,7 +653,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
                   busy={busy}
                   onNewGame={() =>
                     dojo
-                      ? location.assign('?mode=dojo')
+                      ? location.assign(state.cpu === 'ura' ? '?mode=dojo&side=ura' : '?mode=dojo')
                       : void startGame({ length: state.length, first_dealer: state.first_dealer_mode, cpu: state.cpu })
                   }
                   dojo={dojo ? { reward, newLabel: '道場へ戻る', saveFailed } : undefined}

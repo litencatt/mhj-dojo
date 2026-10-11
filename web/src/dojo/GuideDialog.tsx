@@ -8,6 +8,8 @@ import { guideFor, practiceHref } from './yakuGuide';
 interface GuideDialogProps {
   /** The yaku (or 役牌) shown; null keeps it closed. */
   yakuKey: string | null;
+  /** Opened from a lesson (LessonBar): no link away to practise it, which would leave the lesson. */
+  inLesson?: boolean;
   /** Just bought: 修得しました above the guide. */
   learned: boolean;
   onClose: () => void;
@@ -18,7 +20,7 @@ function shantenText(s: number): string {
 }
 
 /** A yaku's guide in a modal dialog: its conditions, han, an example hand and a way to practise it. */
-export function GuideDialog({ yakuKey, learned, onClose }: GuideDialogProps) {
+export function GuideDialog({ yakuKey, inLesson = false, learned, onClose }: GuideDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const backdrop = useBackdropClose(() => ref.current?.close());
   const guide = yakuKey ? guideFor(yakuKey) : undefined;
@@ -34,7 +36,7 @@ export function GuideDialog({ yakuKey, learned, onClose }: GuideDialogProps) {
     if (guide && d && !d.open) d.showModal();
   }, [guide?.key]);
 
-  const href = guide && practiceHref(guide);
+  const href = guide && !inLesson && practiceHref(guide);
   return (
     <dialog ref={ref} class="yaku-guide" aria-labelledby="yaku-guide-heading" onClose={onClose} {...backdrop}>
       {guide && (
@@ -65,14 +67,14 @@ export function GuideDialog({ yakuKey, learned, onClose }: GuideDialogProps) {
             ))}
           </div>
           <p class="dojo-muted yaku-guide-note">離して置いた最後の牌が和了牌。{guide.example.note}</p>
-          {guide.practice && (
+          {!inLesson && guide.practice && (
             <p class="dojo-muted yaku-guide-seed">
               {guide.practice.row === 'normal'
                 ? `練習モードでは立直の宣言はできないので、門前で聴牌するまでを練習します（配牌は${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed}）。`
                 : `配牌が${guide.practice.rowName}${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed} で練習できます。`}
             </p>
           )}
-          {!guide.practice && <p class="dojo-muted yaku-guide-seed">この役は、捨てるだけの練習モードでは練習できません。</p>}
+          {!inLesson && !guide.practice && <p class="dojo-muted yaku-guide-seed">この役は、捨てるだけの練習モードでは練習できません。</p>}
           <div class="dojo-actions">
             {href && (
               <a class="dojo-start" href={href}>

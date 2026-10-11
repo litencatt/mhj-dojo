@@ -27,6 +27,28 @@
 .dojo-play {
   margin-top: 8px;
 }
+/* The cheats' tab says where they work (Shop). */
+.shop-note {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+/* The 表 / ウラ面 tabs (the shop's .shop-tabs) over the game to start, once the 師範戦 is won. */
+.dojo-sides {
+  margin: 8px 0 0;
+}
+.dojo-side-note {
+  flex-basis: 100%;
+  margin: 0;
+  /* As tall on both tabs: a line here, three on a phone (the ウラ面's note and where a game left
+     unfinished on the other tab is, at their longest). */
+  min-height: 1.5em;
+  line-height: 1.5;
+}
+@media (width <= 760px), (height <= 500px) and (pointer: coarse) {
+  .dojo-side-note {
+    min-height: 4.5em;
+  }
+}
 .dojo-level {
   font-size: 1.1rem;
   font-weight: bold;
@@ -406,6 +428,106 @@
   display: inline-flex;
   align-items: center;
 }
+/* The hub's 課程 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
+   (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
+   marked as the notice is. */
+.dojo-lesson-stage > summary {
+  min-height: 32px;
+  line-height: 32px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.dojo-lesson-next {
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: var(--radius-md);
+  background: var(--row-best-bg);
+}
+.dojo-lesson-badge {
+  margin-left: 8px;
+  font-size: 0.8rem;
+}
+.dojo-lesson-more {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}
+.dojo-lesson-more > summary {
+  min-height: 24px;
+  line-height: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dojo-lesson-more p {
+  margin: 4px 0;
+}
+.dojo-lesson-example {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-bottom: 4px;
+}
+.dojo-lesson-later {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dojo-lesson-later .dojo-muted {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+/* A lesson's lines over the hand (LessonBar), a .dojo-notice as tall whatever its state: the
+   lesson, its stage and the last success's note on one line (cut short, never wrapped), then the
+   folded hint, opened only by the player. */
+.lesson-status {
+  margin: 6px 0;
+}
+.lesson-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lesson-stage {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+/* Both are cut short rather than pushed out of the line; the title gives way first (by far), as
+   the note says what just happened. */
+.lesson-title,
+.lesson-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lesson-title {
+  flex-shrink: 100;
+}
+.lesson-note {
+  flex-shrink: 1;
+}
+.lesson-hint summary {
+  min-height: 24px;
+  line-height: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lesson-hint-nudge {
+  margin-left: 8px;
+  color: var(--danger);
+  font-weight: bold;
+}
+.lesson-hint p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+}
 /* On a phone every chip of 所持役 is 44px tall, button or not (a roomy target in a short list). */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   /* Two and a half rows of 44px chips: the next row half shown, as on a wide screen. */
@@ -420,6 +542,23 @@
   .dojo-home .dojo-yaku-guide,
   .yaku-guide .dojo-actions > * {
     min-height: 44px;
+  }
+  .lesson-hint summary,
+  .dojo-lesson-more > summary {
+    min-height: 32px;
+    line-height: 32px;
+  }
+  .dojo-lesson a,
+  .dojo-lesson button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 32px;
+  }
+  .lesson-status button {
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
   }
 }
 

@@ -53,11 +53,17 @@ func simGame(t *testing.T, st *Store, seed int64, yaku []string, s *simStats) {
 	simGameWith(t, st, seed, yaku, Options{CPU: cpu.Weak}, cpu.NewWeak(), s)
 }
 
-// simGameWith plays a dojo game with the options (the opponents' level and
-// the length) and p on your seat.
+// simGameWith plays a dojo game with the options (the opponents' level, the
+// length and any dojo cheats) and p on your seat. A p that is a roundReader
+// is handed the round before each decision.
 func simGameWith(t *testing.T, st *Store, seed int64, yaku []string, o Options, p game.Decider, s *simStats) {
 	t.Helper()
-	o.Dojo = &DojoOptions{Yaku: yaku}
+	var d DojoOptions
+	if o.Dojo != nil {
+		d = *o.Dojo
+	}
+	d.Yaku = yaku
+	o.Dojo = &d
 	m, err := st.Create(&seed, o)
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +72,9 @@ func simGameWith(t *testing.T, st *Store, seed int64, yaku []string, o Options, 
 	for {
 		r := m.game.Round
 		if r.Phase() != game.PhaseEnded {
+			if rr, ok := p.(roundReader); ok {
+				rr.readRound(r)
+			}
 			if err := m.act(p.Decide(r.ViewFor(Human), r.LegalFor(Human))); err != nil {
 				t.Fatalf("seed %d: %v", seed, err)
 			}

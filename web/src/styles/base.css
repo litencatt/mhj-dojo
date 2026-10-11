@@ -99,7 +99,9 @@ h2 {
 .dojo-home button:where(:not(.app-header *)),
 .resume-panel button,
 .tab-stopped button,
-.action-bar button {
+.action-bar button,
+.lesson-status button,
+.yaku-guide button {
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
