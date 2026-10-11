@@ -431,6 +431,11 @@
 /* The hub's 課程 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
    (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
    marked as the notice is. */
+.dojo-lesson-tier {
+  margin: 12px 0 2px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .dojo-lesson-stage > summary {
   min-height: 32px;
   line-height: 32px;

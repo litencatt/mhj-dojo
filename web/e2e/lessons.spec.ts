@@ -258,7 +258,8 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
   await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/段6.*準備中/]);
+  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/上級.*準備中/]);
+  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['入門', '初級', '中級', '卒業']);
   await expect(page.getByTestId('dojo-master-match')).toHaveAttribute('data-state', 'locked');
 });
 
