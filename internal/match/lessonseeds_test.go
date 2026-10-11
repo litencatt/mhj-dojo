@@ -182,7 +182,8 @@ var practiceLessons = map[string]struct {
 		}
 		return verdict(slices.ContainsFunc(after.HandGroups, func(g apiview.HandGroup) bool { return g.Type == handshape.Ryanmen }))
 	}},
-	// Judged on every discard; counted here only where there is a real choice to make.
+	// lessons.ts judges every discard; the search counts only a real choice (a stricter pass, never a
+	// seed the app would not pass), so the seed offers five choices that matter.
 	"max-ukeire": {5, func(before *session.State, discard string, _ *session.State) *bool {
 		if before == nil || discard == "" || !realChoice(before) {
 			return nil
@@ -197,7 +198,8 @@ var practiceLessons = map[string]struct {
 		if !f || !c {
 			return nil
 		}
-		// The player picks the clean tenpai (the lesson's answer) when it is offered.
+		// The seed is for the choice being offered (lessons.ts judges the one the player makes): the
+		// search counts the position, whichever tile the efficient player happened to cut.
 		return verdict(true)
 	}},
 }
@@ -449,12 +451,29 @@ func (p ponPlayer) Decide(v game.View, l game.Legal) game.Action {
 	return p.Player.Decide(v, l)
 }
 
+// learnedLessons are the game lessons whose pass doesn't name a yaku (a kan and
+// a win, folding): another yaku could win, or change the rounds before, so they
+// are played with the yaku a player has there (lessonYaku), not every yaku. The
+// others pass only with their own yaku, counted in their game (tempYaku).
+var learnedLessons = map[string]bool{"kan-win": true, "fold": true}
+
+// lessonYaku is the yaku a lesson is played with: every yaku, or, for the
+// learnedLessons, the starting yaku, the value tiles (stage 3's 役牌のポン) and
+// 嶺上開花 (kan-win's tempYaku), as web/src/dojo/catalog.ts and lessons.ts have them.
+func lessonYaku(t testing.TB, id string) []string {
+	if !learnedLessons[id] {
+		return allYaku
+	}
+	const catalog = "src/dojo/catalog.ts"
+	return slices.Concat(webts.Strings(t, catalog, "INITIAL_YAKU"), webts.Strings(t, catalog, "YAKUHAI_KEYS"), []string{"rinshan"})
+}
+
 // playLessonGame plays a dojo 東風戦 against weak CPUs on seed with p on your
-// seat, every yaku counted, and returns, for each game lesson, the round
-// (from 0) where it got its needed successes, if it did.
-func playLessonGame(t testing.TB, st *Store, seed int64, p game.Decider) map[string]int {
+// seat, counting yaku, and returns, for each game lesson for which judged is
+// true, the round (from 0) where it got its needed successes, if it did.
+func playLessonGame(t testing.TB, st *Store, seed int64, p game.Decider, yaku []string, judged func(id string) bool) map[string]int {
 	t.Helper()
-	m, err := st.Create(&seed, Options{CPU: cpu.Weak, Length: Tonpuu, Dojo: &DojoOptions{Yaku: allYaku}})
+	m, err := st.Create(&seed, Options{CPU: cpu.Weak, Length: Tonpuu, Dojo: &DojoOptions{Yaku: yaku}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +489,7 @@ func playLessonGame(t testing.TB, st *Store, seed int64, p game.Decider) map[str
 		}
 		rec := roundRecord{events: r.Events(), result: r.Result()}
 		for id, l := range gameLessons {
-			if _, done := got[id]; done {
+			if _, done := got[id]; done || !judged(id) {
 				continue
 			}
 			if ok := l.judge(rec); ok != nil && *ok {
@@ -504,9 +523,13 @@ func searchLessonSeeds(t *testing.T) lessonSeedTable {
 		}
 	}
 	st := NewStore(4)
+	learned := lessonYaku(t, "kan-win")
 	for seed := 1; seed <= gameSeedRange; seed++ {
 		for _, pl := range lessonPlayers {
-			for id, at := range playLessonGame(t, st, int64(seed), pl.new()) {
+			for id, at := range playLessonGame(t, st, int64(seed), pl.new(), allYaku, func(id string) bool { return !learnedLessons[id] }) {
+				better(id, lessonSeed{Seed: seed, At: at, Player: pl.name})
+			}
+			for id, at := range playLessonGame(t, st, int64(seed), pl.new(), learned, func(id string) bool { return learnedLessons[id] }) {
 				better(id, lessonSeed{Seed: seed, At: at, Player: pl.name})
 			}
 		}
@@ -584,7 +607,7 @@ func TestLessonSeeds(t *testing.T) {
 			t.Errorf("%s: unknown player %q", id, e.Player)
 			continue
 		}
-		if at, ok := playLessonGame(t, st, int64(e.Seed), lessonPlayers[i].new())[id]; !ok || at != e.At {
+		if at, ok := playLessonGame(t, st, int64(e.Seed), lessonPlayers[i].new(), lessonYaku(t, id), func(j string) bool { return j == id })[id]; !ok || at != e.At {
 			t.Errorf("%s: game seed %d (%s) passes in round %d (%v), want %d", id, e.Seed, e.Player, at, ok, e.At)
 		}
 	}

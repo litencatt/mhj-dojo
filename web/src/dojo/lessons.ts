@@ -8,6 +8,7 @@ import type { GameEvent, GameResult, SessionState, Tile } from '../apiTypes.ts';
 import { parseTile } from '../tiles.ts';
 import { YAKUHAI_KEYS, findItem } from './catalog.ts';
 import { dojoGame, type DojoProgress, type LessonProgress } from './progress.ts';
+import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH } from './rules.ts';
 import seedData from './lessonSeeds.json' with { type: 'json' };
 
 /**
@@ -372,13 +373,15 @@ export function lessonSeed(id: string): number | undefined {
  * The seed the curriculum deals a lesson on: the hub URL's for a game lesson if it has one; else
  * the lesson's own (lessonSeed). A game lesson's own seed was found in a 東風戦 against weak CPUs,
  * so it is used only when the hub plays that game, and only once (a settled seed pays nothing).
+ * A practice lesson's own seed is for its first try only: a success there is seen (its moves are
+ * its key), so the same moves on the same seed would not count again; later tries are random.
  */
 export function lessonDealSeed(p: DojoProgress, lesson: Lesson, hubSeed?: number): number | undefined {
-  if (lesson.form === 'practice') return lessonSeed(lesson.id);
+  if (lesson.form === 'practice') return (p.lessons[lesson.id]?.seen.length ?? 0) === 0 ? lessonSeed(lesson.id) : undefined;
   if (hubSeed !== undefined) return hubSeed;
   const seed = lessonSeed(lesson.id);
   const g = dojoGame(p);
-  return seed !== undefined && !p.settled.includes(String(seed)) && g.length === 'tonpuu' && g.cpu === 'weak' ? seed : undefined;
+  return seed !== undefined && !p.settled.includes(String(seed)) && g.length === DEFAULT_GAME_LENGTH && g.cpu === DEFAULT_GAME_CPU ? seed : undefined;
 }
 
 /**

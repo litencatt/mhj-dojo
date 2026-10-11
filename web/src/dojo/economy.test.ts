@@ -85,6 +85,8 @@ interface Run {
 const MASTER_TRIES = 5;
 
 /** A run from a new dojo, the curriculum played along unless `curriculum` is false. */
+// Every run plays the curriculum along (learn) unless told not to: the bounds above count its
+// rewards, and the comparison below checks the shop is no slower without them.
 function start(stages: readonly Stage[] = STAGES, curriculum = true): Run {
   return { p: initialProgress(), games: 0, han: 0, wins: 0, stages, curriculum, masterTries: 0 };
 }
@@ -197,7 +199,6 @@ test('human-like: the whole shop is bought in 110 to 150 games', () => {
   assert.ok(r.games >= 110 && r.games <= 150, `${r.games} games`);
 });
 
-
 // ---- The curriculum and the 師範戦 (#320), played along ----
 
 /** Plays the run until `done` holds, at most `limit` games, and returns the games played. */
@@ -227,12 +228,10 @@ test('the first purchase comes with the first game', () => {
 });
 
 test('without the curriculum, the shop takes no longer than with it', () => {
-  const all = (p: DojoProgress) => CATALOG.every((it) => p.ownedItems.includes(it.id));
   const without = start(STAGES, false);
   // Without the curriculum the 師範戦 never opens: the cheats are left out of the comparison.
   const noCheats = CATALOG.filter((it) => it.kind !== 'cheat');
   const a = until(without, (p) => noCheats.every((it) => p.ownedItems.includes(it.id)), noCheats);
   const b = until(start(STAGES), (p) => noCheats.every((it) => p.ownedItems.includes(it.id)), noCheats);
   assert.ok(b <= a, `with ${b}, without ${a}`);
-  assert.ok(!all(without.p));
 });

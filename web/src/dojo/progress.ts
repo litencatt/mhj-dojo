@@ -53,8 +53,8 @@ export interface DojoProgress {
 
 /**
  * The 師範戦's record: games tried (dealt) and won; the ウラ面 opens with the first win and stays open.
- * A won 師範戦 may be played again, its rank paying the master's multiplier all the same: #320
- * decides whether a won one should pay less.
+ * A won 師範戦 may be played again; its rank then pays as a normal CPU's (rules.ts
+ * rankMultiplier, masterWon), not the master's: it would be the best paying game otherwise.
  */
 export interface MasterMatchRecord {
   tries: number;

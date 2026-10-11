@@ -442,6 +442,8 @@ test('the curriculum deals a lesson on its seed: practice always, a game only in
   const p = initialProgress();
   assert.equal(lessonDealSeed(p, practice), lessonSeed('shape-win'));
   assert.match(lessonHref(practice, lessonDealSeed(p, practice)), new RegExp(`seed=${lessonSeed('shape-win')}&turns=18&lesson=shape-win`));
+  // Its own seed is for the first try: once a success is seen there, the same moves would not count.
+  assert.equal(lessonDealSeed({ ...p, lessons: { 'shape-win': { assisted: false, count: 0, done: false, seen: ['practice:1:'] } } }, practice), undefined);
   assert.equal(lessonDealSeed(p, game), lessonSeed('riichi-win'));
   assert.equal(lessonDealSeed(p, game, 7), 7); // the hub URL's seed first
   assert.equal(lessonDealSeed({ ...p, settled: [String(lessonSeed('riichi-win'))] }, game), undefined);
