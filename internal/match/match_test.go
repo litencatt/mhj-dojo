@@ -16,7 +16,7 @@ var defaults = Options{Length: Tonpuu, FirstDealer: DealerRandom, CPU: cpu.Norma
 
 func TestCreateOptions(t *testing.T) {
 	st := NewStore(256)
-	for _, o := range []Options{{Length: "x"}, {FirstDealer: "me"}, {CPU: "strong"}} {
+	for _, o := range []Options{{Length: "x"}, {FirstDealer: "me"}, {CPU: "strong"}, {CPU: cpu.Ura}} {
 		if _, err := st.Create(nil, o); !errors.Is(err, game.ErrInvalid) {
 			t.Fatalf("%+v: %v", o, err)
 		}

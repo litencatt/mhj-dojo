@@ -3,7 +3,8 @@
 // a yaku (see calls.go), discards for tile efficiency (lowest shanten, then
 // most unseen accepting tiles) and folds against a riichi (folds) by the
 // danger of each tile (Danger). It is deterministic. The weak player
-// (NewWeak) plays worse on purpose.
+// (NewWeak) plays worse on purpose; the master (NewMaster, master.go)
+// better.
 package cpu
 
 import (
@@ -54,15 +55,24 @@ func kokushiShanten(v game.View) int {
 // Player decides moves for CPU seats. It keeps a shanten memo, so use one
 // Player per game (it is not safe for concurrent use).
 type Player struct {
-	eng  *shanten.Engine
-	weak bool
+	eng    *shanten.Engine
+	weak   bool
+	master bool
 }
 
 // Levels of play.
 const (
 	Weak   = "weak"   // 弱い: NewWeak
 	Normal = "normal" // 普通: New
+	Master = "master" // 師範: NewMaster
+	Ura    = "ura"    // 裏師範: NewUra
 )
+
+// UraDrawBias is the urashihan's draw bias (game.SeatConfig.DrawBias), in
+// percent: its strength, set by the match with its peek. Changing it
+// changes the games the urashihan plays, so their saves no longer replay
+// (their check fails); TestUraSim measures it.
+const UraDrawBias = 5
 
 // weakStray is the share, in percent, of the weak player's discards picked
 // among all those keeping the lowest shanten instead of the best one.
@@ -77,6 +87,16 @@ func New() *Player { return &Player{eng: shanten.NewEngineGen(memoGen)} }
 // shanten instead of the one with the most ukeire. That pick is a hash of
 // what the seat sees, not a random draw, so a game replays exactly.
 func NewWeak() *Player { return &Player{eng: shanten.NewEngineGen(memoGen), weak: true} }
+
+// NewMaster returns a stronger player with an empty memo (see master.go).
+func NewMaster() *Player { return &Player{eng: shanten.NewEngineGen(memoGen), master: true} }
+
+// NewUra returns the urashihan (裏師範): the master, who plays with
+// cheats. They come from its seats' rules (game.SeatConfig), which the
+// match sets for cpu.Ura: a peek at the other seats' tiles, which the player
+// uses (peek.go), and a bias of its draws toward useful tiles
+// (UraDrawBias), which the engine applies.
+func NewUra() *Player { return NewMaster() }
 
 // Decide implements game.Decider.
 func (p *Player) Decide(v game.View, l game.Legal) game.Action {
@@ -106,18 +126,29 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 		tiles = append(tiles, *me.Drawn)
 	}
 	visible := v.Visible()
+	peek := !p.weak && peeked(v)
+	if peek {
+		seePeeked(v, &visible)
+	}
 
 	best := p.byEfficiency(tiles, len(me.Melds), l.Discards, &visible)
 	if !p.weak && needsRoute(v, me.Melds) {
 		p.byYaku(v, best, tiles, &visible)
 	}
+	if p.master {
+		p.rankMaster(v, best, tiles, &visible)
+	}
+	pick := best[0]
 	if !p.weak {
-		if threats := riichiThreats(v); p.folds(v, best[0].shanten, len(threats)) {
+		threats, riichi := p.threats(v)
+		if p.folds(v, best[0].shanten, best[0].ukeire, riichi) {
 			choice := safest(best, threats, &visible)
 			return game.Action{Type: game.Discard, Tile: choice}
 		}
+		if p.master && len(threats) > 0 {
+			pick = guarded(best, threats, &visible)
+		}
 	}
-	pick := best[0]
 	if p.weak {
 		pick.tile = stray(v, best)
 	} else if pick.shanten == 0 && pick.ukeire == 0 {
@@ -127,11 +158,24 @@ func (p *Player) Decide(v game.View, l game.Legal) game.Action {
 			pick = best[i]
 		}
 	}
+	if peek {
+		deadly := p.deadly(v)
+		if i := slices.IndexFunc(best, func(o option) bool { return !deadly[o.kind] }); deadly[pick.kind] && i >= 0 {
+			pick = best[i]
+		}
+	}
 	choice := pick.tile
 	// No riichi on a wait whose tiles are all in sight (the weak player
 	// declares anyway).
 	live := pick.ukeire > 0 || p.weak
 	if pick.shanten == 0 && live && slices.Contains(l.Riichi, choice) {
+		if p.master && len(me.Melds) == 0 {
+			c := tile.CountsOf(tiles)
+			c[pick.kind]--
+			if _, waits := p.shanten(c, 0); dama(v, tiles, choice, waits) {
+				return game.Action{Type: game.Discard, Tile: choice}
+			}
+		}
 		return game.Action{Type: game.Riichi, Tile: choice}
 	}
 	return game.Action{Type: game.Discard, Tile: choice}
@@ -164,12 +208,16 @@ func stray(v game.View, opts []option) string {
 }
 
 // option is a discard with the shanten and unseen accepting tiles it leaves.
+// base is the shanten byEfficiency gave it (byYaku may change shanten), and
+// weight the master's ranking of it (rankMaster).
 type option struct {
 	tile    string
 	kind    tile.Kind
 	red     bool
 	shanten int
 	ukeire  int
+	base    int
+	weight  int
 }
 
 // byEfficiency ranks the discards: lowest shanten, most ukeire, then honors
@@ -182,7 +230,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, v
 		o := option{tile: s, kind: tiles[i].Kind, red: tiles[i].Red}
 		// A red five and a plain one leave the same hand.
 		if j := slices.IndexFunc(opts, func(x option) bool { return x.kind == o.kind }); j >= 0 {
-			o.shanten, o.ukeire = opts[j].shanten, opts[j].ukeire
+			o.shanten, o.ukeire, o.base = opts[j].shanten, opts[j].ukeire, opts[j].base
 			opts = append(opts, o)
 			continue
 		}
@@ -192,7 +240,7 @@ func (p *Player) byEfficiency(tiles []tile.Tile, melds int, discards []string, v
 		for _, k := range acc {
 			o.ukeire += max(0, 4-visible[k])
 		}
-		o.shanten = sh
+		o.shanten, o.base = sh, sh
 		opts = append(opts, o)
 	}
 	sortx.Func(opts, func(a, b option) int {
@@ -260,8 +308,12 @@ func kindsOf(set *[tile.NumKinds]bool) []tile.Kind {
 
 // folds reports whether a hand at shanten sh folds against threats riichi
 // seats: always from foldShanten, and one step from tenpai against two or
-// more of them or with a cheap hand.
-func (p *Player) folds(v game.View, sh, threats int) bool {
+// more of them or with a cheap hand. The master decides by masterFolds,
+// with the hand's ukeire (< 0 when not known).
+func (p *Player) folds(v game.View, sh, ukeire, threats int) bool {
+	if p.master {
+		return p.masterFolds(v, sh, ukeire, threats)
+	}
 	switch {
 	case p.weak || threats == 0 || sh <= 0:
 		return false
@@ -325,6 +377,21 @@ func safeKinds(v game.View, seat int) [tile.NumKinds]bool {
 		}
 	}
 	return safe
+}
+
+// threats returns the safe kinds of the seats the player defends against,
+// every other seat in riichi first (riichi of them) and for the master
+// open hands after them (see openThreats).
+func (p *Player) threats(v game.View) (safe [][tile.NumKinds]bool, riichi int) {
+	if peeked(v) {
+		return nil, 0 // it sees what it would deal into instead (peek.go)
+	}
+	safe = riichiThreats(v)
+	riichi = len(safe)
+	if p.master {
+		safe = openThreats(v, safe)
+	}
+	return safe, riichi
 }
 
 // riichiThreats returns the safe kinds of every other seat in riichi.

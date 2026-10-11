@@ -15,7 +15,8 @@ import (
 )
 
 // The dojo's yaku guide (web/src/dojo/yakuGuide.json, yakuSeeds.json): the han
-// and the example hand of each yaku sold in the shop, and a practice seed whose
+// and the example hand of each yaku sold in the shop (and of 立直, now an
+// initial yaku), and a practice seed whose
 // starting hand is near that yaku. Both are machine-checked here, so they
 // cannot drift from the engine.
 //
@@ -65,6 +66,7 @@ var practiceRows = map[string][]string{
 	"riichi":          {"normal"},
 	"double_riichi":   {"normal"},
 	"ippatsu":         {"normal"},
+	"pinfu":           {"pinfu"},
 	"yakuhai":         {"haku", "hatsu", "chun", "ton"},
 	"iipeikou":        {"iipeikou"},
 	"sanshoku":        {"sanshoku"},

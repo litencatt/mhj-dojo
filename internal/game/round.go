@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/litencatt/mhj-dojo/internal/score"
+	"github.com/litencatt/mhj-dojo/internal/shanten"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
 	"github.com/litencatt/mhj-dojo/internal/yaku"
@@ -180,6 +181,10 @@ type RoundConfig struct {
 	Honba     int
 	Deposit   int
 	Points    [4]int
+
+	// FirstDealer is the game's first dealer (起家): ties in the standings
+	// go to the seat nearer it.
+	FirstDealer int
 	SeatConfig
 }
 
@@ -195,6 +200,17 @@ type SeatConfig struct {
 	// SummonsPerRound is how many Summon moves each seat may make in a
 	// round (0: none).
 	SummonsPerRound [4]int
+	// Peek shows a seat's view (ViewFor) the other seats' concealed tiles:
+	// a CPU's cheat, for its decisions only (the human's peek is the
+	// match's).
+	Peek [4]bool
+	// DrawBias is the chance, in percent, that a seat's live-wall draw
+	// which does not lower its shanten is swapped for the next live-wall
+	// tile that does (see biasDraw): a CPU's cheat, out of riichi only.
+	DrawBias [4]int
+	// WallPeek is how many of its next draws a seat is shown (the dojo's
+	// wall peek, see NextDraws): DrawBias never moves them.
+	WallPeek [4]int
 }
 
 // Round is one round in progress. It is not safe for concurrent use.
@@ -210,6 +226,8 @@ type Round struct {
 	deposit   int
 	honba     int
 	start     [4]int // points at the start of the round
+
+	firstDealer int // the game's (RoundConfig.FirstDealer)
 
 	// kanDora counts the kan dora indicators turned over; pendingDora the
 	// open or added kans whose indicator waits for the discard after them.
@@ -227,6 +245,8 @@ type Round struct {
 	redraws [4]int // Redraw moves made this round
 	summons [4]int // Summon moves made this round
 
+	biasEng *shanten.Engine // DrawBias's shanten memo, made on its first use
+
 	log    []Action    // every applied action, for replay
 	events []Action    // the moves that happened, without skips and unused claims
 	marks  []EventMark // the table right after each event
@@ -242,7 +262,7 @@ func New(seed int64) *Round {
 // NewWithWall is New with a given wall and dealer (used by tests).
 func NewWithWall(w *wall.Wall, dealer int) *Round {
 	return NewRound(RoundConfig{
-		Wall: w, Dealer: dealer, RoundWind: tile.East,
+		Wall: w, Dealer: dealer, FirstDealer: dealer, RoundWind: tile.East,
 		Points: [4]int{StartPoints, StartPoints, StartPoints, StartPoints},
 	})
 }
@@ -251,7 +271,7 @@ func NewWithWall(w *wall.Wall, dealer int) *Round {
 func NewRound(cfg RoundConfig) *Round {
 	r := &Round{
 		wall: cfg.Wall, dealer: cfg.Dealer, roundWind: cfg.RoundWind, turn: cfg.Dealer,
-		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points, seats: cfg.SeatConfig,
+		honba: cfg.Honba, deposit: cfg.Deposit, start: cfg.Points, seats: cfg.SeatConfig, firstDealer: cfg.FirstDealer,
 	}
 	for s := range r.players {
 		r.players[s].hand = cfg.Wall.HandOf(s)
@@ -368,6 +388,7 @@ func (r *Round) draw(seat int) {
 	p := &r.players[seat]
 	p.drawn = &t
 	p.rinshan = false
+	r.biasDraw(seat)
 	r.startTurn(seat)
 }
 
