@@ -10,7 +10,7 @@ import type { DojoProgress } from './progress.ts';
 /** The length of the 師範戦 and of the 裏道場's games (the urashihan was measured in 半荘戦). */
 export const MASTER_MATCH_LENGTH: GameLength = 'hanchan';
 
-/** Whether every lesson of the curriculum's stages 0 to 5 is passed (without its assists). */
+/** Whether every lesson of the curriculum's stages 0 to 5 (初伝〜奥伝) is passed (習得: without its assists). */
 export function curriculumDone(p: DojoProgress): boolean {
   return LESSONS.filter((l) => l.stage <= 5).every((l) => lessonStage(p, l.id) === 'done');
 }

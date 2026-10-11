@@ -253,7 +253,6 @@ export function DojoHome() {
         </div>
       </section>
 
-
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
         <h2 id="dojo-yaku-heading">習得役（{ownedYaku(progress.ownedYaku).length}）</h2>
         <ul class="dojo-yaku" data-testid="dojo-yaku" tabIndex={0} aria-labelledby="dojo-yaku-heading">

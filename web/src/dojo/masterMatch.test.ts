@@ -5,7 +5,7 @@ import { LESSONS } from './lessons.ts';
 import { curriculumDone, masterMatchOpen, uraOpen } from './masterMatch.ts';
 import { initialProgress, xpForLevel, type DojoProgress } from './progress.ts';
 
-/** A progress with every lesson of stages 0 to 5 passed, at the level given. */
+/** A progress with every lesson of stages 0 to 5 (初伝〜奥伝) passed, at the level given (which plays no part). */
 function graduated(lv: number): DojoProgress {
   const lessons = Object.fromEntries(LESSONS.map((l) => [l.id, { assisted: true, count: 0, done: true, seen: [] }]));
   return { ...initialProgress(), xp: xpForLevel(lv), lessons };

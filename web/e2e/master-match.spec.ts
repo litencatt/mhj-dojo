@@ -157,7 +157,8 @@ test('the 表道場 and the 裏道場 tabs are as tall, and each resumes its own
   test.setTimeout(90_000);
   await storeProgress(page, { ...GRADUATED, masterMatch: { tries: 1, wins: 1, uraOpen: true } });
   await page.goto('./?mode=dojo');
-  const panel = page.locator('.dojo-panel').first();
+  // 出稽古's panel, whose tabs these are.
+  const panel = page.locator('section[aria-labelledby="dojo-play-heading"]');
   const omote = page.getByRole('tab', { name: '表道場' });
   const uraTab = page.getByRole('tab', { name: '裏道場' });
   const heights = async () => {

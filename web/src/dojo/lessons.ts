@@ -1,4 +1,5 @@
-// The dojo's curriculum (#316): lessons in stages 0 to 5, each teaching one
+// The dojo's curriculum, 鍛錬 (#316): lessons in stages 0 to 5 (shown as 初伝: 0-1, 中伝: 2-4,
+// 奥伝: 5; 秘伝, a stage 6, is to come), each teaching one
 // thing, in the order of what they rest on. A lesson is played in practice
 // mode or in a dojo game, judged by a pure function of what the engine
 // returns, first with its assists and then without them; passing it without
