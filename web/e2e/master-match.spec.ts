@@ -1,13 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SEED, dojoProgress, finishDojoGame, handPanel, onEngineReply, openSettings, waitForPlayback, watchEngine } from './helpers';
 import { LESSONS } from '../src/dojo/lessons.ts';
-import { MASTER_MATCH_LEVEL } from '../src/dojo/masterMatch.ts';
 import { initialProgress, STORAGE_KEY, xpForLevel, type DojoProgress } from '../src/dojo/progress.ts';
 
-// The 師範戦 and the ウラ面 (#323): the 師範戦 opens once the curriculum is
-// passed at the level, plays three masters without any cheat, and its win
-// opens the ウラ面, whose games play three urashihan with the cheats. The
-// 表's games and CPU games never play either.
+// The 師範戦 and the 裏道場 (#323): the 師範戦 opens once the curriculum is
+// passed (whatever the level), plays three masters without any cheat, and its win
+// opens the 裏道場, whose games play three urashihan with the cheats. The
+// 表道場's games and CPU games never play either.
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -15,9 +14,9 @@ test.beforeEach(async ({ page }) => {
 
 const done = { assisted: true, count: 0, done: true, seen: [] };
 
-/** Every lesson of the curriculum passed, at the 師範戦's level. */
+/** Every lesson of the curriculum passed (at 6級: the level plays no part). */
 const GRADUATED: Partial<DojoProgress> = {
-  xp: xpForLevel(MASTER_MATCH_LEVEL),
+  xp: xpForLevel(5),
   lessons: Object.fromEntries(LESSONS.map((l) => [l.id, done])),
 };
 
@@ -43,8 +42,8 @@ function savedGame(page: Page) {
   }, new URL(page.url()).searchParams.get('game'));
 }
 
-test('the 師範戦 opens with the curriculum passed at its level, and plays three masters without any cheat', async ({ page }) => {
-  // Cheats bought before the ウラ面 work in the 表's games, but not in the 師範戦.
+test('the 師範戦 opens with the curriculum passed, and plays three masters without any cheat', async ({ page }) => {
+  // Cheats bought before the 裏道場 work in the 表道場's games, but not in the 師範戦.
   await storeProgress(page, { ...GRADUATED, ownedItems: ['cheat:peek', 'cheat:redraw'], legacyCheats: ['cheat:peek', 'cheat:redraw'], coins: 200 });
   await page.goto(`./?mode=dojo&seed=${SEED}`);
   await expect(masterRow(page)).toHaveAttribute('data-state', 'open');
@@ -68,28 +67,29 @@ test('the 師範戦 opens with the curriculum passed at its level, and plays thr
   await expect(page.getByRole('button', { name: /^引き直し/ })).toHaveCount(0);
 });
 
-test('the 師範戦 stays locked short of its level, and its URL then deals the hub game', async ({ page }) => {
-  await storeProgress(page, { ...GRADUATED, xp: 0 });
+test('the 師範戦 stays locked short of the curriculum, and its URL then deals the hub game', async ({ page }) => {
+  const { [LESSONS[LESSONS.length - 1].id]: _, ...short } = GRADUATED.lessons!;
+  await storeProgress(page, { ...GRADUATED, xp: 1_000_000, lessons: short });
   await page.goto('./?mode=dojo');
   await expect(masterRow(page)).toHaveAttribute('data-state', 'locked');
   await expect(masterRow(page).getByRole('link')).toHaveCount(0);
   await expect(masterRow(page).locator('summary')).toContainText('先に:');
-  // The cheats are sold once the ウラ面 is open, whatever the level.
+  // The cheats are sold once the 裏道場 is open, whatever the level (a high one here).
   await page.getByRole('tab', { name: 'イカサマ' }).click();
-  await expect(page.getByTestId('shop-cheat-note')).toContainText('師範戦に勝つと開くウラ面');
+  await expect(page.getByTestId('shop-cheat-note')).toContainText('師範戦に勝つと開く裏道場');
   await expect(page.locator('[data-item="cheat:peek"] .shop-locked')).toHaveText('師範戦に勝つと解禁');
-  // No ウラ面 yet: no 表 / ウラ面 tabs.
-  await expect(page.getByRole('tab', { name: 'ウラ面' })).toHaveCount(0);
+  // No 裏道場 yet: no 表道場 / 裏道場 tabs.
+  await expect(page.getByRole('tab', { name: '裏道場' })).toHaveCount(0);
 
   await page.goto(`./?mode=dojo&play=1&match=master&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
   await expect(cpuName(page)).toHaveText('弱い');
 });
 
-test('winning the 師範戦 opens the ウラ面, whose games play the urashihan with the cheats', async ({ page }) => {
+test('winning the 師範戦 opens the 裏道場, whose games play the urashihan with the cheats', async ({ page }) => {
   test.setTimeout(120_000);
   await watchEngine(page);
-  // A cheat bought in the ウラ面 (not a legacy one): it works there only.
+  // A cheat bought in the 裏道場 (not a legacy one): it works there only.
   await storeProgress(page, { ...GRADUATED, ownedItems: ['cheat:peek'] });
   // The game ends with you first.
   onEngineReply(page, (_call, reply) => {
@@ -108,25 +108,25 @@ test('winning the 師範戦 opens the ウラ面, whose games play the urashihan 
   await expect(cpuName(page)).toHaveText('師範');
   await finishDojoGame(page);
   await expect(page.getByTestId('dojo-master-result')).toContainText('師範戦に勝ちました');
-  await expect(page.getByTestId('dojo-master-result')).toContainText('ウラ面が開きました');
+  await expect(page.getByTestId('dojo-master-result')).toContainText('裏道場が開きました');
   expect((await dojoProgress(page))?.masterMatch).toEqual({ tries: 1, wins: 1, uraOpen: true });
 
-  // The hub, after a reload too: the 表 / ウラ面 tabs; the ウラ面 deals a game against the urashihan.
+  // The hub, after a reload too: the 表道場 / 裏道場 tabs; the 裏道場 deals a game against the urashihan.
   await page.getByRole('button', { name: '道場へ戻る' }).click();
   await page.reload();
   await expect(masterRow(page)).toContainText('挑戦 1回・勝利 1回');
-  await expect(page.getByRole('tab', { name: '表' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('link', { name: 'ウラ面で対局' })).toHaveCount(0);
-  await page.getByRole('tab', { name: 'ウラ面' }).click();
+  await expect(page.getByRole('tab', { name: '表道場' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('link', { name: '裏道場で対局' })).toHaveCount(0);
+  await page.getByRole('tab', { name: '裏道場' }).click();
   await expect(page.getByTestId('dojo-side-note')).toContainText('順位の報酬：半荘・CPU 裏師範 ×4');
-  await page.getByRole('link', { name: 'ウラ面で対局' }).click();
+  await page.getByRole('link', { name: '裏道場で対局' }).click();
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   await expect(cpuName(page)).toHaveText('裏師範');
   await expect((await openSettings(page)).getByRole('checkbox', { name: '透視' })).toHaveCount(1);
   await page.keyboard.press('Escape');
 
-  // The 表's game: the cheat bought in the ウラ面 does not work there.
+  // The 表道場's game: the cheat bought in the 裏道場 does not work there.
   await page.goto(`./?mode=dojo&play=1&seed=${SEED}`);
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
@@ -134,7 +134,7 @@ test('winning the 師範戦 opens the ウラ面, whose games play the urashihan 
   await expect((await openSettings(page)).getByRole('checkbox', { name: '透視' })).toHaveCount(0);
 });
 
-test('the 表 and CPU games never play the master or the urashihan', async ({ page }) => {
+test('the 表道場 and CPU games never play the master or the urashihan', async ({ page }) => {
   await storeProgress(page, { ...GRADUATED, xp: 1_000_000, masterMatch: { tries: 1, wins: 1, uraOpen: true } });
   await page.goto('./?mode=dojo');
   const settings = await openSettings(page);
@@ -153,13 +153,13 @@ test('the 表 and CPU games never play the master or the urashihan', async ({ pa
   await expect(form.getByRole('group', { name: 'CPU' })).not.toContainText('師範');
 });
 
-test('the 表 and the ウラ面 tabs are as tall, and each resumes its own unfinished game', async ({ page }) => {
+test('the 表道場 and the 裏道場 tabs are as tall, and each resumes its own unfinished game', async ({ page }) => {
   test.setTimeout(90_000);
   await storeProgress(page, { ...GRADUATED, masterMatch: { tries: 1, wins: 1, uraOpen: true } });
   await page.goto('./?mode=dojo');
   const panel = page.locator('.dojo-panel').first();
-  const omote = page.getByRole('tab', { name: '表' });
-  const uraTab = page.getByRole('tab', { name: 'ウラ面' });
+  const omote = page.getByRole('tab', { name: '表道場' });
+  const uraTab = page.getByRole('tab', { name: '裏道場' });
   const heights = async () => {
     await omote.click();
     const a = (await panel.boundingBox())!.height;
@@ -177,28 +177,44 @@ test('the 表 and the ウラ面 tabs are as tall, and each resumes its own unfin
   };
   await sameHeights();
 
-  // A 師範戦 left unfinished: the 表 resumes it, named; the ウラ面 says where it is, and starting there drops it.
+  // A 師範戦 left unfinished: the 表道場 resumes it, named; the 裏道場 says where it is, and starting there drops it.
   await page.goto('./?mode=dojo&play=1&match=master');
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   await page.goto('./?mode=dojo');
   await expect(page.getByRole('link', { name: '続きから（師範戦）' })).toBeVisible();
-  await sameHeights(); // the ウラ面's note says where the game is, in the same lines
+  await sameHeights(); // the 裏道場's note says where the game is, in the same lines
   await omote.click();
   await expect(page.getByRole('link', { name: '新しく始める' })).toHaveAttribute('title', /中断中の師範戦は破棄/);
   await uraTab.click();
   await expect(page.getByRole('link', { name: /^続きから/ })).toHaveCount(0);
-  await expect(page.getByTestId('dojo-side-note')).toContainText('中断中の師範戦は表のタブに');
-  const start = page.getByRole('link', { name: 'ウラ面で対局' });
+  await expect(page.getByTestId('dojo-side-note')).toContainText('中断中の師範戦は表道場のタブに');
+  const start = page.getByRole('link', { name: '裏道場で対局' });
   await expect(start).toHaveAttribute('title', /中断中の師範戦は破棄/);
   await start.click();
   await expect(handPanel(page)).toBeVisible();
   await waitForPlayback(page);
   await expect(cpuName(page)).toHaveText('裏師範');
 
-  // Now the ウラ面 game is the one to resume, on its tab only.
+  // Now the 裏道場 game is the one to resume, on its tab only.
   await page.goto('./?mode=dojo');
   await expect(page.getByRole('link', { name: /^続きから/ })).toHaveCount(0);
   await uraTab.click();
   await expect(page.getByRole('link', { name: '続きから' })).toBeVisible();
 });
+
+// The hub has one primary button: 鍛錬's while it leads (a lesson next, the 師範戦 open and not won), then 出稽古's.
+for (const [name, p, primary] of [
+  ['a lesson is next', {}, '始める'],
+  ['the 師範戦 is open, not won', GRADUATED, '師範戦に挑戦する'],
+  ['the 師範戦 is won', { ...GRADUATED, masterMatch: { tries: 1, wins: 1, uraOpen: true } }, '対局開始'],
+] as const) {
+  test(`the hub's one primary button when ${name}`, async ({ page }) => {
+    await storeProgress(page, p);
+    await page.goto('./?mode=dojo');
+    const starts = page.locator('.dojo-home .dojo-start');
+    await expect(starts).toHaveCount(1);
+    await expect(starts).toHaveAccessibleName(new RegExp(primary));
+    if (primary !== '対局開始') await expect(page.getByRole('link', { name: '対局開始' })).toHaveClass(/dojo-restart/);
+  });
+}

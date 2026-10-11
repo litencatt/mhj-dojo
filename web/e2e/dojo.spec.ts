@@ -771,7 +771,7 @@ test('a dojo game opened by the CPU game URL moves to the dojo page', async ({ p
   await expect(page.getByRole('link', { name: '道場トップへ戻る' })).toBeVisible();
 });
 
-// A yaku's guide (GuideDialog): shown on buying, and again from the chip in 所持役.
+// A yaku's guide (GuideDialog): shown on buying, and again from the chip in 習得役.
 const shantenText = (s: number) => (s === 0 ? '聴牌' : `${s}向聴`);
 
 test('buying a yaku shows its guide: condition, han, an example hand and a way to practise it', async ({ page }) => {
@@ -823,7 +823,7 @@ test('closing the guide of a bought yaku leaves focus on its chip; a purchase th
   await expect(page.getByText('修得しました')).toBeHidden();
 });
 
-test('an owned yaku in 所持役 opens its guide again; Esc and a click outside close it', async ({ page }) => {
+test('an owned yaku in 習得役 opens its guide again; Esc and a click outside close it', async ({ page }) => {
   await openHub(page, { ownedYaku: ['tanyao', 'pinfu', 'tsumo', 'riichi', 'haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei', 'haitei'] });
   const dialog = page.getByRole('dialog', { name: '立直' });
   await expect(dialog).toBeHidden();

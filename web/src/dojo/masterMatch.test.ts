@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { LESSONS } from './lessons.ts';
-import { MASTER_MATCH_LEVEL, curriculumDone, masterMatchOpen, uraOpen } from './masterMatch.ts';
+import { curriculumDone, masterMatchOpen, uraOpen } from './masterMatch.ts';
 import { initialProgress, xpForLevel, type DojoProgress } from './progress.ts';
 
 /** A progress with every lesson of stages 0 to 5 passed, at the level given. */
@@ -11,19 +11,18 @@ function graduated(lv: number): DojoProgress {
   return { ...initialProgress(), xp: xpForLevel(lv), lessons };
 }
 
-test('the 師範戦 needs the curriculum passed and the level', () => {
+test('the 師範戦 needs the curriculum passed, whatever the level', () => {
   assert.equal(masterMatchOpen(initialProgress()), false);
   assert.equal(curriculumDone(graduated(1)), true);
-  assert.equal(masterMatchOpen(graduated(MASTER_MATCH_LEVEL - 1)), false);
-  assert.equal(masterMatchOpen(graduated(MASTER_MATCH_LEVEL)), true);
+  assert.equal(masterMatchOpen(graduated(1)), true); // 10級: the level is 出稽古's
   // One lesson short, even at a high level.
   const p = graduated(20);
   const { [LESSONS[LESSONS.length - 1].id]: _, ...rest } = p.lessons;
   assert.equal(masterMatchOpen({ ...p, lessons: rest }), false);
 });
 
-test('the ウラ面 opens with a 師範戦 won, not with the level', () => {
+test('the 裏道場 opens with a 師範戦 won, not with the level', () => {
   assert.equal(uraOpen(graduated(30)), false);
-  const p = graduated(MASTER_MATCH_LEVEL);
+  const p = graduated(1);
   assert.equal(uraOpen({ ...p, masterMatch: { tries: 3, wins: 1, uraOpen: true } }), true);
 });
