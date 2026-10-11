@@ -6,10 +6,14 @@
 import type { GameLength } from '../api.ts';
 import { LESSONS, lessonStage } from './lessons.ts';
 import { level, type DojoProgress } from './progress.ts';
-import { HANCHAN_LEVEL } from './rules.ts';
+import { NORMAL_CPU_LEVEL } from './rules.ts';
 
-/** The level the 師範戦 needs besides the curriculum. Provisional: #320 sets it. */
-export const MASTER_MATCH_LEVEL = HANCHAN_LEVEL;
+/**
+ * The level the 師範戦 needs besides the curriculum: 4級, where the normal CPU unlocks, so that
+ * the 表's strongest CPU comes before its master (docs/dojo-economy.md, #320). Played along the
+ * curriculum, it comes about when the curriculum is done.
+ */
+export const MASTER_MATCH_LEVEL = NORMAL_CPU_LEVEL;
 
 /** The length of the 師範戦 and of the ウラ面's games (the urashihan was measured in 半荘戦). */
 export const MASTER_MATCH_LENGTH: GameLength = 'hanchan';

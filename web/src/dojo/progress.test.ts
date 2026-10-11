@@ -526,6 +526,9 @@ test('a 師範戦 counts its try when dealt and its win when settled; the first 
   assert.equal(r.reward?.rankMultiplier, 6);
   r = settle(recordMasterTry(p), master(3, 4));
   assert.deepEqual(r.progress.masterMatch, { tries: 3, wins: 1, uraOpen: true });
+  // Won, the 師範戦 pays as the normal CPU does (rules.ts).
+  assert.equal(r.reward?.rankMultiplier, 4);
+  assert.equal(r.reward?.rankMultiplierLabel, '半荘・CPU 師範（勝利後） ×4');
   // A game settled twice counts once; another CPU's game counts nothing.
   assert.equal(settle(r.progress, master(3, 1)).reward, null);
   assert.deepEqual(settle(p, { ...game(9, 1, []), cpu: 'normal' }).progress.masterMatch, p.masterMatch);
@@ -542,6 +545,7 @@ test('the hub game is never against the master or the urashihan', () => {
 
 test('the 師範戦 and the ウラ面 pay their own multipliers', () => {
   assert.equal(rankMultiplier('hanchan', 'master'), 6);
+  assert.equal(rankMultiplier('hanchan', 'master', true), 4);
   assert.equal(rankMultiplier('hanchan', 'ura'), 4);
   assert.equal(rankMultiplierLabel('hanchan', 'master'), '半荘・CPU 師範 ×6');
   assert.equal(rankMultiplierLabel('tonpuu', 'ura'), 'CPU 裏師範 ×2');
