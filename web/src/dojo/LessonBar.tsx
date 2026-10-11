@@ -10,9 +10,9 @@ export const HINT_AFTER = 3;
 
 const STAGE_NAMES: Record<LessonStage, string> = {
   locked: 'まだ挑戦できません',
-  assisted: '補助あり',
-  unassisted: '補助なし',
-  done: '合格済み',
+  assisted: '手ほどき',
+  unassisted: '見極め',
+  done: '習得済み',
 };
 
 interface LessonBarProps {
@@ -27,9 +27,9 @@ interface LessonBarProps {
 /** The note's text, short enough for a phone's line. */
 function noteText(note: LessonNote): string {
   if (note.kind === 'counted') return '達成！';
-  if (note.kind === 'passed') return '達成！ 次は補助なし';
-  if (note.item) return `合格！ ${note.item}を授かりました`;
-  return note.coins > 0 ? `合格！ ${note.coins}銭を受け取りました` : '合格！';
+  if (note.kind === 'passed') return '達成！ 次は見極め';
+  if (note.item) return `習得！ ${note.item}を授かりました`;
+  return note.coins > 0 ? `習得！ ${note.coins}銭を受け取りました` : '習得！';
 }
 
 /**

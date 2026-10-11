@@ -1,25 +1,24 @@
 import { Fragment } from 'preact';
 import { Tile } from '../components/Tile';
 import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
-import { MASTER_MATCH_LEVEL, curriculumDone, masterMatchOpen } from './masterMatch';
-import { level, progressSaved, saveProgress, type DojoProgress } from './progress';
-import { rankName } from './rules';
+import { curriculumDone, masterMatchOpen } from './masterMatch';
+import { progressSaved, saveProgress, type DojoProgress } from './progress';
 import { expandTiles, guideFor } from './yakuGuide';
 
-// The curriculum's stages (#316), 0 to 5, shown under three tiers: 入門, 初級 and 中級. The word 段
+// The curriculum's stages (#316), 0 to 5, shown under three tiers: 初伝, 中伝 and 奥伝. The word 段
 // is the 級位's (初段, 二段…), so a stage is shown by its name only, never as 段N.
 const STAGE_NAMES = ['和了の形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守り', '手役'] as const;
 const TIERS: readonly { name: string; stages: readonly number[] }[] = [
-  { name: '入門', stages: [0, 1] },
-  { name: '初級', stages: [2, 3, 4] },
-  { name: '中級', stages: [5] },
+  { name: '初伝', stages: [0, 1] },
+  { name: '中伝', stages: [2, 3, 4] },
+  { name: '奥伝', stages: [5] },
 ];
 
 const STATE_NAMES: Record<LessonStage, string> = {
   locked: 'ロック',
-  assisted: '補助あり',
-  unassisted: '補助なし',
-  done: '合格',
+  assisted: '手ほどき',
+  unassisted: '見極め',
+  done: '習得',
 };
 
 /** The lesson to do next: the first being learned, in the curriculum's order. */
@@ -35,10 +34,10 @@ interface CurriculumProps {
 }
 
 /**
- * The hub's 課程 panel: the lessons stage by stage (the stage of the next
+ * The hub's 鍛錬 panel: the lessons stage by stage (the stage of the next
  * lesson open, the others folded), each with its state, a way to start it
  * and, folded, its text and example hand; the next lesson marked. Then the
- * 師範戦 (MasterMatchRow), and 上級 (the position problems) announced at the end.
+ * 師範戦 (MasterMatchRow), and 秘伝 (the position problems) announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const next = nextLesson(progress);
@@ -46,7 +45,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   return (
     <section class="dojo-panel" aria-labelledby="dojo-lessons-heading" data-testid="dojo-lessons">
       <h2 id="dojo-lessons-heading">
-        課程（{passed} / {LESSONS.length}）
+        鍛錬（{passed} / {LESSONS.length}）
       </h2>
       {TIERS.map((tier) => (
         <Fragment key={tier.name}>
@@ -73,11 +72,11 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           })}
         </Fragment>
       ))}
-      <h3 class="dojo-lesson-tier">卒業</h3>
+      <h3 class="dojo-lesson-tier">皆伝</h3>
       <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
         <summary>
           師範戦
-          <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '中級までの後'}</span>
+          <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '奥伝の後'}</span>
         </summary>
         <ul class="shop-list">
           <MasterMatchRow progress={progress} />
@@ -85,7 +84,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
       </details>
       <ul class="dojo-lesson-later">
         <li>
-          上級（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
+          秘伝（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
         </li>
       </ul>
     </section>
@@ -163,11 +162,7 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
   const open = masterMatchOpen(progress);
   const { tries, wins, uraOpen } = progress.masterMatch;
   const left = LESSONS.filter((l) => lessonStage(progress, l.id) !== 'done').length;
-  const lv = level(progress.xp);
-  const missing = [
-    !curriculumDone(progress) && `入門〜中級の課題に合格する（あと${left}）`,
-    lv < MASTER_MATCH_LEVEL && `${rankName(MASTER_MATCH_LEVEL)}になる（いま${rankName(lv)}）`,
-  ].filter((m): m is string => !!m);
+  const missing = [!curriculumDone(progress) && `初伝〜奥伝の課題を習得する（あと${left}）`].filter((m): m is string => !!m);
   const keep = () => {
     if (!progressSaved()) saveProgress(progress);
   };
@@ -187,7 +182,7 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
       <details class="dojo-lesson-more" open={open && !uraOpen}>
         <summary>{missing.length > 0 ? `説明（先に: ${missing.join('、')}）` : '説明'}</summary>
         <p>
-          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つとウラ面が開き、裏師範との対局とイカサマ（ショップ）が解禁されます。
+          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つと裏道場が開き、裏師範との対局とイカサマ（よろず屋）が解禁されます。
         </p>
       </details>
     </li>

@@ -15,11 +15,11 @@ export const NORMAL_CPU_LEVEL = 7;
 export const HANCHAN_RANK_MULTIPLIER = 2;
 export const NORMAL_CPU_RANK_MULTIPLIER = 2;
 /**
- * The 師範戦 (against the master) and the ウラ面's games (against the urashihan), by the CPU alone
+ * The 師範戦 (against the master) and the 裏道場's games (against the urashihan), by the CPU alone
  * (docs/dojo-economy.md, #320). The master is harder than the normal CPU (a human-like player is
- * 1st about 22% of the time) and the 師範戦 is the 表's last trial: x3 until it is won. Won, it
+ * 1st about 22% of the time) and the 師範戦 is the 表道場's last trial: x3 until it is won. Won, it
  * pays as the normal CPU does (x2), so that playing it again is no better a way to earn than the
- * 表's games. The urashihan is beaten with the cheats, whose redraws and summons the game pays: x2.
+ * 表道場's games. The urashihan is beaten with the cheats, whose redraws and summons the game pays: x2.
  */
 export const MASTER_CPU_RANK_MULTIPLIER = 3;
 export const URA_CPU_RANK_MULTIPLIER = 2;

@@ -1,4 +1,5 @@
-// The dojo's curriculum (#316): lessons in stages 0 to 5, each teaching one
+// The dojo's curriculum, 鍛錬 (#316): lessons in stages 0 to 5 (shown as 初伝: 0-1, 中伝: 2-4,
+// 奥伝: 5; 秘伝, a stage 6, is to come), each teaching one
 // thing, in the order of what they rest on. A lesson is played in practice
 // mode or in a dojo game, judged by a pure function of what the engine
 // returns, first with its assists and then without them; passing it without
@@ -302,7 +303,7 @@ export const LESSONS: readonly Lesson[] = [
     },
   },
   handYaku('pinfu-win', 5, ['pinfu'], '平和で和了する',
-    '門前で、面子がすべて順子、雀頭が役牌でなく、両面待ちで和了すると平和。入門の両面待ちが前提。',
+    '門前で、面子がすべて順子、雀頭が役牌でなく、両面待ちで和了すると平和。初伝の両面待ちが前提。',
     '123m678m345p789s55p', ['ryanmen-tenpai', 'riichi-win'], { item: 'pinfu', coins: 0 }),
   handYaku('honitsu-win', 5, ['honitsu', 'chinitsu'], '混一色で和了する',
     '1種類の数牌と字牌だけで作ると混一色。門前で3翻、鳴いても2翻。',
