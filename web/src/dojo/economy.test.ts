@@ -13,7 +13,7 @@
 // riichi sticks and the win effects) are extras for the long run, bought apart
 // (the whole-shop tests). The curriculum is played along (learn, #320): its
 // rewards are paid as they are earned, and once the 師範戦 opens it is tried
-// until won (MASTER_TRIES), which opens the ウラ面 and its cheats in the shop.
+// until won (MASTER_TRIES), which opens the 裏道場 and its cheats in the shop.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CATALOG, YAKUHAI_KEYS, YAKUMAN_PACK, type ShopItem } from './catalog.ts';
@@ -74,13 +74,13 @@ interface Run {
   wins: number;
   stages: readonly Stage[];
   curriculum: boolean; // the curriculum played along (learn)
-  masterTries: number; // the 師範戦's games so far (it opens the ウラ面 on the MASTER_TRIES-th)
+  masterTries: number; // the 師範戦's games so far (it opens the 裏道場 on the MASTER_TRIES-th)
 }
 
 /**
  * The 師範戦's tries until it is won: a human-like player is 1st in about 22% of them
  * (docs/dojo-economy.md), so the 5th try wins (1 - 0.78^5 ≈ 71%). They count as games of the
- * run's stage: the 師範戦 pays x6 against the 表's x1, but the 1st place is rarer.
+ * run's stage: the 師範戦 pays x6 against the 表道場's x1, but the 1st place is rarer.
  */
 const MASTER_TRIES = 5;
 
@@ -132,7 +132,7 @@ function play(r: Run, shop: readonly ShopItem[] = core) {
   const g = { seed: r.games, you: 0, game_over: true, standings: [{ seat: 0, rank }], rounds };
   r.p = settle(r.p, g).progress;
   if (r.curriculum) r.p = learn(r.p, r.games);
-  // Once open, the 師範戦 is tried until it is won, which opens the ウラ面 (and its cheats in the shop).
+  // Once open, the 師範戦 is tried until it is won, which opens the 裏道場 (and its cheats in the shop).
   if (!r.p.masterMatch.uraOpen && masterMatchOpen(r.p) && ++r.masterTries >= MASTER_TRIES) {
     r.p = { ...r.p, masterMatch: { tries: r.masterTries, wins: 1, uraOpen: true } };
   }
@@ -214,10 +214,9 @@ test('the curriculum is passed in 25 to 35 games, one success a game', () => {
   }
 });
 
-test('the 師範戦 opens about when the curriculum is passed: 25 to 40 games', () => {
+test('the 師範戦 opens as the curriculum is passed, whatever the level', () => {
   for (const stages of [STAGES, HUMAN_STAGES]) {
-    const n = until(start(stages), masterMatchOpen);
-    assert.ok(n >= 25 && n <= 40, `${n} games`);
+    assert.equal(until(start(stages), masterMatchOpen), until(start(stages), curriculumDone));
   }
 });
 

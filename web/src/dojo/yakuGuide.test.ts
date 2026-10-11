@@ -12,7 +12,7 @@ const NO_PRACTICE = ['haitei', 'houtei', 'rinshan', 'chankan', 'sankantsu'];
 
 const rawHand = (id: string) => (guideData as Record<string, { example: { hand: string } }>)[id].example.hand;
 // The initial yaku with a guide: 立直 kept the one it had when it was sold (#321), so its chip in
-// 所持役 still opens it. 断么九 and 門前清自摸和 never had one. Listed by hand on purpose: a guide
+// 習得役 still opens it. 断么九 and 門前清自摸和 never had one. Listed by hand on purpose: a guide
 // for an initial yaku is a choice, and this is where it is made.
 const GUIDED_INITIAL = ['riichi'];
 const SOLD = [...CATALOG.filter((it) => it.kind === 'yaku').map((it) => it.id), ...GUIDED_INITIAL];

@@ -6,7 +6,7 @@ import { dojoGame, dojoOptions, type DojoProgress } from './dojo/progress';
 import type { GameSummary } from './saves';
 
 export const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
-/** The CPU levels the game options offer: the master and the urashihan play only the dojo's 師範戦 and ウラ面 (masterMatchOptions, uraGameOptions). */
+/** The CPU levels the game options offer: the master and the urashihan play only the dojo's 師範戦 and 裏道場 (masterMatchOptions, uraGameOptions). */
 export const CPU_NAMES = { weak: '弱い', normal: '普通' } as const;
 /** Every CPU level's name, for a game's. */
 export const CPU_LEVEL_NAMES: Record<CpuLevel, string> = { ...CPU_NAMES, master: '師範', ura: '裏師範' };
@@ -58,7 +58,7 @@ export function masterMatchOptions(p: DojoProgress): GameOptions | null {
   return { length: MASTER_MATCH_LENGTH, cpu: 'master', first_dealer: 'random', dojo: dojoOptions(p, 'master') };
 }
 
-/** A ウラ面 game: a 半荘戦 against three urashihan, with the cheats owned; null until the ウラ面 is open. */
+/** A 裏道場 game: a 半荘戦 against three urashihan, with the cheats owned; null until the 裏道場 is open. */
 export function uraGameOptions(p: DojoProgress): GameOptions | null {
   if (!uraOpen(p)) return null;
   return { length: MASTER_MATCH_LENGTH, cpu: 'ura', first_dealer: 'random', dojo: dojoOptions(p, 'ura') };

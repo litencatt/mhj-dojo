@@ -15,7 +15,7 @@ export function useDojoGame(dojo: boolean, state: GameState | null) {
   const [progress, setProgress] = useState<DojoProgress>(() => (dojo ? loadProgress().progress : initialProgress()));
   const [saveFailed, setSaveFailed] = useState(false);
   const [reward, setReward] = useState<Reward | null>(null);
-  // A cheat counts only where it may be used: never in the 師範戦, in the 表 only when bought before the ウラ面.
+  // A cheat counts only where it may be used: never in the 師範戦, in the 表道場 only when bought before the 裏道場.
   const has = (id: string) =>
     dojo &&
     (progress.ownedItems.includes(id) || progress.ownedYaku.includes(id)) &&

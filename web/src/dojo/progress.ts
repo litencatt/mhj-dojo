@@ -43,16 +43,16 @@ export interface DojoProgress {
   gameCpu: CpuLevel;
   // The curriculum's lessons (lessons.ts) by id: those not begun are absent. Data from before had none: {}.
   lessons: Record<string, LessonProgress>;
-  // The 師範戦 (masterMatch.ts). Data from before had none: not tried, the ウラ面 closed.
+  // The 師範戦 (masterMatch.ts). Data from before had none: not tried, the 裏道場 closed.
   masterMatch: MasterMatchRecord;
-  // The cheats (ids) owned when they moved to the ウラ面 (#323): those stay usable in the 表's games but
-  // the 師範戦 (cheatUsable); a cheat bought later works in the ウラ面 only. Data from before had none:
+  // The cheats (ids) owned when they moved to the 裏道場 (#323): those stay usable in the 表道場's games but
+  // the 師範戦 (cheatUsable); a cheat bought later works in the 裏道場 only. Data from before had none:
   // the cheats it owned then (an early save's boolean: the cheats owned when read, if true).
   legacyCheats: string[];
 }
 
 /**
- * The 師範戦's record: games tried (dealt) and won; the ウラ面 opens with the first win and stays open.
+ * The 師範戦's record: games tried (dealt) and won; the 裏道場 opens with the first win and stays open.
  * A won 師範戦 may be played again; its rank then pays as a normal CPU's (rules.ts
  * rankMultiplier, masterWon), not the master's: it would be the best paying game otherwise.
  */
@@ -154,7 +154,7 @@ export interface Reward {
   coinsAfter: number;
   levelBefore: number;
   levelAfter: number;
-  // A 師範戦's outcome: won (1st place), and whether this win opened the ウラ面.
+  // A 師範戦's outcome: won (1st place), and whether this win opened the 裏道場.
   masterMatch?: { won: boolean; uraOpened: boolean };
 }
 
@@ -298,7 +298,7 @@ export function owns(p: DojoProgress, id: string): boolean {
   return p.ownedItems.includes(id) || p.ownedYaku.includes(id);
 }
 
-// 'ura': a cheat, sold only once the ウラ面 is open (the 師範戦 won), whatever the level.
+// 'ura': a cheat, sold only once the 裏道場 is open (the 師範戦 won), whatever the level.
 export type PurchaseDenied = 'unknown' | 'owned' | 'level' | 'ura' | 'requires' | 'coins';
 
 export type Purchase =
@@ -355,7 +355,7 @@ export function lengthUnlocked(p: DojoProgress, length: GameLength): boolean {
 
 /**
  * Whether the hub's game may be against the CPU level at the progress's level. The master and the
- * urashihan never: they play only the 師範戦 and the ウラ面's games (masterMatch.ts), not the hub's game.
+ * urashihan never: they play only the 師範戦 and the 裏道場's games (masterMatch.ts), not the hub's game.
  */
 export function cpuUnlocked(p: DojoProgress, cpu: CpuLevel): boolean {
   if (cpu === 'master' || cpu === 'ura') return false;
@@ -367,18 +367,18 @@ export function recordMasterTry(p: DojoProgress): DojoProgress {
   return { ...p, masterMatch: { ...p.masterMatch, tries: p.masterMatch.tries + 1 } };
 }
 
-/** The kind of a dojo game: the 表's games, the 師範戦, or the ウラ面's games. */
+/** The kind of a dojo game: the 表道場's games, the 師範戦, or the 裏道場's games. */
 export type DojoGameKind = 'omote' | 'master' | 'ura';
 
-/** The kind of a dojo game against the CPU level: the master plays only the 師範戦, the urashihan only the ウラ面. */
+/** The kind of a dojo game against the CPU level: the master plays only the 師範戦, the urashihan only the 裏道場. */
 export function gameKind(cpu: CpuLevel | undefined): DojoGameKind {
   return cpu === 'master' ? 'master' : cpu === 'ura' ? 'ura' : 'omote';
 }
 
 /**
- * Whether the owned cheat `id` may be used in a game of the kind: never in the 師範戦 (the 表's last
- * trial is played straight); in the ウラ面's games once it is open; and in the 表's other games only
- * if it was owned when the cheats moved to the ウラ面 (legacyCheats: never taken away).
+ * Whether the owned cheat `id` may be used in a game of the kind: never in the 師範戦 (the 表道場's last
+ * trial is played straight); in the 裏道場's games once it is open; and in the 表道場's other games only
+ * if it was owned when the cheats moved to the 裏道場 (legacyCheats: never taken away).
  */
 export function cheatUsable(p: DojoProgress, id: string, kind: DojoGameKind): boolean {
   if (!p.ownedItems.includes(id)) return false;

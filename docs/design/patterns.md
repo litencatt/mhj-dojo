@@ -23,4 +23,4 @@
 - 状態は属性で表す: モード → `aria-current="page"`、トグル → `aria-pressed`、タブ → `role="tab"` + `aria-selected`、ダイアログを開くボタン → `aria-haspopup="dialog"`。
 - ホバー表現は `@media (hover: hover)` の中だけ(タッチで持ち上げが残らないように)。
 - アニメーションは `@media (prefers-reduced-motion: no-preference)` の中だけ。
-- 状態の切り替えで高さが変わる行(CPU の要約、再生中、ショップの一覧)は `min-height` や固定高さで保つ。
+- 状態の切り替えで高さが変わる行(CPU の要約、再生中、よろず屋の一覧)は `min-height` や固定高さで保つ。
