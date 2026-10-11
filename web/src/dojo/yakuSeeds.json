@@ -51,6 +51,11 @@
       "row": "junchan",
       "shanten": 2
     },
+    "pinfu": {
+      "seed": 1488,
+      "row": "pinfu",
+      "shanten": 1
+    },
     "riichi": {
       "seed": 8430,
       "row": "normal",

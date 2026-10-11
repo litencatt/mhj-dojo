@@ -215,3 +215,78 @@ func TestRestoreChecksTheSave(t *testing.T) {
 		t.Fatalf("no check: %v", err)
 	}
 }
+
+// A game against the urashihan, whose draws the engine biases, with the
+// dojo's cheats (redraw, summon, wall peek and peek) and calls and kans,
+// rebuilds from its save after every cheat, kan and next: the same state
+// and the same check.
+func TestSaveRestoresUraWithCheats(t *testing.T) {
+	if testing.Short() {
+		t.Skip("plays whole games on one goroutine; run without -short")
+	}
+	seen := map[game.ActionType]bool{}
+	for seed := range int64(3) {
+		st := NewStore(256)
+		d := DojoOptions{Yaku: allYaku, Peek: true, WallPeek: 3, RedrawsPerRound: 1, SummonsPerRound: 1}
+		m, err := st.Create(&seed, Options{Length: Tonpuu, CPU: cpu.Ura, Dojo: &d})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := m.State()
+		riichi := false
+		for steps := 0; !s.GameOver; steps++ {
+			if steps > 3000 {
+				t.Fatal("game does not end")
+			}
+			kans := countKans(m)
+			a := game.Action{Type: ActionNext}
+			switch l := s.Legal; {
+			case s.CanNext:
+				riichi = false
+			case l.Redraw:
+				a = game.Action{Type: game.Redraw}
+			case len(l.Summon) > 0:
+				a = game.Action{Type: game.Summon, Tile: l.Summon[len(l.Summon)-1]}
+			default:
+				a = caller(s, &riichi)
+			}
+			if a.Type == ActionNext {
+				s, err = m.Next()
+			} else {
+				s, err = m.Act(a)
+			}
+			if err != nil {
+				t.Fatalf("seed %d: %+v: %v", seed, a, err)
+			}
+			if countKans(m) > kans {
+				seen[game.Kan] = true
+				restored(t, st, m)
+			}
+			switch a.Type {
+			case game.Redraw, game.Summon, ActionNext:
+				seen[a.Type] = true
+				r := restored(t, st, m)
+				if r.Save().Check != m.Save().Check {
+					t.Fatalf("seed %d: check %s, restored %s", seed, m.Save().Check, r.Save().Check)
+				}
+			}
+		}
+		restored(t, st, m)
+	}
+	for _, a := range []game.ActionType{game.Redraw, game.Summon, game.Kan, ActionNext} {
+		if !seen[a] {
+			t.Errorf("no %s played; pick other seeds", a)
+		}
+	}
+}
+
+// countKans counts the kans made so far in m's round, by any seat.
+func countKans(m *Match) int {
+	n := 0
+	for _, a := range m.game.Round.Events() {
+		if a.Type == game.Kan {
+			n++
+		}
+	}
+	return n
+}

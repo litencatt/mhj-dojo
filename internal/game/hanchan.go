@@ -78,6 +78,8 @@ func (h *Hanchan) deal(points [4]int) {
 		Deposit:    h.deposit,
 		Points:     points,
 		SeatConfig: h.seats,
+
+		FirstDealer: h.firstDealer,
 	})
 }
 
