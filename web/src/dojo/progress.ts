@@ -19,7 +19,7 @@ import {
   findItem,
 } from './catalog.ts';
 import type { CpuLevel, GameLength } from '../api.ts';
-import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH, HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplier } from './rules.ts';
+import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH, HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplier, rankMultiplierLabel } from './rules.ts';
 
 export interface DojoProgress {
   version: 1;
@@ -134,6 +134,7 @@ export interface FinishedGame {
 export interface Reward {
   rank: number;
   rankMultiplier: number; // of the rank's XP and coins: 半荘戦 x2, CPU 普通 x2 (rules.ts)
+  rankMultiplierLabel: string; // its label (rankMultiplierLabel): '' for x1
   rankXp: number;
   xp: number; // the game's whole XP, the rounds' won han paid before included
   coins: number; // the game's whole coins, before the floor at 0: may be negative
@@ -237,7 +238,10 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   const summons = sumSummons(g.rounds);
   const summonCost = summons * SUMMON_COST;
   const bonus = p.firstGameBonus ? 0 : FIRST_GAME_BONUS;
-  const multiplier = rankMultiplier(g.length ?? DEFAULT_GAME_LENGTH, g.cpu ?? DEFAULT_GAME_CPU);
+  // A 師範戦 played after it was won pays as the normal CPU (rules.ts).
+  const masterWon = p.masterMatch.uraOpen;
+  const multiplier = rankMultiplier(g.length ?? DEFAULT_GAME_LENGTH, g.cpu ?? DEFAULT_GAME_CPU, masterWon);
+  const multiplierLabel = rankMultiplierLabel(g.length ?? DEFAULT_GAME_LENGTH, g.cpu ?? DEFAULT_GAME_CPU, masterWon);
   const rankXp = Math.round(RANK_XP[rank - 1] * multiplier);
   const xp = rankXp + han * XP_PER_HAN;
   const rankCoins = Math.round(RANK_COINS[rank - 1] * multiplier);
@@ -267,7 +271,7 @@ export function settle(p: DojoProgress, g: FinishedGame, gameId?: string): { pro
   return {
     progress,
     reward: {
-      rank, rankMultiplier: multiplier, rankXp, xp, coins, rankCoins, hanCoins, wins, winBonusCoins, cheatedWins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
+      rank, rankMultiplier: multiplier, rankMultiplierLabel: multiplierLabel, rankXp, xp, coins, rankCoins, hanCoins, wins, winBonusCoins, cheatedWins, paidCoins, paidXp, han, redraws, redrawCost, summons, summonCost,
       firstGameBonus: bonus, coinsAfter,
       levelBefore: level(p.xp - paidXp), levelAfter: level(progress.xp),
       masterMatch: master,

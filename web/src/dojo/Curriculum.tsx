@@ -1,5 +1,5 @@
 import { Tile } from '../components/Tile';
-import { LESSONS, findLesson, lessonActive, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
+import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
 import { MASTER_MATCH_LEVEL, curriculumDone, masterMatchOpen } from './masterMatch';
 import { level, progressSaved, saveProgress, type DojoProgress } from './progress';
 import { rankName } from './rules';
@@ -115,7 +115,7 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
         </button>
       )}
       {active && (
-        <a class={next ? 'dojo-start' : 'dojo-restart'} href={lessonHref(lesson, lesson.form === 'game' ? seed : undefined)}
+        <a class={next ? 'dojo-start' : 'dojo-restart'} href={lessonHref(lesson, lessonDealSeed(progress, lesson, seed))}
           onClick={keep}
           onAuxClick={keep}
           aria-label={`${lesson.title}を${progress.lessons[lesson.id] ? '続ける' : '始める'}`}
@@ -174,7 +174,7 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
       <details class="dojo-lesson-more" open={open && !uraOpen}>
         <summary>{missing.length > 0 ? `説明（先に: ${missing.join('、')}）` : '説明'}</summary>
         <p>
-          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。勝つとウラ面が開き、裏師範との対局とイカサマ（ショップ）が解禁されます。
+          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つとウラ面が開き、裏師範との対局とイカサマ（ショップ）が解禁されます。
         </p>
       </details>
     </li>

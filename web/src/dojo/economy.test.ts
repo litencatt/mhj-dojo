@@ -11,14 +11,15 @@
 // The targets count the core of the shop: the yaku, the assists and the tile
 // themes. The cheats and the other looks (the tile backs, the table cloths, the
 // riichi sticks and the win effects) are extras for the long run, bought apart
-// (the whole-shop tests). The cheats are sold only once the ウラ面 is open
-// (#323): those tests open it from the start, an optimistic bound, as the
-// 師範戦 takes some games to win (docs/dojo-economy.md). The curriculum's rewards (lessons.ts) are left out for now:
-// their values are provisional until #320 puts them into the economy.
+// (the whole-shop tests). The curriculum is played along (learn, #320): its
+// rewards are paid as they are earned, and once the 師範戦 opens it is tried
+// until won (MASTER_TRIES), which opens the ウラ面 and its cheats in the shop.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CATALOG, YAKUHAI_KEYS, YAKUMAN_PACK, type ShopItem } from './catalog.ts';
 import { initialProgress, level, purchase, settle, type DojoProgress, type RoundLite } from './progress.ts';
+import { LESSONS, lessonActive, recordSuccess } from './lessons.ts';
+import { curriculumDone, masterMatchOpen } from './masterMatch.ts';
 
 const CORE_KINDS: ShopItem['kind'][] = ['yaku', 'assist', 'theme', 'pack'];
 const core = CATALOG.filter((it) => CORE_KINDS.includes(it.kind));
@@ -72,12 +73,42 @@ interface Run {
   han: number;
   wins: number;
   stages: readonly Stage[];
+  curriculum: boolean; // the curriculum played along (learn)
+  masterTries: number; // the 師範戦's games so far (it opens the ウラ面 on the MASTER_TRIES-th)
 }
 
-/** A run from a new dojo; `uraOpen` opens the ウラ面 from the start (optimistic), so the cheats are sold by their price alone. */
-function start(stages: readonly Stage[] = STAGES, uraOpen = false): Run {
-  const p = initialProgress();
-  return { p: uraOpen ? { ...p, masterMatch: { ...p.masterMatch, uraOpen } } : p, games: 0, han: 0, wins: 0, stages };
+/**
+ * The 師範戦's tries until it is won: a human-like player is 1st in about 22% of them
+ * (docs/dojo-economy.md), so the 5th try wins (1 - 0.78^5 ≈ 71%). They count as games of the
+ * run's stage: the 師範戦 pays x6 against the 表's x1, but the 1st place is rarer.
+ */
+const MASTER_TRIES = 5;
+
+/** A run from a new dojo, the curriculum played along unless `curriculum` is false. */
+function start(stages: readonly Stage[] = STAGES, curriculum = true): Run {
+  return { p: initialProgress(), games: 0, han: 0, wins: 0, stages, curriculum, masterTries: 0 };
+}
+
+/**
+ * The curriculum played along a game: every practice lesson open is passed at once (practice mode
+ * costs no game), and the first game lesson open gets one success in the game (a lesson with
+ * assists needs its successes twice, with them and without). Its rewards are paid as lessons.ts pays them.
+ */
+function learn(p: DojoProgress, game: number): DojoProgress {
+  const practice = () => {
+    for (let again = true; again; ) {
+      again = false;
+      for (const l of LESSONS.filter((l) => l.form === 'practice' && lessonActive(p, l.id))) {
+        for (let i = 0; lessonActive(p, l.id); i++) p = recordSuccess(p, l.id, `practice:${l.id}:${i}`).progress;
+        again = true;
+      }
+    }
+  };
+  practice();
+  const next = LESSONS.find((l) => l.form === 'game' && lessonActive(p, l.id));
+  if (next) p = recordSuccess(p, next.id, `game:${game}`).progress;
+  practice();
+  return p;
 }
 
 /** One game at the run's stage, then buys the cheapest thing it can of `shop` (the core by default). */
@@ -98,6 +129,11 @@ function play(r: Run, shop: readonly ShopItem[] = core) {
   const rank = rankAt(s.ranks, (r.games * 0.6180339887) % 1); // spread evenly over the ranks
   const g = { seed: r.games, you: 0, game_over: true, standings: [{ seat: 0, rank }], rounds };
   r.p = settle(r.p, g).progress;
+  if (r.curriculum) r.p = learn(r.p, r.games);
+  // Once open, the 師範戦 is tried until it is won, which opens the ウラ面 (and its cheats in the shop).
+  if (!r.p.masterMatch.uraOpen && masterMatchOpen(r.p) && ++r.masterTries >= MASTER_TRIES) {
+    r.p = { ...r.p, masterMatch: { tries: r.masterTries, wins: 1, uraOpen: true } };
+  }
   for (const it of [...shop].sort((a, b) => a.price - b.price)) {
     const bought = purchase(r.p, it.id);
     if (bought.ok) r.p = bought.progress;
@@ -138,7 +174,7 @@ test('the yakuman pack is bought within 40 games of Lv10, the core shop bought f
 });
 
 test('the whole shop, cheats and every look included, is bought in about 175 games', () => {
-  const r = start(STAGES, true);
+  const r = start(STAGES);
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 160 && r.games <= 190, `${r.games} games`);
 });
@@ -156,7 +192,47 @@ test('human-like: Lv10 comes after 40 to 60 games', () => {
 });
 
 test('human-like: the whole shop is bought in 110 to 150 games', () => {
-  const r = start(HUMAN_STAGES, true);
+  const r = start(HUMAN_STAGES);
   while (!CATALOG.every((it) => r.p.ownedItems.includes(it.id)) && r.games < 400) play(r, CATALOG);
   assert.ok(r.games >= 110 && r.games <= 150, `${r.games} games`);
+});
+
+
+// ---- The curriculum and the 師範戦 (#320), played along ----
+
+/** Plays the run until `done` holds, at most `limit` games, and returns the games played. */
+function until(r: Run, done: (p: DojoProgress) => boolean, shop: readonly ShopItem[] = core, limit = 400): number {
+  while (!done(r.p) && r.games < limit) play(r, shop);
+  return r.games;
+}
+
+test('the curriculum is passed in 25 to 35 games, one success a game', () => {
+  for (const stages of [STAGES, HUMAN_STAGES]) {
+    const n = until(start(stages), curriculumDone);
+    assert.ok(n >= 25 && n <= 35, `${n} games`);
+  }
+});
+
+test('the 師範戦 opens about when the curriculum is passed: 25 to 40 games', () => {
+  for (const stages of [STAGES, HUMAN_STAGES]) {
+    const n = until(start(stages), masterMatchOpen);
+    assert.ok(n >= 25 && n <= 40, `${n} games`);
+  }
+});
+
+test('the first purchase comes with the first game', () => {
+  const r = start(STAGES);
+  play(r);
+  assert.ok(r.p.ownedItems.length > 0, `${r.p.ownedItems}`);
+});
+
+test('without the curriculum, the shop takes no longer than with it', () => {
+  const all = (p: DojoProgress) => CATALOG.every((it) => p.ownedItems.includes(it.id));
+  const without = start(STAGES, false);
+  // Without the curriculum the 師範戦 never opens: the cheats are left out of the comparison.
+  const noCheats = CATALOG.filter((it) => it.kind !== 'cheat');
+  const a = until(without, (p) => noCheats.every((it) => p.ownedItems.includes(it.id)), noCheats);
+  const b = until(start(STAGES), (p) => noCheats.every((it) => p.ownedItems.includes(it.id)), noCheats);
+  assert.ok(b <= a, `with ${b}, without ${a}`);
+  assert.ok(!all(without.p));
 });

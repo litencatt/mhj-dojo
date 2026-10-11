@@ -3,7 +3,7 @@ import { ABORT_NAMES, LENGTH_NAMES, roundName, seatLabel, WIND_NAMES } from './G
 import { deltaClass, signed } from './ResultPanel';
 import { CATALOG } from '../dojo/catalog';
 import { cheated, type Reward } from '../dojo/progress';
-import { rankMultiplierLabel, rankName } from '../dojo/rules';
+import { rankName } from '../dojo/rules';
 
 export interface FinalPanelProps {
   state: GameState;
@@ -14,14 +14,14 @@ export interface FinalPanelProps {
 }
 
 /** 道場の報酬: XP, coins, the redraws' and summons' cost, the level-up and what it unlocked. */
-function DojoReward({ reward, state }: { reward: Reward | null; state: GameState }) {
+function DojoReward({ reward }: { reward: Reward | null }) {
   if (!reward) return <p class="muted dojo-reward">この対局の報酬は受け取り済みです。</p>;
   // The cheats unlock with the ウラ面, not the level.
   const unlocked = reward.levelAfter > reward.levelBefore
     ? CATALOG.filter((it) => it.kind !== 'cheat' && it.level > reward.levelBefore && it.level <= reward.levelAfter)
     : [];
   const master = reward.masterMatch;
-  const multiplier = reward.rankMultiplier !== 1 ? `（${rankMultiplierLabel(state.length, state.cpu)}）` : '';
+  const multiplier = reward.rankMultiplierLabel ? `（${reward.rankMultiplierLabel}）` : '';
   return (
     <div class="dojo-reward" data-testid="dojo-reward">
       <h3>道場の報酬</h3>
@@ -97,7 +97,7 @@ export function FinalPanel({ state, busy, onNewGame, dojo }: FinalPanelProps) {
           {dojo ? dojo.newLabel : '新しい対局'}
         </button>
       </div>
-      {dojo && <DojoReward reward={dojo.reward} state={state} />}
+      {dojo && <DojoReward reward={dojo.reward} />}
       {dojo?.saveFailed && (
         <p class="dojo-notice" role="alert">
           報酬を保存できませんでした（ブラウザの保存領域を確認してください）。

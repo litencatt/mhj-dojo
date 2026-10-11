@@ -5,12 +5,16 @@ import type { GameEvent, GameResult, SessionState, WinYaku, YakuRow } from '../a
 import { CATALOG, findItem } from './catalog.ts';
 import {
   LESSONS,
+  LESSON_COINS,
   bestDiscards,
   discardsAgainstRiichi,
   findLesson,
   gameRoundKey,
   isSuji,
   lessonAids,
+  lessonDealSeed,
+  lessonHref,
+  lessonSeed,
   lessonStage,
   practiceKey,
   recordSuccess,
@@ -328,7 +332,7 @@ test('a lesson is locked until its prerequisites are passed, then assisted, unas
   assert.deepEqual([s.passed, s.completed], [true, true]);
   assert.equal(lessonStage(s.progress, 'ryanmen-tenpai'), 'done');
   assert.deepEqual(s.progress.lessons['ryanmen-tenpai'], { assisted: true, count: 0, done: true, seen: [] });
-  assert.equal(s.progress.coins, 20);
+  assert.equal(s.progress.coins, LESSON_COINS);
 });
 
 test('a lesson of N successes counts them in each stage', () => {
@@ -397,7 +401,7 @@ test('passing a lesson grants its reward once, whatever the level', () => {
   assert.ok(y.ownedItems.includes('yakuhai'));
   const d = pass(passed(['suji']), 'fold'); // 危険牌の印 is Lv4 in the shop; a lesson grants it at Lv1
   assert.ok(d.ownedItems.includes('assist:danger'));
-  assert.equal(pass(initialProgress(), 'shape-win').coins, 20);
+  assert.equal(pass(initialProgress(), 'shape-win').coins, LESSON_COINS);
 });
 
 test('passing a lesson whose yaku is owned already pays it in coins instead', () => {
@@ -421,4 +425,26 @@ test('lessons are kept by a save; data before them reads as {}, and a lesson out
   assert.deepEqual(parseProgress(JSON.stringify({ ...p, coins: 7, lessons: mixed })), {
     ...p, coins: 7, lessons: { 'shape-win': { assisted: true, count: 0, done: true, seen: [] } }, // seen came later: none
   });
+});
+
+// ---- Seeds (lessonSeeds.json, #320) ----
+
+test('every lesson has a seed in lessonSeeds.json or is listed as missing, and nothing else is there', async () => {
+  const { default: data } = await import('./lessonSeeds.json', { with: { type: 'json' } });
+  const ids = LESSONS.map((l) => l.id).sort();
+  assert.deepEqual([...Object.keys(data.seeds), ...data.missing].sort(), ids);
+  for (const l of LESSONS) assert.equal(lessonSeed(l.id) === undefined, data.missing.includes(l.id), l.id);
+});
+
+test('the curriculum deals a lesson on its seed: practice always, a game only in the default 東風戦 and once', () => {
+  const practice = findLesson('shape-win')!;
+  const game = findLesson('riichi-win')!;
+  const p = initialProgress();
+  assert.equal(lessonDealSeed(p, practice), lessonSeed('shape-win'));
+  assert.match(lessonHref(practice, lessonDealSeed(p, practice)), new RegExp(`seed=${lessonSeed('shape-win')}&turns=18&lesson=shape-win`));
+  assert.equal(lessonDealSeed(p, game), lessonSeed('riichi-win'));
+  assert.equal(lessonDealSeed(p, game, 7), 7); // the hub URL's seed first
+  assert.equal(lessonDealSeed({ ...p, settled: [String(lessonSeed('riichi-win'))] }, game), undefined);
+  assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameLength: 'hanchan' }, game), undefined);
+  assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameCpu: 'normal' }, game), undefined);
 });

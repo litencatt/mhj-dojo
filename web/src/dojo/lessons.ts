@@ -7,7 +7,8 @@
 import type { GameEvent, GameResult, SessionState, Tile } from '../apiTypes.ts';
 import { parseTile } from '../tiles.ts';
 import { YAKUHAI_KEYS, findItem } from './catalog.ts';
-import type { DojoProgress, LessonProgress } from './progress.ts';
+import { dojoGame, type DojoProgress, type LessonProgress } from './progress.ts';
+import seedData from './lessonSeeds.json' with { type: 'json' };
 
 /**
  * A practice-mode step: the state reached, and the state and discard that led
@@ -62,9 +63,10 @@ export type Lesson =
   | (LessonBase & { form: 'practice'; judge: (s: PracticeStep) => Verdict })
   | (LessonBase & { form: 'game'; judge: (r: RoundRecord) => Verdict });
 
-// The coins of a lesson that grants no item: small and provisional. The rewards
-// are not in the economy yet (economy.test.ts leaves them out); #320 sets them.
-const LESSON_COINS = 20;
+// The coins of a lesson that grants no item (docs/dojo-economy.md): about half
+// a 東風戦's coins, so that a lesson is worth doing between games; economy.test.ts
+// plays the curriculum along.
+export const LESSON_COINS = 30;
 
 const NOYAKU = ['assist:noyaku'];
 const UKEIRE = ['assist:ukeire'];
@@ -358,8 +360,30 @@ export function lessonActive(p: DojoProgress, id: string): boolean {
 }
 
 /**
+ * The seed a lesson is dealt on by default (lessonSeeds.json, which internal/match's
+ * TestLessonSeeds finds and checks): one where a simulated player passes it soon; none for a
+ * lesson without one found (dealt at random).
+ */
+export function lessonSeed(id: string): number | undefined {
+  return (seedData.seeds as Record<string, { seed: number } | undefined>)[id]?.seed;
+}
+
+/**
+ * The seed the curriculum deals a lesson on: the hub URL's for a game lesson if it has one; else
+ * the lesson's own (lessonSeed). A game lesson's own seed was found in a 東風戦 against weak CPUs,
+ * so it is used only when the hub plays that game, and only once (a settled seed pays nothing).
+ */
+export function lessonDealSeed(p: DojoProgress, lesson: Lesson, hubSeed?: number): number | undefined {
+  if (lesson.form === 'practice') return lessonSeed(lesson.id);
+  if (hubSeed !== undefined) return hubSeed;
+  const seed = lessonSeed(lesson.id);
+  const g = dojoGame(p);
+  return seed !== undefined && !p.settled.includes(String(seed)) && g.length === 'tonpuu' && g.cpu === 'weak' ? seed : undefined;
+}
+
+/**
  * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=[&seed=]) or
- * practice mode (?seed=&turns=18&lesson=); a random seed if none is given (#320 picks them).
+ * practice mode (?seed=&turns=18&lesson=); a random seed if none is given.
  */
 export function lessonHref(lesson: Lesson, seed?: number): string {
   const id = encodeURIComponent(lesson.id);
