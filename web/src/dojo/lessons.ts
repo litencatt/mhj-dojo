@@ -43,9 +43,11 @@ interface LessonBase {
   id: string;
   stage: 0 | 1 | 2 | 3 | 4 | 5;
   title: string;
-  /** What to do and why, for the lesson's page. */
+  /** What to do to pass, in one line, always shown with the lesson. */
+  goal: string;
+  /** Why and how: the rules behind the goal, shown folded. */
   text: string;
-  /** An example hand in compact notation ("123m55z"): the winning hand, or the tenpai the lesson asks for; none where a hand shows nothing. */
+  /** An example hand in compact notation, its blocks apart ("123m 55z"): the winning hand, or the tenpai the lesson asks for; none where a hand shows nothing. */
   example?: string;
   /** Successes a stage needs (1 if not given). */
   times?: number;
@@ -194,13 +196,14 @@ function handYaku(
   stage: 2 | 5,
   keys: string[],
   title: string,
+  goal: string,
   text: string,
   example: string,
   requires: string[],
   reward: Lesson['reward'],
 ): Lesson {
   return {
-    id, stage, title, text, example, form: 'game', assists: stage === 2 ? NOYAKU : [],
+    id, stage, title, goal, text, example, form: 'game', assists: stage === 2 ? NOYAKU : [],
     tempYaku: stage === 5 ? [keys[0]] : [], reward, requires, guide: keys[0],
     judge: (r) => wonWith(r, keys),
   };
@@ -209,16 +212,18 @@ function handYaku(
 export const LESSONS: readonly Lesson[] = [
   {
     id: 'shape-win', stage: 0, title: '和了形を作る', form: 'practice',
-    text: '和了の形は4面子1雀頭（3+3+3+3+2）。面子は順子（123のような続き）か刻子（同じ牌3枚）、雀頭は同じ牌2枚。練習モードで、シャンテン数を見ながらツモ和了まで手を進めよう。',
-    example: '123m456p789s111z55p',
+    goal: 'ツモ和了まで手を進める',
+    text: '和了の形は4面子1雀頭（3+3+3+3+2）。面子は順子（123のような続き）か刻子（同じ牌3枚）、雀頭は同じ牌2枚。シャンテン数（聴牌まであと何枚か）を見ながら進めよう。',
+    example: '123m 456p 789s 111z 55p',
     assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: [],
     // Judged when the practice ends: won by tsumo, or not (exhausted). A discard that goes on is not judged.
     judge: (s) => (s.after.status === 'playing' ? null : s.after.status === 'tsumo' && s.after.win !== null),
   },
   {
     id: 'ryanmen-tenpai', stage: 1, title: '両面で聴牌する', form: 'practice',
-    text: '待ちの形には両面・嵌張・辺張・単騎・双碰がある。両面（34 で 2・5 を待つ）は待ちの牌が2種8枚と最も広い。両面の待ちで聴牌しよう。',
-    example: '123m456p789s34m55z',
+    goal: '両面待ちで聴牌する',
+    text: '待ちの形には両面・嵌張・辺張・単騎・双碰がある。両面（34 で 2・5 を待つ）は待ちの牌が2種8枚と最も広い。',
+    example: '123m 456p 789s 34m 55z',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['shape-win'],
     // At the start (no step yet) a hand dealt at tenpai was not made by you.
     // Judged on a discard that leaves the hand at tenpai; others (and a hand dealt at tenpai) are not.
@@ -227,14 +232,16 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'max-ukeire', stage: 1, title: '受け入れの多い方を残す', form: 'practice', times: 5,
-    text: '有効牌（引けばシャンテン数が進む牌）が多いほど、早く聴牌できる。シャンテン数を下げず、有効牌が最も多く残る牌を切ろう（5回）。',
+    goal: '有効牌が最も多く残る牌を切る（5回）',
+    text: '有効牌（引けばシャンテン数が進む牌）が多いほど、早く聴牌できる。シャンテン数を下げない打牌のうち、有効牌が最も多く残るものを選ぶ。',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['shape-win'],
     // Judged on each discard (a tsumo or the start is not one).
     judge: (s) => (s.before === null || s.discard === null ? null : bestDiscards(s.before).includes(kind(s.discard))),
   },
   {
     id: 'furiten', stage: 1, title: '振聴を避けて聴牌する', form: 'practice',
-    text: '自分の捨て牌に待ちの牌が1枚でもあると振聴で、ロンできない（ツモなら和了れる）。聴牌を取る打牌が2つ以上あり、そのどれかが振聴の待ちになるとき、振聴にならない方を選ぼう。',
+    goal: '聴牌の取り方が複数あるとき、振聴にならない方を選ぶ',
+    text: '自分の捨て牌に待ちの牌が1枚でもあると振聴で、ロンできない（ツモなら和了れる）。聴牌を取る打牌が2つ以上あり、そのどれかが振聴の待ちになる局面で判定する。',
     assists: UKEIRE, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['ryanmen-tenpai'],
     // Counted only where both kinds of tenpai could be taken; elsewhere the step is not judged.
     judge: (s) => {
@@ -245,37 +252,44 @@ export const LESSONS: readonly Lesson[] = [
     },
   },
   handYaku('riichi-win', 2, ['riichi', 'double_riichi'], '立直して和了する',
+    '立直をかけて和了する',
     '和了には役が1つ以上要る（1翻縛り）。立直は、門前で聴牌して宣言すれば、手の形を問わず役になる。',
-    '234m567m345p678s22s', ['shape-win'], { coins: LESSON_COINS }),
+    '234m 567m 345p 678s 22s', ['shape-win'], { coins: LESSON_COINS }),
   handYaku('tsumo-win', 2, ['tsumo'], '門前でツモ和了する',
+    '鳴かずに、ツモで和了する',
     '鳴かずに（門前で）自分で引いて和了すれば、門前清自摸和という役になる。ロンでは付かない。',
-    '234m567m345p678s22s', ['shape-win'], { coins: LESSON_COINS }),
+    '234m 567m 345p 678s 22s', ['shape-win'], { coins: LESSON_COINS }),
   handYaku('tanyao-win', 2, ['tanyao'], '断么九で和了する',
+    '2〜8の数牌だけで和了する',
     '2〜8の数牌だけで作れば断么九。1・9と字牌を使わない、という決まりだけで、鳴いても付く。',
-    '234m567m345p678s22s', ['shape-win'], { coins: LESSON_COINS }),
+    '234m 567m 345p 678s 22s', ['shape-win'], { coins: LESSON_COINS }),
   {
     id: 'yakuhai-pon', stage: 3, title: '役牌をポンして和了する', form: 'game',
+    goal: '役牌をポンして和了する',
     text: '白・發・中と、場風・自風の刻子は1翻。ポンしても役が残るので、鳴くならまず役牌から。鳴くと立直はできなくなる。',
-    example: '234m567p789s22p555z',
+    example: '234m 567p 789s 555z 22p',
     assists: NOYAKU, tempYaku: YAKUHAI_KEYS, reward: { item: 'yakuhai', coins: 0 }, requires: ['riichi-win', 'tanyao-win'], guide: 'yakuhai',
     judge: (r) => wonWithCalledYakuhai(r),
   },
   {
     id: 'kuitan', stage: 3, title: 'チーして喰いタンで和了する', form: 'game',
+    goal: 'チーして、断么九で和了する',
     text: '断么九は鳴いても付く（喰いタン）。2〜8だけの手なら、チーして早く和了れる。',
-    example: '234m567m345p678s22s',
+    example: '234m 567m 345p 678s 22s',
     assists: NOYAKU, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['yakuhai-pon'],
     judge: (r) => called(r, 'chii') && wonWith(r, ['tanyao']),
   },
   {
     id: 'kan-win', stage: 3, title: 'カンして和了する', form: 'game',
-    text: '同じ牌4枚でカンすると、嶺上牌を引き、ドラが1枚増える。カンした局で和了しよう。嶺上牌で和了すれば嶺上開花。',
+    goal: 'カンした局で和了する',
+    text: '同じ牌4枚でカンすると、嶺上牌を引き、ドラが1枚増える。嶺上牌で和了すれば嶺上開花。',
     assists: NOYAKU, tempYaku: ['rinshan'], reward: { item: 'rinshan', coins: 0 }, requires: ['yakuhai-pon'], guide: 'rinshan',
     judge: (r) => called(r, 'kan') && won(r),
   },
   {
     id: 'genbutsu', stage: 4, title: '現物を切る', form: 'game',
-    text: 'リーチした人の捨て牌と、リーチの後に誰かが捨てて通った牌（現物）では、その人にロンされない。他家のリーチの後は、現物だけを切って局を終えよう。字牌が4枚見えているなど、現物でなくても安全な牌はここでは数えない。',
+    goal: '他家のリーチの後、現物だけを切って局を終える',
+    text: 'リーチした人の捨て牌と、リーチの後に誰かが捨てて通った牌（現物）では、その人にロンされない。字牌が4枚見えているなど、現物でなくても安全な牌はここでは数えない。',
     assists: DANGER, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['riichi-win'],
     judge: (r) => {
       const ds = discardsAgainstRiichi(r);
@@ -284,7 +298,8 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'suji', stage: 4, title: 'スジを使う', form: 'game',
-    text: '両面待ちは、現物に4があれば1・7では待てない（スジ）。現物がないときは、スジの牌が比較的安全。他家のリーチの後、現物かスジだけを切り、スジを1枚以上使って局を終えよう。壁（見えている4枚）や字牌の見え方はここでは数えない。',
+    goal: '他家のリーチの後、現物かスジだけを切り、スジを1枚以上使って局を終える',
+    text: '両面待ちは、現物に4があれば1・7では待てない（スジ）。現物がないときは、スジの牌が比較的安全。壁（見えている4枚）や字牌の見え方はここでは数えない。',
     assists: DANGER, tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['genbutsu', 'ryanmen-tenpai'],
     judge: (r) => {
       const ds = discardsAgainstRiichi(r);
@@ -294,7 +309,8 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'fold', stage: 4, title: 'リーチを受けて降りきる', form: 'game', times: 3,
-    text: '降りの目安: 2向聴以下なら降りる、1向聴ならスジまで、聴牌なら押す。他家のリーチの後、現物かスジだけを切って、和了も放銃もせずに局を終えよう（3回）。',
+    goal: '他家のリーチの後、現物かスジだけを切り、和了も放銃もせずに局を終える（3回）',
+    text: '降りの目安: 2向聴以下なら降りる、1向聴ならスジまで、聴牌なら押す。',
     assists: DANGER, tempYaku: [], reward: { item: 'assist:danger', coins: 0 }, requires: ['suji'],
     judge: (r) => {
       const ds = discardsAgainstRiichi(r);
@@ -303,26 +319,33 @@ export const LESSONS: readonly Lesson[] = [
     },
   },
   handYaku('pinfu-win', 5, ['pinfu'], '平和で和了する',
+    '平和を付けて和了する',
     '門前で、面子がすべて順子、雀頭が役牌でなく、両面待ちで和了すると平和。初伝の両面待ちが前提。',
-    '123m678m345p789s55p', ['ryanmen-tenpai', 'riichi-win'], { item: 'pinfu', coins: 0 }),
+    '123m 678m 345p 789s 55p', ['ryanmen-tenpai', 'riichi-win'], { item: 'pinfu', coins: 0 }),
   handYaku('honitsu-win', 5, ['honitsu', 'chinitsu'], '混一色で和了する',
+    '混一色を付けて和了する',
     '1種類の数牌と字牌だけで作ると混一色。門前で3翻、鳴いても2翻。',
-    '123m456m789m111z55z', ['pinfu-win', 'yakuhai-pon'], { item: 'honitsu', coins: 0 }),
+    '123m 456m 789m 111z 55z', ['pinfu-win', 'yakuhai-pon'], { item: 'honitsu', coins: 0 }),
   handYaku('iipeikou-win', 5, ['iipeikou', 'ryanpeikou'], '一盃口で和了する',
+    '一盃口を付けて和了する',
     '同じ順子を2つ（223344 のように）作ると一盃口。門前限定。',
-    '223344m567p678s55s', ['honitsu-win'], { item: 'iipeikou', coins: 0 }),
+    '234m 234m 567p 678s 55s', ['honitsu-win'], { item: 'iipeikou', coins: 0 }),
   handYaku('sanshoku-win', 5, ['sanshoku'], '三色同順で和了する',
+    '三色同順を付けて和了する',
     '萬子・筒子・索子で同じ数の順子をそろえると三色同順。門前で2翻、鳴くと1翻。',
-    '123m123p123s789m55z', ['iipeikou-win'], { item: 'sanshoku', coins: 0 }),
+    '123m 123p 123s 789m 55z', ['iipeikou-win'], { item: 'sanshoku', coins: 0 }),
   handYaku('chiitoitsu-win', 5, ['chiitoitsu'], '七対子で和了する',
+    '七対子で和了する',
     '対子を7つ（すべて違う牌）そろえると七対子。4面子1雀頭ではない、例外の和了形。',
-    '1133m5577p2299s11z', ['sanshoku-win'], { item: 'chiitoitsu', coins: 0 }),
+    '11m 33m 55p 77p 22s 99s 11z', ['sanshoku-win'], { item: 'chiitoitsu', coins: 0 }),
   handYaku('toitoi-win', 5, ['toitoi'], '対々和で和了する',
+    '対々和を付けて和了する',
     '面子をすべて刻子にすると対々和。ポンしても2翻のまま。',
-    '111m555p999s222z33z', ['chiitoitsu-win'], { item: 'toitoi', coins: 0 }),
+    '111m 555p 999s 222z 33z', ['chiitoitsu-win'], { item: 'toitoi', coins: 0 }),
   handYaku('ittsu-win', 5, ['ittsu'], '一気通貫で和了する',
+    '一気通貫を付けて和了する',
     '同じ色で123・456・789をそろえると一気通貫。門前で2翻、鳴くと1翻。',
-    '123456789m234p55s', ['chiitoitsu-win'], { item: 'ittsu', coins: 0 }),
+    '123m 456m 789m 234p 55s', ['chiitoitsu-win'], { item: 'ittsu', coins: 0 }),
 ];
 
 /** The discards (as kinds) with the lowest normal-form shanten and, among them, the most ukeire. */

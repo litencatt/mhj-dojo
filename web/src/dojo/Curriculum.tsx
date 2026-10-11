@@ -16,10 +16,15 @@ const TIERS: readonly { name: string; stages: readonly number[] }[] = [
 
 const STATE_NAMES: Record<LessonStage, string> = {
   locked: 'ロック',
-  assisted: '手ほどき',
-  unassisted: '見極め',
+  assisted: '手ほどき中',
+  unassisted: '見極め中',
   done: '習得',
 };
+
+// A lesson without assists has one stage: it is not learned yet rather than being 見極め.
+function stateName(lesson: Lesson, state: LessonStage): string {
+  return state === 'unassisted' && lesson.assists.length === 0 ? '未習得' : STATE_NAMES[state];
+}
 
 /** The lesson to do next: the first being learned, in the curriculum's order. */
 export function nextLesson(p: DojoProgress): Lesson | undefined {
@@ -35,8 +40,9 @@ interface CurriculumProps {
 
 /**
  * The hub's 鍛錬 panel: the lessons stage by stage (the stage of the next
- * lesson open, the others folded), each with its state, a way to start it
- * and, folded, its text and example hand; the next lesson marked. Then the
+ * lesson open, the others folded), each with its form, its state, its goal,
+ * a way to start it and, folded, its text and example hand; the next lesson
+ * marked. Then the
  * 師範戦 (MasterMatchRow), and 秘伝 (the position problems) announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
@@ -114,13 +120,16 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
     <li class={`shop-item dojo-lesson${next ? ' dojo-lesson-next' : ''}`} data-lesson={lesson.id} data-state={state} aria-current={next ? 'step' : undefined}>
       <span class="shop-name">
         {lesson.title}
-        {next && <span class="dojo-aid-ok dojo-lesson-badge">次はこれ</span>}
+        <span class="dojo-lesson-form">{lesson.form === 'practice' ? '練習モード' : '対局'}</span>
       </span>
       <span class={state === 'done' ? 'shop-owned' : state === 'locked' ? 'shop-locked' : 'shop-price'}>
-        {STATE_NAMES[state]}
+        {stateName(lesson, state)}
         {active && times > 1 && ` ${count}/${times}`}
-        {lesson.form === 'practice' ? '・練習' : '・対局'}
       </span>
+      <p class="dojo-lesson-goal">
+        <span class="dojo-aid-label">目標</span>
+        {lesson.goal}
+      </p>
       {guide && (
         <button type="button" aria-haspopup="dialog" aria-label={`${lesson.title}：役の解説`} onClick={() => onGuide(guide)}>
           役の解説
@@ -135,13 +144,19 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
           {progress.lessons[lesson.id] ? '続ける' : '始める'}
         </a>
       )}
-      <details class="dojo-lesson-more" open={next}>
-        <summary>{state === 'locked' && requires.length > 0 ? `説明（先に: ${requires.join('、')}）` : '説明'}</summary>
+      {/* Open for a dojo that has not begun the curriculum: its first lesson's rules are new. */}
+      <details class="dojo-lesson-more" open={next && Object.keys(progress.lessons).length === 0}>
+        <summary>{state === 'locked' && requires.length > 0 ? `解説（先に: ${requires.join('、')}）` : '解説'}</summary>
         <p>{lesson.text}</p>
         {lesson.example && (
           <div class="dojo-lesson-example" role="group" aria-label="例の手">
-            {expandTiles(lesson.example).map((t, i) => (
-              <Tile key={i} tile={t} size="xs" />
+            <span class="dojo-muted">例</span>
+            {lesson.example.split(' ').map((block, i) => (
+              <span key={i} class="dojo-lesson-block">
+                {expandTiles(block).map((t, j) => (
+                  <Tile key={j} tile={t} size="xs" />
+                ))}
+              </span>
             ))}
           </div>
         )}
@@ -172,6 +187,10 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
       <span class={uraOpen ? 'shop-owned' : open ? 'shop-price' : 'shop-locked'}>
         {!open ? 'ロック' : `挑戦 ${tries}回・勝利 ${wins}回`}
       </span>
+      <p class="dojo-lesson-goal">
+        <span class="dojo-aid-label">目標</span>
+        半荘戦で師範3人を相手に1位になる
+      </p>
       {open && (
         <a class={uraOpen ? 'dojo-restart' : 'dojo-start'} href={MASTER_MATCH_HREF} onClick={keep} onAuxClick={keep}
           aria-label={uraOpen ? '師範戦にもう一度挑戦する' : '師範戦に挑戦する'}
@@ -180,9 +199,9 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
         </a>
       )}
       <details class="dojo-lesson-more" open={open && !uraOpen}>
-        <summary>{missing.length > 0 ? `説明（先に: ${missing.join('、')}）` : '説明'}</summary>
+        <summary>{missing.length > 0 ? `解説（先に: ${missing.join('、')}）` : '解説'}</summary>
         <p>
-          半荘戦で師範（普通より強い CPU）3人を相手に、1位になれば勝ちです。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つと裏道場が開き、裏師範との対局とイカサマ（よろず屋）が解禁されます。
+          師範は普通より強い CPU です。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つと裏道場が開き、裏師範との対局とイカサマ（よろず屋）が解禁されます。
         </p>
       </details>
     </li>
