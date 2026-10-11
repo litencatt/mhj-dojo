@@ -13,6 +13,7 @@ import {
 } from './helpers';
 import { initialProgress, STORAGE_KEY, type DojoProgress } from '../src/dojo/progress.ts';
 import { tileName } from '../src/tiles.ts';
+import { LESSON_COINS } from '../src/dojo/lessons.ts';
 
 // The curriculum's lessons played (dojo/lessons.ts): a game lesson in a dojo
 // game (?mode=dojo&play=1&lesson=), a practice lesson in practice mode
@@ -221,10 +222,10 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
   }
   await page.locator('.tsumo-button').click();
   await expect(stageOf(page)).toHaveAttribute('data-stage', 'done');
-  await expect(bar.locator('.lesson-note')).toHaveText('合格！ 20銭を受け取りました');
+  await expect(bar.locator('.lesson-note')).toHaveText(`合格！ ${LESSON_COINS}銭を受け取りました`);
   const p = await dojoProgress(page);
   expect(p?.lessons['shape-win'].done).toBe(true);
-  expect(p?.coins).toBe(20);
+  expect(p?.coins).toBe(LESSON_COINS);
 });
 
 // ---- The hub's 課程 panel ----

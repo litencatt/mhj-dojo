@@ -1,0 +1,103 @@
+{
+  "practice_range": 1000,
+  "game_range": 400,
+  "seeds": {
+    "chiitoitsu-win": {
+      "seed": 76,
+      "at": 0,
+      "player": "menzen"
+    },
+    "fold": {
+      "seed": 25,
+      "at": 2,
+      "player": "pon"
+    },
+    "furiten": {
+      "seed": 895,
+      "at": 6
+    },
+    "genbutsu": {
+      "seed": 2,
+      "at": 0,
+      "player": "normal"
+    },
+    "honitsu-win": {
+      "seed": 235,
+      "at": 0,
+      "player": "normal"
+    },
+    "iipeikou-win": {
+      "seed": 69,
+      "at": 0,
+      "player": "normal"
+    },
+    "ittsu-win": {
+      "seed": 329,
+      "at": 0,
+      "player": "normal"
+    },
+    "kan-win": {
+      "seed": 86,
+      "at": 0,
+      "player": "pon"
+    },
+    "kuitan": {
+      "seed": 9,
+      "at": 0,
+      "player": "normal"
+    },
+    "max-ukeire": {
+      "seed": 1,
+      "at": 5
+    },
+    "pinfu-win": {
+      "seed": 19,
+      "at": 0,
+      "player": "menzen"
+    },
+    "riichi-win": {
+      "seed": 8,
+      "at": 0,
+      "player": "menzen"
+    },
+    "ryanmen-tenpai": {
+      "seed": 18,
+      "at": 4
+    },
+    "sanshoku-win": {
+      "seed": 53,
+      "at": 0,
+      "player": "normal"
+    },
+    "shape-win": {
+      "seed": 698,
+      "at": 4
+    },
+    "suji": {
+      "seed": 5,
+      "at": 0,
+      "player": "normal"
+    },
+    "tanyao-win": {
+      "seed": 8,
+      "at": 0,
+      "player": "menzen"
+    },
+    "toitoi-win": {
+      "seed": 157,
+      "at": 0,
+      "player": "pon"
+    },
+    "tsumo-win": {
+      "seed": 10,
+      "at": 0,
+      "player": "normal"
+    },
+    "yakuhai-pon": {
+      "seed": 16,
+      "at": 0,
+      "player": "normal"
+    }
+  },
+  "missing": []
+}
