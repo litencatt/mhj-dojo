@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.1011.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.0...v2026.1011.1) - 2026-10-11
+
+### 新機能
+- 道場の課程: 区切りを入門・初級・中級にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/346
+- 道場: 鍛錬を先に進める流れにし、世界観の用語をそろえる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/348
+### 依存関係
+- Bump the web-minor group in /web with 2 updates by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/336
+
 ## [v2026.1011.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1009.2...v2026.1011.0) - 2026-10-11
 
 ### 新機能
