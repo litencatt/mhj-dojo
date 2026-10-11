@@ -88,7 +88,7 @@ test('the lessons have unique ids, stages 0 to 5, prerequisites that come earlie
     for (const r of l.requires) assert.ok(ids.indexOf(r) >= 0 && ids.indexOf(r) < i, `${l.id} requires ${r}`);
     if (l.reward.item !== undefined) assert.ok(findItem(l.reward.item), `${l.id}: ${l.reward.item}`);
     for (const a of l.assists) assert.equal(findItem(a)?.kind, 'assist', `${l.id}: ${a}`);
-    assert.ok(l.title && l.text, l.id);
+    assert.ok(l.title && l.goal && l.text, l.id);
   });
 });
 
@@ -150,7 +150,8 @@ test('every example is a winning hand of 14 tiles, or a tenpai of 13 waiting on 
   const kinds = ['m', 'p', 's'].flatMap((s) => [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${n}${s}`)).concat([1, 2, 3, 4, 5, 6, 7].map((n) => `${n}z`));
   for (const l of LESSONS) {
     if (l.example === undefined) continue;
-    const m = counts(l.example);
+    for (const block of l.example.split(' ')) assert.match(block, /^\d{2,4}[mpsz]$/, `${l.id}: a block of one suit`);
+    const m = counts(l.example.replaceAll(' ', ''));
     const n = [...m.values()].reduce((a, b) => a + b, 0);
     if (l.id === 'ryanmen-tenpai') {
       assert.equal(n, 13, l.id);

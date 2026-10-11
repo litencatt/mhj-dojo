@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { GuideDialog } from './GuideDialog';
-import type { Lesson, LessonStage } from './lessons';
+import { singleStage, type Lesson, type LessonStage } from './lessons';
 import type { LessonNote } from './useLesson';
 import { guideFor } from './yakuGuide';
 import './dojo.css';
@@ -10,8 +10,8 @@ export const HINT_AFTER = 3;
 
 const STAGE_NAMES: Record<LessonStage, string> = {
   locked: 'まだ挑戦できません',
-  assisted: '手ほどき',
-  unassisted: '見極め',
+  assisted: '手ほどき中',
+  unassisted: '見極め中',
   done: '習得済み',
 };
 
@@ -35,7 +35,7 @@ function noteText(note: LessonNote): string {
 /**
  * A lesson's lines over the hand (a dojo game's or practice mode's), as tall
  * whatever happens: the lesson's title, its stage and count and what the
- * last success did, on one line; then its hint, folded, the lesson's text and
+ * last success did, on one line; then its hint, folded, the lesson's goal and text and
  * its yaku's guide, which asks to be opened after failures in a row.
  */
 export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: LessonBarProps) {
@@ -49,7 +49,7 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
         <span class="dojo-aid-label">課題</span>
         <b class="lesson-title">{lesson.title}</b>
         <span class="lesson-stage" data-stage={stage}>
-          {STAGE_NAMES[stage]}
+          {stage === 'unassisted' && singleStage(lesson) ? '未習得' : STAGE_NAMES[stage]}
           {active && times > 1 && ` ${count}/${times}`}
         </span>
         {note && <span class="dojo-aid-ok lesson-note">{noteText(note)}</span>}
@@ -61,6 +61,8 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
           {active && failures >= HINT_AFTER && <span class="lesson-hint-nudge">うまくいかないときは開いてみよう</span>}
         </summary>
         <p>
+          <b>{lesson.goal}</b>
+          <br />
           {lesson.text}
           {guide && (
             <button type="button" aria-haspopup="dialog" onClick={() => setGuideOpen(true)}>
