@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1011.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.1...v2026.1011.2) - 2026-10-11
+
+### 新機能
+- 道場の鍛錬: 課題に目標を1行で出し、解説と例の手を読みやすくする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/350
+
 ## [v2026.1011.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.0...v2026.1011.1) - 2026-10-11
 
 ### 新機能
