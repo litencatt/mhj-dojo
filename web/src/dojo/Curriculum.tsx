@@ -1,3 +1,4 @@
+import { Fragment } from 'preact';
 import { Tile } from '../components/Tile';
 import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, type Lesson, type LessonStage } from './lessons';
 import { MASTER_MATCH_LEVEL, curriculumDone, masterMatchOpen } from './masterMatch';
@@ -5,8 +6,14 @@ import { level, progressSaved, saveProgress, type DojoProgress } from './progres
 import { rankName } from './rules';
 import { expandTiles, guideFor } from './yakuGuide';
 
-// The curriculum's stages (#316), 0 to 5.
-const STAGE_NAMES = ['形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守りの入門', '手役'] as const;
+// The curriculum's stages (#316), 0 to 5, shown under three tiers: 入門, 初級 and 中級. The word 段
+// is the 級位's (初段, 二段…), so a stage is shown by its name only, never as 段N.
+const STAGE_NAMES = ['和了の形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守り', '手役'] as const;
+const TIERS: readonly { name: string; stages: readonly number[] }[] = [
+  { name: '入門', stages: [0, 1] },
+  { name: '初級', stages: [2, 3, 4] },
+  { name: '中級', stages: [5] },
+];
 
 const STATE_NAMES: Record<LessonStage, string> = {
   locked: 'ロック',
@@ -31,7 +38,7 @@ interface CurriculumProps {
  * The hub's 課程 panel: the lessons stage by stage (the stage of the next
  * lesson open, the others folded), each with its state, a way to start it
  * and, folded, its text and example hand; the next lesson marked. Then the
- * 師範戦 (MasterMatchRow), and 段6 announced at the end.
+ * 師範戦 (MasterMatchRow), and 上級 (the position problems) announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const next = nextLesson(progress);
@@ -41,30 +48,36 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
       <h2 id="dojo-lessons-heading">
         課程（{passed} / {LESSONS.length}）
       </h2>
-      {STAGE_NAMES.map((name, stage) => {
-        const lessons = LESSONS.filter((l) => l.stage === stage);
-        const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-        return (
-          <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
-            <summary>
-              段{stage} {name}
-              <span class="dojo-muted">
-                {' '}
-                {done} / {lessons.length}
-              </span>
-            </summary>
-            <ul class="shop-list">
-              {lessons.map((l) => (
-                <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
-              ))}
-            </ul>
-          </details>
-        );
-      })}
+      {TIERS.map((tier) => (
+        <Fragment key={tier.name}>
+          <h3 class="dojo-lesson-tier">{tier.name}</h3>
+          {tier.stages.map((stage) => {
+            const lessons = LESSONS.filter((l) => l.stage === stage);
+            const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
+            return (
+              <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
+                <summary>
+                  {STAGE_NAMES[stage]}
+                  <span class="dojo-muted">
+                    {' '}
+                    {done} / {lessons.length}
+                  </span>
+                </summary>
+                <ul class="shop-list">
+                  {lessons.map((l) => (
+                    <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
+                  ))}
+                </ul>
+              </details>
+            );
+          })}
+        </Fragment>
+      ))}
+      <h3 class="dojo-lesson-tier">卒業</h3>
       <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
         <summary>
           師範戦
-          <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '段0〜5の後'}</span>
+          <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '中級までの後'}</span>
         </summary>
         <ul class="shop-list">
           <MasterMatchRow progress={progress} />
@@ -72,7 +85,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
       </details>
       <ul class="dojo-lesson-later">
         <li>
-          段6 中級（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
+          上級（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
         </li>
       </ul>
     </section>
@@ -152,7 +165,7 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
   const left = LESSONS.filter((l) => lessonStage(progress, l.id) !== 'done').length;
   const lv = level(progress.xp);
   const missing = [
-    !curriculumDone(progress) && `段0〜5の課題に合格する（あと${left}）`,
+    !curriculumDone(progress) && `入門〜中級の課題に合格する（あと${left}）`,
     lv < MASTER_MATCH_LEVEL && `${rankName(MASTER_MATCH_LEVEL)}になる（いま${rankName(lv)}）`,
   ].filter((m): m is string => !!m);
   const keep = () => {
