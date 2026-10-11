@@ -27,19 +27,28 @@
 .dojo-play {
   margin-top: 8px;
 }
+/* The hub's first band: the 級位, its 稽古 and the 銭 on one line, no heading (as tall as its line). */
+.dojo-status-panel {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* 出稽古's line under its heading: what its games are (the game to start keeps its margin below). */
+.dojo-play-note {
+  margin: 0;
+}
 /* The cheats' tab says where they work (Shop). */
 .shop-note {
   margin: 0 0 8px;
   font-size: 0.85rem;
 }
-/* The 表 / ウラ面 tabs (the shop's .shop-tabs) over the game to start, once the 師範戦 is won. */
+/* The 表道場 / 裏道場 tabs (the shop's .shop-tabs) over the game to start, once the 師範戦 is won. */
 .dojo-sides {
   margin: 8px 0 0;
 }
 .dojo-side-note {
   flex-basis: 100%;
   margin: 0;
-  /* As tall on both tabs: a line here, three on a phone (the ウラ面's note and where a game left
+  /* As tall on both tabs: a line here, three on a phone (the 裏道場's note and where a game left
      unfinished on the other tab is, at their longest). */
   min-height: 1.5em;
   line-height: 1.5;
@@ -369,7 +378,7 @@
   }
 }
 
-/* A yaku's guide (GuideDialog, a modal <dialog>): just bought, or opened from 所持役. */
+/* A yaku's guide (GuideDialog, a modal <dialog>): just bought, or opened from 習得役. */
 .yaku-guide {
   width: min(520px, calc(100vw - 32px));
   box-sizing: border-box;
@@ -428,9 +437,14 @@
   display: inline-flex;
   align-items: center;
 }
-/* The hub's 課程 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
+/* The hub's 鍛錬 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
    (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
    marked as the notice is. */
+.dojo-lesson-tier {
+  margin: 12px 0 2px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .dojo-lesson-stage > summary {
   min-height: 32px;
   line-height: 32px;
@@ -446,6 +460,7 @@
 }
 .dojo-lesson-badge {
   margin-left: 8px;
+  white-space: nowrap;
   font-size: 0.8rem;
 }
 .dojo-lesson-more {
@@ -528,7 +543,7 @@
   gap: 4px 8px;
   margin: 4px 0 0;
 }
-/* On a phone every chip of 所持役 is 44px tall, button or not (a roomy target in a short list). */
+/* On a phone every chip of 習得役 is 44px tall, button or not (a roomy target in a short list). */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   /* Two and a half rows of 44px chips: the next row half shown, as on a wide screen. */
   .dojo-yaku {

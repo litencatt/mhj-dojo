@@ -251,7 +251,7 @@ test('a theme is set only when it is owned', () => {
   assert.equal(setTheme(setTheme(p, 'theme:wafuu'), 'default').activeTheme, 'default');
 });
 
-test('the dojo options follow what is owned (cheats bought before the ウラ面: usable in every game)', () => {
+test('the dojo options follow what is owned (cheats bought before the 裏道場: usable in every game)', () => {
   const p = withFirstBonus({ ownedItems: ['cheat:peek', 'cheat:redraw'], ownedYaku: ['tanyao', 'riichi'], legacyCheats: ['cheat:peek', 'cheat:redraw'] });
   assert.deepEqual(dojoOptions(p), {
     yaku: ['tanyao', 'riichi'], peek: true, redraws_per_round: 1,
@@ -444,7 +444,7 @@ test('a level is shown as its 級位: 10級 to 1級, then 初段, 二段 and on'
   assert.deepEqual([1, 2, 10, 11, 12, 20, 21].map(rankName), ['10級', '9級', '1級', '初段', '二段', '十段', '11段']);
 });
 
-// ---- The 師範戦 and the ウラ面 (#323) ----
+// ---- The 師範戦 and the 裏道場 (#323) ----
 
 const opened = (over: Partial<DojoProgress> = {}): DojoProgress =>
   withFirstBonus({ masterMatch: { tries: 1, wins: 1, uraOpen: true }, ...over });
@@ -456,7 +456,7 @@ test('a new dojo has not tried the 師範戦 and owns no legacy cheats', () => {
   for (const kind of ['omote', 'master', 'ura'] as const) assert.equal(cheatUsable(p, 'cheat:peek', kind), false, kind);
 });
 
-test('the cheats are sold once the ウラ面 is open, whatever the level', () => {
+test('the cheats are sold once the 裏道場 is open, whatever the level', () => {
   const rich = withFirstBonus({ xp: 1_000_000, coins: 10_000 });
   for (const it of CATALOG.filter((i) => i.kind === 'cheat')) {
     assert.deepEqual(purchase(rich, it.id), { ok: false, reason: 'ura' }, it.id);
@@ -466,7 +466,7 @@ test('the cheats are sold once the ウラ面 is open, whatever the level', () =>
   assert.deepEqual(purchase(opened({ coins: 10_000 }), 'chinitsu'), { ok: false, reason: 'level' });
 });
 
-test('cheats bought in the ウラ面 work only in its games; legacy ones in the 表 too; none in the 師範戦', () => {
+test('cheats bought in the 裏道場 work only in its games; legacy ones in the 表道場 too; none in the 師範戦', () => {
   const p = opened({ ownedItems: ['cheat:peek', 'cheat:summon'] });
   assert.equal(dojoOptions(p).peek, false);
   assert.equal(dojoOptions(p).summons_per_round, 0);
@@ -502,16 +502,16 @@ test('data from before: the cheats owned then become the legacy ones, the 師範
   assert.equal(parseProgress(JSON.stringify({ ...p, legacyCheats: 'yes' })), null);
 });
 
-test('a cheat bought after the ウラ面 opened works there only, even for one with legacy cheats', () => {
+test('a cheat bought after the 裏道場 opened works there only, even for one with legacy cheats', () => {
   const p = opened({ ownedItems: ['cheat:wallpeek', 'cheat:peek'], legacyCheats: ['cheat:wallpeek'] });
-  assert.equal(dojoOptions(p).wall_peek, 3); // legacy: the 表 too
-  assert.equal(dojoOptions(p).peek, false); // bought in the ウラ面: not in the 表
+  assert.equal(dojoOptions(p).wall_peek, 3); // legacy: the 表道場 too
+  assert.equal(dojoOptions(p).peek, false); // bought in the 裏道場: not in the 表道場
   assert.equal(dojoOptions(p, 'ura').peek, true);
   assert.equal(dojoOptions(p, 'master').wall_peek, 0);
   assert.equal(cheatUsable(p, 'cheat:summon', 'ura'), false); // not owned
 });
 
-test('a 師範戦 counts its try when dealt and its win when settled; the first win opens the ウラ面 for good', () => {
+test('a 師範戦 counts its try when dealt and its win when settled; the first win opens the 裏道場 for good', () => {
   const master = (seed: number, rank: number): FinishedGame => ({ ...game(seed, rank, []), length: 'hanchan', cpu: 'master' });
   // Each try counts as its game is dealt; the win as it is settled.
   let p = recordMasterTry(withFirstBonus());
@@ -543,7 +543,7 @@ test('the hub game is never against the master or the urashihan', () => {
   assert.equal(parseProgress(JSON.stringify({ ...p, gameCpu: 'ura' })), null);
 });
 
-test('the 師範戦 and the ウラ面 pay their own multipliers', () => {
+test('the 師範戦 and the 裏道場 pay their own multipliers', () => {
   assert.equal(rankMultiplier('hanchan', 'master'), 6);
   assert.equal(rankMultiplier('hanchan', 'master', true), 4);
   assert.equal(rankMultiplier('hanchan', 'ura'), 4);

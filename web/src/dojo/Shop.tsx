@@ -84,7 +84,7 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
 
   return (
     <section class="dojo-panel" aria-labelledby="dojo-shop-heading">
-      <h2 id="dojo-shop-heading">ショップ</h2>
+      <h2 id="dojo-shop-heading">よろず屋</h2>
       <div class="shop-tabs" role="tablist" aria-label="商品の種類">
         {TABS.map((t, i) => (
           <button
@@ -108,8 +108,8 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
       <div id="shop-tabpanel" class="shop-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`shop-tab-${tab}`}>
           {tab === 'cheat' && (
             <p class="dojo-muted shop-note" data-testid="shop-cheat-note">
-              {p.masterMatch.uraOpen ? 'イカサマはウラ面の対局で使えます（師範戦では使えません）。' : 'イカサマは師範戦に勝つと開くウラ面で解禁され、ウラ面の対局で使えます。'}
-              {p.legacyCheats.length > 0 && 'ウラ面ができる前から持っているイカサマは、師範戦を除く表の対局でも使えます。'}
+              {p.masterMatch.uraOpen ? 'イカサマは裏道場の対局で使えます（師範戦では使えません）。' : 'イカサマは師範戦に勝つと開く裏道場で解禁され、裏道場の対局で使えます。'}
+              {p.legacyCheats.length > 0 && '裏道場ができる前から持っているイカサマは、師範戦を除く表道場の対局でも使えます。'}
             </p>
           )}
           {/* In unlock order; a locked item says its rank (a cheat, the 師範戦) where its button would be. */}

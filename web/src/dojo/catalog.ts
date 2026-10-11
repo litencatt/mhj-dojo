@@ -22,7 +22,7 @@
 //   the core's coin cost (the yakuman pack aside) has been bought.
 // - The yakuman pack costs at most 40 more games after Lv10, the core bought first.
 // - The cheats and the other looks too: the whole shop is bought in about 175 games
-//   (the cheats once the ウラ面 is open).
+//   (the cheats once the 裏道場 is open).
 // - The curriculum is played along (economy.test.ts learn, #320): its rewards
 //   (lessons.ts LESSON_COINS and the items its lessons grant) are in every count
 //   above; it is passed in about 30 games, and the 師範戦 opens about then.
@@ -137,7 +137,7 @@ export const CATALOG: readonly ShopItem[] = [
   { id: 'effect:kinkou', kind: 'effect', name: '和了演出: 金の光', price: 150, level: 5 },
   { id: 'assist:ukeire', kind: 'assist', name: '補助: 有効牌ハイライト', price: 150, level: 5 },
 
-  // The cheats are sold once the ウラ面 is open (the 師範戦 won, #323), whatever the level: their
+  // The cheats are sold once the 裏道場 is open (the 師範戦 won, #323), whatever the level: their
   // level only orders them in the shop (progress.ts purchase).
   { id: 'cheat:ura', kind: 'cheat', name: 'イカサマ: 裏ドラ透視', price: 600, level: 6 },
 

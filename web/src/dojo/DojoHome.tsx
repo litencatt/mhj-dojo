@@ -21,18 +21,18 @@ import {
 import { LENGTH_NAMES, roundName } from '../components/GameTable';
 import type { CpuLevel, GameLength } from '../api';
 import { HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplierLabel, rankName } from './rules';
-import { MASTER_MATCH_LENGTH } from './masterMatch';
+import { MASTER_MATCH_LENGTH, masterMatchOpen } from './masterMatch';
 import { discardUnfinishedDojoGames, savedGames } from '../saves';
 import { CPU_LEVEL_NAMES } from '../gameOptions';
 import { Shop } from './Shop';
-import { Curriculum } from './Curriculum';
+import { Curriculum, nextLesson } from './Curriculum';
 import { GuideDialog } from './GuideDialog';
 import { guideFor } from './yakuGuide';
 import { LooksSettings, useDojoLooks } from './looks';
 import './dojo.css';
 
 /**
- * ?mode=dojo&play=1[&match=ura][&seed=]: the page that starts a dojo game (match=ura: a ウラ面
+ * ?mode=dojo&play=1[&match=ura][&seed=]: the page that starts a dojo game (match=ura: a 裏道場
  * game). The seed of this page's URL is kept unless that game was settled already: it would pay
  * its rounds again but never settle (no rank, no redraw or summon cost).
  */
@@ -51,20 +51,20 @@ function hubSeed(settled: readonly string[]): number | undefined {
 }
 
 // What an unfinished game is called, by its kind (progress.ts gameKind).
-const KIND_NAMES: Record<DojoGameKind, string> = { omote: '対局', master: '師範戦', ura: 'ウラ面の対局' };
+const KIND_NAMES: Record<DojoGameKind, string> = { omote: '対局', master: '師範戦', ura: '裏道場の対局' };
 
-// The hub's two faces once the 師範戦 is won: the 表's game and the ウラ面's (against the urashihan).
+// The hub's two faces once the 師範戦 is won: the 表道場's game and the 裏道場's (against the urashihan).
 const SIDES = [
-  { key: 'omote', label: '表' },
-  { key: 'ura', label: 'ウラ面' },
+  { key: 'omote', label: '表道場' },
+  { key: 'ura', label: '裏道場' },
 ] as const;
 
 const LENGTHS: { value: GameLength; level: number }[] = [
   { value: 'tonpuu', level: 1 },
   { value: 'hanchan', level: HANCHAN_LEVEL },
 ];
-// The master (師範) and the urashihan (裏師範) are not the hub's game: they play the 師範戦 (課程) and
-// the ウラ面's games (its tab).
+// The master (師範) and the urashihan (裏師範) are not the hub's game: they play the 師範戦 (鍛錬) and
+// the 裏道場's games (its tab).
 const CPUS: { value: CpuLevel; level: number }[] = [
   { value: 'weak', level: 1 },
   { value: 'normal', level: NORMAL_CPU_LEVEL },
@@ -88,12 +88,12 @@ export function DojoHome() {
     loaded.corrupted ? '保存された道場のデータを読み込めませんでした。元のデータは別に残し、最初から始めます。' : null,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The yaku guide shown (a yaku just bought, or an owned one chosen in 所持役).
+  // The yaku guide shown (a yaku just bought, or an owned one chosen in 習得役).
   const [guide, setGuide] = useState<{ key: string; learned: boolean } | null>(null);
   // The dojo's own unfinished games (the CPU game's list never has them).
   // The dojo plays one game at a time: the latest unfinished one is offered (older ones, from before, too are dropped on a new start).
   const [resume] = useState(() => savedGames('dojo').find((g) => g.round && !g.round.over) ?? null);
-  // The 表 or the ウラ面 (?side=ura, as a ウラ面 game's 道場へ戻る opens it), once the 師範戦 is won.
+  // The 表道場 or the 裏道場 (?side=ura, as a 裏道場 game's 道場へ戻る opens it), once the 師範戦 is won.
   const [side, setSide] = useState<'omote' | 'ura'>(() => (new URLSearchParams(location.search).get('side') === 'ura' ? 'ura' : 'omote'));
   const ura = progress.masterMatch.uraOpen && side === 'ura';
   const sideRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -138,15 +138,18 @@ export function DojoHome() {
   const lv = level(progress.xp);
   const next = xpForLevel(lv + 1);
   const bar = Math.round(levelProgress(progress.xp) * 100);
-  // The 表's game (設定 chooses it) and the game 対局開始 plays: the 表's or, on the ウラ面, the urashihan's.
+  // The 表道場's game (設定 chooses it) and the game 対局開始 plays: the 表道場's or, on the 裏道場, the urashihan's.
   const game = dojoGame(progress);
   const multiplier = rankMultiplierLabel(game.length, game.cpu);
   const play = ura ? { length: MASTER_MATCH_LENGTH, cpu: 'ura' as const } : game;
-  // The unfinished game belongs to a face: a 表 game or the 師範戦 to the 表, a ウラ面 game to the ウラ面.
+  // The unfinished game belongs to a face: a 表道場 game or the 師範戦 to the 表道場, a 裏道場 game to the 裏道場.
   const resumeKind = resume ? gameKind(resume.cpu as CpuLevel) : null;
   const resumeSide = resumeKind === 'ura' ? 'ura' : 'omote';
   const resumeHere = resume !== null && resumeSide === (ura ? 'ura' : 'omote');
   const discardTitle = resumeKind ? `中断中の${KIND_NAMES[resumeKind]}は破棄され、報酬はもらえません` : undefined;
+  // One primary button a place (DESIGN.md): 鍛錬's while it leads (a lesson is next, or the 師範戦 is
+  // open and not won), then 出稽古's.
+  const playClass = nextLesson(progress) || (masterMatchOpen(progress) && !progress.masterMatch.uraOpen) ? 'dojo-restart' : 'dojo-start';
 
   return (
     <div class="dojo-home">
@@ -158,8 +161,8 @@ export function DojoHome() {
         </p>
       )}
 
-      <section class="dojo-panel" aria-labelledby="dojo-status-heading">
-        <h2 id="dojo-status-heading">修行の記録</h2>
+      {/* The 級位, its 稽古 and the 銭: grown by every game, the curriculum's and 出稽古's. */}
+      <section class="dojo-panel dojo-status-panel" aria-label="級位と銭">
         <div class="dojo-status">
           <span class="dojo-level" data-testid="dojo-level">{rankName(lv)}</span>
           <div
@@ -179,6 +182,13 @@ export function DojoHome() {
             <span class="dojo-coins" data-testid="dojo-coins">{progress.coins}</span> 銭
           </span>
         </div>
+      </section>
+
+      <Curriculum progress={progress} seed={hubSeed(progress.settled)} onGuide={(key) => setGuide({ key, learned: false })} />
+
+      <section class="dojo-panel" aria-labelledby="dojo-play-heading">
+        <h2 id="dojo-play-heading">出稽古</h2>
+        <p class="dojo-muted dojo-play-note">鍛錬の外で、CPU と自由に打つ対局です。稽古と銭がたまり、級位が上がると長さと CPU の選択肢が増えます（設定）。</p>
         {progress.masterMatch.uraOpen && (
           <div class="shop-tabs dojo-sides" role="tablist" aria-label="道場の面">
             {SIDES.map((s, i) => (
@@ -213,13 +223,13 @@ export function DojoHome() {
               {ura
                 ? `裏師範（イカサマを使う CPU）3人と半荘戦。イカサマが使えます。順位の報酬：${rankMultiplierLabel(play.length, play.cpu)}`
                 : `${LENGTH_NAMES[play.length]}・CPU ${CPU_LEVEL_NAMES[play.cpu]}。順位の報酬：${rankMultiplierLabel(play.length, play.cpu) || '×1'}`}
-              {resume && !resumeHere && `（中断中の${KIND_NAMES[resumeKind!]}は${resumeSide === 'ura' ? 'ウラ面' : '表'}のタブに）`}
+              {resume && !resumeHere && `（中断中の${KIND_NAMES[resumeKind!]}は${resumeSide === 'ura' ? '裏道場' : '表道場'}のタブに）`}
             </p>
           )}
           {resume && resumeHere ? (
             <>
               <a
-                class="dojo-start"
+                class={playClass}
                 href={`?mode=dojo&game=${encodeURIComponent(resume.id)}`}
                 title={resume.round ? roundName(resume.round.wind, resume.round.number, resume.round.honba) : undefined}
               >
@@ -232,21 +242,19 @@ export function DojoHome() {
           ) : (
             // A game unfinished on the other face is dropped by a new start here too (one game at a time).
             <a
-              class="dojo-start"
+              class={playClass}
               href={playHref(progress.settled, ura)}
               title={resume ? discardTitle : `${LENGTH_NAMES[play.length]}、CPU は${CPU_LEVEL_NAMES[play.cpu]}`}
               onClick={resume ? discardUnfinishedDojoGames : undefined}
             >
-              {ura ? 'ウラ面で対局' : '対局開始'}
+              {ura ? '裏道場で対局' : '対局開始'}
             </a>
           )}
         </div>
       </section>
 
-      <Curriculum progress={progress} seed={hubSeed(progress.settled)} onGuide={(key) => setGuide({ key, learned: false })} />
-
       <section class="dojo-panel" aria-labelledby="dojo-yaku-heading">
-        <h2 id="dojo-yaku-heading">所持役（{ownedYaku(progress.ownedYaku).length}）</h2>
+        <h2 id="dojo-yaku-heading">習得役（{ownedYaku(progress.ownedYaku).length}）</h2>
         <ul class="dojo-yaku" data-testid="dojo-yaku" tabIndex={0} aria-labelledby="dojo-yaku-heading">
           {ownedYaku(progress.ownedYaku).map(({ name, guide: guideKey }) => (
             <li key={name}>

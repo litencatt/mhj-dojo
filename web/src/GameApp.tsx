@@ -158,7 +158,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   }
 
   // The dojo's options come from what is bought now (p), not from the URL; a lesson's game adds its yaku.
-  // ?match=master is the 師範戦 and ?match=ura a ウラ面 game, each once open (else the hub's game).
+  // ?match=master is the 師範戦 and ?match=ura a 裏道場 game, each once open (else the hub's game).
   function createOptions(params: URLSearchParams, p: DojoProgress, lessonId?: string): GameOptions {
     if (!dojo) return parseOptions((k) => params.get(k));
     const match = params.get('match');
@@ -188,7 +188,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     },
     create: (params) => {
       const p = loadProgress().progress;
-      // A 師範戦 or ウラ面 game is never a lesson's.
+      // A 師範戦 or 裏道場 game is never a lesson's.
       const forLesson = dojo && !params.get('match') ? openLesson(params, p) : undefined;
       const options = createOptions(params, p, forLesson?.id);
       // The 師範戦 is dealt on a random seed, never the URL's: one played before (settled) would pay nothing.
@@ -218,7 +218,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
             seed: state.seed !== null ? String(state.seed) : null,
             play: null,
             // Kept so that a game whose save is gone (404) is dealt again for its lesson, or as the
-            // 師範戦 or a ウラ面 game.
+            // 師範戦 or a 裏道場 game.
             lesson: lessonId,
             match: state.cpu === 'master' || state.cpu === 'ura' ? state.cpu : null,
             length: null,
@@ -558,7 +558,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
               )}
               {!lesson && askedLesson !== null && (
                 <p class="dojo-notice" data-testid="lesson-closed">
-                  この課題はまだ挑戦できないか、合格済みです。課題のない対局になります。
+                  この課題はまだ挑戦できないか、習得済みです。課題のない対局になります。
                 </p>
               )}
               <GameTable
