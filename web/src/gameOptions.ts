@@ -2,7 +2,9 @@ import type { CpuLevel, GameOptions } from './api';
 import type { ResumeItem } from './components/ResumePanel';
 import { LENGTH_NAMES, WIND_NAMES, roundName } from './components/GameTable';
 import { MASTER_MATCH_LENGTH, masterMatchOpen, uraOpen } from './dojo/masterMatch';
+import { lessonAids } from './dojo/lessons';
 import { dojoGame, dojoOptions, type DojoProgress } from './dojo/progress';
+import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH } from './dojo/rules';
 import type { GameSummary } from './saves';
 
 export const DEALER_NAMES = { random: 'ランダム', you: '自分' } as const;
@@ -50,6 +52,16 @@ export function urlOptions(): GameOptions {
 /** The game a dojo plays: the length and CPU chosen in the hub, with what the dojo has bought. */
 export function dojoGameOptions(p: DojoProgress): GameOptions {
   return { ...dojoGame(p), first_dealer: 'random', dojo: dojoOptions(p) };
+}
+
+/**
+ * A lesson's game (#344): a 東風戦 against weak CPUs whatever the hub chose, as its seed
+ * (lessonSeeds.json) was searched for, with what the dojo has bought and the lesson's yaku.
+ */
+export function lessonGameOptions(p: DojoProgress, lessonId: string): GameOptions {
+  const dojo = dojoOptions(p);
+  const yaku = [...new Set([...dojo.yaku, ...lessonAids(p, lessonId).yaku])];
+  return { length: DEFAULT_GAME_LENGTH, cpu: DEFAULT_GAME_CPU, first_dealer: 'random', dojo: { ...dojo, yaku } };
 }
 
 /** The 師範戦: a 半荘戦 against three masters with the yaku the dojo has bought, without any cheat; null until it may be tried. */

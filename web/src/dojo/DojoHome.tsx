@@ -284,6 +284,7 @@ export function DojoHome() {
           </p>
         )}
         {/* The game a new start plays: the choices unlock with the rank (no purchase). */}
+        <p class="dojo-muted">出稽古の対局に使います（鍛錬の課題の対局は東風戦・CPU 弱い）。</p>
         <div class="dojo-game-options">
           <fieldset class="dojo-settings-group">
             <legend>長さ</legend>

@@ -440,6 +440,15 @@
 /* The hub's 鍛錬 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
    (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
    marked as the notice is. */
+/* The panel's heading with the lessons learned as a bar (the 稽古's, .dojo-xpbar) and a count. */
+.dojo-lessons-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dojo-lessons-heading h2 {
+  margin: 0;
+}
 .dojo-lesson-tier {
   margin: 12px 0 2px;
   font-size: 0.85rem;

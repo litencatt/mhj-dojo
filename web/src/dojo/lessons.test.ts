@@ -448,6 +448,6 @@ test('the curriculum deals a lesson on its seed: practice always, a game only in
   assert.equal(lessonDealSeed(p, game), lessonSeed('riichi-win'));
   assert.equal(lessonDealSeed(p, game, 7), 7); // the hub URL's seed first
   assert.equal(lessonDealSeed({ ...p, settled: [String(lessonSeed('riichi-win'))] }, game), undefined);
-  assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameLength: 'hanchan' }, game), undefined);
-  assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameCpu: 'normal' }, game), undefined);
+  // The hub's length and CPU do not matter: a lesson's game is a 東風戦 against weak CPUs.
+  assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameLength: 'hanchan', gameCpu: 'normal' }, game), lessonSeed('riichi-win'));
 });

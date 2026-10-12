@@ -33,12 +33,12 @@ import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
 import { LessonBar } from './dojo/LessonBar';
 import { useLesson } from './dojo/useLesson';
-import { findLesson, gameRoundKey, lessonActive, lessonAids } from './dojo/lessons';
+import { findLesson, gameRoundKey, lessonActive } from './dojo/lessons';
 import { LooksSettings, useSharedLooks } from './dojo/looks';
 import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
 import { RadioGroup } from './components/RadioGroup';
-import { CPU_LEVEL_NAMES, CPU_NAMES, DEALER_NAMES, dojoGameOptions, masterMatchOptions, parseOptions, savedItem, uraGameOptions, urlOptions } from './gameOptions';
+import { CPU_LEVEL_NAMES, CPU_NAMES, DEALER_NAMES, dojoGameOptions, lessonGameOptions, masterMatchOptions, parseOptions, savedItem, uraGameOptions, urlOptions } from './gameOptions';
 import './dojo/dojo.css';
 
 // A hand the state does not give yet: one array, so the Hand's selection is
@@ -157,16 +157,15 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     return request(() => asked(api.createGame({ seed, ...options }, adviceOn)));
   }
 
-  // The dojo's options come from what is bought now (p), not from the URL; a lesson's game adds its yaku.
+  // The dojo's options come from what is bought now (p), not from the URL; a lesson's game is a
+  // 東風戦 against weak CPUs with its yaku added (lessonGameOptions).
   // ?match=master is the 師範戦 and ?match=ura a 裏道場 game, each once open (else the hub's game).
   function createOptions(params: URLSearchParams, p: DojoProgress, lessonId?: string): GameOptions {
     if (!dojo) return parseOptions((k) => params.get(k));
     const match = params.get('match');
     const special = match === 'master' ? masterMatchOptions(p) : match === 'ura' ? uraGameOptions(p) : null;
     if (special) return special;
-    const options = dojoGameOptions(p);
-    const extra = lessonId === undefined ? [] : lessonAids(p, lessonId).yaku;
-    return options.dojo ? { ...options, dojo: { ...options.dojo, yaku: [...new Set([...options.dojo.yaku, ...extra])] } } : options;
+    return lessonId === undefined ? dojoGameOptions(p) : lessonGameOptions(p, lessonId);
   }
 
   // One choice of the new-game form changed.
