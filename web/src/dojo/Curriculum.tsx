@@ -58,6 +58,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           aria-valuemin={0}
           aria-valuemax={LESSONS.length}
           aria-valuenow={passed}
+          aria-valuetext={`${passed} / ${LESSONS.length}`}
         >
           <div style={{ width: `${Math.round((passed / LESSONS.length) * 100)}%` }} />
         </div>
