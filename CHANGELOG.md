@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1012.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.2...v2026.1012.0) - 2026-10-12
+
+### 新機能
+- 道場の鍛錬: 課題の対局を東風戦・CPU 弱いで打ち、パネルに進み具合を出す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/353
+
 ## [v2026.1011.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.1...v2026.1011.2) - 2026-10-11
 
 ### 新機能
