@@ -49,34 +49,62 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const passed = LESSONS.filter((l) => lessonStage(progress, l.id) === 'done').length;
   return (
     <section class="dojo-panel" aria-labelledby="dojo-lessons-heading" data-testid="dojo-lessons">
-      <h2 id="dojo-lessons-heading">
-        鍛錬（{passed} / {LESSONS.length}）
-      </h2>
-      {TIERS.map((tier) => (
-        <Fragment key={tier.name}>
-          <h3 class="dojo-lesson-tier">{tier.name}</h3>
-          {tier.stages.map((stage) => {
-            const lessons = LESSONS.filter((l) => l.stage === stage);
-            const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-            return (
-              <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
-                <summary>
-                  {STAGE_NAMES[stage]}
-                  <span class="dojo-muted">
-                    {' '}
-                    {done} / {lessons.length}
-                  </span>
-                </summary>
+      <div class="dojo-lessons-heading">
+        <h2 id="dojo-lessons-heading">鍛錬</h2>
+        <div
+          class="dojo-xpbar"
+          role="progressbar"
+          aria-label="習得した課題"
+          aria-valuemin={0}
+          aria-valuemax={LESSONS.length}
+          aria-valuenow={passed}
+        >
+          <div style={{ width: `${Math.round((passed / LESSONS.length) * 100)}%` }} />
+        </div>
+        <small class="dojo-muted" data-testid="dojo-lessons-count">
+          {passed} / {LESSONS.length}
+        </small>
+      </div>
+      {TIERS.map((tier) => {
+        const tierLessons = LESSONS.filter((l) => tier.stages.includes(l.stage));
+        const tierDone = tierLessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
+        return (
+          <Fragment key={tier.name}>
+            <h3 class="dojo-lesson-tier">
+              {tier.name}
+              <span class="dojo-muted">
+                {' '}
+                {tierDone} / {tierLessons.length}
+              </span>
+            </h3>
+            {tier.stages.map((stage) => {
+              const lessons = LESSONS.filter((l) => l.stage === stage);
+              const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
+              const rows = (
                 <ul class="shop-list">
                   {lessons.map((l) => (
                     <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
                   ))}
                 </ul>
-              </details>
-            );
-          })}
-        </Fragment>
-      ))}
+              );
+              // A stage of one lesson needs no heading of its own: the lesson's title says it.
+              if (lessons.length === 1) return <Fragment key={stage}>{rows}</Fragment>;
+              return (
+                <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
+                  <summary>
+                    {STAGE_NAMES[stage]}
+                    <span class="dojo-muted">
+                      {' '}
+                      {done} / {lessons.length}
+                    </span>
+                  </summary>
+                  {rows}
+                </details>
+              );
+            })}
+          </Fragment>
+        );
+      })}
       <h3 class="dojo-lesson-tier">皆伝</h3>
       <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
         <summary>
@@ -146,7 +174,10 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
       {/* Open for a dojo that has not begun the curriculum: its first lesson's rules are new. */}
       <details class="dojo-lesson-more" open={next && Object.keys(progress.lessons).length === 0}>
         <summary>{state === 'locked' && requires.length > 0 ? `解説（先に: ${requires.join('、')}）` : '解説'}</summary>
-        <p>{lesson.text}</p>
+        <p>
+          {lesson.text}
+          {lesson.form === 'game' && <span class="dojo-muted"> 課題の対局は東風戦・CPU 弱い（順位の報酬は等倍）。</span>}
+        </p>
         {lesson.example && (
           <div class="dojo-lesson-example" role="group" aria-label="例の手">
             <span class="dojo-muted">例</span>

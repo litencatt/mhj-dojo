@@ -6,6 +6,8 @@ import {
   dojoProgress,
   engineSession,
   handPanel,
+  isRequest,
+  nextEngineReply,
   onEngineReply,
   playToResult,
   waitForPlayback,
@@ -247,26 +249,30 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(first.locator('.dojo-lesson-more')).toHaveAttribute('open', '');
   await expect(first.getByRole('group', { name: '例の手' }).locator('.tile')).toHaveCount(14);
   await expect(first.locator('.dojo-lesson-block')).toHaveCount(5);
-  await expect(panel.locator('.dojo-lesson-stage').nth(0)).toHaveAttribute('open', '');
-  await expect(panel.locator('.dojo-lesson-stage').nth(1)).not.toHaveAttribute('open', '');
+  // 和了の形 has one lesson: no stage heading of its own, its row right under 初伝.
+  await expect(first).toBeVisible();
+  await expect(panel.locator('.dojo-lesson-stage summary').first()).toContainText('聴牌・待ち・振聴');
+  await expect(panel.locator('.dojo-lesson-stage').nth(0)).not.toHaveAttribute('open', '');
+  await expect(panel.getByRole('progressbar', { name: '習得した課題' })).toHaveAttribute('aria-valuenow', '0');
+  await expect(panel.getByTestId('dojo-lessons-count')).toHaveText('0 / 20');
   await expect(panel.locator('[aria-current="step"]')).toHaveCount(1);
   // Locked: no way to start it, and what comes first is named.
-  await openStage(panel.locator('.dojo-lesson-stage').nth(1));
+  await openStage(panel.locator('.dojo-lesson-stage').nth(0));
   const locked = lessonRow(page, 'ryanmen-tenpai');
   await expect(locked).toHaveAttribute('data-state', 'locked');
   await expect(locked.getByRole('link')).toHaveCount(0);
   await expect(locked.locator('.dojo-lesson-more summary')).toContainText('解説（先に: 和了形を作る）');
   // A lesson's yaku has its guide; stage 6 is announced, the 師範戦 locked (master-match.spec.ts).
-  await openStage(panel.locator('.dojo-lesson-stage').nth(2));
+  await openStage(panel.locator('.dojo-lesson-stage').nth(1));
   await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
   await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/秘伝.*準備中/]);
-  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['初伝', '中伝', '奥伝', '皆伝']);
+  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['初伝 0 / 4', '中伝 0 / 9', '奥伝 0 / 7', '皆伝']);
   await expect(page.getByTestId('dojo-master-match')).toHaveAttribute('data-state', 'locked');
 });
 
-test('a lesson started from the hub and passed shows so after a reload; its yaku is granted and owned in the shop', async ({ page }) => {
+test('a lesson started from the hub is a 東風戦 against weak CPUs whatever the hub chose; passed, it shows so after a reload and its yaku is owned', async ({ page }) => {
   test.setTimeout(90_000);
   await watchEngine(page);
   // DOJO_WIN_SEED wins the first round by tsumo; the engine's result is given 平和 too, as a win
@@ -277,13 +283,22 @@ test('a lesson started from the hub and passed shows so after a reload; its yaku
       r.yaku.push({ key: 'pinfu', name: '平和', han: 1 });
     }
   });
-  await storeProgress(page, { lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done } });
+  // The hub plays 半荘戦 against normal CPUs (unlocked by the 稽古): the lesson's game does not.
+  await storeProgress(page, {
+    xp: 1_000_000,
+    gameLength: 'hanchan',
+    gameCpu: 'normal',
+    lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done },
+  });
   await page.goto(`./?mode=dojo&seed=${DOJO_WIN_SEED}`);
-  await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
+  await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(4));
   const row = lessonRow(page, 'pinfu-win');
   await expect(row).toHaveAttribute('data-state', 'unassisted');
+  const created = nextEngineReply(page, (call) => isRequest(call, 'POST', /^\/api\/games$/));
   await row.getByRole('link', { name: '始める' }).click();
   await expect(page).toHaveURL(/lesson=pinfu-win/);
+  const g = (await created).data;
+  expect([g.length, g.cpu]).toEqual(['tonpuu', 'weak']);
   await expect(handPanel(page)).toBeVisible();
   await playToResult(page);
   const bar = page.getByTestId('lesson-status');
@@ -293,7 +308,7 @@ test('a lesson started from the hub and passed shows so after a reload; its yaku
   for (const step of ['hub', 'reload']) {
     if (step === 'hub') await page.goto('./?mode=dojo');
     else await page.reload();
-    await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
+    await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(4));
     await expect(row, step).toHaveAttribute('data-state', 'done');
     await expect(row.getByRole('link'), step).toHaveCount(0);
     await expect(row.locator('.shop-owned'), step).toContainText('習得');
