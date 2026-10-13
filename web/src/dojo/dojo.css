@@ -557,11 +557,18 @@
 .lesson-note {
   flex-shrink: 1;
 }
-.lesson-hint summary {
+.lesson-hint summary,
+.lesson-next {
   min-height: 24px;
   line-height: 24px;
   color: var(--muted);
   cursor: pointer;
+}
+.lesson-next {
+  margin: 0;
+}
+.lesson-next a {
+  font-weight: bold;
 }
 .lesson-hint-nudge {
   margin-left: 8px;
@@ -591,6 +598,7 @@
     min-height: 44px;
   }
   .lesson-hint summary,
+  .lesson-next,
   .dojo-lesson-more > summary {
     min-height: 32px;
     line-height: 32px;

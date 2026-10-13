@@ -2,7 +2,7 @@
 
 The page talks to its engine, the Go code built as WebAssembly (`cmd/mhj-dojo-wasm`), in a Web
 Worker (`web/site-public/worker.js`, started by `web/src/engine.ts`, with `web/src/wasm.ts` routing the requests). A request is an HTTP-style
-method, path and JSON body — practice (`/api/sessions…`) or game (`/api/games…`), below — which
+method, path and JSON body — practice (`/api/sessions…`), game (`/api/games…`) or problem (`/api/problems…`), below — which
 the worker's `mhjDojoRequest(method, path, body)` hands to `apicall.Route` (`internal/apicall`). It
 returns `{status, body, save}`: an HTTP status code and a JSON body, the error ones
 `{"error": "message"}` with a 4xx/5xx status ("Errors" under the implementation notes), and a game's save (see "Game saves").
@@ -922,6 +922,90 @@ unaffected.
                                 // [{"seat": 0, "yaku": "daisangen"}]; yaku: "daisangen" | "daisuushii" | "suukantsu"
 }
 ```
+
+## Problems
+
+Practice problems (`internal/problem`; the design is `docs/problems.md`). A
+problem is fixed by its kind, level and seed, so the engine keeps nothing:
+the answer names the problem by its `id`, and the engine builds it again to
+grade the answer. Only `nanikiru` (何切る) exists so far.
+
+### `POST /api/problems`
+Body: `{"kind": "nanikiru", "level": 1, "seed": 42}` — `seed` is optional
+(random in `[0, 2^32)`, as for sessions) and must be in `[0, 2^53 − 1]`, so
+that the page reads it exactly as a JavaScript number (sessions take any
+64-bit seed). Returns a `Problem`, without its
+answer:
+
+```jsonc
+{
+  "id": "nanikiru:1:42",          // kind:level:seed, written as the engine writes it (no leading zeros or +)
+  "kind": "nanikiru",
+  "level": 1,                     // nanikiru: 1–3
+  "seed": 42,                     // the seed asked for (or picked)
+  "source": 42,                   // the candidate seed the position was made from (below)
+  "position": {
+    "hand": ["2m", "3m", "4m", …], // 13 tiles, sorted
+    "drawn": "8m",                // the 14th tile
+    "dora_indicators": ["9p"],
+    "junme": 9,                   // the discard being chosen: turn + 1
+    "round_wind": "1z", "seat_wind": "1z",
+    "discards": ["9m", "9m", "1z", …], // your own discards so far (junme − 1)
+    "remaining": {"1m": 4, …}     // unseen copies, as a State's `remaining`
+  },
+  "choose": "one"                 // one | many: how many tiles an answer holds
+}
+```
+
+### `POST /api/problems/answer`
+Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
+(a nanikiru answer is one tile of `hand` or `drawn`). Returns a `Result`:
+
+```jsonc
+{
+  "id": "nanikiru:1:42",
+  "correct": false,               // the answer ranks first (a red five with a plain copy held does not count)
+  "answer": [ { "tile": "8m", "rank": 3, "shanten": 2, "ukeire": 62, "wait": null } ],
+  "best": ["9s", "6p"],           // the correct tiles
+  "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first
+  "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
+}
+```
+
+**Nanikiru.** The position is a practice wall (`seed` as a session's) played
+from the deal with a best discard of the advice each turn, up to a junme of
+the level. The ranking is the advice's first three keys (shanten, `ukeire`,
+`wait`; see "Advice"), ranked as `Review` ranks a discard, so every kind
+ranked first is correct — except a red five discarded while a plain copy is
+held, which gives up a dora for nothing (`Review`'s `is_best` is false; its
+`rank` is still 1, and `best` names the plain five). `text` uses `Review`'s words for the exact tile answered, then why the
+best beats the runner-up (the advice's first note; with two correct kinds,
+and only for an answer of one of them, the runner-up's review, which
+compares it with the advice's best), unless the answer is the runner-up,
+and says that defence and 打点 (points) are not considered. A position is used only if it fits the level and
+the best stands clearly apart from the runner-up (the best discard outside
+rank 1):
+
+| level | best discard | junme | runner-up |
+|---|---|---|---|
+| 1 | 1-shanten | 4–9 | any clear gap |
+| 2 | 2-shanten | 3–8 | any clear gap |
+| 3 | 1- or 2-shanten | 6–12 | same shanten as the best |
+
+A clear gap is a higher shanten, or `ukeire` at least 4 and at least 15% of
+the runner-up's more, or, at 1-shanten with equal `ukeire`, a `wait` at
+least 0.5 wider; and at most two kinds rank first. The position is checked
+from a junme the seed and level pick within the level's range; the first
+that passes is used. A seed whose wall gives none tries the candidate seeds
+`wall.RoundSeed(seed, i)`, i = 1…100, in turn (`source`); every seed in
+1…100 gives a problem at every level (`TestSweep`). Generating one takes ~4
+ms on average natively (worst ~35 ms, seeds 1…2000): the walk only needs the normal-form
+row of each discard, so the advice there breaks ties on the first three keys
+by dora, terminals and kind order, not by near yaku.
+
+**Errors**: `400` invalid body, `kind`, `level`, `seed`, `id` (also one not written canonically) or tile, an answer of
+the wrong size or with a tile not in the position; `422` (never seen in
+tests) a seed for which no candidate seed gives a problem.
 
 ## Memory
 

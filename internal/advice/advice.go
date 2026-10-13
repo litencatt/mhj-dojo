@@ -267,6 +267,35 @@ func (a *Advice) Review(t tile.Tile) *Review {
 	return r
 }
 
+// Ranked is one distinct discard ranked by the first three keys, as Review
+// ranks it: shanten, ukeire and expected wait (ties share a rank).
+type Ranked struct {
+	Tile    tile.Tile // exact tile (a plain five before a red one)
+	Rank    int
+	Shanten int
+	Ukeire  int
+	Wait    *float64 // expected wait at tenpai (0.1 steps); nil above 1-shanten
+}
+
+// Ranked returns every distinct discard, best first.
+func (a *Advice) Ranked() []Ranked {
+	out := make([]Ranked, len(a.all))
+	for i, c := range a.all {
+		rank := 1
+		for _, x := range a.all {
+			if primary(x, c) < 0 {
+				rank++
+			}
+		}
+		out[i] = Ranked{Tile: c.t, Rank: rank, Shanten: c.shanten, Ukeire: c.ukeire}
+		if c.hasWait {
+			v := waitKey(c)
+			out[i].Wait = &v
+		}
+	}
+	return out
+}
+
 func (c cand) export() Candidate {
 	out := Candidate{Tile: c.t.String(), Shanten: c.shanten, UkeireKinds: len(c.uke), Ukeire: c.ukeire, Yaku: c.yaku}
 	if out.Yaku == nil {

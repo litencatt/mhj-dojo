@@ -169,6 +169,25 @@ test.describe('touch', () => {
     await expect(hand.locator('.tile-picked')).toHaveCount(0);
   });
 
+  test('a tap whose click says mouse (iOS WebKit) still selects first: the press decides', async ({ page }) => {
+    const calls = await engineCalls(page);
+    await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
+    const hand = page.getByRole('region', { name: '手牌' });
+    const tile = hand.locator('.hand-tiles button.tile').first();
+    // WebKit's tap: a touch press, then a click whose pointerType is 'mouse'.
+    const tap = () =>
+      tile.evaluate((el) => {
+        el.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }));
+        el.dispatchEvent(new PointerEvent('click', { pointerType: 'mouse', detail: 1, bubbles: true, cancelable: true }));
+      });
+    await tap();
+    await expect(tile).toHaveClass(/tile-picked/);
+    expect(await discardsSent(calls)).toBe(0);
+    await tap();
+    await expect(hand.locator('.discard-river .tile')).toHaveCount(1);
+    expect(await discardsSent(calls)).toBe(1);
+  });
+
   test('the selection is announced, and a tap outside the hand drops it', async ({ page }) => {
     await openPractice(page, ['chart', 'tree', 'advice', 'gloss']);
     const hand = page.getByRole('region', { name: '手牌' });

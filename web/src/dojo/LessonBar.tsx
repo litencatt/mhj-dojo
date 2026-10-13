@@ -35,7 +35,7 @@ function noteText(note: LessonNote): string {
 /**
  * A lesson's lines over the hand (a dojo game's or practice mode's), as tall
  * whatever happens: the lesson's title, its stage and count and what the
- * last success did, on one line; then its hint, folded, the lesson's goal and text and
+ * last success did, on one line; then its hint (once learned, the way back to the hub), folded, the lesson's goal and text and
  * its yaku's guide, which asks to be opened after failures in a row.
  */
 export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: LessonBarProps) {
@@ -48,29 +48,37 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
       <p class="lesson-status-line" role="status" aria-live="polite">
         <span class="dojo-aid-label">課題</span>
         <b class="lesson-title">{lesson.title}</b>
-        <span class="lesson-stage" data-stage={stage}>
+        {/* Once learned the note says so: the stage gives the title the room. */}
+        <span class="lesson-stage" data-stage={stage} hidden={stage === 'done' && note !== null}>
           {stage === 'unassisted' && singleStage(lesson) ? '未習得' : STAGE_NAMES[stage]}
           {active && times > 1 && ` ${count}/${times}`}
         </span>
         {note && <span class="dojo-aid-ok lesson-note">{noteText(note)}</span>}
         {saveFailed && <span class="dojo-aid-warn lesson-note">保存できませんでした</span>}
       </p>
-      <details class="lesson-hint">
-        <summary>
-          ヒント
-          {active && failures >= HINT_AFTER && <span class="lesson-hint-nudge">うまくいかないときは開いてみよう</span>}
-        </summary>
-        <p>
-          <b>{lesson.goal}</b>
-          <br />
-          {lesson.text}
-          {guide && (
-            <button type="button" aria-haspopup="dialog" onClick={() => setGuideOpen(true)}>
-              役の解説
-            </button>
-          )}
+      {stage === 'done' ? (
+        // Learned: no hint is needed any more, and the way on is the hub's next lesson.
+        <p class="lesson-next">
+          <a href="?mode=dojo">道場に戻って次の課題へ</a>
         </p>
-      </details>
+      ) : (
+        <details class="lesson-hint">
+          <summary>
+            ヒント
+            {active && failures >= HINT_AFTER && <span class="lesson-hint-nudge">うまくいかないときは開いてみよう</span>}
+          </summary>
+          <p>
+            <b>{lesson.goal}</b>
+            <br />
+            {lesson.text}
+            {guide && (
+              <button type="button" aria-haspopup="dialog" onClick={() => setGuideOpen(true)}>
+                役の解説
+              </button>
+            )}
+          </p>
+        </details>
+      )}
       <GuideDialog yakuKey={guideOpen ? guide : null} inLesson learned={false} onClose={() => setGuideOpen(false)} />
     </div>
   );

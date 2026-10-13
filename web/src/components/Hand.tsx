@@ -29,8 +29,9 @@ export interface HandProps {
   // Game mode: a mark per tile (exact string), e.g. its danger against a
   // riichi: a class for the badge and the text it stands for.
   marks?: Record<string, { className: string; text: string }>;
-  // The dojo's 有効牌ハイライト: a count under each tile (exact string), and its text; best is marked.
-  badges?: Record<string, { count: number; text: string; best: boolean }>;
+  // The dojo's 有効牌ハイライト: a count under each tile (exact string; − sets the hand back), and its
+  // text; best is marked. A legend under the hand says what the numbers are.
+  badges?: Record<string, { label: string; text: string; best: boolean; back: boolean }>;
   onDiscard: (tile: string) => void;
   onPreview: (tile: string | null) => void;
 }
@@ -88,7 +89,7 @@ type Pick = number | 'drawn';
 export function Hand(props: HandProps) {
   const { hand, groups, drawn, discards, disabled, allowed, onlyDrawn = false, melds, status, river, tools, acting = false, highlight, marks, badges, onDiscard, onPreview } = props;
   const mark = (t: string) =>
-    classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className, badges?.[t]?.best ? 'tile-ukeire-best' : undefined);
+    classes(highlight && t === highlight ? 'tile-advice' : undefined, marks?.[t]?.className, badges?.[t]?.best ? 'tile-ukeire-best' : undefined, badges?.[t]?.back ? 'tile-ukeire-back' : undefined);
   const label = (t: string) => {
     const notes = [marks?.[t]?.text, badges?.[t]?.text].filter(Boolean);
     return notes.length > 0 ? `${tileName(t)}、${notes.join('、')}` : undefined;
@@ -107,9 +108,10 @@ export function Hand(props: HandProps) {
   // tile remounts when its position moves to another group, so focus is put
   // back at that position.
   const refocusPos = useRef<number | null>(null);
-  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'), for
-  // a browser whose click event does not say (a PointerEvent's pointerType);
-  // cleared by a key press or a cancelled press, so it never outlives its tap.
+  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'): it
+  // decides over the click's own pointerType, which iOS (WebKit) gives a tap as
+  // 'mouse', and stands in for a browser whose click does not say. Cleared by a
+  // key press or a cancelled press, so it never outlives its tap.
   const pointer = useRef<string | null>(null);
   // The tile a tap selected, with its tile, kept previewed until discarded.
   const [picked, setPicked] = useState<{ at: Pick; tile: string } | null>(null);
@@ -141,7 +143,7 @@ export function Hand(props: HandProps) {
   // either); the mouse and the keyboard (a click with no pointer, detail 0)
   // discard at once.
   const tapToDiscard = (e: MouseEvent, at: Pick, t: string): boolean => {
-    const type = 'pointerType' in e && typeof e.pointerType === 'string' ? (e as PointerEvent).pointerType : pointer.current;
+    const type = pointer.current ?? ('pointerType' in e && typeof e.pointerType === 'string' ? (e as PointerEvent).pointerType : null);
     pointer.current = null;
     const touch = e.detail !== 0 && (type === 'touch' || type === 'pen');
     if (!touch) return true;
@@ -204,7 +206,7 @@ export function Hand(props: HandProps) {
         className={classes(mark(t), pickClass(pos, t))}
         label={label(t)}
         title={marks?.[t]?.text}
-        badge={badges?.[t] && String(badges[t].count)}
+        badge={badges?.[t]?.label}
         onClick={(e) => {
           if (!tapToDiscard(e, pos, t)) return;
           refocusPos.current = tilesRef.current?.contains(document.activeElement) ? pos : null;
@@ -274,7 +276,7 @@ export function Hand(props: HandProps) {
               className={classes(mark(drawn), pickClass('drawn', drawn))}
               label={label(drawn)}
               title={marks?.[drawn]?.text}
-              badge={badges?.[drawn] && String(badges[drawn].count)}
+              badge={badges?.[drawn]?.label}
               onClick={(e) => {
                 if (!tapToDiscard(e, 'drawn', drawn)) return;
                 refocus.current = !!document.activeElement?.closest('.hand-drawn');
@@ -288,6 +290,11 @@ export function Hand(props: HandProps) {
         {melds}
       </div>
       {river}
+      {badges && (
+        <p class="hand-badge-legend">
+          牌の下の数字は、その牌を切ったときの有効牌の枚数（青い牌が最も多い）。「−」は切ると向聴が戻る牌。
+        </p>
+      )}
       {/* Always mounted, so a screen reader announces the selection. */}
       <p class="visually-hidden" role="status" aria-live="polite">
         {picked ? `選択中：${tileName(picked.tile)}（もう一度タップで打牌）` : ''}
