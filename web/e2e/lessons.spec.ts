@@ -173,6 +173,9 @@ test('a practice lesson judges each discard and keeps its count in the dojo', as
   // The assisted stage marks the best discards (有効牌ハイライト).
   const best = handPanel(page).locator('.tile-ukeire-best').first();
   await expect(best).toBeVisible();
+  await expect(handPanel(page).locator('.hand-badge-legend')).toContainText('有効牌の枚数');
+  // A discard that sets the hand back shows − (its larger count would read as better than the best).
+  for (const back of await handPanel(page).locator('.tile-ukeire-back').all()) await expect(back.locator('.tile-badge')).toHaveText('−');
   await best.click();
   await expect(stageOf(page)).toHaveText('手ほどき中 1/5');
   await expect(bar.locator('.lesson-note')).toHaveText('達成！');
@@ -228,6 +231,11 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
   const p = await dojoProgress(page);
   expect(p?.lessons['shape-win'].done).toBe(true);
   expect(p?.coins).toBe(LESSON_COINS);
+  // Learned: the hint gives way to the way back, which leads to the hub's next lesson.
+  await expect(bar.locator('.lesson-hint')).toHaveCount(0);
+  await bar.getByRole('link', { name: '道場に戻って次の課題へ' }).click();
+  await expect(page.getByTestId('dojo-lessons')).toBeVisible();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-lesson', 'ryanmen-tenpai');
 });
 
 // ---- The hub's 鍛錬 panel ----
