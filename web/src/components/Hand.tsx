@@ -108,9 +108,10 @@ export function Hand(props: HandProps) {
   // tile remounts when its position moves to another group, so focus is put
   // back at that position.
   const refocusPos = useRef<number | null>(null);
-  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'), for
-  // a browser whose click event does not say (a PointerEvent's pointerType);
-  // cleared by a key press or a cancelled press, so it never outlives its tap.
+  // The pointer of the latest press in the hand ('touch', 'pen' or 'mouse'): it
+  // decides over the click's own pointerType, which iOS (WebKit) gives a tap as
+  // 'mouse', and stands in for a browser whose click does not say. Cleared by a
+  // key press or a cancelled press, so it never outlives its tap.
   const pointer = useRef<string | null>(null);
   // The tile a tap selected, with its tile, kept previewed until discarded.
   const [picked, setPicked] = useState<{ at: Pick; tile: string } | null>(null);
@@ -142,7 +143,7 @@ export function Hand(props: HandProps) {
   // either); the mouse and the keyboard (a click with no pointer, detail 0)
   // discard at once.
   const tapToDiscard = (e: MouseEvent, at: Pick, t: string): boolean => {
-    const type = 'pointerType' in e && typeof e.pointerType === 'string' ? (e as PointerEvent).pointerType : pointer.current;
+    const type = pointer.current ?? ('pointerType' in e && typeof e.pointerType === 'string' ? (e as PointerEvent).pointerType : null);
     pointer.current = null;
     const touch = e.detail !== 0 && (type === 'touch' || type === 'pen');
     if (!touch) return true;
