@@ -928,7 +928,7 @@ unaffected.
 Practice problems (`internal/problem`; the design is `docs/problems.md`). A
 problem is fixed by its kind, level and seed, so the engine keeps nothing:
 the answer names the problem by its `id`, and the engine builds it again to
-grade the answer. Only `nanikiru` (何切る) exists so far.
+grade the answer. Kinds: `nanikiru` (何切る) and `machi` (待ち当て).
 
 ### `POST /api/problems`
 Body: `{"kind": "nanikiru", "level": 1, "seed": 42}` — `seed` is optional
@@ -941,12 +941,12 @@ answer:
 {
   "id": "nanikiru:1:42",          // kind:level:seed, written as the engine writes it (no leading zeros or +)
   "kind": "nanikiru",
-  "level": 1,                     // nanikiru: 1–3
+  "level": 1,                     // nanikiru: 1–3, machi: 1–3
   "seed": 42,                     // the seed asked for (or picked)
   "source": 42,                   // the candidate seed the position was made from (below)
   "position": {
     "hand": ["2m", "3m", "4m", …], // 13 tiles, sorted
-    "drawn": "8m",                // the 14th tile
+    "drawn": "8m",                // the 14th tile; null for machi
     "dora_indicators": ["9p"],
     "junme": 9,                   // the discard being chosen: turn + 1
     "round_wind": "1z", "seat_wind": "1z",
@@ -959,7 +959,8 @@ answer:
 
 ### `POST /api/problems/answer`
 Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
-(a nanikiru answer is one tile of `hand` or `drawn`). Returns a `Result`:
+(a nanikiru answer is one tile of `hand` or `drawn`; a machi answer is 1–9
+distinct kinds, any kind, a red five naming the 5). Returns a `Result`:
 
 ```jsonc
 {
@@ -967,7 +968,8 @@ Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
   "correct": false,               // the answer ranks first (a red five with a plain copy held does not count)
   "answer": [ { "tile": "8m", "rank": 3, "shanten": 2, "ukeire": 62, "wait": null } ],
   "best": ["9s", "6p"],           // the correct tiles
-  "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first
+  "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first (machi: the waits)
+  "missed": ["7s"],               // machi only: the waits the answer left out (omitted for nanikiru)
   "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
 }
 ```
@@ -1003,8 +1005,32 @@ ms on average natively (worst ~35 ms, seeds 1…2000): the walk only needs the n
 row of each discard, so the advice there breaks ties on the first three keys
 by dora, terminals and kind order, not by near yaku.
 
+**Machi.** The position is a closed 13-tile tenpai hand alone: `drawn` is
+null, `dora_indicators` and `discards` are empty, `junme` is 0 and
+`remaining` counts 4 minus the hand's copies. The waits are every kind that
+completes the hand (4 melds + pair, chiitoitsu or kokushi), whether or not
+copies are left to draw — except a kind the hand holds four of. The answer
+is correct when its kinds are exactly the waits. Each `answer` entry has
+`rank` 1, `shanten` −1 and `ukeire` (the wait's copies outside the hand)
+for a wait, and `rank` 2, `shanten` 0 for any other kind; `best` and
+`ranking` are the waits in kind order, `missed` the waits not answered.
+`text` says what was missed or wrong, lists the waits, and gives for each a
+winning reading with its shape, e.g. `1索で 123m 456m 11p 123s 456s（両面）`
+(the most open reading: 両面, 嵌張, 辺張, 双碰, then 単騎). Levels:
+
+| level | hand | made from |
+|---|---|---|
+| 1 | not one suit; 1–2 waits that one block explains (単騎, 嵌張, 辺張, 両面, 双碰) | the practice wall played from the deal, discarding the lowest normal shanten with the most unseen ukeire; the first 13 tiles after a discard that fit |
+| 2 | not one suit; 3+ waits, or waits no single block explains (延べ単, 両面 + 単騎, …) | as level 1 |
+| 3 | one suit (清一色), 3+ waits | 13 tiles of a suit dealt from a seeded shuffle |
+
+No problem has more than 9 waits (kokushi's 13-sided wait is never shown).
+Every seed in 1…100 gives a problem at every level (`TestMachiSweep`);
+generating one takes under 5 ms on average natively (worst ~40 ms, level 2,
+seeds 1…2000).
+
 **Errors**: `400` invalid body, `kind`, `level`, `seed`, `id` (also one not written canonically) or tile, an answer of
-the wrong size or with a tile not in the position; `422` (never seen in
+the wrong size, with a tile not in the position (nanikiru) or with a kind twice (machi); `422` (never seen in
 tests) a seed for which no candidate seed gives a problem.
 
 ## Memory
