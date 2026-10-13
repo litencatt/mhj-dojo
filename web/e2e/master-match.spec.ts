@@ -74,10 +74,8 @@ test('the 師範戦 stays locked short of the curriculum, and its URL then deals
   await expect(masterRow(page)).toHaveAttribute('data-state', 'locked');
   await expect(masterRow(page).getByRole('link')).toHaveCount(0);
   await expect(masterRow(page).locator('summary')).toContainText('先に:');
-  // The cheats are sold once the 裏道場 is open, whatever the level (a high one here).
-  await page.getByRole('tab', { name: 'イカサマ' }).click();
-  await expect(page.getByTestId('shop-cheat-note')).toContainText('師範戦に勝つと開く裏道場');
-  await expect(page.locator('[data-item="cheat:peek"] .shop-locked')).toHaveText('師範戦に勝つと解禁');
+  // The cheats are the 裏道場's: no tab for them before it is open, whatever the level (a high one here).
+  await expect(page.getByRole('tab', { name: 'イカサマ' })).toHaveCount(0);
   // No 裏道場 yet: no 表道場 / 裏道場 tabs.
   await expect(page.getByRole('tab', { name: '裏道場' })).toHaveCount(0);
 

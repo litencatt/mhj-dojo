@@ -113,7 +113,7 @@ function learn(p: DojoProgress, game: number): DojoProgress {
   return p;
 }
 
-/** One game at the run's stage, then buys the cheapest thing it can of `shop` (the core by default). */
+/** One game at the run's stage, then buys what it can of `shop` (the core by default): 平和 and 役牌 first, then the cheapest. */
 function play(r: Run, shop: readonly ShopItem[] = core) {
   const s = stage(r.p, r.stages);
   r.games++;
@@ -136,7 +136,10 @@ function play(r: Run, shop: readonly ShopItem[] = core) {
   if (!r.p.masterMatch.uraOpen && masterMatchOpen(r.p) && ++r.masterTries >= MASTER_TRIES) {
     r.p = { ...r.p, masterMatch: { tries: r.masterTries, wins: 1, uraOpen: true } };
   }
-  for (const it of [...shop].sort((a, b) => a.price - b.price)) {
+  // 平和 and 役牌 first (the hub's first purchases: the yaku a beginner lacks), then the cheapest: a
+  // 級 the curriculum's 稽古 opens early (LESSON_XP) must not have its cheaper items bought before them.
+  const first = (it: ShopItem) => (it.id === 'pinfu' || it.id === 'yakuhai' ? 0 : 1);
+  for (const it of [...shop].sort((a, b) => first(a) - first(b) || a.price - b.price)) {
     const bought = purchase(r.p, it.id);
     if (bought.ok) r.p = bought.progress;
   }

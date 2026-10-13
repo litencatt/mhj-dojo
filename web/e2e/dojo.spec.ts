@@ -237,11 +237,18 @@ test('the hub follows what another tab has stored, and buys on top of it', async
   expect((await dojoProgress(page))?.xp).toBe(100);
 });
 
-test('the shop shows one kind of item per tab, in a list that scrolls', async ({ page }) => {
+test('the shop has no cheat tab until the 裏道場 is open', async ({ page }) => {
   await page.goto('./?mode=dojo');
   const tabs = page.getByRole('tablist', { name: '商品の種類' });
+  await expect(tabs.getByRole('tab')).toHaveText(['役', '見た目', '補助']);
+  await expect(page.locator('.shop-tabpanel')).not.toContainText('裏道場');
+});
+
+test('the shop shows one kind of item per tab, in a list that scrolls', async ({ page }) => {
+  await openHub(page, { masterMatch: { tries: 1, wins: 1, uraOpen: true } });
+  const tabs = page.getByRole('tablist', { name: '商品の種類' });
   await expect(tabs.getByRole('tab')).toHaveText(['役', '見た目', '補助', 'イカサマ']);
-  const panel = page.getByRole('tabpanel');
+  const panel = page.locator('#shop-tabpanel'); // the 出稽古 has the 表道場 / 裏道場 tabs' too
   await expect(tabs.getByRole('tab', { name: '役' })).toHaveAttribute('aria-selected', 'true');
   await expect(panel.locator('[data-item="yakuhai"]')).toBeVisible();
   await expect(panel.locator('[data-item^="theme:"]')).toHaveCount(0);
