@@ -259,6 +259,9 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   await expect(panel.locator('[data-item^="cloth:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="stick:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="effect:"]')).toHaveCount(3);
+  // Kind by kind (牌テーマ, 裏柄, 卓布, リーチ棒, 和了演出), each in unlock order.
+  const kinds = (await panel.locator('[data-item]').evaluateAll((els) => els.map((el) => el.getAttribute('data-item')!.split(':')[0])));
+  expect(kinds.filter((k, i) => k !== kinds[i - 1])).toEqual(['theme', 'back', 'cloth', 'stick', 'effect']);
   await expect(panel.locator('[data-item="pinfu"]')).toHaveCount(0);
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
