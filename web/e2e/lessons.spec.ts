@@ -252,7 +252,9 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(first).toHaveAttribute('data-state', 'unassisted');
   await expect(first.locator('.dojo-lesson-form')).toHaveText('練習モード');
   await expect(first.locator('.shop-price')).toHaveText('未習得'); // no assists: no 見極め
-  await expect(first.locator('.dojo-lesson-goal')).toContainText('ツモ和了まで');
+  await expect(first.locator('.dojo-lesson-goal')).toContainText('ツモ和了');
+  // A term's first use has its reading over it.
+  await expect(first.locator('.dojo-lesson-goal ruby')).toHaveText(['和了（ホーラ）']);
   await expect(first.getByRole('link', { name: '始める' })).toHaveAttribute('href', /lesson=shape-win/);
   await expect(first.locator('.dojo-lesson-more')).toHaveAttribute('open', '');
   await expect(first.getByRole('group', { name: '例の手' }).locator('.tile')).toHaveCount(14);

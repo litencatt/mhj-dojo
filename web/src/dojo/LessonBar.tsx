@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { Furigana } from './Furigana';
 import { GuideDialog } from './GuideDialog';
 import { singleStage, type Lesson, type LessonStage } from './lessons';
 import type { LessonNote } from './useLesson';
@@ -43,6 +44,7 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
   const times = lesson.times ?? 1;
   const active = stage === 'assisted' || stage === 'unassisted';
   const guide = lesson.guide !== undefined && guideFor(lesson.guide) ? lesson.guide : null;
+  const seen = new Set<string>(); // the hint's goal and text read a term once between them
   return (
     <div class="dojo-notice lesson-status" data-testid="lesson-status">
       <p class="lesson-status-line" role="status" aria-live="polite">
@@ -68,9 +70,14 @@ export function LessonBar({ lesson, stage, count, note, failures, saveFailed }: 
             {active && failures >= HINT_AFTER && <span class="lesson-hint-nudge">うまくいかないときは開いてみよう</span>}
           </summary>
           <p>
-            <b>{lesson.goal}</b>
+            <b>
+              <Furigana text={lesson.goal} seen={seen} />
+            </b>
             <br />
-            {lesson.text}
+            {/* In a span: the paragraph is a flex row, whose items each ruby would become. */}
+            <span>
+              <Furigana text={lesson.text} seen={seen} />
+            </span>
             {guide && (
               <button type="button" aria-haspopup="dialog" onClick={() => setGuideOpen(true)}>
                 役の解説
