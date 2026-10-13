@@ -1,100 +1,239 @@
 {
-  "range": 10000,
+  "range": 50000,
   "seeds": {
     "chanta": {
-      "seed": 1285,
-      "row": "chanta",
-      "shanten": 2
+      "goal": "win",
+      "seeds": [
+        170,
+        305,
+        337,
+        669,
+        820,
+        1089,
+        1285,
+        1398
+      ]
     },
     "chiitoitsu": {
-      "seed": 590,
-      "row": "chiitoitsu",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        8,
+        16,
+        17,
+        18,
+        24,
+        38,
+        40,
+        44
+      ]
     },
     "chinitsu": {
-      "seed": 3202,
-      "row": "chinitsu",
-      "shanten": 3
+      "goal": "win",
+      "seeds": [
+        2456,
+        4878,
+        8858,
+        10085,
+        12082,
+        13431,
+        16406,
+        17738
+      ]
     },
     "double_riichi": {
-      "seed": 8430,
-      "row": "normal",
-      "shanten": 0
+      "goal": "tenpai",
+      "seeds": [
+        2795,
+        7727,
+        8430,
+        9509,
+        9582,
+        12735,
+        16566,
+        18110
+      ]
     },
     "honitsu": {
-      "seed": 9904,
-      "row": "honitsu",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        219,
+        349,
+        457,
+        641,
+        895,
+        1521,
+        1532,
+        1952
+      ]
     },
     "honroutou": {
-      "seed": 1501,
-      "row": "honroutou",
-      "shanten": 3
+      "goal": "win",
+      "seeds": [
+        720,
+        2710,
+        2793,
+        3757,
+        4274,
+        5606,
+        7168,
+        8318
+      ]
     },
     "iipeikou": {
-      "seed": 8430,
-      "row": "iipeikou",
-      "shanten": 0
+      "goal": "win",
+      "seeds": [
+        24,
+        41,
+        45,
+        59,
+        176,
+        252,
+        283,
+        326
+      ]
     },
     "ippatsu": {
-      "seed": 8430,
-      "row": "normal",
-      "shanten": 0
+      "goal": "tenpai",
+      "seeds": [
+        4,
+        13,
+        54,
+        75,
+        79,
+        100,
+        113,
+        127
+      ]
     },
     "ittsu": {
-      "seed": 4837,
-      "row": "ittsu",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        1170,
+        1294,
+        2272,
+        2482,
+        2789,
+        3057,
+        3117,
+        3279
+      ]
     },
     "junchan": {
-      "seed": 3293,
-      "row": "junchan",
-      "shanten": 2
+      "goal": "win",
+      "seeds": [
+        687,
+        1089,
+        1525,
+        1715,
+        1722,
+        1774,
+        1815,
+        2075
+      ]
     },
     "pinfu": {
-      "seed": 1488,
-      "row": "pinfu",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        2,
+        5,
+        7,
+        11,
+        18,
+        39,
+        41,
+        54
+      ]
     },
     "riichi": {
-      "seed": 8430,
-      "row": "normal",
-      "shanten": 0
+      "goal": "tenpai",
+      "seeds": [
+        4,
+        13,
+        54,
+        75,
+        79,
+        100,
+        113,
+        127
+      ]
     },
     "ryanpeikou": {
-      "seed": 2299,
-      "row": "ryanpeikou",
-      "shanten": 2
+      "goal": "win",
+      "seeds": [
+        396,
+        501,
+        1889,
+        2527,
+        4205,
+        4913,
+        7972,
+        8382
+      ]
     },
     "sanankou": {
-      "seed": 7727,
-      "row": "sanankou",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        180,
+        297,
+        435,
+        511,
+        668,
+        735,
+        813,
+        815
+      ]
     },
     "sanshoku": {
-      "seed": 7139,
-      "row": "sanshoku",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        11,
+        69,
+        79,
+        223,
+        431,
+        463,
+        557,
+        615
+      ]
     },
     "sanshoku_doukou": {
-      "seed": 435,
-      "row": "sanshoku_doukou",
-      "shanten": 3
+      "goal": "win",
+      "seeds": [
+        2744,
+        4206,
+        5287,
+        5625,
+        5654,
+        10692,
+        18059,
+        21822
+      ]
     },
     "shousangen": {
-      "seed": 432,
-      "row": "shousangen",
-      "shanten": 3
-    },
-    "toitoi": {
-      "seed": 1846,
-      "row": "toitoi",
-      "shanten": 2
+      "goal": "win",
+      "seeds": [
+        2815,
+        4344,
+        8169,
+        12595,
+        13441,
+        18331,
+        19613,
+        19655
+      ]
     },
     "yakuhai": {
-      "seed": 1934,
-      "row": "hatsu",
-      "shanten": 1
+      "goal": "win",
+      "seeds": [
+        4,
+        18,
+        67,
+        125,
+        137,
+        192,
+        199,
+        213
+      ]
     }
   }
 }
