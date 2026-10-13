@@ -1,5 +1,7 @@
 # Changelog
 
+## [v2026.1013.3](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.2...v2026.1013.3) - 2026-10-13
+
 ## [v2026.1013.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.1...v2026.1013.2) - 2026-10-13
 
 ### 新機能
