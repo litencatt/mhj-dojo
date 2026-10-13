@@ -969,7 +969,7 @@ distinct kinds, any kind, a red five naming the 5). Returns a `Result`:
   "answer": [ { "tile": "8m", "rank": 3, "shanten": 2, "ukeire": 62, "wait": null } ],
   "best": ["9s", "6p"],           // the correct tiles
   "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first (machi: the waits)
-  "missed": ["7s"],               // machi only: the waits the answer left out (omitted for nanikiru)
+  "missed": ["7s"],               // machi only: the waits the answer left out (omitted when none, and for nanikiru)
   "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
 }
 ```

@@ -82,7 +82,7 @@ func TestGradeMachi(t *testing.T) {
 	if r := grade(t, machiProblem("11m22m33p44p55s66s7z"), "7z"); !r.Correct || !strings.Contains(r.Text, "（七対子の単騎）") {
 		t.Fatalf("chiitoitsu: %+v", r)
 	}
-	if r := grade(t, machiProblem("11m22m33p44p55s66s5z"), "5z"); !r.Correct || !strings.HasSuffix(r.Text, "5z（七対子の単騎）。") {
+	if r := grade(t, machiProblem("11m22m33p44p55s66s5z"), "5z"); !r.Correct || !strings.HasSuffix(r.Text, " 白白（七対子の単騎）。") {
 		t.Fatalf("chiitoitsu text: %q", r.Text)
 	}
 	for _, ans := range [][]string{{}, {"1s", "1s"}, {"5s", "0s"}, {"1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p"}} {

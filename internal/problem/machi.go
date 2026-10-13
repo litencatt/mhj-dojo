@@ -292,7 +292,7 @@ func readingText(c tile.Counts, w tile.Kind) string {
 	head := tileName(w) + "で "
 	if len(rs) == 0 {
 		if yaku.IsKokushi(c) {
-			return head + "国士無双"
+			return head + "国士無双（単騎）"
 		}
 		var pairs []string
 		for k, n := range c {
@@ -323,9 +323,13 @@ func readingText(c tile.Counts, w tile.Kind) string {
 	return head + strings.Join(parts, " ") + "（" + waitNames[r.Wait] + "）"
 }
 
-// group writes n tiles from k in steps of step, as "456m" or "55p".
+// group writes n tiles from k in steps of step, as "456m" or "55p"; honors by name, as "白白",
+// which reads more easily than "55z".
 func group(k tile.Kind, step, n int) string {
 	var b strings.Builder
+	if k.String()[1] == 'z' {
+		return strings.Repeat(honorNames[k.Num()-1], n)
+	}
 	for i := range n {
 		b.WriteString(strconv.Itoa(k.Num() + i*step))
 	}

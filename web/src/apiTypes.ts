@@ -366,7 +366,7 @@ export interface ProblemPosition {
   hand: Tile[]; // 13 tiles, sorted
   drawn: Tile | null; // the tile just drawn; null for machi
   dora_indicators: Tile[];
-  junme: number; // the discard being chosen: turn + 1
+  junme: number; // the discard being chosen: turn + 1; 0 for machi
   round_wind: Tile;
   seat_wind: Tile;
   discards: Tile[]; // your own discards so far
@@ -397,6 +397,6 @@ export interface ProblemResult {
   answer: ProblemEval[]; // each tile of the answer, in order
   best: Tile[]; // the correct tiles
   ranking: ProblemEval[]; // every choice, best first (machi: the waits)
-  missed?: Tile[]; // machi: the waits the answer left out
+  missed?: Tile[]; // machi: the waits the answer left out (omitted when none)
   text: string;
 }
