@@ -13,7 +13,10 @@ import (
 
 	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/match"
+	"github.com/litencatt/mhj-dojo/internal/problem"
 	"github.com/litencatt/mhj-dojo/internal/session"
+	"github.com/litencatt/mhj-dojo/internal/tile"
+	"github.com/litencatt/mhj-dojo/internal/wall"
 )
 
 // maxBody bounds a request body.
@@ -49,16 +52,17 @@ func Decode(r io.Reader, v any, required bool) error {
 	return nil
 }
 
-// Status returns the HTTP status for an error from a session, a game or
-// Decode.
+// Status returns the HTTP status for an error from a session, a game, a
+// problem or Decode.
 func Status(err error) int {
 	switch {
 	case errors.Is(err, session.ErrNotFound), errors.Is(err, match.ErrNotFound):
 		return statusNotFound
-	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid):
+	case errors.Is(err, session.ErrInvalid), errors.Is(err, game.ErrInvalid), errors.Is(err, problem.ErrInvalid):
 		return statusBadRequest
-	case errors.Is(err, session.ErrTreeFull):
-		// Not a state conflict: the current node is fine to act on.
+	case errors.Is(err, session.ErrTreeFull), errors.Is(err, problem.ErrNoPosition):
+		// Not a state conflict: the current node is fine to act on, or
+		// the request is well formed but its seed gives no problem.
 		return statusUnprocessableEntity
 	case errors.Is(err, session.ErrConflict), errors.Is(err, game.ErrConflict):
 		return statusConflict
@@ -224,11 +228,52 @@ func GameAction(m *match.Match, v match.View, body io.Reader) (match.State, erro
 	return m.ActView(game.Action{Type: req.Type, Tile: req.Tile, Tiles: req.Tiles}, v)
 }
 
+// CreateProblem is Route's POST /api/problems.
+func CreateProblem(body io.Reader) (*problem.Problem, error) {
+	var req struct {
+		Kind  problem.Kind `json:"kind"`
+		Level int          `json:"level"`
+		Seed  *int64       `json:"seed"`
+	}
+	if err := Decode(body, &req, true); err != nil {
+		return nil, err
+	}
+	// Problem seeds are always shown, so a small range is fine.
+	return problem.Generate(req.Kind, req.Level, wall.PickSeed(req.Seed, 1<<32))
+}
+
+// AnswerProblem is Route's POST /api/problems/answer: it builds the problem
+// again from its id and grades the answer.
+func AnswerProblem(body io.Reader) (*problem.Result, error) {
+	var req struct {
+		ID     string   `json:"id"`
+		Answer []string `json:"answer"`
+	}
+	if err := Decode(body, &req, true); err != nil {
+		return nil, err
+	}
+	kind, level, seed, err := problem.Parse(req.ID)
+	if err != nil {
+		return nil, err
+	}
+	ans := make([]tile.Tile, len(req.Answer))
+	for i, s := range req.Answer {
+		if ans[i], err = tile.Parse(s); err != nil {
+			return nil, Invalid(err.Error())
+		}
+	}
+	p, err := problem.Generate(kind, level, seed)
+	if err != nil {
+		return nil, err
+	}
+	return p.Grade(ans)
+}
+
 // Route runs one request given as its method and path, with any query (such
 // as "POST", "/api/sessions/{id}/discard?advice=0"): the engine's entry for
 // every operation, which the WebAssembly build calls. It returns the status
 // (an HTTP status code) and the response value: a session.State, a
-// match.State or an ErrorBody. Any other path is a 404.
+// match.State, a problem.Problem, a problem.Result or an ErrorBody. Any other path is a 404.
 func Route(store *session.Store, games *match.Store, method, path string, body io.Reader) (int, any) {
 	path, query, _ := strings.Cut(path, "?")
 	return result(route(store, games, method, path, query, body))
@@ -365,6 +410,12 @@ func route(store *session.Store, games *match.Store, method, path, query string,
 			return nil, err
 		}
 		return f(m, v, body)
+	}
+	switch {
+	case path == "/api/problems" && method == methodPost:
+		return CreateProblem(body)
+	case path == "/api/problems/answer" && method == methodPost:
+		return AnswerProblem(body)
 	}
 	return nil, noEndpoint
 }
