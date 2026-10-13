@@ -3,7 +3,7 @@ import { loadProgress } from '../dojo/progress';
 import { useBackdropClose } from './backdrop';
 
 /** The mode the help is opened from: its own explanation comes first, then what it uses. */
-export type HelpMode = 'practice' | 'game' | 'dojo';
+export type HelpMode = 'practice' | 'game' | 'dojo' | 'quiz';
 
 export interface HelpProps {
   mode: HelpMode;
@@ -140,6 +140,25 @@ export function Help({ mode, onShowGlossary }: HelpProps) {
       </ul>
     </section>
   );
+  const quizSection = (
+    <section aria-labelledby="help-quiz">
+      <h3 id="help-quiz">問題（何切る）</h3>
+      <ul>
+        <li>
+          <b>出題</b>：手牌13枚とツモ牌（右に離して表示）、ドラ、巡目、場風・自風を見て、何を切るのが最もよいかを答えます。難易度は「設定」で 1向聴・2向聴・上級（向聴が同じで有効牌の枚数だけが違う手）から選べ、選ぶとすぐ次の問題になります。
+        </li>
+        <li>
+          <b>答え方</b>：切る牌をクリックします。スマートフォンなどのタッチ操作では、1回目のタップで牌を選び（持ち上がります）、同じ牌をもう一度タップすると答えます。
+        </li>
+        <li>
+          <b>採点</b>：正解か不正解かと、正解の牌（手牌で持ち上げて表示）、切る牌ごとの順位（向聴・有効牌の枚数・聴牌時の待ちの平均枚数）、解説を表示します。比べるのは向聴・有効牌・待ちだけで、守備と打点は考えません。順位が1位の牌はどれも正解です（普通の5を持ったまま赤5を切るのは除きます）。
+        </li>
+        <li>
+          <b>次の問題</b>：次のシードの問題に進みます。URL に難易度とシードが入るので、同じ URL を開くと同じ問題になります。ヘッダーの「成績」（正解数 / 回答数）は、このページを開いている間だけ数えます。
+        </li>
+      </ul>
+    </section>
+  );
 
   return (
     <>
@@ -186,7 +205,7 @@ export function Help({ mode, onShowGlossary }: HelpProps) {
             <section aria-labelledby="help-about">
               <h3 id="help-about">このアプリについて</h3>
               <p>
-                日本式リーチ麻雀の練習アプリです。役ごとにあと何向聴か・どの牌が有効牌かを見ながら打てます。モードは3つで、ヘッダーのリンクで切り替えます。
+                日本式リーチ麻雀の練習アプリです。役ごとにあと何向聴か・どの牌が有効牌かを見ながら打てます。モードは4つで、ヘッダーのリンクで切り替えます。
               </p>
               <ul>
                 <li>
@@ -198,6 +217,9 @@ export function Help({ mode, onShowGlossary }: HelpProps) {
                 <li>
                   <b>道場</b>：少ない役から始めて、対局で稼いだ銭で役や補助を買い、級位・段位を上げていきます。
                 </li>
+                <li>
+                  <b>問題</b>：何切るの問題に答え、エンジンの順位と解説で答え合わせをします。
+                </li>
               </ul>
               <p>
                 各モードの選択肢（新しく始めるときの条件や表示）は、ヘッダーの「設定」にあります。リリースごとの変更は<a href="info/">更新情報</a>にあります。
@@ -207,6 +229,7 @@ export function Help({ mode, onShowGlossary }: HelpProps) {
             {mode === 'practice' && practiceSection}
             {mode === 'game' && gameSection}
             {mode === 'dojo' && dojoSection}
+            {mode === 'quiz' && quizSection}
 
             <section aria-labelledby="help-terms">
               <h3 id="help-terms">画面の用語</h3>

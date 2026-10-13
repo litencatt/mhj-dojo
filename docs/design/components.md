@@ -39,5 +39,8 @@
 ## 牌
 `.tile`(`tile-md` 36x48、`tile-sm` 26x35、`tile-xs` 18x24)。面は `TileFace.tsx` の SVG。選択可能な牌は `.tile-interactive`、選択中は `.tile-picked`、裏は `.tile-back`。色は `--tile-*` のみで、テーマ・裏柄は `<html>` の `data-tile-theme` / `data-tile-back` で切り替える(道場で選んだものを全モードで当てる)。スマホの手牌は 14 枚が1行に収まるよう `--hand-tile` で幅を決める。スマホの役別向聴・複合役の有効牌は折り返さず1行(1枚 最大16px・最小11px で行に収め、それでも入らなければ横スクロール)。
 
+## 問題(何切る)
+`web/src/quiz/QuizApp.tsx`(`?mode=quiz`、スタイルは `styles/quiz.css`)。外枠は `.app.app-quiz` で、どの幅でも1列(`.area-main` の中に `.area-header` と `.area-hand`)。ヘッダーの状態の行は練習と同じ `.header-status` の `.game-status`(難易度・巡目・場風・自風・成績)と `.dora-box`(固定する手牌の欄がないので、スマホでもヘッダーに出す)。その下に問いのパネル(`section.quiz-question`、見出し「何切る」と問い `.quiz-prompt`)、手牌の欄は練習と同じ `Hand`(タップで選び2回目で答える)。採点のパネル `section.quiz-result`: 見出しに正解・不正解のバッジ(`.dojo-aid-ok` / `.dojo-aid-warn`)と正解の牌、解説はアドバイスの評価と同じ `.advice-review`(正解なら `.advice-review-best`)、順位の表 `.quiz-ranking`(列の幅だけの表、牌は xs、1位の行は `--row-best-bg`、自分の答えの行 `.quiz-rank-answer` は太字と「あなた」)、主ボタン `.dojo-start` の「次の問題」(`.quiz-actions`)。手牌では正解の牌を `.tile-advice`(持ち上げて `--accent` の枠)、不正解の答えを `.tile-quiz-wrong`(`--danger` の枠、持ち上げない)で示す。難易度は「設定」の `RadioGroup`(選ぶとすぐ次の問題)。
+
 ## アクションバー
 `.action-bar`(対局の操作ボタンの行)。鳴きの問い(ロン・ポン・カン・チー・スキップ)は `.action-bar-call` で右寄せにし、打牌で使う右端(ツモ牌)の近くに置く。スマホ(`width <= 760px`)ではボタンをヘッダーの 設定 と同じ高さ 32px(`min-height: 32px; padding: 4px 12px; font-size: 0.85rem`、主ボタン `.action-primary` も同じ、牌入りの `.action-call` は上下 3px)にして役別向聴の欄を広く取る。行そのものも `min-height: 32px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。

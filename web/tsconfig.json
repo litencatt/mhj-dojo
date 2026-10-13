@@ -19,5 +19,5 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/dojo/*.test.ts"]
+  "exclude": ["src/dojo/*.test.ts", "src/quiz/*.test.ts"]
 }
