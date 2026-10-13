@@ -3,7 +3,7 @@
 // the local mhj-dojo alike (issue #147).
 
 import { lease, live, STOPPED, STOPPED_MESSAGE } from './singleTab';
-import type { ActionType, GameOptions, GameState, SessionState, Tile } from './apiTypes';
+import type { ActionType, GameOptions, GameState, Problem, ProblemKind, ProblemResult, SessionState, Tile } from './apiTypes';
 import { wasmRequest } from './wasm';
 
 // The types live in apiTypes.ts; the pages import them from here, with the requests.
@@ -127,4 +127,15 @@ export function gameAction(id: string, type: ActionType, tile?: Tile, tiles?: Ti
     method: 'POST',
     body: JSON.stringify({ type, ...(tile ? { tile } : {}), ...(tiles ? { tiles } : {}) }),
   });
+}
+
+// ---- Practice problems (docs/api.md "Problems") ----
+
+// Problems hold no state in the engine: the answer names the problem by id.
+export function createProblem(opts: { kind: ProblemKind; level: number; seed?: number }): Promise<Problem> {
+  return request<Problem>('/api/problems', { method: 'POST', body: JSON.stringify(opts) });
+}
+
+export function answerProblem(id: string, answer: Tile[]): Promise<ProblemResult> {
+  return request<ProblemResult>('/api/problems/answer', { method: 'POST', body: JSON.stringify({ id, answer }) });
 }

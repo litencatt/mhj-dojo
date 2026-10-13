@@ -282,6 +282,14 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+.tile.tile-ukeire-back .tile-badge {
+  background: none;
+}
+.hand-badge-legend {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
 .tile.tile-ukeire-best {
   border-color: var(--accent);
 }

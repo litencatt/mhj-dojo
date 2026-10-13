@@ -1,5 +1,11 @@
 # Changelog
 
+## [v2026.1013.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1012.0...v2026.1013.0) - 2026-10-13
+
+### 新機能
+- 道場の鍛錬: 習得後に道場へ戻れるようにし、有効牌ハイライトに凡例を出す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/356
+- 練習問題の土台: シードから決まる何切るの出題と採点 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/357
+
 ## [v2026.1012.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1011.2...v2026.1012.0) - 2026-10-12
 
 ### 新機能

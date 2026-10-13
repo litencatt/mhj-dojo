@@ -3,7 +3,15 @@ import { Tile } from '../components/Tile';
 import { tileName } from '../tiles';
 
 /** Each hand tile's ukeire once discarded (the normal row of by_discard); the best (lowest shanten, then most) marked. */
-export function ukeireBadges(state: Pick<GameState, 'by_discard'>): Record<string, { count: number; text: string; best: boolean }> {
+/** A hand tile's badge: its ukeire once discarded, or − when that sets the hand back a shanten. */
+export interface UkeireBadge {
+  label: string;
+  text: string;
+  best: boolean;
+  back: boolean;
+}
+
+export function ukeireBadges(state: Pick<GameState, 'by_discard'>): Record<string, UkeireBadge> {
   const rows = Object.entries(state.by_discard).flatMap(([t, rs]) => {
     const n = rs.find((r) => r.key === 'normal');
     return n && n.shanten !== null ? [{ t, shanten: n.shanten, count: n.ukeire_total }] : [];
@@ -11,7 +19,13 @@ export function ukeireBadges(state: Pick<GameState, 'by_discard'>): Record<strin
   const low = Math.min(...rows.map((r) => r.shanten));
   const most = Math.max(...rows.filter((r) => r.shanten === low).map((r) => r.count));
   return Object.fromEntries(
-    rows.map((r) => [r.t, { count: r.count, text: `切ると有効牌${r.count}枚`, best: r.shanten === low && r.count === most }]),
+    // A discard that sets the hand back has more ukeire (for the farther shanten): its count would read as
+    // better than the best, so it shows − instead.
+    rows.map((r) =>
+      r.shanten > low
+        ? [r.t, { label: '−', text: `切ると向聴が戻る（有効牌${r.count}枚）`, best: false, back: true }]
+        : [r.t, { label: String(r.count), text: `切ると有効牌${r.count}枚`, best: r.count === most, back: false }],
+    ),
   );
 }
 
