@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1013.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.0...v2026.1013.1) - 2026-10-13
+
+### 新機能
+- 用語表に課題の用語を足し、課題の文の麻雀用語に読みカナを振る by @litencatt in https://github.com/litencatt/mhj-dojo/pull/360
+
 ## [v2026.1013.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1012.0...v2026.1013.0) - 2026-10-13
 
 ### 新機能

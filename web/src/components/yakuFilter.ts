@@ -77,7 +77,8 @@ function categoryOf(row: YakuRow): Category {
   return row.han === 2 ? '2' : '1';
 }
 
-function toKatakana(s: string): string {
+/** Hiragana as katakana, for a search that matches either. */
+export function toKatakana(s: string): string {
   return s.replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60));
 }
 
