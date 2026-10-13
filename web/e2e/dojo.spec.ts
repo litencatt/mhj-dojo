@@ -798,7 +798,7 @@ test('buying a yaku shows its guide: condition, han, an example hand and a way t
   await expect(page.getByTestId('dojo-coins')).toHaveText('420');
 
   // 練習 opens practice mode on one of the yaku's seeds, without showing the seed in the guide.
-  await expect(dialog).toContainText('練習モードで、配牌から一気通貫で和了れる山を用意します。');
+  await expect(dialog).toContainText('練習モードで、配牌から一気通貫で和了りまで行ける筋のある山を用意します');
   await expect(dialog).not.toContainText('シード');
   const link = dialog.getByRole('link', { name: 'この役を練習する' });
   const seed = Number(/[?&]seed=(\d+)/.exec((await link.getAttribute('href'))!)![1]);
@@ -815,7 +815,7 @@ test('closing the guide of a bought yaku leaves focus on its chip; a purchase th
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   const dialog = page.getByRole('dialog', { name: '平和' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('練習モードで、配牌から平和で和了れる山を用意します。');
+  await expect(dialog).toContainText('練習モードで、配牌から平和で和了りまで行ける筋のある山を用意します');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '平和' })).toBeFocused();

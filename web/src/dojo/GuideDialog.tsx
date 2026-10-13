@@ -64,11 +64,11 @@ export function GuideDialog({ yakuKey, inLesson = false, learned, onClose }: Gui
             ))}
           </div>
           <p class="dojo-muted yaku-guide-note">離して置いた最後の牌が和了牌。{guide.example.note}</p>
-          {!inLesson && guide.practice && (
+          {!inLesson && guide.practice && href && (
             <p class="dojo-muted yaku-guide-seed">
               {guide.practice.goal === 'tenpai'
                 ? '練習モードでは立直を宣言できないので、門前で聴牌するまでを練習します。'
-                : `練習モードで、配牌から${guide.name}で和了れる山を用意します。`}
+                : `練習モードで、配牌から${guide.name}で和了りまで行ける筋のある山を用意します（どう打つかはあなた次第）。`}
             </p>
           )}
           {!inLesson && !guide.practice && <p class="dojo-muted yaku-guide-seed">この役は、捨てるだけの練習モードでは練習できません。</p>}
