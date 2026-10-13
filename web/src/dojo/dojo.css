@@ -570,6 +570,15 @@
 .lesson-next a {
   font-weight: bold;
 }
+/* Furigana over a lesson text's mahjong terms (Furigana): small and muted, so the text reads as before. */
+.furigana {
+  ruby-align: center;
+}
+.furigana rt {
+  font-size: 0.6em;
+  font-weight: normal;
+  color: var(--muted);
+}
 .lesson-hint-nudge {
   margin-left: 8px;
   color: var(--danger);
