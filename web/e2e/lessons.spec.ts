@@ -15,7 +15,7 @@ import {
 } from './helpers';
 import { initialProgress, STORAGE_KEY, type DojoProgress } from '../src/dojo/progress.ts';
 import { tileName } from '../src/tiles.ts';
-import { LESSON_COINS } from '../src/dojo/lessons.ts';
+import { LESSON_COINS, LESSON_XP } from '../src/dojo/lessons.ts';
 
 // The curriculum's lessons played (dojo/lessons.ts): a game lesson in a dojo
 // game (?mode=dojo&play=1&lesson=), a practice lesson in practice mode
@@ -231,6 +231,7 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
   const p = await dojoProgress(page);
   expect(p?.lessons['shape-win'].done).toBe(true);
   expect(p?.coins).toBe(LESSON_COINS);
+  expect(p?.xp).toBe(LESSON_XP); // 稽古 too, though no game was played
   // Learned: the hint gives way to the way back, which leads to the hub's next lesson.
   await expect(bar.locator('.lesson-hint')).toHaveCount(0);
   await bar.getByRole('link', { name: '道場に戻って次の課題へ' }).click();
