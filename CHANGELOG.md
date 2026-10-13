@@ -1,5 +1,13 @@
 # Changelog
 
+## [v2026.1013.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.1...v2026.1013.2) - 2026-10-13
+
+### 新機能
+- 道場の鍛錬: 課題を習得すると稽古25が加わるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/363
+- 道場の鍛錬: 区切りの折りたたみをそろえる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/365
+### CI・リポジトリ
+- 更新情報: ネタバレになる変更を載せない by @litencatt in https://github.com/litencatt/mhj-dojo/pull/367
+
 ## [v2026.1013.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.0...v2026.1013.1) - 2026-10-13
 
 ### 新機能
