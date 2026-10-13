@@ -82,15 +82,7 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
             {tier.stages.map((stage) => {
               const lessons = LESSONS.filter((l) => l.stage === stage);
               const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-              const rows = (
-                <ul class="shop-list">
-                  {lessons.map((l) => (
-                    <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
-                  ))}
-                </ul>
-              );
-              // A stage of one lesson needs no heading of its own: the lesson's title says it.
-              if (lessons.length === 1) return <Fragment key={stage}>{rows}</Fragment>;
+              // Every stage folds alike, one of a single lesson too: only the next lesson's is open.
               return (
                 <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
                   <summary>
@@ -100,7 +92,11 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
                       {done} / {lessons.length}
                     </span>
                   </summary>
-                  {rows}
+                  <ul class="shop-list">
+                    {lessons.map((l) => (
+                      <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
+                    ))}
+                  </ul>
                 </details>
               );
             })}
