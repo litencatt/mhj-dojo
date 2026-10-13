@@ -228,6 +228,11 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
   const p = await dojoProgress(page);
   expect(p?.lessons['shape-win'].done).toBe(true);
   expect(p?.coins).toBe(LESSON_COINS);
+  // Learned: the hint gives way to the way back, which leads to the hub's next lesson.
+  await expect(bar.locator('.lesson-hint')).toHaveCount(0);
+  await bar.getByRole('link', { name: '道場に戻って次の課題へ' }).click();
+  await expect(page.getByTestId('dojo-lessons')).toBeVisible();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-lesson', 'ryanmen-tenpai');
 });
 
 // ---- The hub's 鍛錬 panel ----
