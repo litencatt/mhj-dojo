@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PHONE, loaded, versionPattern } from './helpers';
+import { initialProgress, STORAGE_KEY } from '../src/dojo/progress.ts';
 
 // The header's version and the help dialog, in both modes.
 
@@ -138,4 +139,23 @@ test('the dojo hub has the same header, and its help explains the dojo', async (
   for (const h of ['練習モード', 'CPU対戦']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
   // No glossary on the hub: the help points to practice mode's.
   await expect(dialog.locator('.help-lead')).toContainText('練習モードの用語表');
+});
+
+// What the 師範戦 opens (the 裏道場, its CPU and the cheats) is told only once it is open: in the
+// help, and in the 師範戦's own text in the hub.
+test('the dojo tells nothing of the 裏道場 before the 師範戦 is won', async ({ page }) => {
+  const words = ['裏道場', '裏師範', 'イカサマ'];
+  await page.goto('./?mode=dojo');
+  const dialog = await openHelp(page);
+  for (const w of words) await expect(dialog, w).not.toContainText(w);
+  await page.keyboard.press('Escape');
+  for (const w of words) await expect(page.getByTestId('dojo-master-match'), w).not.toContainText(w);
+
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [
+    STORAGE_KEY,
+    JSON.stringify({ ...initialProgress(), masterMatch: { tries: 1, wins: 1, uraOpen: true } }),
+  ]);
+  await page.reload();
+  const opened = await openHelp(page);
+  for (const w of words) await expect(opened, w).toContainText(w);
 });

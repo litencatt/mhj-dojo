@@ -231,7 +231,9 @@ function MasterMatchRow({ progress }: { progress: DojoProgress }) {
       <details class="dojo-lesson-more" open={open && !uraOpen}>
         <summary>{missing.length > 0 ? `解説（先に: ${missing.join('、')}）` : '解説'}</summary>
         <p>
-          師範は普通より強い CPU です。何度でも挑戦できます。師範戦ではイカサマは使えません。順位の報酬は6倍（勝ったあとは4倍）。勝つと裏道場が開き、裏師範との対局とイカサマ（よろず屋）が解禁されます。
+          師範は普通より強い CPU です。何度でも挑戦できます。順位の報酬は6倍（勝ったあとは4倍）。
+          {/* What it opens is told once it is open. */}
+          {uraOpen ? '勝って裏道場が開きました。裏師範との対局とイカサマ（よろず屋）が使えます（師範戦ではイカサマは使えません）。' : '勝つと、道場の先が開けます。'}
         </p>
       </details>
     </li>
