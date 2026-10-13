@@ -152,3 +152,10 @@ test('a title loses the issue it names at its end', () => {
   const titles = parseChangelog(md)[0].sections[0].items.map((it) => it.title);
   assert.deepEqual(titles, ['CPU対戦の処理時間のベンチマークを足す', '鳴きをブラウザで', '牌 (#1) の向き', '末尾に空白', '(#6)']);
 });
+
+// The 更新情報 page is read by players who have not won the 師範戦: what it opens stays unsaid
+// there. A pull request about it is labelled spoiler, which .github/release.yml leaves out.
+test("the repository's CHANGELOG.md tells nothing of what the 師範戦 opens", () => {
+  const md = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
+  for (const word of ['裏道場', '裏師範', 'ウラ面', 'イカサマ']) assert.ok(!md.includes(word), `${word} in CHANGELOG.md: label its pull request spoiler and take the line out`);
+});
