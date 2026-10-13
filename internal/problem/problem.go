@@ -105,6 +105,9 @@ func Generate(kind Kind, level int, seed int64) (*Problem, error) {
 	if err := check(kind, level); err != nil {
 		return nil, err
 	}
+	if err := checkSeed(seed); err != nil {
+		return nil, err
+	}
 	mu.Lock()
 	defer mu.Unlock()
 	for i := 0; i <= maxTries; i++ {
@@ -140,6 +143,12 @@ func Parse(s string) (Kind, int, int64, error) {
 	if err := check(kind, level); err != nil {
 		return "", 0, 0, err
 	}
+	if err := checkSeed(seed); err != nil {
+		return "", 0, 0, err
+	}
+	if id(kind, level, seed) != s {
+		return "", 0, 0, fmt.Errorf("%w: id %q is not canonical", ErrInvalid, s)
+	}
 	return kind, level, seed, nil
 }
 
@@ -160,6 +169,17 @@ func check(kind Kind, level int) error {
 	}
 	if level < 1 || level > n {
 		return fmt.Errorf("%w: level must be between 1 and %d", ErrInvalid, n)
+	}
+	return nil
+}
+
+// MaxSeed is the largest seed: the page reads seeds as JavaScript numbers,
+// which hold integers exactly only up to 2^53 − 1.
+const MaxSeed = 1<<53 - 1
+
+func checkSeed(seed int64) error {
+	if seed < 0 || seed > MaxSeed {
+		return fmt.Errorf("%w: seed must be between 0 and %d", ErrInvalid, int64(MaxSeed))
 	}
 	return nil
 }

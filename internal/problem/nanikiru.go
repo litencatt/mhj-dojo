@@ -61,7 +61,10 @@ func nanikiru(level int, src int64) *Problem {
 	hand := w.Hand()
 	var discards []tile.Tile
 	for turn := range lv.maxJunme {
-		d, _ := w.Draw(turn)
+		d, ok := w.Draw(turn)
+		if !ok {
+			return nil
+		}
 		tiles := append(slices.Clone(hand), d)
 		visible := tile.CountsOf(tiles)
 		for _, t := range append(slices.Clone(discards), ind...) {
@@ -140,7 +143,9 @@ func (lv nanikiruLevel) clear(ranked []advice.Ranked) bool {
 	return false
 }
 
-// gradeNanikiru grades a discard: correct when it ranks first.
+// gradeNanikiru grades a discard: correct when it ranks first, unless it
+// is a red five discarded while a plain copy is held (advice.Review: that
+// gives up a dora for nothing).
 func (p *Problem) gradeNanikiru(ans []tile.Tile) (*Result, error) {
 	if len(ans) != 1 {
 		return nil, fmt.Errorf("%w: answer must be one tile", ErrInvalid)
@@ -162,20 +167,23 @@ func (p *Problem) gradeNanikiru(ans []tile.Tile) (*Result, error) {
 	e := eval(mine)
 	e.Tile = ans[0].String()
 	res.Answer = []Eval{e}
-	res.Correct = mine.Rank == 1
-	text := review(adv, mine.Tile)
+	rv := adv.Review(ans[0])
+	res.Correct = rv.IsBest
+	text := strings.TrimPrefix(rv.Text, "前巡の") + "。"
 	// Then why the best beats the runner-up (the filter makes sure there
-	// is one): the advice's note compares the first two discards, which
-	// with two correct kinds are both correct, so a correct answer gets
-	// the runner-up's review instead.
+	// is one), unless the answer is the runner-up, whose review says so:
+	// the advice's note compares the first two discards, which with two
+	// correct kinds are both correct, so then a correct answer gets the
+	// runner-up's review instead.
 	runnerUp := ranked[len(res.Best)].Tile
 	switch {
+	case runnerUp.Kind == ans[0].Kind:
 	case len(res.Best) == 1 && len(adv.Notes) > 0:
 		text += adv.Notes[0]
-	case res.Correct:
+	case len(res.Best) > 1 && mine.Rank == 1:
 		text += review(adv, runnerUp)
 	}
-	res.Text = text + "向聴・有効牌・聴牌時の待ちで比べ、守備と点数は考えない。"
+	res.Text = text + "この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
 	return res, nil
 }
 

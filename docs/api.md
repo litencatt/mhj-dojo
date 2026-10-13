@@ -932,12 +932,14 @@ grade the answer. Only `nanikiru` (何切る) exists so far.
 
 ### `POST /api/problems`
 Body: `{"kind": "nanikiru", "level": 1, "seed": 42}` — `seed` is optional
-(random in `[0, 2^32)`, as for sessions). Returns a `Problem`, without its
+(random in `[0, 2^32)`, as for sessions) and must be in `[0, 2^53 − 1]`, so
+that the page reads it exactly as a JavaScript number (sessions take any
+64-bit seed). Returns a `Problem`, without its
 answer:
 
 ```jsonc
 {
-  "id": "nanikiru:1:42",          // kind:level:seed
+  "id": "nanikiru:1:42",          // kind:level:seed, written as the engine writes it (no leading zeros or +)
   "kind": "nanikiru",
   "level": 1,                     // nanikiru: 1–3
   "seed": 42,                     // the seed asked for (or picked)
@@ -962,11 +964,11 @@ Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
 ```jsonc
 {
   "id": "nanikiru:1:42",
-  "correct": false,               // every tile of the answer ranks first
+  "correct": false,               // the answer ranks first (a red five with a plain copy held does not count)
   "answer": [ { "tile": "8m", "rank": 3, "shanten": 2, "ukeire": 62, "wait": null } ],
   "best": ["9s", "6p"],           // the correct tiles
   "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first
-  "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…守備と点数は考えない。"
+  "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
 }
 ```
 
@@ -974,10 +976,13 @@ Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
 from the deal with a best discard of the advice each turn, up to a junme of
 the level. The ranking is the advice's first three keys (shanten, `ukeire`,
 `wait`; see "Advice"), ranked as `Review` ranks a discard, so every kind
-ranked first is correct. `text` uses `Review`'s words for the answer, then why the
+ranked first is correct — except a red five discarded while a plain copy is
+held, which gives up a dora for nothing (`Review`'s `is_best` is false; its
+`rank` is still 1, and `best` names the plain five). `text` uses `Review`'s words for the exact tile answered, then why the
 best beats the runner-up (the advice's first note; with two correct kinds,
-and only for a correct answer, the runner-up's review), and says that
-defence and points are not considered. A position is used only if it fits the level and
+and only for an answer of one of them, the runner-up's review, which
+compares it with the advice's best), unless the answer is the runner-up,
+and says that defence and 打点 (points) are not considered. A position is used only if it fits the level and
 the best stands clearly apart from the runner-up (the best discard outside
 rank 1):
 
@@ -998,7 +1003,7 @@ ms on average natively (worst ~35 ms, seeds 1…2000): the walk only needs the n
 row of each discard, so the advice there breaks ties on the first three keys
 by dora, terminals and kind order, not by near yaku.
 
-**Errors**: `400` invalid body, `kind`, `level`, `id` or tile, an answer of
+**Errors**: `400` invalid body, `kind`, `level`, `seed`, `id` (also one not written canonically) or tile, an answer of
 the wrong size or with a tile not in the position; `422` (never seen in
 tests) a seed for which no candidate seed gives a problem.
 

@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/litencatt/mhj-dojo/internal/advice"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
+	"github.com/litencatt/mhj-dojo/internal/yaku"
 )
 
 func generate(t *testing.T, kind Kind, level int, seed int64) *Problem {
@@ -68,10 +70,13 @@ func TestParse(t *testing.T) {
 	if err != nil || kind != p.Kind || level != p.Level || seed != p.Seed {
 		t.Fatalf("Parse(%q) = %s, %d, %d, %v", p.ID, kind, level, seed, err)
 	}
-	if _, _, seed, _ := Parse("nanikiru:1:-5"); seed != -5 {
-		t.Fatalf("negative seed: %d", seed)
+	if _, _, seed, err := Parse("nanikiru:1:9007199254740991"); err != nil || seed != MaxSeed {
+		t.Fatalf("largest seed: %d, %v", seed, err)
 	}
-	for _, id := range []string{"", "nanikiru", "nanikiru:1", "nanikiru:1:2:3", "oshihiki:1:2", "nanikiru:0:2", "nanikiru:4:2", "nanikiru:x:2", "nanikiru:1:x"} {
+	for _, id := range []string{
+		"", "nanikiru", "nanikiru:1", "nanikiru:1:2:3", "oshihiki:1:2", "nanikiru:0:2", "nanikiru:4:2", "nanikiru:x:2", "nanikiru:1:x",
+		"nanikiru:01:42", "nanikiru:1:+42", "nanikiru:1:042", "nanikiru:+1:42", "nanikiru:1:-5", "nanikiru:1:9007199254740992",
+	} {
 		if _, _, _, err := Parse(id); !errors.Is(err, ErrInvalid) {
 			t.Errorf("Parse(%q): %v, want ErrInvalid", id, err)
 		}
@@ -79,9 +84,10 @@ func TestParse(t *testing.T) {
 	for _, c := range []struct {
 		kind  Kind
 		level int
-	}{{"machi", 1}, {Nanikiru, 0}, {Nanikiru, 4}} {
-		if _, err := Generate(c.kind, c.level, 1); !errors.Is(err, ErrInvalid) {
-			t.Errorf("Generate(%s, %d): %v, want ErrInvalid", c.kind, c.level, err)
+		seed  int64
+	}{{"machi", 1, 1}, {Nanikiru, 0, 1}, {Nanikiru, 4, 1}, {Nanikiru, 1, -1}, {Nanikiru, 1, MaxSeed + 1}} {
+		if _, err := Generate(c.kind, c.level, c.seed); !errors.Is(err, ErrInvalid) {
+			t.Errorf("Generate(%s, %d, %d): %v, want ErrInvalid", c.kind, c.level, c.seed, err)
 		}
 	}
 }
@@ -105,7 +111,7 @@ func TestNoAnswerInJSON(t *testing.T) {
 func TestGrade(t *testing.T) {
 	p := generate(t, Nanikiru, 1, 42)
 	r := grade(t, p, correct(p)[0])
-	if !r.Correct || r.Answer[0].Rank != 1 || !strings.Contains(r.Text, "最善") || !strings.Contains(r.Text, "守備と点数は考えない") {
+	if !r.Correct || r.Answer[0].Rank != 1 || !strings.Contains(r.Text, "最善") || !strings.HasSuffix(r.Text, "この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。") {
 		t.Fatalf("best: %+v", r)
 	}
 	worst := r.Ranking[len(r.Ranking)-1]
@@ -224,4 +230,46 @@ func checkRanking(t *testing.T, p *Problem, lv nanikiruLevel, ranking []Eval) {
 	default:
 		t.Errorf("%s: unclear: %+v vs %+v", p.ID, a, b)
 	}
+}
+
+// handProblem is a problem on 14 given tiles, past the filter.
+func handProblem(hand string) *Problem {
+	tiles := tile.MustParseHand(hand)
+	adv := advice.Compute(advice.Input{
+		Tiles: tiles, Visible: tile.CountsOf(tiles), Turn: 3, MaxTurns: 18, ByDiscard: byDiscard(tiles),
+		Han: func(key string) int { return yaku.HanFor(key, winds) }, Analyzer: analyzer,
+	})
+	return &Problem{ID: "test", Kind: Nanikiru, answer: answer{tiles: tiles, advice: adv}}
+}
+
+// TestGradeRedFive: with a plain and a red 5p held, discarding the red one
+// gives up a dora for nothing, so only the plain one is correct.
+func TestGradeRedFive(t *testing.T) {
+	p := handProblem("123m456s789s11z4p05p")
+	if r := grade(t, p, "5p"); !r.Correct || !slices.Equal(r.Best, []string{"5p"}) || !strings.HasPrefix(r.Text, "打 5筒: 最善。") {
+		t.Fatalf("5p: %+v", r)
+	}
+	r := grade(t, p, "0p")
+	if r.Correct || r.Answer[0].Tile != "0p" || r.Answer[0].Rank != 1 || !strings.HasPrefix(r.Text, "打 赤5筒: 最善と同じ牌種だが赤ドラを失う") {
+		t.Fatalf("0p: %+v", r)
+	}
+}
+
+// TestGradeRunnerUpText: the runner-up's explanation is not repeated by the
+// note comparing it with the best.
+func TestGradeRunnerUpText(t *testing.T) {
+	for seed := int64(1); seed <= 30; seed++ {
+		p := generate(t, Nanikiru, 2, seed)
+		best := grade(t, p, correct(p)[0])
+		if len(best.Best) != 1 {
+			continue
+		}
+		runnerUp := best.Ranking[1].Tile
+		r := grade(t, p, runnerUp)
+		if note := p.answer.advice.Notes[0]; strings.Contains(r.Text, note) || !strings.Contains(best.Text, note) {
+			t.Fatalf("%s: answer %s: %q", p.ID, runnerUp, r.Text)
+		}
+		return
+	}
+	t.Fatal("no problem with one correct kind")
 }

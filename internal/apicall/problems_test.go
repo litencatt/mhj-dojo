@@ -68,6 +68,9 @@ func TestProblemErrors(t *testing.T) {
 		{"POST", "/api/problems", `{"kind":"nanikiru"}`, statusBadRequest},
 		{"POST", "/api/problems", `{"kind":"nanikiru","level":4}`, statusBadRequest},
 		{"POST", "/api/problems/answer", `{"id":"nanikiru:1","answer":["1m"]}`, statusBadRequest},
+		{"POST", "/api/problems", `{"kind":"nanikiru","level":1,"seed":-1}`, statusBadRequest},
+		{"POST", "/api/problems", `{"kind":"nanikiru","level":1,"seed":9007199254740992}`, statusBadRequest},
+		{"POST", "/api/problems/answer", `{"id":"nanikiru:01:42","answer":["1m"]}`, statusBadRequest},
 		{"POST", "/api/problems/answer", `{"id":"nanikiru:1:42","answer":["xx"]}`, statusBadRequest},
 		{"POST", "/api/problems/answer", `{"id":"nanikiru:1:42","answer":[]}`, statusBadRequest},
 		{"POST", "/api/problems/answer", `{"id":"nanikiru:1:42","answer":["7z"]}`, statusBadRequest}, // not in the hand
