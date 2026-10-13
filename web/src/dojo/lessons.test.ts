@@ -6,6 +6,7 @@ import { CATALOG, findItem } from './catalog.ts';
 import {
   LESSONS,
   LESSON_COINS,
+  LESSON_XP,
   bestDiscards,
   discardsAgainstRiichi,
   findLesson,
@@ -403,6 +404,7 @@ test('passing a lesson grants its reward once, whatever the level', () => {
   const d = pass(passed(['suji']), 'fold'); // 危険牌の印 is Lv4 in the shop; a lesson grants it at Lv1
   assert.ok(d.ownedItems.includes('assist:danger'));
   assert.equal(pass(initialProgress(), 'shape-win').coins, LESSON_COINS);
+  assert.equal(pass(initialProgress(), 'shape-win').xp, LESSON_XP); // every lesson adds 稽古, the practice ones too
 });
 
 test('passing a lesson whose yaku is owned already pays it in coins instead', () => {

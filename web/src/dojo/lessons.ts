@@ -71,6 +71,11 @@ export type Lesson =
 // plays the curriculum along.
 export const LESSON_COINS = 30;
 
+// The 稽古 of every lesson learned (docs/dojo-economy.md): the 初伝's four practice lessons, which play no game, make
+// the first 級 (100) between them, so the curriculum moves the 級位 too; 20 lessons are 500 in all,
+// a few 級 beside the games'.
+export const LESSON_XP = 25;
+
 const NOYAKU = ['assist:noyaku'];
 const UKEIRE = ['assist:ukeire'];
 const DANGER = ['assist:danger'];
@@ -458,7 +463,7 @@ export function recordSuccess(p: DojoProgress, id: string, key: string): { progr
 }
 
 /**
- * Passes the lesson and pays its reward. Only recordSuccess calls it, on a
+ * Passes the lesson and pays its reward (and LESSON_XP). Only recordSuccess calls it, on a
  * lesson unlocked and not done, so the reward is paid once; the item is
  * granted whatever the level its shop entry asks for (a lesson is not
  * gated by level), as a purchase would grant it (its yaku with it). An
@@ -478,5 +483,5 @@ function completeLesson(p: DojoProgress, lesson: Lesson): DojoProgress {
       ownedYaku = [...ownedYaku, ...grants.filter((k) => !ownedYaku.includes(k))];
     }
   }
-  return { ...p, coins, ownedItems, ownedYaku, lessons };
+  return { ...p, xp: p.xp + LESSON_XP, coins, ownedItems, ownedYaku, lessons };
 }
