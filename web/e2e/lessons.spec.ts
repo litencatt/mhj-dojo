@@ -173,6 +173,9 @@ test('a practice lesson judges each discard and keeps its count in the dojo', as
   // The assisted stage marks the best discards (有効牌ハイライト).
   const best = handPanel(page).locator('.tile-ukeire-best').first();
   await expect(best).toBeVisible();
+  await expect(handPanel(page).locator('.hand-badge-legend')).toContainText('有効牌の枚数');
+  // A discard that sets the hand back shows − (its larger count would read as better than the best).
+  for (const back of await handPanel(page).locator('.tile-ukeire-back').all()) await expect(back.locator('.tile-badge')).toHaveText('−');
   await best.click();
   await expect(stageOf(page)).toHaveText('手ほどき中 1/5');
   await expect(bar.locator('.lesson-note')).toHaveText('達成！');
