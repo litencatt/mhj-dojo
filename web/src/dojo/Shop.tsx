@@ -39,17 +39,21 @@ interface ShopProps {
 
 /** The dojo's shop: the items of the chosen tab by level, bought with coins. */
 export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
-  const [tab, setTab] = useState(TABS[0].key);
+  // The cheats are the 裏道場's: their tab shows once it is open, so the shop does not tell of it
+  // before the 師範戦 is won.
+  const tabs = TABS.filter((t) => t.key !== 'cheat' || p.masterMatch.uraOpen);
+  const [chosen, setTab] = useState(TABS[0].key);
+  const tab = tabs.some((t) => t.key === chosen) ? chosen : tabs[0].key;
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const shown = CATALOG.filter((it) => TABS.find((t) => t.key === tab)!.kinds.includes(it.kind));
+  const shown = CATALOG.filter((it) => tabs.find((t) => t.key === tab)!.kinds.includes(it.kind));
 
   // Arrow keys, Home and End move between the tabs (the WAI-ARIA tabs pattern).
   function onTabKey(e: KeyboardEvent, i: number) {
-    const to = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: TABS.length - 1 } as Record<string, number>)[e.key];
+    const to = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 } as Record<string, number>)[e.key];
     if (to === undefined) return;
     e.preventDefault();
-    const j = (to + TABS.length) % TABS.length;
-    setTab(TABS[j].key);
+    const j = (to + tabs.length) % tabs.length;
+    setTab(tabs[j].key);
     tabRefs.current[j]?.focus();
   }
 
@@ -86,7 +90,7 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
     <section class="dojo-panel" aria-labelledby="dojo-shop-heading">
       <h2 id="dojo-shop-heading">よろず屋</h2>
       <div class="shop-tabs" role="tablist" aria-label="商品の種類">
-        {TABS.map((t, i) => (
+        {tabs.map((t, i) => (
           <button
             key={t.key}
             ref={(el) => {
@@ -108,7 +112,7 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
       <div id="shop-tabpanel" class="shop-tabpanel" role="tabpanel" tabIndex={0} aria-labelledby={`shop-tab-${tab}`}>
           {tab === 'cheat' && (
             <p class="dojo-muted shop-note" data-testid="shop-cheat-note">
-              {p.masterMatch.uraOpen ? 'イカサマは裏道場の対局で使えます（師範戦では使えません）。' : 'イカサマは師範戦に勝つと開く裏道場で解禁され、裏道場の対局で使えます。'}
+              イカサマは裏道場の対局で使えます（師範戦では使えません）。
               {p.legacyCheats.length > 0 && '裏道場ができる前から持っているイカサマは、師範戦を除く表道場の対局でも使えます。'}
             </p>
           )}
