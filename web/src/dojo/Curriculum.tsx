@@ -3,6 +3,7 @@ import { Tile } from '../components/Tile';
 import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, singleStage, type Lesson, type LessonStage } from './lessons';
 import { curriculumDone, masterMatchOpen } from './masterMatch';
 import { progressSaved, saveProgress, type DojoProgress } from './progress';
+import { Furigana } from './Furigana';
 import { expandTiles, guideFor } from './yakuGuide';
 
 // The curriculum's stages (#316), 0 to 5, shown under three tiers: 初伝, 中伝 and 奥伝. The word 段
@@ -144,6 +145,8 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
   const keep = () => {
     if (!progressSaved()) saveProgress(progress);
   };
+  // The goal and the text read a term once between them (Furigana).
+  const seen = new Set<string>();
   return (
     <li class={`shop-item dojo-lesson${next ? ' dojo-lesson-next' : ''}`} data-lesson={lesson.id} data-state={state} aria-current={next ? 'step' : undefined}>
       <span class="shop-name">
@@ -156,7 +159,7 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
       </span>
       <p class="dojo-lesson-goal">
         <span class="dojo-aid-label">目標</span>
-        {lesson.goal}
+        <Furigana text={lesson.goal} seen={seen} />
       </p>
       {guide && (
         <button type="button" aria-haspopup="dialog" aria-label={`${lesson.title}：役の解説`} onClick={() => onGuide(guide)}>
@@ -176,7 +179,7 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
       <details class="dojo-lesson-more" open={next && Object.keys(progress.lessons).length === 0}>
         <summary>{state === 'locked' && requires.length > 0 ? `解説（先に: ${requires.join('、')}）` : '解説'}</summary>
         <p>
-          {lesson.text}
+          <Furigana text={lesson.text} seen={seen} />
           {lesson.form === 'game' && <span class="dojo-muted"> 課題の対局は東風戦・CPU 弱い（順位の報酬は等倍）。</span>}
         </p>
         {lesson.example && (

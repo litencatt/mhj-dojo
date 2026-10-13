@@ -323,3 +323,26 @@ test('the yaku filter bar starts open on a desktop and folds away', async ({ pag
   await expect(yaku.getByRole('button', { name: '条件をクリア' })).toHaveCount(0);
   await expect(toggle).toBeFocused();
 });
+
+// The glossary has the terms the lessons and the advice use, found by their writing or reading.
+test('the glossary finds the terms the lessons use', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('./?seed=1&turns=18');
+  const glossary = page.getByRole('region', { name: '用語表' });
+  // Minimized by default: opened from the dock.
+  const dock = page.getByRole('navigation', { name: '最小化したパネル' });
+  await dock.getByRole('button', { name: '用語表' }).click();
+  const search = glossary.getByRole('searchbox', { name: '用語を検索' });
+  for (const [query, term] of [
+    ['振聴', '振聴'],
+    ['フリテン', '振聴'],
+    ['スジ', '筋'],
+    ['放銃', '放銃'],
+    ['シャンポン', '双碰'],
+    ['打牌', '打牌'],
+    ['対子', '対子'],
+  ]) {
+    await search.fill(query);
+    await expect(glossary.locator('dt').filter({ hasText: term }).first(), query).toBeVisible();
+  }
+});
