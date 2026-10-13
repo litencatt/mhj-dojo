@@ -105,6 +105,21 @@ func TestReview(t *testing.T) {
 	}
 }
 
+// TestRanked: every distinct discard, best first, ranked as Review ranks it.
+func TestRanked(t *testing.T) {
+	a := Compute(input(yakushanten.NewAnalyzer(), "123m456p789s23s11z9m", "", 3, 18))
+	ranked := a.Ranked()
+	if len(ranked) != len(a.all) || ranked[0].Tile.String() != "9m" || ranked[0].Rank != 1 || ranked[0].Shanten != 0 || ranked[0].Wait == nil {
+		t.Fatalf("ranked %+v", ranked)
+	}
+	for i, r := range ranked {
+		rv := a.Review(r.Tile)
+		if r.Rank != rv.Rank || r.Shanten != rv.Shanten || r.Ukeire != rv.Ukeire || (i > 0 && r.Rank < ranked[i-1].Rank) {
+			t.Fatalf("%s: ranked %+v, review %+v", r.Tile, r, rv)
+		}
+	}
+}
+
 func TestRedFiveKept(t *testing.T) {
 	// Two 5p, one red: discarding 5p keeps the red one.
 	a := Compute(input(yakushanten.NewAnalyzer(), "123m406p789s11z55p9m", "", 0, 18))

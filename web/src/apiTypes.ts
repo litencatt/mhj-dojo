@@ -357,3 +357,45 @@ export interface GameOptions {
   cpu: CpuLevel;
   dojo?: DojoOptions;
 }
+
+// ---- Practice problems (docs/api.md "Problems") ----
+
+export type ProblemKind = 'nanikiru'; // 何切る
+
+export interface ProblemPosition {
+  hand: Tile[]; // 13 tiles, sorted
+  drawn: Tile | null; // the tile just drawn
+  dora_indicators: Tile[];
+  junme: number; // the discard being chosen: turn + 1
+  round_wind: Tile;
+  seat_wind: Tile;
+  discards: Tile[]; // your own discards so far
+  remaining: Remaining;
+}
+
+export interface Problem {
+  id: string; // "kind:level:seed": answer with it
+  kind: ProblemKind;
+  level: number;
+  seed: number; // the seed asked for (or picked)
+  source: number; // the candidate seed the position was made from
+  position: ProblemPosition;
+  choose: 'one' | 'many'; // how many tiles an answer holds
+}
+
+export interface ProblemEval {
+  tile: Tile;
+  rank: number; // 1 = correct (ties share a rank)
+  shanten: number;
+  ukeire: number;
+  wait: number | null; // expected tenpai wait; null above 1-shanten
+}
+
+export interface ProblemResult {
+  id: string;
+  correct: boolean;
+  answer: ProblemEval[]; // each tile of the answer, in order
+  best: Tile[]; // the correct tiles
+  ranking: ProblemEval[]; // every choice, best first
+  text: string;
+}
