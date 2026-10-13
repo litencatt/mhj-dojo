@@ -121,7 +121,7 @@ test('a level chosen in 設定 starts its problem at once, on the same seed', as
   await expect(levels.getByRole('radio')).toHaveCount(3);
   await expect(levels.getByRole('radio', { name: '1向聴' })).toBeChecked();
   await expect(levels.getByRole('radio', { name: '1向聴' })).toBeFocused();
-  await levels.getByRole('radio', { name: '2向聴' }).check();
+  await levels.getByRole('radio', { name: '2向聴' }).click(); // the dialog closes and the problem loads; the radio follows once it has come
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/[?&]level=2(&|$)/);
   await expect(page).toHaveURL(/[?&]seed=1(&|$)/);

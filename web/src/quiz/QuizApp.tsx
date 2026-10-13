@@ -48,10 +48,11 @@ export function QuizApp() {
 
   // Asks for a problem; the URL then names it, the seed the engine picked
   // included, so a reload shows the same problem.
+  // asked follows only once the problem has come: a failed or refused request leaves the one shown.
   function load(p: QuizParams) {
-    setAsked(p);
     return request(() =>
       api.createProblem(p).then((problem) => {
+        setAsked(p);
         history.replaceState(null, '', quizUrl(location.href, problem));
         return { problem, result: null, answer: [] };
       }),
@@ -124,8 +125,11 @@ export function QuizApp() {
                   </div>
                   <div>
                     <dt>成績</dt>
-                    <dd data-testid="quiz-score" aria-label={`${score.answered}問中${score.correct}問正解`}>
-                      {score.correct} / {score.answered}
+                    <dd>
+                      <span aria-hidden="true" data-testid="quiz-score">
+                        {score.correct} / {score.answered}
+                      </span>
+                      <span class="visually-hidden">{`${score.answered}問中${score.correct}問正解`}</span>
                     </dd>
                   </div>
                 </dl>
@@ -159,6 +163,7 @@ export function QuizApp() {
                 name="quiz-level"
                 value={String(asked.level)}
                 names={levels}
+                disabled={busy}
                 onChange={(l) => {
                   if (busy) return;
                   setSettingsOpen(false);
@@ -206,7 +211,9 @@ export function QuizApp() {
                 nextRef={nextRef}
                 onNext={() => {
                   fromNext.current = true;
-                  void load({ kind: problem.kind, level: problem.level, seed: nextSeed(problem.seed) });
+                  void load({ kind: problem.kind, level: problem.level, seed: nextSeed(problem.seed) }).then((ok) => {
+                    if (!ok) fromNext.current = false;
+                  });
                 }}
               />
             )}
