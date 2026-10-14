@@ -196,7 +196,7 @@ export function SeatStatus({ seat, state }: { seat: Seat; state: GameState }) {
 }
 
 interface RiverProps {
-  seat: Seat;
+  seat: Pick<Seat, 'seat' | 'river'>; // a game's seat, or a problem's (ProblemSeat)
   highlight?: PlaybackHighlight | null;
   id?: string;
   label?: string;

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import * as api from '../api';
-import type { Problem, ProblemResult, Tile as TileT } from '../api';
+import type { Problem, ProblemResult, ProblemSeat, Tile as TileT } from '../api';
+import { River } from '../components/GameTable';
+import { Melds } from '../components/Melds';
 import { EngineLoading } from '../components/EngineLoading';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { Hand } from '../components/Hand';
@@ -11,7 +13,7 @@ import { Tile } from '../components/Tile';
 import { useSerialRequest } from '../hooks';
 import { tileName } from '../tiles';
 import { LooksSettings, useSharedLooks } from '../dojo/looks';
-import { KINDS, KIND_NAMES, LEVEL_NAMES, MAX_PICKS, PICKER_ROWS, doraOf, togglePick, nextSeed, parseQuizParams, quizUrl, shantenLabel, type QuizParams } from './quiz';
+import { KINDS, KIND_NAMES, kindKey, seatName, LEVEL_NAMES, MAX_PICKS, PICKER_ROWS, doraOf, togglePick, nextSeed, parseQuizParams, quizUrl, shantenLabel, type QuizParams } from './quiz';
 import '../dojo/dojo.css';
 
 // What the page shows: the problem and, once answered, its result and the
@@ -100,7 +102,15 @@ export function QuizApp() {
   // picker for a many-tile answer, a wait left out said so), and a wrong
   // answer outlined in red.
   const marks: Record<string, { className: string; text: string }> = {};
-  if (result) {
+  if (result && problem?.kind === 'oshihiki' && pos) {
+    // Graded by kind: every tile of a safest kind is correct, a red five as its plain copy.
+    const bestKinds = result.best.map(kindKey);
+    for (const t of [...pos.hand, ...(pos.drawn ? [pos.drawn] : [])]) {
+      const mine = shown!.answer.includes(t);
+      if (bestKinds.includes(kindKey(t))) marks[t] = { className: 'tile-advice', text: mine ? '正解、あなたの答え' : '正解' };
+      else if (mine) marks[t] = { className: 'tile-quiz-wrong', text: 'あなたの答え' };
+    }
+  } else if (result) {
     for (const t of shown!.answer) if (!result.best.includes(t)) marks[t] = { className: 'tile-quiz-wrong', text: 'あなたの答え' };
     for (const t of result.best) marks[t] = { className: 'tile-advice', text: shown!.answer.includes(t) ? '正解、あなたの答え' : many ? '正解、見逃し' : '正解' };
   }
@@ -209,6 +219,7 @@ export function QuizApp() {
             <section class="quiz-question" aria-labelledby="quiz-title">
               <h2 id="quiz-title">{kind.title}</h2>
               <p class="quiz-prompt">{kind.prompt}</p>
+              {pos.seats && <QuizTable seats={pos.seats} />}
               <p class="quiz-hint muted">
                 {many
                   ? result
@@ -346,6 +357,8 @@ function QuizResult({ many, result, answer, busy, nextRef, onNext }: QuizResultP
       <p class={result.correct ? 'advice-review advice-review-best' : 'advice-review'}>{result.text}</p>
       {many ? (
         <MachiTable result={result} answer={answer} />
+      ) : result.ranking[0]?.danger !== undefined ? (
+        <DangerTable result={result} answer={answer} />
       ) : (
         <table class="quiz-ranking">
           <caption class="visually-hidden">切る牌ごとの順位</caption>
@@ -418,6 +431,66 @@ function MachiTable({ result, answer }: { result: ProblemResult; answer: TileT[]
               </th>
               <td>{e.ukeire}枚</td>
               <td>{mine ? '選んだ' : <span class="dojo-aid-warn">見逃し</span>}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * An oshihiki problem's table: the other seats' rivers, 下家 to 上家, each
+ * with its riichi (the declaration tile lies sideways) and its melds.
+ */
+function QuizTable({ seats }: { seats: ProblemSeat[] }) {
+  return (
+    <div class="quiz-table" role="group" aria-label="他家の河">
+      {seats
+        .filter((s) => s.seat !== 0)
+        .map((s) => (
+          <div key={s.seat} class="quiz-seat">
+            <span class="quiz-seat-name">
+              {seatName(s.seat)}
+              {s.riichi && <span class="dojo-aid-warn">リーチ</span>}
+            </span>
+            <River seat={s} label={`${seatName(s.seat)}の捨て牌`} />
+            <Melds melds={s.melds} owner={s.seat} size="xs" />
+          </div>
+        ))}
+    </div>
+  );
+}
+
+/** An oshihiki grading: every kind of the hand, safest first, with why and its danger (summed over the riichi). */
+function DangerTable({ result, answer }: { result: ProblemResult; answer: TileT[] }) {
+  return (
+    <table class="quiz-ranking">
+      <caption class="visually-hidden">切る牌ごとの危険度</caption>
+      <thead>
+        <tr>
+          <th scope="col">順位</th>
+          <th scope="col">打牌</th>
+          <th scope="col">根拠</th>
+          <th scope="col" title="リーチへの放銃の危険度（0 安全〜9、リーチが複数なら合計）">
+            危険度
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {result.ranking.map((e) => {
+          const mine = answer.some((a) => kindKey(a) === kindKey(e.tile));
+          return (
+            <tr key={e.tile} class={[e.rank === 1 ? 'quiz-rank-best' : '', mine ? 'quiz-rank-answer' : ''].join(' ').trim() || undefined}>
+              <td>{e.rank}位</td>
+              <th scope="row" aria-label={`打 ${tileName(e.tile)}${mine ? '（あなたの答え）' : ''}`}>
+                <span class="quiz-rank-tile">
+                  <Tile tile={e.tile} size="xs" />
+                  {mine && <span class="quiz-you">あなた</span>}
+                </span>
+              </th>
+              <td class="quiz-reason">{e.reason}</td>
+              <td>{e.danger}</td>
             </tr>
           );
         })}
