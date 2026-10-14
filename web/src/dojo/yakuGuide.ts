@@ -1,7 +1,8 @@
-// The dojo's yaku guide: what a bought yaku asks for, its han, an example hand and a practice seed.
+// The dojo's yaku guide: what a bought yaku asks for, its han, an example hand and practice seeds.
 // The han and the examples are in yakuGuide.json and the seeds in yakuSeeds.json; internal/session's
 // yakuguide_test.go checks both against the engine (the examples are complete hands that score the
-// yaku, the seeds are the best of 1..range for the yaku's row), so they cannot drift.
+// yaku; on each seed, a line of discards in practice mode wins by tsumo with the yaku, or for the
+// 立直 family reaches a closed tenpai), so they cannot drift.
 import { YAKU_CONDITIONS } from '../components/yakuInfo.ts';
 import { YAKUHAI_KEYS, yakuName } from './catalog.ts';
 import guideData from './yakuGuide.json' with { type: 'json' };
@@ -14,10 +15,12 @@ interface GuideEntry {
 }
 
 interface SeedEntry {
-  seed: number;
-  row: string; // the analysis row (key) the seed's shanten is of
-  shanten: number;
+  goal: PracticeGoal;
+  seeds: number[];
 }
+
+/** What a practice seed surely allows: a tsumo win with the yaku, or (立直 cannot be declared) a closed tenpai. */
+export type PracticeGoal = 'win' | 'tenpai';
 
 const GUIDE = guideData as Record<string, GuideEntry>;
 const SEEDS = (seedData as { seeds: Record<string, SeedEntry> }).seeds;
@@ -43,8 +46,8 @@ export interface YakuGuide {
   hanLabel: string;
   /** The tiles in hand (without the winning tile), the called or concealed kans, and the winning tile. */
   example: { hand: string[]; melds: string[][]; win: string; note?: string };
-  /** The practice seed, and what the starting hand is at in its row; none where practice mode cannot reach the yaku. */
-  practice: { seed: number; row: string; rowName: string; shanten: number } | null;
+  /** The practice seeds and what they allow; none where practice mode cannot reach the yaku. */
+  practice: { goal: PracticeGoal; seeds: readonly number[] } | null;
 }
 
 /** The guide key of an owned yaku key: the dragons and the winds are one item, 役牌. */
@@ -90,11 +93,13 @@ export function guideFor(key: string): YakuGuide | undefined {
     condition: CONDITIONS[k] ?? YAKU_CONDITIONS[k] ?? '',
     hanLabel: hanLabel(g.han, g.openHan),
     example: { hand, melds: (g.example.melds ?? []).map(expandTiles), win, note: g.example.note },
-    practice: s ? { seed: s.seed, row: s.row, rowName: s.row === 'normal' ? '一般形' : yakuName(s.row), shanten: s.shanten } : null,
+    practice: s ? { goal: s.goal, seeds: s.seeds } : null,
   };
 }
 
-/** The practice mode (?seed=&turns=) on a guide's seed, or undefined where there is none. */
-export function practiceHref(g: YakuGuide): string | undefined {
-  return g.practice ? `?seed=${g.practice.seed}&turns=18` : undefined;
+/** The practice mode (?seed=&turns=) on one of a guide's seeds picked at random, or undefined where there is none. */
+export function practiceHref(g: YakuGuide, random: () => number = Math.random): string | undefined {
+  const seeds = g.practice?.seeds;
+  if (!seeds?.length) return undefined;
+  return `?seed=${seeds[Math.min(Math.floor(random() * seeds.length), seeds.length - 1)]}&turns=18`;
 }

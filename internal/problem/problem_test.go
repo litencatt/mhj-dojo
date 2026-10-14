@@ -85,7 +85,7 @@ func TestParse(t *testing.T) {
 		kind  Kind
 		level int
 		seed  int64
-	}{{"machi", 1, 1}, {Nanikiru, 0, 1}, {Nanikiru, 4, 1}, {Nanikiru, 1, -1}, {Nanikiru, 1, MaxSeed + 1}} {
+	}{{"oshihiki", 1, 1}, {Machi, 0, 1}, {Machi, 4, 1}, {Nanikiru, 0, 1}, {Nanikiru, 4, 1}, {Nanikiru, 1, -1}, {Nanikiru, 1, MaxSeed + 1}} {
 		if _, err := Generate(c.kind, c.level, c.seed); !errors.Is(err, ErrInvalid) {
 			t.Errorf("Generate(%s, %d, %d): %v, want ErrInvalid", c.kind, c.level, c.seed, err)
 		}

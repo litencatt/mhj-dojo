@@ -64,6 +64,10 @@ Open `/?mode=dojo` for CPU games in which you learn yaku one at a time (東風�
 - **Cheats** (sold once the 裏道場 is open, and used in its games only; cheats bought before it keep working in the 表道場's games but the 師範戦) — **裏ドラ透視** shows the ura dora during the round; **リーチ者の待ち透視** shows the waits of a CPU player in riichi; **透視** (peek) shows the CPU hands during the round (the advice and danger marks still ignore them); **山読み** shows your next three draws (if nobody calls or kans). **引き直し** (redraw) sends your drawn tile to the end of the live wall and draws the next one: once a round, not on your first go-around, in riichi or on a kan replacement tile, and 20 sen each, settled when the game ends. Your hand size and the draws left stay the same, but every later draw shifts by one tile. **牌寄せ** (summon) swaps your drawn tile for a kind you pick from those still in the live wall: under the same conditions as a redraw, once a round, 50 sen each, settled likewise.
 - **Results** — a win greys out the yaku it didn't count, marked 「未修得」. A round with a redraw or a summon is marked 「イカサマ使用」 (its win with no win bonus), and the final result shows the rank's multiplier, e.g. 「順位 +120（半荘 ×2）」.
 
+## Problems (何切る)
+
+Open `/?mode=quiz` (the header's **問題**) for what-to-discard problems: a hand of 13 tiles and the drawn one, with the dora, the turn and the winds; tap the tile you would discard (on a touch screen, tap it again to answer). The engine grades it: correct or not, the correct tiles raised in the hand, every discard ranked by shanten, ukeire and (at 1-shanten) the expected tenpai wait, and why. The level (1向聴, 2向聴, 上級: same shanten, ukeire only) is chosen in 設定; **次の問題** goes on to the next seed. The URL holds the kind, level and seed (`?mode=quiz&kind=nanikiru&level=1&seed=42`; without a seed the engine picks one and writes it there), so the same URL is the same problem. Defence and points are not considered. See [docs/problems.md](docs/problems.md).
+
 ## Requirements
 
 - Go 1.27+

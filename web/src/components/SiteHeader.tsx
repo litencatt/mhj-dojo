@@ -2,11 +2,12 @@ import type { ComponentChildren } from 'preact';
 import { Help, type HelpMode } from './Help';
 import { VersionTag } from './VersionTag';
 
-// The three modes, linked from every page's header (a dojo game's 道場 leads back to the hub).
+// The modes, linked from every page's header (a dojo game's 道場 leads back to the hub).
 const MODE_LINKS: readonly (readonly [HelpMode, string, string])[] = [
   ['practice', '?', '練習'],
   ['game', '?mode=game', 'CPU対戦'],
   ['dojo', '?mode=dojo', '道場'],
+  ['quiz', '?mode=quiz', '問題'],
 ];
 
 interface SiteHeaderProps {
@@ -17,7 +18,7 @@ interface SiteHeaderProps {
   children?: ComponentChildren; // under the title row: the session's or game's status
 }
 
-/** Every mode's header: the title and the three modes (this one marked), then the version, 設定 and help. */
+/** Every mode's header: the title and the modes (this one marked), then the version, 設定 and help. */
 export function SiteHeader({ mode, back, onSettings, onShowGlossary, children }: SiteHeaderProps) {
   return (
     <header class="app-header">

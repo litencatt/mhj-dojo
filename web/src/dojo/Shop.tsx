@@ -29,6 +29,13 @@ const TABS: { key: string; label: string; kinds: ItemKind[] }[] = [
 // The items chosen in 設定 once owned.
 const LOOK_KINDS: ItemKind[] = ['theme', 'back', 'cloth', 'stick', 'effect'];
 
+// The looks tab lists its items kind by kind in LOOK_KINDS' order (牌テーマ, 裏柄, 卓布, リーチ棒,
+// 和了演出); the other tabs have one order for all (0).
+function kindOrder(it: ShopItem): number {
+  const i = LOOK_KINDS.indexOf(it.kind);
+  return i < 0 ? 0 : i;
+}
+
 interface ShopProps {
   progress: DojoProgress;
   // Applies a change to the progress as it is stored now (another tab may have paid a game since).
@@ -116,9 +123,10 @@ export function Shop({ progress: p, onChange, onLearned }: ShopProps) {
               {p.legacyCheats.length > 0 && '裏道場ができる前から持っているイカサマは、師範戦を除く表道場の対局でも使えます。'}
             </p>
           )}
-          {/* In unlock order; a locked item says its rank (a cheat, the 師範戦) where its button would be. */}
+          {/* In unlock order (the looks kind by kind, as 設定 groups them); a locked item says its rank
+              (a cheat, the 師範戦) where its button would be. */}
           <ul class="shop-list">
-            {[...shown].sort((a, b) => a.level - b.level).map((it) => {
+            {[...shown].sort((a, b) => kindOrder(a) - kindOrder(b) || a.level - b.level).map((it) => {
               const have = owns(p, it.id);
               const locked = lockedLabel(p, it);
               return (

@@ -17,7 +17,7 @@
 - 設定: `web/src/components/SettingsDialog.tsx`。各モードの設定をここに集め、ヘッダーの 設定 から開く。開いたら最初の入力(ラジオならその組の選択中のもの)にフォーカス。
 - 見た目の選択: `web/src/dojo/looks.tsx` の `LooksSettings`(牌テーマ・裏柄・卓布・リーチ棒・和了演出の `fieldset.dojo-settings-group` と見本 `.dojo-settings-sample`)。道場のハブ・道場の対局・練習・CPU対戦の 設定 で同じものを、モードの選択肢(新しく始めるフォームなど)の後に置く。選べるのは解放済みだけで、道場の進捗がないときは出さない。ハブ以外(`ownedOnly`)では、1つも持っていない種類の組を出さず、何も持っていなければ見た目の選択ごと出さない。保存に失敗したら `.save-failed` で知らせる。当てるのは `useDojoLooks`(ハブ)・`useSharedLooks`(ほかのモード、別タブの変更も `storage` イベントで追う)で、`<html>` の `data-*` に付ける。
 - ヘルプ: `Help.tsx`。スマホでは画面ほぼ全幅、閉じるボタンは大きくする。
-- 役の解説: `web/src/dojo/GuideDialog.tsx`(`.yaku-guide`)。役を買った直後(修得しました、`.dojo-aid-ok`)と、習得役のチップ(`.dojo-yaku-guide`、中身は枠なしのボタン)から開く。成立条件・翻・例の手(`Tile`、右端が和了牌)と、主ボタン `.dojo-start` の「この役を練習する」(練習モードへのリンク)、副ボタンの閉じる。
+- 役の解説: `web/src/dojo/GuideDialog.tsx`(`.yaku-guide`)。役を買った直後(修得しました、`.dojo-aid-ok`)と、習得役のチップ(`.dojo-yaku-guide`、中身は枠なしのボタン)から開く。成立条件・翻・例の手(`Tile`、右端が和了牌)と、主ボタン `.dojo-start` の「この役を練習する」(練習モードへのリンク。役ごとに、その役で和了れる(立直の仲間は門前で聴牌できる)シードを `web/src/dojo/yakuSeeds.json` に複数持ち、開くたびにひとつを選ぶ。シードの値は解説に出さず、`.yaku-guide-seed` には何を練習するかだけを書く。練習モードで作れない役は、リンクの代わりにその旨を書く)、副ボタンの閉じる。
 
 ## 選択肢(ラジオ・チェック)
 `fieldset.option-group`(練習・CPU対戦)と `fieldset.dojo-settings-group`(道場。練習・CPU対戦の 設定 に出る見た目の選択 `LooksSettings` も)は同じ見た目の枠付き。`legend` が項目名、中の `label` は `--fg` のまま(muted にしない)。設定ダイアログでは1項目が1行。入力欄・select は `padding: 4px 6px`、`--border`、`--radius-sm`、`--bg` 地。
@@ -38,6 +38,9 @@
 
 ## 牌
 `.tile`(`tile-md` 36x48、`tile-sm` 26x35、`tile-xs` 18x24)。面は `TileFace.tsx` の SVG。選択可能な牌は `.tile-interactive`、選択中は `.tile-picked`、裏は `.tile-back`。色は `--tile-*` のみで、テーマ・裏柄は `<html>` の `data-tile-theme` / `data-tile-back` で切り替える(道場で選んだものを全モードで当てる)。スマホの手牌は 14 枚が1行に収まるよう `--hand-tile` で幅を決める。スマホの役別向聴・複合役の有効牌は折り返さず1行(1枚 最大16px・最小11px で行に収め、それでも入らなければ横スクロール)。
+
+## 問題(何切る)
+`web/src/quiz/QuizApp.tsx`(`?mode=quiz`、スタイルは `styles/quiz.css`)。外枠は `.app.app-quiz` で、どの幅でも1列(`.area-main` の中に `.area-header` と `.area-hand`)。ヘッダーの状態の行は練習と同じ `.header-status` の `.game-status`(難易度・巡目・場風・自風・成績)と `.dora-box`(固定する手牌の欄がないので、スマホでもヘッダーに出す)。その下に問いのパネル(`section.quiz-question`、見出し「何切る」と問い `.quiz-prompt`)、手牌の欄は練習と同じ `Hand`(タップで選び2回目で答える)。採点のパネル `section.quiz-result`: 見出しに正解・不正解のバッジ(`.dojo-aid-ok` / `.dojo-aid-warn`)と正解の牌、解説はアドバイスの評価と同じ `.advice-review`(正解なら `.advice-review-best`)、順位の表 `.quiz-ranking`(列の幅だけの表、牌は xs、1位の行は `--row-best-bg`、自分の答えの行 `.quiz-rank-answer` は太字と「あなた」)、主ボタン `.dojo-start` の「次の問題」(`.quiz-actions`)。手牌では正解の牌を `.tile-advice`(持ち上げて `--accent` の枠)、不正解の答えを `.tile-quiz-wrong`(`--danger` の枠、持ち上げない)で示す。種類と難易度は「設定」の `RadioGroup`(選ぶとすぐ同じシードのその問題。読み込み中は選べない)。待ち当て(`choose: "many"`)では手牌は押せず、その下に牌の一覧 `section.quiz-picker`(34種を4行の `.quiz-picker-row`、行の9分の1・最大 40px の幅の牌。選んだ牌は `aria-pressed` と `.tile-quiz-picked`(持ち上げて `--fg` の枠))と主ボタン「答える」。採点では一覧の上に `.tile-advice` / `.tile-quiz-wrong` を付け、表は待ちごとの残り枚数と「選んだ／見逃し」(`.dojo-aid-warn`)。
 
 ## アクションバー
 `.action-bar`(対局の操作ボタンの行)。鳴きの問い(ロン・ポン・カン・チー・スキップ)は `.action-bar-call` で右寄せにし、打牌で使う右端(ツモ牌)の近くに置く。スマホ(`width <= 760px`)ではボタンをヘッダーの 設定 と同じ高さ 32px(`min-height: 32px; padding: 4px 12px; font-size: 0.85rem`、主ボタン `.action-primary` も同じ、牌入りの `.action-call` は上下 3px)にして役別向聴の欄を広く取る。行そのものも `min-height: 32px` で、ボタンのない行(再生中の `.action-bar-playback`、ヒントだけの道場の行)でも高さが変わらない。

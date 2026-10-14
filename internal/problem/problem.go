@@ -33,6 +33,7 @@ type Kind string
 // Kinds of problems.
 const (
 	Nanikiru Kind = "nanikiru" // 何切る: discard one of 14 tiles
+	Machi    Kind = "machi"    // 待ち当て: name every wait of a 13-tile tenpai hand
 )
 
 // maxTries bounds the candidate seeds Generate tries after the first.
@@ -54,7 +55,7 @@ type Problem struct {
 // Position is what the page needs to draw the problem.
 type Position struct {
 	Hand           []string       `json:"hand"`  // 13 tiles, sorted
-	Drawn          *string        `json:"drawn"` // the tile just drawn
+	Drawn          *string        `json:"drawn"` // the tile just drawn; nil for machi
 	DoraIndicators []string       `json:"dora_indicators"`
 	Junme          int            `json:"junme"` // the discard being chosen: turn + 1
 	RoundWind      string         `json:"round_wind"`
@@ -67,10 +68,11 @@ type Position struct {
 type Result struct {
 	ID      string   `json:"id"`
 	Correct bool     `json:"correct"`
-	Answer  []Eval   `json:"answer"`  // each tile of the answer, in order
-	Best    []string `json:"best"`    // the correct tiles
-	Ranking []Eval   `json:"ranking"` // every choice, best first
-	Text    string   `json:"text"`    // the explanation, in Japanese
+	Answer  []Eval   `json:"answer"`           // each tile of the answer, in order
+	Best    []string `json:"best"`             // the correct tiles
+	Ranking []Eval   `json:"ranking"`          // every choice, best first (machi: the waits)
+	Missed  []string `json:"missed,omitempty"` // machi: the waits the answer left out
+	Text    string   `json:"text"`             // the explanation, in Japanese
 }
 
 // Eval is one tile's place in the ranking.
@@ -84,12 +86,14 @@ type Eval struct {
 
 // answer is what grading needs, per kind.
 type answer struct {
-	tiles  []tile.Tile    // the tiles an answer may name
+	tiles  []tile.Tile    // nanikiru: the tiles an answer may name
 	advice *advice.Advice // nanikiru: the ranking of the discards
+	hand   tile.Counts    // machi: the 13 tiles
+	waits  []tile.Kind    // machi: the kinds that complete the hand, in kind order
 }
 
 // levels is the number of levels of each kind.
-var levels = map[Kind]int{Nanikiru: len(nanikiruLevels)}
+var levels = map[Kind]int{Nanikiru: len(nanikiruLevels), Machi: machiLevels}
 
 // analyzer is shared by every problem, so that its memo stays warm across
 // requests; mu guards it (an analyzer is not safe for concurrent use).
@@ -115,7 +119,12 @@ func Generate(kind Kind, level int, seed int64) (*Problem, error) {
 		if i > 0 {
 			src = wall.RoundSeed(seed, i)
 		}
-		p := nanikiru(level, src)
+		var p *Problem
+		if kind == Machi {
+			p = machi(level, src)
+		} else {
+			p = nanikiru(level, src)
+		}
 		if p == nil {
 			continue
 		}
@@ -152,8 +161,12 @@ func Parse(s string) (Kind, int, int64, error) {
 	return kind, level, seed, nil
 }
 
-// Grade grades an answer: the tiles chosen, exact tiles of the position.
+// Grade grades an answer: for nanikiru the tile chosen, an exact tile of
+// the position; for machi the kinds named (a red five names the 5).
 func (p *Problem) Grade(ans []tile.Tile) (*Result, error) {
+	if p.Kind == Machi {
+		return p.gradeMachi(ans)
+	}
 	for _, t := range ans {
 		if !slices.Contains(p.answer.tiles, t) {
 			return nil, fmt.Errorf("%w: tile %s is not in the hand", ErrInvalid, t)
@@ -165,7 +178,7 @@ func (p *Problem) Grade(ans []tile.Tile) (*Result, error) {
 func check(kind Kind, level int) error {
 	n, ok := levels[kind]
 	if !ok {
-		return fmt.Errorf("%w: kind must be nanikiru", ErrInvalid)
+		return fmt.Errorf("%w: kind must be nanikiru or machi", ErrInvalid)
 	}
 	if level < 1 || level > n {
 		return fmt.Errorf("%w: level must be between 1 and %d", ErrInvalid, n)

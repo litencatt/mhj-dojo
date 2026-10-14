@@ -19,7 +19,7 @@ cd web && npm run typecheck
 make build && make e2e
 ```
 
-見た目は、`bin/mhj-dojo --port 8811 --open=false` で起動し、練習(`/?seed=1`)・CPU対戦(`/?mode=game&seed=1`)・道場(`/?mode=dojo`、対局開始後も)・更新情報(`/info/`)を、1280x900 と 390x844、ライトとダーク(`emulateMedia({colorScheme:'dark'})`)で撮って見比べる。設定ダイアログを開いた状態も撮る。
+見た目は、`bin/mhj-dojo --port 8811 --open=false` で起動し、練習(`/?seed=1`)・CPU対戦(`/?mode=game&seed=1`)・道場(`/?mode=dojo`、対局開始後も)・問題(`/?mode=quiz&seed=1`、答えた後も)・更新情報(`/info/`)を、1280x900 と 390x844、ライトとダーク(`emulateMedia({colorScheme:'dark'})`)で撮って見比べる。設定ダイアログを開いた状態も撮る。
 
 ## CSS の置き場所と順番
 
