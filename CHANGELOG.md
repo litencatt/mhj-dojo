@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1014.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.1...v2026.1014.2) - 2026-10-14
+
+### 新機能
+- 道場の秘伝: 何切る・待ち当て・押し引きを鍛錬の課題にする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/385
+
 ## [v2026.1014.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.0...v2026.1014.1) - 2026-10-14
 
 ### 新機能
