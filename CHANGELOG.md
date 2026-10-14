@@ -2,7 +2,7 @@
 
 ## [v2026.1014.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.0...v2026.1014.1) - 2026-10-14
 
-### その他
+### 新機能
 - 練習問題: 押し引きの出題と採点 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/380
 - 問題の画面: 押し引きを答えられるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/381
 
