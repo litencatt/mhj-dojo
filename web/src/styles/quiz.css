@@ -96,6 +96,36 @@
   gap: 8px;
 }
 
+/* A many-tile answer (machi): every tile kind, a row per suit on one grid
+   (the honors' row left-aligned under the suits), the tiles as wide as a
+   ninth of the row up to 40px, so a phone's taps land; then 答える. */
+.quiz-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.quiz-picker-row {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 40px));
+  gap: 4px;
+}
+.quiz-picker .tile {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
+/* Picked, not yet answered: raised and outlined like the correct tiles will be, in the text colour (--fg). */
+.tile.tile-quiz-picked {
+  transform: translateY(-4px);
+  border-color: var(--fg);
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+.quiz-picker .quiz-actions {
+  align-items: center;
+  margin-top: 2px;
+}
+
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   .quiz-actions button {

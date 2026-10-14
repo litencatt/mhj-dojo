@@ -120,7 +120,8 @@ test('a level chosen in 設定 starts its problem at once, on the same seed', as
   const levels = dialog.getByRole('group', { name: '難易度' });
   await expect(levels.getByRole('radio')).toHaveCount(3);
   await expect(levels.getByRole('radio', { name: '1向聴' })).toBeChecked();
-  await expect(levels.getByRole('radio', { name: '1向聴' })).toBeFocused();
+  // The dialog opens on the first group's choice: the kind.
+  await expect(dialog.getByRole('group', { name: '種類' }).getByRole('radio', { name: '何切る' })).toBeFocused();
   await levels.getByRole('radio', { name: '2向聴' }).click(); // the dialog closes and the problem loads; the radio follows once it has come
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/[?&]level=2(&|$)/);
@@ -143,7 +144,7 @@ test('the help explains the problems', async ({ page }) => {
   await loaded(page);
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
-  await expect(dialog.getByRole('heading', { name: '問題（何切る）', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '問題（何切る・待ち当て）', exact: true })).toBeVisible();
   for (const h of ['練習モード', 'CPU対戦', '道場']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
 });
 
@@ -189,5 +190,99 @@ for (const [width, height] of [[320, 640], [PHONE.width, PHONE.height]]) {
     expect((await next.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     const table = (await result(page).locator('.quiz-ranking').boundingBox())!;
     expect(table.x + table.width).toBeLessThanOrEqual(width);
+  });
+}
+
+// 待ち当て (machi, #242): the waits picked under the hand, sent by 答える.
+// Level 3 is a 清一色 hand: 東 is never among its waits.
+const MACHI_URL = './?mode=quiz&kind=machi&level=3&seed=1';
+const picker = (page: Page) => page.locator('.quiz-picker');
+const pick = (page: Page, label: string) => picker(page).locator(`button.tile[aria-label="${label}"]`);
+
+test('待ち当て: a wait left out is 不正解 with the waits shown; every wait picked is 正解', async ({ page }) => {
+  await page.goto(MACHI_URL);
+  await loaded(page);
+  await expect(page).toHaveTitle('mhj-dojo - 待ち当て');
+  await expect(page.getByRole('heading', { name: '待ち当て', level: 2 })).toBeVisible();
+  await expect(page.getByText('待ちの牌をすべて選ぶ')).toBeVisible();
+  // The hand's shape only: 13 tiles, no drawn tile, no turn, winds or dora; the hand takes no answer.
+  await expect(handPanel(page).locator('.hand-tiles .tile')).toHaveCount(13);
+  await expect(handPanel(page).locator('.hand-drawn .tile')).toHaveCount(0);
+  await expect(page.locator('.header-status .game-status')).toContainText('清一色');
+  await expect(page.locator('.header-status .game-status')).not.toContainText('巡目');
+  await expect(page.locator('.header-status .dora-box')).toHaveCount(0);
+  await expect(handTiles(page).first()).toHaveAttribute('aria-disabled', 'true');
+  // The picker: every tile kind; 答える waits for a pick, and a second press takes it out.
+  await expect(picker(page).locator('button.tile')).toHaveCount(34);
+  const answer = page.getByRole('button', { name: '答える' });
+  await expect(answer).toBeDisabled();
+  await pick(page, '東').click();
+  await expect(pick(page, '東')).toHaveAttribute('aria-pressed', 'true');
+  await expect(picker(page)).toContainText('1種を選択');
+  await pick(page, '南').click();
+  await pick(page, '南').click();
+  await expect(pick(page, '南')).toHaveAttribute('aria-pressed', 'false');
+  await answer.click();
+
+  await expect(page.getByRole('heading', { name: '不正解' })).toBeVisible();
+  await expect(page.getByTestId('quiz-score')).toHaveText('0 / 1');
+  const best = await bestLabels(page);
+  expect(best.length).toBeGreaterThanOrEqual(3);
+  // 東 outlined red; every wait raised and said to be left out; the picker takes no more.
+  await expect(picker(page).locator('button.tile[aria-label="東、あなたの答え"]')).toHaveClass(/tile-quiz-wrong/);
+  for (const b of best) await expect(pick(page, `${b}、正解、見逃し`)).toHaveClass(/tile-advice/);
+  await expect(page.getByRole('button', { name: '答える' })).toHaveCount(0);
+  await expect(picker(page).locator('button.tile').first()).toHaveAttribute('aria-disabled', 'true');
+  const rows = result(page).locator('.quiz-ranking tbody tr');
+  await expect(rows).toHaveCount(best.length);
+  await expect(rows.first()).toContainText('見逃し');
+  await expect(result(page).locator('.advice-review')).toContainText('待ちは');
+  await expect(page.getByRole('button', { name: '次の問題' })).toBeFocused();
+
+  // The same problem again, every wait picked: 正解.
+  await page.reload();
+  await loaded(page);
+  for (const b of best) await pick(page, b).click();
+  await page.getByRole('button', { name: '答える' }).click();
+  await expect(page.getByRole('heading', { name: '正解', exact: true })).toBeVisible();
+  for (const b of best) await expect(pick(page, `${b}、正解、あなたの答え`)).toHaveClass(/tile-advice/);
+  await expect(result(page).locator('.quiz-rank-answer')).toHaveCount(best.length);
+  await expect(result(page).locator('.quiz-ranking')).not.toContainText('見逃し');
+  // 次の問題: a fresh picker, its first tile focused.
+  await page.getByRole('button', { name: '次の問題' }).click();
+  await expect(page).toHaveURL(/[?&]seed=2(&|$)/);
+  await expect(picker(page).locator('button.tile').first()).toBeFocused();
+  await expect(picker(page).locator('button.tile[aria-pressed="true"]')).toHaveCount(0);
+});
+
+test('the kind chosen in 設定 starts its problem at once, at its first level, on the same seed', async ({ page }) => {
+  await page.goto(QUIZ_URL);
+  await loaded(page);
+  await page.getByRole('button', { name: '設定' }).click();
+  const dialog = page.getByRole('dialog', { name: '設定' });
+  await dialog.getByRole('group', { name: '種類' }).getByRole('radio', { name: '待ち当て' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/[?&]kind=machi(&|$)/);
+  await expect(page).toHaveURL(/[?&]level=1(&|$)/);
+  await expect(page).toHaveURL(/[?&]seed=1(&|$)/);
+  await expect(page.getByRole('heading', { name: '待ち当て', level: 2 })).toBeVisible();
+  await page.getByRole('button', { name: '設定' }).click();
+  await expect(dialog.getByRole('group', { name: '難易度' }).getByRole('radio', { name: '基本形' })).toBeChecked();
+});
+
+for (const [width, height] of [[320, 640], [PHONE.width, PHONE.height]]) {
+  test(`待ち当て: a ${width}px-wide phone fits the picker and its grading without a sideways scroll`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto(MACHI_URL);
+    await loaded(page);
+    // A suit's nine on one row.
+    const row = picker(page).locator('.quiz-picker-row').first().locator('.tile');
+    const y0 = (await row.first().boundingBox())!.y;
+    expect(Math.abs((await row.last().boundingBox())!.y - y0)).toBeLessThan(2);
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+    await pick(page, '東').click();
+    await page.getByRole('button', { name: '答える' }).click();
+    await expect(result(page)).toBeVisible();
+    expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
   });
 }

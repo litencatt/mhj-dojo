@@ -4,8 +4,8 @@
 
 import type { ProblemKind, Tile } from '../apiTypes';
 
-/** The kinds the page asks so far: machi (#242) needs a many-tile answer, oshihiki (#241) the rivers. */
-export type QuizKind = Extract<ProblemKind, 'nanikiru'>;
+/** The kinds the page asks so far: oshihiki (#241) still needs the rivers and the riichi shown. */
+export type QuizKind = Extract<ProblemKind, 'nanikiru' | 'machi'>;
 
 /** The problem a URL asks for: no seed lets the engine pick one (written back into the URL once known). */
 export interface QuizParams {
@@ -14,16 +14,38 @@ export interface QuizParams {
   seed: number | undefined;
 }
 
-// Each kind's page: its heading and its question. Later kinds (machi #242,
-// oshihiki #241) add theirs here.
+// Each kind's page: its heading and its question. oshihiki (#241) adds its own here.
 export const KINDS: Record<QuizKind, { title: string; prompt: string }> = {
   nanikiru: { title: '何切る', prompt: '何を切る？' },
+  machi: { title: '待ち当て', prompt: '待ちの牌をすべて選ぶ' },
 };
 
 // The levels a kind offers, as the 設定 names them (docs/problems.md).
 export const LEVEL_NAMES: Record<QuizKind, Record<string, string>> = {
   nanikiru: { '1': '1向聴', '2': '2向聴', '3': '上級' },
+  machi: { '1': '基本形', '2': '複合形', '3': '清一色' },
 };
+
+/** The kinds as the 設定 names them. */
+export const KIND_NAMES: Record<QuizKind, string> = { nanikiru: KINDS.nanikiru.title, machi: KINDS.machi.title };
+
+/** The tile kinds a many-tile answer picks from, a row per suit: 萬子, 筒子, 索子, then the honors. */
+export const PICKER_ROWS: readonly (readonly Tile[])[] = [
+  ...(['m', 'p', 's'] as const).map((suit) => Array.from({ length: 9 }, (_, i) => `${i + 1}${suit}`)),
+  Array.from({ length: 7 }, (_, i) => `${i + 1}z`),
+];
+
+// The most kinds an answer holds: the engine asks no wider wait (九面待ち, docs/problems.md).
+export const MAX_PICKS = 9;
+
+const PICK_ORDER = PICKER_ROWS.flat();
+
+/** picked with t added or, if there, taken out, in the picker's order; past MAX_PICKS nothing is added. */
+export function togglePick(picked: readonly Tile[], t: Tile): Tile[] {
+  if (picked.includes(t)) return picked.filter((p) => p !== t);
+  if (picked.length >= MAX_PICKS) return [...picked];
+  return [...picked, t].sort((a, b) => PICK_ORDER.indexOf(a) - PICK_ORDER.indexOf(b));
+}
 
 const isKind = (s: string | null): s is QuizKind => s !== null && Object.hasOwn(KINDS, s);
 
