@@ -211,7 +211,7 @@ export function QuizApp() {
                 nextRef={nextRef}
                 onNext={() => {
                   fromNext.current = true;
-                  void load({ kind: problem.kind, level: problem.level, seed: nextSeed(problem.seed) }).then((ok) => {
+                  void load({ kind: asked.kind, level: problem.level, seed: nextSeed(problem.seed) }).then((ok) => {
                     if (!ok) fromNext.current = false;
                   });
                 }}

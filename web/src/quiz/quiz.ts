@@ -4,25 +4,28 @@
 
 import type { ProblemKind, Tile } from '../apiTypes';
 
+/** The kinds the page asks so far: machi (#242) needs a many-tile answer, oshihiki (#241) the rivers. */
+export type QuizKind = Extract<ProblemKind, 'nanikiru'>;
+
 /** The problem a URL asks for: no seed lets the engine pick one (written back into the URL once known). */
 export interface QuizParams {
-  kind: ProblemKind;
+  kind: QuizKind;
   level: number;
   seed: number | undefined;
 }
 
 // Each kind's page: its heading and its question. Later kinds (machi #242,
 // oshihiki #241) add theirs here.
-export const KINDS: Record<ProblemKind, { title: string; prompt: string }> = {
+export const KINDS: Record<QuizKind, { title: string; prompt: string }> = {
   nanikiru: { title: '何切る', prompt: '何を切る？' },
 };
 
 // The levels a kind offers, as the 設定 names them (docs/problems.md).
-export const LEVEL_NAMES: Record<ProblemKind, Record<string, string>> = {
+export const LEVEL_NAMES: Record<QuizKind, Record<string, string>> = {
   nanikiru: { '1': '1向聴', '2': '2向聴', '3': '上級' },
 };
 
-const isKind = (s: string | null): s is ProblemKind => s !== null && Object.hasOwn(KINDS, s);
+const isKind = (s: string | null): s is QuizKind => s !== null && Object.hasOwn(KINDS, s);
 
 /**
  * The problem asked for by a URL's query: an unknown kind or level falls
@@ -33,7 +36,7 @@ const isKind = (s: string | null): s is ProblemKind => s !== null && Object.hasO
 export function parseQuizParams(search: string): QuizParams {
   const q = new URLSearchParams(search);
   const kindParam = q.get('kind');
-  const kind: ProblemKind = isKind(kindParam) ? kindParam : 'nanikiru';
+  const kind: QuizKind = isKind(kindParam) ? kindParam : 'nanikiru';
   const levelParam = q.get('level') ?? '';
   const level = Object.hasOwn(LEVEL_NAMES[kind], levelParam) ? Number(levelParam) : 1;
   const s = q.get('seed') ?? '';
