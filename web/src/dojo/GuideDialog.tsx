@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { useBackdropClose } from '../components/backdrop';
 import { Tile } from '../components/Tile';
 import { useMediaQuery } from '../hooks';
@@ -13,10 +13,6 @@ interface GuideDialogProps {
   /** Just bought: 修得しました above the guide. */
   learned: boolean;
   onClose: () => void;
-}
-
-function shantenText(s: number): string {
-  return s === 0 ? '聴牌' : `${s}向聴`;
 }
 
 /** A yaku's guide in a modal dialog: its conditions, han, an example hand and a way to practise it. */
@@ -36,7 +32,8 @@ export function GuideDialog({ yakuKey, inLesson = false, learned, onClose }: Gui
     if (guide && d && !d.open) d.showModal();
   }, [guide?.key]);
 
-  const href = guide && !inLesson && practiceHref(guide);
+  // One of the yaku's seeds, picked anew each time the guide opens.
+  const href = useMemo(() => guide && !inLesson && practiceHref(guide), [guide?.key, inLesson]);
   return (
     <dialog ref={ref} class="yaku-guide" aria-labelledby="yaku-guide-heading" onClose={onClose} {...backdrop}>
       {guide && (
@@ -67,11 +64,11 @@ export function GuideDialog({ yakuKey, inLesson = false, learned, onClose }: Gui
             ))}
           </div>
           <p class="dojo-muted yaku-guide-note">離して置いた最後の牌が和了牌。{guide.example.note}</p>
-          {!inLesson && guide.practice && (
+          {!inLesson && guide.practice && href && (
             <p class="dojo-muted yaku-guide-seed">
-              {guide.practice.row === 'normal'
-                ? `練習モードでは立直の宣言はできないので、門前で聴牌するまでを練習します（配牌は${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed}）。`
-                : `配牌が${guide.practice.rowName}${shantenText(guide.practice.shanten)}のシード ${guide.practice.seed} で練習できます。`}
+              {guide.practice.goal === 'tenpai'
+                ? '練習モードでは立直を宣言できないので、門前で聴牌するまでを練習します。'
+                : `練習モードで、配牌から${guide.name}で和了りまで行ける筋のある山を用意します（どう打つかはあなた次第）。`}
             </p>
           )}
           {!inLesson && !guide.practice && <p class="dojo-muted yaku-guide-seed">この役は、捨てるだけの練習モードでは練習できません。</p>}
