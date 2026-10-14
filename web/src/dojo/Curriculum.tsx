@@ -1,4 +1,3 @@
-import { Fragment } from 'preact';
 import { Tile } from '../components/Tile';
 import { LESSONS, findLesson, lessonActive, lessonDealSeed, lessonHref, lessonStage, singleStage, type Lesson, type LessonStage } from './lessons';
 import { curriculumDone, masterMatchOpen } from './masterMatch';
@@ -6,14 +5,18 @@ import { progressSaved, saveProgress, type DojoProgress } from './progress';
 import { Furigana } from './Furigana';
 import { expandTiles, guideFor } from './yakuGuide';
 
-// The curriculum's stages (#316), 0 to 5, shown under three tiers: 初伝, 中伝 and 奥伝. The word 段
-// is the 級位's (初段, 二段…), so a stage is shown by its name only, never as 段N.
-const STAGE_NAMES = ['和了の形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守り', '手役'] as const;
+// The curriculum's stages (#316), 0 to 6, shown under four tiers: 初伝, 中伝 and 奥伝, then,
+// after the 師範戦 (皆伝), 秘伝. The word 段 is the 級位's (初段, 二段…), so a stage is shown by its
+// name only, never as 段N.
+const STAGE_NAMES = ['和了の形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守り', '手役', '局面問題'] as const;
 const TIERS: readonly { name: string; stages: readonly number[] }[] = [
   { name: '初伝', stages: [0, 1] },
   { name: '中伝', stages: [2, 3, 4] },
   { name: '奥伝', stages: [5] },
 ];
+const HIDEN = { name: '秘伝', stages: [6] };
+
+const FORM_NAMES: Record<Lesson['form'], string> = { practice: '練習モード', game: '対局', quiz: '問題' };
 
 const STATE_NAMES: Record<LessonStage, string> = {
   locked: 'ロック',
@@ -42,8 +45,9 @@ interface CurriculumProps {
  * The hub's 鍛錬 panel: the lessons stage by stage (the stage of the next
  * lesson open, the others folded), each with its form, its state, its goal,
  * a way to start it and, folded, its text and example hand; the next lesson
- * marked. Then the
- * 師範戦 (MasterMatchRow), and 秘伝 (the position problems) announced at the end.
+ * marked. Then the 師範戦 (MasterMatchRow), then 秘伝 (the practice
+ * problems, which rest on lessons before it, not on the 師範戦), and the
+ * score lessons announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const next = nextLesson(progress);
@@ -67,42 +71,9 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           {passed} / {LESSONS.length}
         </small>
       </div>
-      {TIERS.map((tier) => {
-        const tierLessons = LESSONS.filter((l) => tier.stages.includes(l.stage));
-        const tierDone = tierLessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-        return (
-          <Fragment key={tier.name}>
-            <h3 class="dojo-lesson-tier">
-              {tier.name}
-              <span class="dojo-muted">
-                {' '}
-                {tierDone} / {tierLessons.length}
-              </span>
-            </h3>
-            {tier.stages.map((stage) => {
-              const lessons = LESSONS.filter((l) => l.stage === stage);
-              const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-              // Every stage folds alike, one of a single lesson too: only the next lesson's is open.
-              return (
-                <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
-                  <summary>
-                    {STAGE_NAMES[stage]}
-                    <span class="dojo-muted">
-                      {' '}
-                      {done} / {lessons.length}
-                    </span>
-                  </summary>
-                  <ul class="shop-list">
-                    {lessons.map((l) => (
-                      <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
-                    ))}
-                  </ul>
-                </details>
-              );
-            })}
-          </Fragment>
-        );
-      })}
+      {TIERS.map((tier) => (
+        <Tier key={tier.name} tier={tier} progress={progress} next={next} seed={seed} onGuide={onGuide} />
+      ))}
       <h3 class="dojo-lesson-tier">皆伝</h3>
       <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
         <summary>
@@ -113,12 +84,59 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           <MasterMatchRow progress={progress} />
         </ul>
       </details>
+      <Tier tier={HIDEN} progress={progress} next={next} seed={seed} onGuide={onGuide} />
       <ul class="dojo-lesson-later">
         <li>
-          秘伝（何切る・押し引き・待ち当て・点数）<span class="dojo-muted">準備中</span>
+          秘伝の点数計算<span class="dojo-muted">準備中</span>
         </li>
       </ul>
     </section>
+  );
+}
+
+interface TierProps {
+  tier: { name: string; stages: readonly number[] };
+  progress: DojoProgress;
+  next: Lesson | undefined;
+  seed?: number;
+  onGuide: (key: string) => void;
+}
+
+/** A tier's heading with its count learned, then its stages, each folded unless the next lesson is in it. */
+function Tier({ tier, progress, next, seed, onGuide }: TierProps) {
+  const tierLessons = LESSONS.filter((l) => tier.stages.includes(l.stage));
+  const tierDone = tierLessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
+  return (
+    <>
+      <h3 class="dojo-lesson-tier">
+        {tier.name}
+        <span class="dojo-muted">
+          {' '}
+          {tierDone} / {tierLessons.length}
+        </span>
+      </h3>
+      {tier.stages.map((stage) => {
+        const lessons = LESSONS.filter((l) => l.stage === stage);
+        const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
+        // Every stage folds alike, one of a single lesson too: only the next lesson's is open.
+        return (
+          <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
+            <summary>
+              {STAGE_NAMES[stage]}
+              <span class="dojo-muted">
+                {' '}
+                {done} / {lessons.length}
+              </span>
+            </summary>
+            <ul class="shop-list">
+              {lessons.map((l) => (
+                <LessonRow key={l.id} lesson={l} progress={progress} next={l.id === next?.id} seed={seed} onGuide={onGuide} />
+              ))}
+            </ul>
+          </details>
+        );
+      })}
+    </>
   );
 }
 
@@ -147,7 +165,7 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
     <li class={`shop-item dojo-lesson${next ? ' dojo-lesson-next' : ''}`} data-lesson={lesson.id} data-state={state} aria-current={next ? 'step' : undefined}>
       <span class="shop-name">
         {lesson.title}
-        <span class="dojo-lesson-form">{lesson.form === 'practice' ? '練習モード' : '対局'}</span>
+        <span class="dojo-lesson-form">{FORM_NAMES[lesson.form]}</span>
       </span>
       <span class={state === 'done' ? 'shop-owned' : state === 'locked' ? 'shop-locked' : 'shop-price'}>
         {stateName(lesson, state)}

@@ -1,11 +1,12 @@
-// The dojo's curriculum, 鍛錬 (#316): lessons in stages 0 to 5 (shown as 初伝: 0-1, 中伝: 2-4,
-// 奥伝: 5; 秘伝, a stage 6, is to come), each teaching one
+// The dojo's curriculum, 鍛錬 (#316): lessons in stages 0 to 6 (shown as 初伝: 0-1, 中伝: 2-4,
+// 奥伝: 5, 秘伝: 6), each teaching one
 // thing, in the order of what they rest on. A lesson is played in practice
 // mode or in a dojo game, judged by a pure function of what the engine
-// returns, first with its assists and then without them; passing it without
+// returns, or, 秘伝's, on the practice problems' page (?mode=quiz), judged by
+// the engine's grading, first with its assists and then without them; passing it without
 // them pays its reward, once. A failure costs nothing. No page plays them yet
 // (#318); plain Node runs the tests, so imports carry the .ts extension.
-import type { GameEvent, GameResult, SessionState, Tile } from '../apiTypes.ts';
+import type { GameEvent, GameResult, ProblemKind, SessionState, Tile } from '../apiTypes.ts';
 import { parseTile } from '../tiles.ts';
 import { YAKUHAI_KEYS, findItem } from './catalog.ts';
 import type { DojoProgress, LessonProgress } from './progress.ts';
@@ -40,7 +41,7 @@ export type Verdict = boolean | null;
 
 interface LessonBase {
   id: string;
-  stage: 0 | 1 | 2 | 3 | 4 | 5;
+  stage: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   title: string;
   /** What to do to pass, in one line, always shown with the lesson. */
   goal: string;
@@ -64,7 +65,9 @@ interface LessonBase {
 
 export type Lesson =
   | (LessonBase & { form: 'practice'; judge: (s: PracticeStep) => Verdict })
-  | (LessonBase & { form: 'game'; judge: (r: RoundRecord) => Verdict });
+  | (LessonBase & { form: 'game'; judge: (r: RoundRecord) => Verdict })
+  // 秘伝: problems of a kind and level (docs/problems.md), each answered right a success (quizKey).
+  | (LessonBase & { form: 'quiz'; quiz: { kind: ProblemKind; level: number } });
 
 // The coins of a lesson that grants no item (docs/dojo-economy.md): about half
 // a 東風戦's coins, so that a lesson is worth doing between games; economy.test.ts
@@ -72,7 +75,7 @@ export type Lesson =
 export const LESSON_COINS = 30;
 
 // The 稽古 of every lesson learned (docs/dojo-economy.md): the 初伝's four practice lessons, which play no game, make
-// the first 級 (100) between them, so the curriculum moves the 級位 too; 20 lessons are 500 in all,
+// the first 級 (100) between them, so the curriculum moves the 級位 too; 23 lessons are 575 in all,
 // a few 級 beside the games'.
 export const LESSON_XP = 25;
 
@@ -91,6 +94,11 @@ function kind(t: Tile): Tile {
 export function practiceKey(s: SessionState): string {
   // A tsumo keeps the discards of the position it was made from: told apart by its status.
   return `practice:${s.seed}:${s.discards.map(kind).join('')}${s.status === 'tsumo' ? ':tsumo' : ''}`;
+}
+
+/** The key a quiz success is counted under: the problem's id (kind:level:seed), so a problem counts once. */
+export function quizKey(problemId: string): string {
+  return `quiz:${problemId}`;
 }
 
 /** The key a game success is counted under: the game and the round's index in it. */
@@ -350,6 +358,26 @@ export const LESSONS: readonly Lesson[] = [
     '一気通貫を付けて和了する',
     '同じ色で123・456・789をそろえると一気通貫。門前で2翻、鳴くと1翻。',
     '123m 456m 789m 234p 55s', ['chiitoitsu-win'], { item: 'ittsu', coins: 0 }),
+  // 秘伝 (stage 6): the 中級 judgments of the stages before, as practice problems at their level 2,
+  // each resting on the lesson that taught its basis.
+  {
+    id: 'hiden-nanikiru', stage: 6, title: '何切る', form: 'quiz', times: 5, quiz: { kind: 'nanikiru', level: 2 },
+    goal: '2向聴の何切るに5問正解する',
+    text: '向聴数を進める牌を残し、同じなら受け入れ（有効牌）の多い方を残す。答えると、切る牌ごとの向聴と有効牌の順位が出る。',
+    assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['max-ukeire'],
+  },
+  {
+    id: 'hiden-machi', stage: 6, title: '待ち当て', form: 'quiz', times: 5, quiz: { kind: 'machi', level: 2 },
+    goal: '待ちが3種以上か形の重なる聴牌で、待ちをすべて当てる（5問）',
+    text: '聴牌の手に1枚足して和了の形になる牌が待ち。延べ単（3456 で 3・6）や両面と単騎の重なりなど、塊を分け直すと待ちが増える。待ちを1つでも見逃すと振聴にも気づけない。',
+    assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['furiten'],
+  },
+  {
+    id: 'hiden-oshihiki', stage: 6, title: '押し引き', form: 'quiz', times: 5, quiz: { kind: 'oshihiki', level: 2 },
+    goal: '現物のない手で、リーチにいちばん安全な牌を選ぶ（5問）',
+    text: '現物がないときは、筋・ノーチャンス（壁）・見えている字牌の枚数から安全な牌を読む。片筋や無筋の中張牌は危ない。',
+    assists: [], tempYaku: [], reward: { coins: LESSON_COINS }, requires: ['fold'],
+  },
 ];
 
 /** The discards (as kinds) with the lowest normal-form shanten and, among them, the most ukeire. */
@@ -410,6 +438,7 @@ export function lessonSeed(id: string): number | undefined {
  * its key), so the same moves on the same seed would not count again; later tries are random.
  */
 export function lessonDealSeed(p: DojoProgress, lesson: Lesson, hubSeed?: number): number | undefined {
+  if (lesson.form === 'quiz') return undefined; // the problems' page picks a seed and goes on from it
   if (lesson.form === 'practice') return (p.lessons[lesson.id]?.seen.length ?? 0) === 0 ? lessonSeed(lesson.id) : undefined;
   if (hubSeed !== undefined) return hubSeed;
   // A lesson's game is always a 東風戦 against weak CPUs (lessonGameOptions), as its seed was searched for.
@@ -418,11 +447,13 @@ export function lessonDealSeed(p: DojoProgress, lesson: Lesson, hubSeed?: number
 }
 
 /**
- * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=[&seed=]) or
- * practice mode (?seed=&turns=18&lesson=); a random seed if none is given.
+ * Where a lesson is played: a dojo game (?mode=dojo&play=1&lesson=[&seed=]),
+ * practice mode (?seed=&turns=18&lesson=) or the problems' page
+ * (?mode=quiz&kind=&level=&lesson=); a random seed if none is given.
  */
 export function lessonHref(lesson: Lesson, seed?: number): string {
   const id = encodeURIComponent(lesson.id);
+  if (lesson.form === 'quiz') return `?mode=quiz&kind=${lesson.quiz.kind}&level=${lesson.quiz.level}&lesson=${id}`;
   if (lesson.form === 'game') return `?mode=dojo&play=1&lesson=${id}${seed === undefined ? '' : `&seed=${seed}`}`;
   return `?${seed === undefined ? '' : `seed=${seed}&`}turns=18&lesson=${id}`;
 }
