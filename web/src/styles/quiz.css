@@ -126,6 +126,41 @@
   margin-top: 2px;
 }
 
+/* An oshihiki problem's table: a row per other seat (下家, 対面, 上家), its
+   name and riichi, then its river wrapping (not the game table's 6-wide
+   grid) and its melds. */
+.quiz-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.quiz-seat {
+  display: grid;
+  grid-template-columns: 4.5em 1fr;
+  align-items: start;
+  gap: 2px 8px;
+}
+.quiz-seat-name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+.quiz-seat .seat-river {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+}
+.quiz-seat .melds {
+  grid-column: 2;
+}
+/* The reason wraps (two riichi make it long); the other columns stay one line. */
+.quiz-ranking .quiz-reason {
+  white-space: normal;
+}
+
 /* ---- Narrow screens and phones ---- */
 @media (width <= 760px), (height <= 500px) and (pointer: coarse) {
   .quiz-actions button {
