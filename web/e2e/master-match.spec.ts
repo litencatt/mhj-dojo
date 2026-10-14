@@ -68,7 +68,9 @@ test('the 師範戦 opens with the curriculum passed, and plays three masters wi
 });
 
 test('the 師範戦 stays locked short of the curriculum, and its URL then deals the hub game', async ({ page }) => {
-  const { [LESSONS[LESSONS.length - 1].id]: _, ...short } = GRADUATED.lessons!;
+  // The last lesson of the curriculum (秘伝, after the 師範戦, is not asked).
+  const last = LESSONS.filter((l) => l.stage <= 5).at(-1)!;
+  const { [last.id]: _, ...short } = GRADUATED.lessons!;
   await storeProgress(page, { ...GRADUATED, xp: 1_000_000, lessons: short });
   await page.goto('./?mode=dojo');
   await expect(masterRow(page)).toHaveAttribute('data-state', 'locked');

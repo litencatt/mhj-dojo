@@ -18,6 +18,7 @@ import {
   lessonSeed,
   lessonStage,
   practiceKey,
+  quizKey,
   recordSuccess,
   tenpaiDiscards,
   type Lesson,
@@ -81,10 +82,10 @@ function passed(ids: string[], over: Partial<DojoProgress> = {}): DojoProgress {
 
 // ---- The catalog of lessons ----
 
-test('the lessons have unique ids, stages 0 to 5, prerequisites that come earlier and rewards from the shop', () => {
+test('the lessons have unique ids, stages 0 to 6, prerequisites that come earlier and rewards from the shop', () => {
   const ids = LESSONS.map((l) => l.id);
   assert.equal(new Set(ids).size, ids.length);
-  assert.deepEqual([...new Set(LESSONS.map((l) => l.stage))], [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual([...new Set(LESSONS.map((l) => l.stage))], [0, 1, 2, 3, 4, 5, 6]);
   LESSONS.forEach((l, i) => {
     for (const r of l.requires) assert.ok(ids.indexOf(r) >= 0 && ids.indexOf(r) < i, `${l.id} requires ${r}`);
     if (l.reward.item !== undefined) assert.ok(findItem(l.reward.item), `${l.id}: ${l.reward.item}`);
@@ -432,11 +433,13 @@ test('lessons are kept by a save; data before them reads as {}, and a lesson out
 
 // ---- Seeds (lessonSeeds.json, #320) ----
 
-test('every lesson has a seed in lessonSeeds.json or is listed as missing, and nothing else is there', async () => {
+test('every lesson dealt on a wall has a seed in lessonSeeds.json or is listed as missing, and nothing else is there', async () => {
   const { default: data } = await import('./lessonSeeds.json', { with: { type: 'json' } });
-  const ids = LESSONS.map((l) => l.id).sort();
+  // 秘伝's are problems: the page picks their seeds.
+  const dealt = LESSONS.filter((l) => l.form !== 'quiz');
+  const ids = dealt.map((l) => l.id).sort();
   assert.deepEqual([...Object.keys(data.seeds), ...data.missing].sort(), ids);
-  for (const l of LESSONS) assert.equal(lessonSeed(l.id) === undefined, data.missing.includes(l.id), l.id);
+  for (const l of dealt) assert.equal(lessonSeed(l.id) === undefined, data.missing.includes(l.id), l.id);
 });
 
 test('the curriculum deals a lesson on its seed: practice always, a game only in the default 東風戦 and once', () => {
@@ -452,4 +455,24 @@ test('the curriculum deals a lesson on its seed: practice always, a game only in
   assert.equal(lessonDealSeed({ ...p, settled: [String(lessonSeed('riichi-win'))] }, game), undefined);
   // The hub's length and CPU do not matter: a lesson's game is a 東風戦 against weak CPUs.
   assert.equal(lessonDealSeed({ ...p, xp: 1_000_000, gameLength: 'hanchan', gameCpu: 'normal' }, game), lessonSeed('riichi-win'));
+});
+
+// ---- 秘伝 (stage 6): practice problems ----
+
+test('秘伝 asks problems of each kind at level 2, on the problems\' page, each problem counted once', () => {
+  const hiden = LESSONS.filter((l) => l.stage === 6);
+  assert.deepEqual(hiden.map((l) => (l.form === 'quiz' ? `${l.quiz.kind}:${l.quiz.level}` : l.form)), ['nanikiru:2', 'machi:2', 'oshihiki:2']);
+  const l = findLesson('hiden-machi')!;
+  assert.equal(lessonHref(l), '?mode=quiz&kind=machi&level=2&lesson=hiden-machi');
+  assert.equal(lessonDealSeed(initialProgress(), l, 42), undefined);
+  // Unlocked by 振聴を避けて聴牌する; five problems answered right, the same one twice counted once.
+  let p = initialProgress();
+  for (const r of l.requires) p = { ...p, lessons: { ...p.lessons, [r]: { assisted: true, count: 0, done: true, seen: [] } } };
+  assert.equal(lessonStage(p, l.id), 'unassisted');
+  p = recordSuccess(p, l.id, quizKey('machi:2:1')).progress;
+  assert.equal(recordSuccess(p, l.id, quizKey('machi:2:1')).progress, p);
+  for (const seed of [2, 3, 4]) p = recordSuccess(p, l.id, quizKey(`machi:2:${seed}`)).progress;
+  const r = recordSuccess(p, l.id, quizKey('machi:2:5'));
+  assert.equal(r.completed, true);
+  assert.equal(r.progress.coins, p.coins + LESSON_COINS);
 });
