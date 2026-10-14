@@ -144,7 +144,7 @@ test('the help explains the problems', async ({ page }) => {
   await loaded(page);
   await page.getByRole('button', { name: 'ヘルプ', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'ヘルプ' });
-  await expect(dialog.getByRole('heading', { name: '問題（何切る・待ち当て）', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: '問題（何切る・待ち当て・押し引き）', exact: true })).toBeVisible();
   for (const h of ['練習モード', 'CPU対戦', '道場']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
 });
 
@@ -286,3 +286,57 @@ for (const [width, height] of [[320, 640], [PHONE.width, PHONE.height]]) {
     expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
   });
 }
+
+// 押し引き (oshihiki, #241): the other seats' rivers with a riichi, answered
+// from the hand like 何切る, graded by danger.
+const OSHIHIKI_URL = './?mode=quiz&kind=oshihiki&level=1&seed=1';
+
+test('押し引き: the rivers and the riichi are shown; the safest tile is 正解 with its reason, a dangerous one is not', async ({ page }) => {
+  await page.goto(OSHIHIKI_URL);
+  await loaded(page);
+  await expect(page).toHaveTitle('mhj-dojo - 押し引き');
+  await expect(page.getByText('リーチに対して、いちばん安全な牌は？')).toBeVisible();
+  await expect(page.locator('.header-status .game-status')).toContainText('現物あり');
+  const table = page.getByRole('group', { name: '他家の河' });
+  await expect(table.locator('.quiz-seat')).toHaveCount(3);
+  await expect(table.locator('.quiz-seat-name')).toHaveText([/^下家/, /^対面/, /^上家/]);
+  await expect(table.getByText('リーチ', { exact: true })).toHaveCount(1);
+  await expect(table.locator('.river-riichi')).toHaveCount(1);
+  await expect(handPanel(page).locator('.hand-drawn button.tile')).toHaveCount(1);
+
+  // The last tile of the hand first: graded, then the safest from the ranking.
+  await handTiles(page).last().click();
+  await expect(result(page)).toBeVisible();
+  const rows = result(page).locator('.quiz-ranking tbody tr');
+  await expect(rows.first()).toContainText('1位');
+  await expect(rows.first()).toContainText(/現物|リーチ後に通った牌/);
+  await expect(rows.first().locator('td').last()).toHaveText('0');
+  await expect(result(page).locator('.advice-review')).toContainText('押すか降りるか');
+  const best = await bestLabels(page);
+  await page.reload();
+  await loaded(page);
+  await handPanel(page).locator(`button.tile[aria-label="${best[0]}"]`).first().click();
+  await expect(page.getByRole('heading', { name: '正解', exact: true })).toBeVisible();
+  await expect(result(page).locator('.quiz-rank-answer')).toHaveClass(/quiz-rank-best/);
+  // A dangerous tile: the last row of the ranking.
+  await page.getByRole('button', { name: '次の問題' }).click();
+  await expect(result(page)).toHaveCount(0);
+  await handTiles(page).first().click();
+  await expect(result(page)).toBeVisible();
+  const last = result(page).locator('.quiz-ranking tbody tr').last();
+  await expect(last.locator('td').last()).not.toHaveText('0');
+});
+
+test('押し引き: a 320px-wide phone fits the rivers and the grading without a sideways scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  // Two riichi: the longest reasons (per seat).
+  await page.goto('./?mode=quiz&kind=oshihiki&level=3&seed=5');
+  await loaded(page);
+  expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  await handTiles(page).first().click();
+  await expect(result(page)).toBeVisible();
+  await expect(result(page).locator('.quiz-reason').first()).toContainText('、');
+  expect(await pageOverflowX(page)).toBeLessThanOrEqual(0);
+  const table = (await result(page).locator('.quiz-ranking').boundingBox())!;
+  expect(table.x + table.width).toBeLessThanOrEqual(320);
+});

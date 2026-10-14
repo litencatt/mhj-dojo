@@ -4,8 +4,8 @@
 
 import type { ProblemKind, Tile } from '../apiTypes';
 
-/** The kinds the page asks so far: oshihiki (#241) still needs the rivers and the riichi shown. */
-export type QuizKind = Extract<ProblemKind, 'nanikiru' | 'machi'>;
+/** The kinds the page asks. */
+export type QuizKind = ProblemKind;
 
 /** The problem a URL asks for: no seed lets the engine pick one (written back into the URL once known). */
 export interface QuizParams {
@@ -14,20 +14,32 @@ export interface QuizParams {
   seed: number | undefined;
 }
 
-// Each kind's page: its heading and its question. oshihiki (#241) adds its own here.
+// Each kind's page: its heading and its question.
 export const KINDS: Record<QuizKind, { title: string; prompt: string }> = {
   nanikiru: { title: '何切る', prompt: '何を切る？' },
   machi: { title: '待ち当て', prompt: '待ちの牌をすべて選ぶ' },
+  oshihiki: { title: '押し引き', prompt: 'リーチに対して、いちばん安全な牌は？' },
 };
 
 // The levels a kind offers, as the 設定 names them (docs/problems.md).
 export const LEVEL_NAMES: Record<QuizKind, Record<string, string>> = {
   nanikiru: { '1': '1向聴', '2': '2向聴', '3': '上級' },
   machi: { '1': '基本形', '2': '複合形', '3': '清一色' },
+  oshihiki: { '1': '現物あり', '2': '現物なし', '3': '複数リーチ' },
 };
 
 /** The kinds as the 設定 names them. */
-export const KIND_NAMES: Record<QuizKind, string> = { nanikiru: KINDS.nanikiru.title, machi: KINDS.machi.title };
+export const KIND_NAMES: Record<QuizKind, string> = { nanikiru: KINDS.nanikiru.title, machi: KINDS.machi.title, oshihiki: KINDS.oshihiki.title };
+
+/** A tile's kind, as a tile: a red five as its plain copy. */
+export function kindKey(t: Tile): Tile {
+  return t[0] === '0' ? `5${t[1]}` : t;
+}
+
+/** The other seats as you see them: 下家, 対面, 上家 (seat 0 is yours). */
+export function seatName(seat: number): string {
+  return ['自分', '下家', '対面', '上家'][((seat % 4) + 4) % 4];
+}
 
 /** The tile kinds a many-tile answer picks from, a row per suit: 萬子, 筒子, 索子, then the honors. */
 export const PICKER_ROWS: readonly (readonly Tile[])[] = [
