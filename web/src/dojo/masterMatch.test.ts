@@ -17,7 +17,8 @@ test('the 師範戦 needs the curriculum passed, whatever the level', () => {
   assert.equal(masterMatchOpen(graduated(1)), true); // 10級: the level is 出稽古's
   // One lesson short, even at a high level.
   const p = graduated(20);
-  const { [LESSONS[LESSONS.length - 1].id]: _, ...rest } = p.lessons;
+  const last = LESSONS.filter((l) => l.stage <= 5).at(-1)!;
+  const { [last.id]: _, ...rest } = p.lessons;
   assert.equal(masterMatchOpen({ ...p, lessons: rest }), false);
 });
 

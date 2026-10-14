@@ -14,6 +14,10 @@ import { useSerialRequest } from '../hooks';
 import { tileName } from '../tiles';
 import { LooksSettings, useSharedLooks } from '../dojo/looks';
 import { KINDS, KIND_NAMES, kindKey, seatName, LEVEL_NAMES, MAX_PICKS, PICKER_ROWS, doraOf, togglePick, nextSeed, parseQuizParams, quizUrl, shantenLabel, type QuizParams } from './quiz';
+import { LessonBar } from '../dojo/LessonBar';
+import { findLesson, quizKey } from '../dojo/lessons';
+import { progressSaved } from '../dojo/progress';
+import { useLesson } from '../dojo/useLesson';
 import '../dojo/dojo.css';
 
 // What the page shows: the problem and, once answered, its result and the
@@ -27,6 +31,19 @@ interface Shown {
 
 const noop = () => {};
 
+/** The 秘伝 lesson the URL asks for (?lesson=), once the dojo has a progress to keep it in. */
+function askedLesson(): string | null {
+  const lesson = findLesson(new URLSearchParams(location.search).get('lesson') ?? '');
+  return lesson?.form === 'quiz' && progressSaved() ? lesson.id : null;
+}
+
+/** The problems the page asks for: the URL's, or a 秘伝 lesson's kind and level (the URL's seed kept). */
+function askedParams(lessonId: string | null): QuizParams {
+  const p = parseQuizParams(location.search);
+  const lesson = lessonId === null ? undefined : findLesson(lessonId);
+  return lesson?.form === 'quiz' ? { ...p, kind: lesson.quiz.kind, level: lesson.quiz.level } : p;
+}
+
 /**
  * The practice problems (?mode=quiz&kind=&level=&seed=, issue #239): a
  * position and its question, answered by tapping tiles in the hand (as
@@ -36,7 +53,10 @@ const noop = () => {};
  * seed. The count of correct answers lasts as long as the page.
  */
 export function QuizApp() {
-  const [asked, setAsked] = useState<QuizParams>(() => parseQuizParams(location.search));
+  // A 秘伝 lesson (dojo/lessons.ts): each problem answered right counts once (quizKey). Its kind and level are fixed.
+  const [lessonId] = useState(askedLesson);
+  const lesson = useLesson(lessonId);
+  const [asked, setAsked] = useState<QuizParams>(() => askedParams(lessonId));
   const [shown, setShown] = useState<Shown | null>(null);
   const [score, setScore] = useState({ correct: 0, answered: 0 });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,7 +67,10 @@ export function QuizApp() {
   const handRef = useRef<HTMLDivElement>(null);
   const { busy, error, retryable, request, retry } = useSerialRequest<Shown>((next) => {
     setShown(next);
-    if (next.result) setScore((s) => ({ correct: s.correct + (next.result!.correct ? 1 : 0), answered: s.answered + 1 }));
+    if (next.result) {
+      setScore((s) => ({ correct: s.correct + (next.result!.correct ? 1 : 0), answered: s.answered + 1 }));
+      lesson?.record(next.result.correct, quizKey(next.problem.id));
+    }
   });
 
   // Asks for a problem; the URL then names it, the seed the engine picked
@@ -179,33 +202,36 @@ export function QuizApp() {
             )}
           </SiteHeader>
           <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)}>
-            <div class="new-game-form">
-              {/* A kind or a level chosen starts its problem at once, on the same seed (a kind at its first level). */}
-              <RadioGroup
-                label="種類"
-                name="quiz-kind"
-                value={asked.kind}
-                names={KIND_NAMES}
-                disabled={busy}
-                onChange={(k) => {
-                  if (busy) return;
-                  setSettingsOpen(false);
-                  void load({ kind: k, level: 1, seed: problem?.seed ?? asked.seed });
-                }}
-              />
-              <RadioGroup
-                label="難易度"
-                name="quiz-level"
-                value={String(asked.level)}
-                names={levels}
-                disabled={busy}
-                onChange={(l) => {
-                  if (busy) return;
-                  setSettingsOpen(false);
-                  void load({ ...asked, level: Number(l), seed: problem?.seed ?? asked.seed });
-                }}
-              />
-            </div>
+            {/* A lesson's problems keep its kind and level. */}
+            {!lesson && (
+              <div class="new-game-form">
+                {/* A kind or a level chosen starts its problem at once, on the same seed (a kind at its first level). */}
+                <RadioGroup
+                  label="種類"
+                  name="quiz-kind"
+                  value={asked.kind}
+                  names={KIND_NAMES}
+                  disabled={busy}
+                  onChange={(k) => {
+                    if (busy) return;
+                    setSettingsOpen(false);
+                    void load({ kind: k, level: 1, seed: problem?.seed ?? asked.seed });
+                  }}
+                />
+                <RadioGroup
+                  label="難易度"
+                  name="quiz-level"
+                  value={String(asked.level)}
+                  names={levels}
+                  disabled={busy}
+                  onChange={(l) => {
+                    if (busy) return;
+                    setSettingsOpen(false);
+                    void load({ ...asked, level: Number(l), seed: problem?.seed ?? asked.seed });
+                  }}
+                />
+              </div>
+            )}
             {looks.progress && <LooksSettings progress={looks.progress} onChange={looks.change} open={settingsOpen} ownedOnly saveFailed={looks.saveFailed} />}
           </SettingsDialog>
           {/* 再試行 only for an engine failure: a refused request would fail again. */}
@@ -216,6 +242,16 @@ export function QuizApp() {
         {/* The hand's area (base.css): under the header in the one-column order of a narrow screen. */}
         {problem && pos && (
           <div class="area-hand" ref={handRef}>
+            {lesson && (
+              <LessonBar
+                lesson={lesson.lesson}
+                stage={lesson.stage}
+                count={lesson.count}
+                note={lesson.note}
+                failures={lesson.failures}
+                saveFailed={lesson.saveFailed}
+              />
+            )}
             <section class="quiz-question" aria-labelledby="quiz-title">
               <h2 id="quiz-title">{kind.title}</h2>
               <p class="quiz-prompt">{kind.prompt}</p>
