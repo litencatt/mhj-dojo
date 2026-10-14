@@ -928,7 +928,7 @@ unaffected.
 Practice problems (`internal/problem`; the design is `docs/problems.md`). A
 problem is fixed by its kind, level and seed, so the engine keeps nothing:
 the answer names the problem by its `id`, and the engine builds it again to
-grade the answer. Kinds: `nanikiru` (何切る) and `machi` (待ち当て).
+grade the answer. Kinds: `nanikiru` (何切る), `machi` (待ち当て) and `oshihiki` (押し引き).
 
 ### `POST /api/problems`
 Body: `{"kind": "nanikiru", "level": 1, "seed": 42}` — `seed` is optional
@@ -941,7 +941,7 @@ answer:
 {
   "id": "nanikiru:1:42",          // kind:level:seed, written as the engine writes it (no leading zeros or +)
   "kind": "nanikiru",
-  "level": 1,                     // nanikiru: 1–3, machi: 1–3
+  "level": 1,                     // 1–3 for every kind
   "seed": 42,                     // the seed asked for (or picked)
   "source": 42,                   // the candidate seed the position was made from (below)
   "position": {
@@ -951,7 +951,8 @@ answer:
     "junme": 9,                   // the discard being chosen: turn + 1
     "round_wind": "1z", "seat_wind": "1z",
     "discards": ["9m", "9m", "1z", …], // your own discards so far (junme − 1)
-    "remaining": {"1m": 4, …}     // unseen copies, as a State's `remaining`
+    "remaining": {"1m": 4, …},    // unseen copies, as a State's `remaining`
+    "seats": [ { "seat": 0, "wind": "1z", "riichi": false, "river": [ { "tile": "9m", "riichi": false, "called": false }, … ], "melds": [] }, … ] // oshihiki only: the table, seat 0 yours, as a State's seats
   },
   "choose": "one"                 // one | many: how many tiles an answer holds
 }
@@ -959,7 +960,7 @@ answer:
 
 ### `POST /api/problems/answer`
 Body: `{"id": "nanikiru:1:42", "answer": ["9s"]}` — the exact tiles chosen
-(a nanikiru answer is one tile of `hand` or `drawn`; a machi answer is 1–9
+(a nanikiru or oshihiki answer is one tile of `hand` or `drawn`; a machi answer is 1–9
 distinct kinds, any kind, a red five naming the 5). Returns a `Result`:
 
 ```jsonc
@@ -969,7 +970,7 @@ distinct kinds, any kind, a red five naming the 5). Returns a `Result`:
   "answer": [ { "tile": "8m", "rank": 3, "shanten": 2, "ukeire": 62, "wait": null } ],
   "best": ["9s", "6p"],           // the correct tiles
   "ranking": [ { "tile": "9s", "rank": 1, "shanten": 1, "ukeire": 12, "wait": 5.3 }, … ], // every choice, best first (machi: the waits)
-  "missed": ["7s"],               // machi only: the waits the answer left out (omitted when none, and for nanikiru)
+  "missed": ["7s"],               // machi only: the waits the answer left out (omitted when none, and for the other kinds)
   "text": "打 8萬: 最善（打 9索）より向聴が1つ遠い（3位）。…この問題は向聴・有効牌・聴牌時の待ちだけで比べています（守備と打点は考えません）。"
 }
 ```
@@ -1029,8 +1030,36 @@ Every seed in 1…100 gives a problem at every level (`TestMachiSweep`);
 generating one takes under 5 ms on average natively (worst ~40 ms, level 2,
 seeds 1…2000).
 
+**Oshihiki.** The position is seat 0's discard in a round the CPU plays
+in every seat (the normal CPU, seat 0 too, from the deal of `source`) while
+another seat is in riichi: seat 0 closed and not in riichi, with a drawn
+tile it cannot win on. `seats` is the table as seat 0 sees it; `discards`
+and `junme` are seat 0's. Each kind of the hand is scored by the danger of
+discarding it against each riichi (`cpu.Danger`, 0 safe … 9 a middle tile
+no wait rules out), summed over the riichi seats; every kind with the
+lowest sum is correct. Each `ranking` and `answer` entry has `rank`,
+`danger` (that sum) and `reason`, how a player reads it: 現物, リーチ後に通った牌,
+筋, ノーチャンス（壁）, 筋とノーチャンス, 片筋, 無筋の端牌 / 2・8牌 / 中張牌, or an
+honor's copies in sight (with two riichi, per seat: 下家に…、対面に…);
+`shanten`, `ukeire` and `wait` are 0 / null. `text` gives the answer's
+reason and danger when wrong, the safest kinds with theirs, and says that
+pushing or folding and your own hand are not considered. A position is used
+when at most two kinds are safest, not every kind, and it fits the level:
+
+| level | riichi | the safest |
+|---|---|---|
+| 1 | one seat | safe (danger 0): a 現物 or a tile passed after the riichi |
+| 2 | one seat | not safe: read from suji, walls or honors |
+| 3 | two or three seats | any |
+
+The first such decision of the round is used; a round without one tries
+the next candidate seed. Every seed in 1…100 gives a problem at every level
+(`TestOshihikiSweep`); generating one takes ~15 / 50 / 60 ms on average
+natively for levels 1 / 2 / 3 (worst ~200 ms): each candidate is a whole
+CPU round, ~6 ms.
+
 **Errors**: `400` invalid body, `kind`, `level`, `seed`, `id` (also one not written canonically) or tile, an answer of
-the wrong size, with a tile not in the position (nanikiru) or with a kind twice (machi); `422` (never seen in
+the wrong size, with a tile not in the position (nanikiru, oshihiki) or with a kind twice (machi); `422` (never seen in
 tests) a seed for which no candidate seed gives a problem.
 
 ## Memory

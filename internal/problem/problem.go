@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/litencatt/mhj-dojo/internal/advice"
+	"github.com/litencatt/mhj-dojo/internal/game"
 	"github.com/litencatt/mhj-dojo/internal/tile"
 	"github.com/litencatt/mhj-dojo/internal/wall"
 	"github.com/litencatt/mhj-dojo/internal/yakushanten"
@@ -34,6 +35,7 @@ type Kind string
 const (
 	Nanikiru Kind = "nanikiru" // 何切る: discard one of 14 tiles
 	Machi    Kind = "machi"    // 待ち当て: name every wait of a 13-tile tenpai hand
+	Oshihiki Kind = "oshihiki" // 押し引き: discard the safest tile against a riichi
 )
 
 // maxTries bounds the candidate seeds Generate tries after the first.
@@ -62,6 +64,9 @@ type Position struct {
 	SeatWind       string         `json:"seat_wind"`
 	Discards       []string       `json:"discards"`  // the player's own discards so far
 	Remaining      map[string]int `json:"remaining"` // unseen copies of each kind, as a session's
+	// Seats is the table, seat 0 yours: every river, riichi and meld
+	// (oshihiki only).
+	Seats []SeatPosition `json:"seats,omitempty"`
 }
 
 // Result grades an answer.
@@ -82,18 +87,24 @@ type Eval struct {
 	Shanten int      `json:"shanten"`
 	Ukeire  int      `json:"ukeire"`
 	Wait    *float64 `json:"wait"` // expected tenpai wait; null above 1-shanten
+	// oshihiki: the danger summed over the riichi seats (cpu.Danger) and
+	// why, as a player reads it (現物, 筋…).
+	Danger *int   `json:"danger,omitempty"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // answer is what grading needs, per kind.
 type answer struct {
-	tiles  []tile.Tile    // nanikiru: the tiles an answer may name
+	tiles  []tile.Tile    // nanikiru, oshihiki: the tiles an answer may name
 	advice *advice.Advice // nanikiru: the ranking of the discards
 	hand   tile.Counts    // machi: the 13 tiles
 	waits  []tile.Kind    // machi: the kinds that complete the hand, in kind order
+	view   *game.View     // oshihiki: the position as seat 0 sees it
+	riichi []int          // oshihiki: the seats in riichi
 }
 
 // levels is the number of levels of each kind.
-var levels = map[Kind]int{Nanikiru: len(nanikiruLevels), Machi: machiLevels}
+var levels = map[Kind]int{Nanikiru: len(nanikiruLevels), Machi: machiLevels, Oshihiki: len(oshihikiLevels)}
 
 // analyzer is shared by every problem, so that its memo stays warm across
 // requests; mu guards it (an analyzer is not safe for concurrent use).
@@ -120,9 +131,12 @@ func Generate(kind Kind, level int, seed int64) (*Problem, error) {
 			src = wall.RoundSeed(seed, i)
 		}
 		var p *Problem
-		if kind == Machi {
+		switch kind {
+		case Machi:
 			p = machi(level, src)
-		} else {
+		case Oshihiki:
+			p = oshihiki(level, src)
+		default:
 			p = nanikiru(level, src)
 		}
 		if p == nil {
@@ -161,8 +175,8 @@ func Parse(s string) (Kind, int, int64, error) {
 	return kind, level, seed, nil
 }
 
-// Grade grades an answer: for nanikiru the tile chosen, an exact tile of
-// the position; for machi the kinds named (a red five names the 5).
+// Grade grades an answer: for nanikiru and oshihiki the tile chosen, an
+// exact tile of the position; for machi the kinds named (a red five names the 5).
 func (p *Problem) Grade(ans []tile.Tile) (*Result, error) {
 	if p.Kind == Machi {
 		return p.gradeMachi(ans)
@@ -172,13 +186,16 @@ func (p *Problem) Grade(ans []tile.Tile) (*Result, error) {
 			return nil, fmt.Errorf("%w: tile %s is not in the hand", ErrInvalid, t)
 		}
 	}
+	if p.Kind == Oshihiki {
+		return p.gradeOshihiki(ans)
+	}
 	return p.gradeNanikiru(ans)
 }
 
 func check(kind Kind, level int) error {
 	n, ok := levels[kind]
 	if !ok {
-		return fmt.Errorf("%w: kind must be nanikiru or machi", ErrInvalid)
+		return fmt.Errorf("%w: kind must be nanikiru, machi or oshihiki", ErrInvalid)
 	}
 	if level < 1 || level > n {
 		return fmt.Errorf("%w: level must be between 1 and %d", ErrInvalid, n)
