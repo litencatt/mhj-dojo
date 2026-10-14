@@ -74,7 +74,7 @@ func TestParse(t *testing.T) {
 		t.Fatalf("largest seed: %d, %v", seed, err)
 	}
 	for _, id := range []string{
-		"", "nanikiru", "nanikiru:1", "nanikiru:1:2:3", "oshihiki:1:2", "nanikiru:0:2", "nanikiru:4:2", "nanikiru:x:2", "nanikiru:1:x",
+		"", "nanikiru", "nanikiru:1", "nanikiru:1:2:3", "score:1:2", "oshihiki:4:2", "nanikiru:0:2", "nanikiru:4:2", "nanikiru:x:2", "nanikiru:1:x",
 		"nanikiru:01:42", "nanikiru:1:+42", "nanikiru:1:042", "nanikiru:+1:42", "nanikiru:1:-5", "nanikiru:1:9007199254740992",
 	} {
 		if _, _, _, err := Parse(id); !errors.Is(err, ErrInvalid) {
@@ -85,7 +85,7 @@ func TestParse(t *testing.T) {
 		kind  Kind
 		level int
 		seed  int64
-	}{{"oshihiki", 1, 1}, {Machi, 0, 1}, {Machi, 4, 1}, {Nanikiru, 0, 1}, {Nanikiru, 4, 1}, {Nanikiru, 1, -1}, {Nanikiru, 1, MaxSeed + 1}} {
+	}{{"score", 1, 1}, {Oshihiki, 4, 1}, {Machi, 0, 1}, {Machi, 4, 1}, {Nanikiru, 0, 1}, {Nanikiru, 4, 1}, {Nanikiru, 1, -1}, {Nanikiru, 1, MaxSeed + 1}} {
 		if _, err := Generate(c.kind, c.level, c.seed); !errors.Is(err, ErrInvalid) {
 			t.Errorf("Generate(%s, %d, %d): %v, want ErrInvalid", c.kind, c.level, c.seed, err)
 		}

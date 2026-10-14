@@ -64,7 +64,7 @@ func TestProblemErrors(t *testing.T) {
 		status             int
 	}{
 		{"POST", "/api/problems", ``, statusBadRequest},
-		{"POST", "/api/problems", `{"kind":"oshihiki","level":1}`, statusBadRequest},
+		{"POST", "/api/problems", `{"kind":"score","level":1}`, statusBadRequest},
 		{"POST", "/api/problems", `{"kind":"nanikiru"}`, statusBadRequest},
 		{"POST", "/api/problems", `{"kind":"nanikiru","level":4}`, statusBadRequest},
 		{"POST", "/api/problems/answer", `{"id":"nanikiru:1","answer":["1m"]}`, statusBadRequest},
@@ -127,5 +127,39 @@ func TestMachiRoutes(t *testing.T) {
 		if status, b := call(t, store, "POST", "/api/problems/answer", body); status != statusBadRequest {
 			t.Errorf("%s: %d %s", body, status, b)
 		}
+	}
+}
+
+// TestOshihikiRoutes asks for an oshihiki problem and answers it through
+// Route: the table comes with the problem, the dangers only with the grading.
+func TestOshihikiRoutes(t *testing.T) {
+	store := session.NewStore(256)
+	status, b := call(t, store, "POST", "/api/problems", `{"kind":"oshihiki","level":1,"seed":42}`)
+	if status != statusOK {
+		t.Fatalf("create: %d %s", status, b)
+	}
+	if strings.Contains(string(b), "danger") || strings.Contains(string(b), "reason") {
+		t.Fatalf("the problem shows its answer: %s", b)
+	}
+	var p problem.Problem
+	if err := json.Unmarshal(b, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.ID != "oshihiki:1:42" || p.Choose != "one" || len(p.Position.Seats) != 4 || p.Position.Drawn == nil {
+		t.Fatalf("create: %s", b)
+	}
+	status, b = call(t, store, "POST", "/api/problems/answer", `{"id":"oshihiki:1:42","answer":["`+*p.Position.Drawn+`"]}`)
+	if status != statusOK {
+		t.Fatalf("answer: %d %s", status, b)
+	}
+	var r problem.Result
+	if err := json.Unmarshal(b, &r); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Best) == 0 || r.Ranking[0].Danger == nil || *r.Ranking[0].Danger != 0 || r.Ranking[0].Reason == "" || r.Text == "" {
+		t.Fatalf("answer: %s", b)
+	}
+	if status, b := call(t, store, "POST", "/api/problems/answer", `{"id":"oshihiki:1:42","answer":["1m","2m"]}`); status != statusBadRequest {
+		t.Errorf("two tiles: %d %s", status, b)
 	}
 }
