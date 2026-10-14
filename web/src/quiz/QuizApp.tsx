@@ -78,8 +78,9 @@ export function QuizApp() {
 
   // Answered: 次の問題 takes the focus (without scrolling the hand away), so
   // the keyboard goes on with Enter. The problem it brings gives the focus to
-  // the first tile it answers with (the hand's, or the picker's for machi), if nothing else holds it (次の問題 went with the
-  // result); a problem the page opened on leaves the focus alone.
+  // the first tile it answers with (the hand's, or the picker's for machi),
+  // if nothing else holds it (次の問題 went with the result); a problem the
+  // page opened on leaves the focus alone.
   const result = shown?.result ?? null;
   const problem = shown?.problem ?? null;
   const fromNext = useRef(false);
