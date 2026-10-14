@@ -83,3 +83,49 @@ func TestProblemErrors(t *testing.T) {
 		}
 	}
 }
+
+// TestMachiRoutes asks for a machi problem and answers it through Route.
+func TestMachiRoutes(t *testing.T) {
+	store := session.NewStore(256)
+	status, b := call(t, store, "POST", "/api/problems", `{"kind":"machi","level":3,"seed":42}`)
+	if status != statusOK {
+		t.Fatalf("create: %d %s", status, b)
+	}
+	if strings.Contains(string(b), "best") || strings.Contains(string(b), "waits") {
+		t.Fatalf("the problem shows its answer: %s", b)
+	}
+	var p problem.Problem
+	if err := json.Unmarshal(b, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.ID != "machi:3:42" || p.Choose != "many" || len(p.Position.Hand) != 13 || p.Position.Drawn != nil {
+		t.Fatalf("create: %s", b)
+	}
+	answer := func(tiles string) problem.Result {
+		t.Helper()
+		status, b := call(t, store, "POST", "/api/problems/answer", `{"id":"`+p.ID+`","answer":[`+tiles+`]}`)
+		if status != statusOK {
+			t.Fatalf("answer %s: %d %s", tiles, status, b)
+		}
+		var r problem.Result
+		if err := json.Unmarshal(b, &r); err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	r := answer(`"` + p.Position.Hand[0] + `"`)
+	best := answer(`"` + strings.Join(r.Best, `","`) + `"`)
+	if !best.Correct || len(best.Best) < 3 || len(best.Missed) != 0 || best.Text == "" {
+		t.Fatalf("waits: %+v", best)
+	}
+	for _, body := range []string{
+		`{"id":"machi:3:42","answer":[]}`,
+		`{"id":"machi:3:42","answer":["5m","0m"]}`,
+		`{"id":"machi:3:42","answer":["8z"]}`,
+		`{"id":"machi:4:42","answer":["1m"]}`,
+	} {
+		if status, b := call(t, store, "POST", "/api/problems/answer", body); status != statusBadRequest {
+			t.Errorf("%s: %d %s", body, status, b)
+		}
+	}
+}

@@ -259,6 +259,9 @@ test('the shop shows one kind of item per tab, in a list that scrolls', async ({
   await expect(panel.locator('[data-item^="cloth:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="stick:"]')).toHaveCount(3);
   await expect(panel.locator('[data-item^="effect:"]')).toHaveCount(3);
+  // Kind by kind (牌テーマ, 裏柄, 卓布, リーチ棒, 和了演出), each in unlock order.
+  const kinds = (await panel.locator('[data-item]').evaluateAll((els) => els.map((el) => el.getAttribute('data-item')!.split(':')[0])));
+  expect(kinds.filter((k, i) => k !== kinds[i - 1])).toEqual(['theme', 'back', 'cloth', 'stick', 'effect']);
   await expect(panel.locator('[data-item="pinfu"]')).toHaveCount(0);
   // Arrow keys move between the tabs.
   await page.keyboard.press('ArrowRight');
@@ -779,7 +782,6 @@ test('a dojo game opened by the CPU game URL moves to the dojo page', async ({ p
 });
 
 // A yaku's guide (GuideDialog): shown on buying, and again from the chip in 習得役.
-const shantenText = (s: number) => (s === 0 ? '聴牌' : `${s}向聴`);
 
 test('buying a yaku shows its guide: condition, han, an example hand and a way to practise it', async ({ page }) => {
   await openHub(page, { xp: 5000, coins: 500, firstGameBonus: true });
@@ -798,14 +800,16 @@ test('buying a yaku shows its guide: condition, han, an example hand and a way t
   await expect(hand.locator('.tile').last()).toHaveAccessibleName('和了牌 9萬');
   await expect(page.getByTestId('dojo-coins')).toHaveText('420');
 
-  // 練習 opens practice mode on the seed whose hand is near the yaku: its row shows that shanten.
-  const seed = guide.practice!.seed;
-  await dialog.getByRole('link', { name: 'この役を練習する' }).click();
+  // 練習 opens practice mode on one of the yaku's seeds, without showing the seed in the guide.
+  await expect(dialog).toContainText('練習モードで、配牌から一気通貫で和了りまで行ける筋のある山を用意します');
+  await expect(dialog).not.toContainText('シード');
+  const link = dialog.getByRole('link', { name: 'この役を練習する' });
+  const seed = Number(/[?&]seed=(\d+)/.exec((await link.getAttribute('href'))!)![1]);
+  expect(guide.practice!.seeds).toContain(seed);
+  await link.click();
   await expect(page).toHaveURL(new RegExp(`\\?seed=${seed}&turns=18$`));
   await expect(handPanel(page)).toBeVisible();
-  const row = page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '一気通貫' });
-  await expect(row.locator('.shanten-cell')).toContainText(shantenText(guide.practice!.shanten));
-  expect(guide.practice!.shanten).toBeLessThanOrEqual(1);
+  await expect(page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: '一気通貫' })).toBeVisible();
 });
 
 test('closing the guide of a bought yaku leaves focus on its chip; a purchase that fails shows no guide', async ({ page }) => {
@@ -814,7 +818,7 @@ test('closing the guide of a bought yaku leaves focus on its chip; a purchase th
   await page.getByRole('dialog', { name: '購入しますか？' }).getByRole('button', { name: '購入' }).click();
   const dialog = page.getByRole('dialog', { name: '平和' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(`配牌が平和${shantenText(guideFor('pinfu')!.practice!.shanten)}のシード`);
+  await expect(dialog).toContainText('練習モードで、配牌から平和で和了りまで行ける筋のある山を用意します');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page.getByTestId('dojo-yaku').getByRole('button', { name: '平和' })).toBeFocused();
@@ -841,7 +845,7 @@ test('an owned yaku in 習得役 opens its guide again; Esc and a click outside 
   await chip.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('1翻（門前限定）');
-  await expect(dialog).toContainText('門前で聴牌するまでを練習します');
+  await expect(dialog).toContainText('練習モードでは立直を宣言できないので、門前で聴牌するまでを練習します。');
   await expect(dialog.getByText('修得しました')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
