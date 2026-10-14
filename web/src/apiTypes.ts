@@ -360,7 +360,7 @@ export interface GameOptions {
 
 // ---- Practice problems (docs/api.md "Problems") ----
 
-export type ProblemKind = 'nanikiru' | 'machi'; // 何切る | 待ち当て
+export type ProblemKind = 'nanikiru' | 'machi' | 'oshihiki'; // 何切る | 待ち当て | 押し引き
 
 export interface ProblemPosition {
   hand: Tile[]; // 13 tiles, sorted
@@ -371,7 +371,11 @@ export interface ProblemPosition {
   seat_wind: Tile;
   discards: Tile[]; // your own discards so far
   remaining: Remaining;
+  seats?: ProblemSeat[]; // oshihiki only: the table, seat 0 yours
 }
+
+/** A seat of an oshihiki problem's table, as a game's Seat. */
+export type ProblemSeat = Pick<Seat, 'seat' | 'wind' | 'riichi' | 'river' | 'melds'>;
 
 export interface Problem {
   id: string; // "kind:level:seed": answer with it
@@ -389,6 +393,8 @@ export interface ProblemEval {
   shanten: number; // machi: -1 (complete) for a wait, 0 otherwise
   ukeire: number; // machi: the wait's copies outside the hand
   wait: number | null; // expected tenpai wait; null above 1-shanten
+  danger?: number; // oshihiki: the danger summed over the riichi seats (0 safe … 9 each)
+  reason?: string; // oshihiki: how it reads (現物, 筋, 片筋…)
 }
 
 export interface ProblemResult {
