@@ -11,7 +11,7 @@ import { Tile } from '../components/Tile';
 import { useSerialRequest } from '../hooks';
 import { tileName } from '../tiles';
 import { LooksSettings, useSharedLooks } from '../dojo/looks';
-import { KINDS, LEVEL_NAMES, doraOf, nextSeed, parseQuizParams, quizUrl, shantenLabel, type QuizParams } from './quiz';
+import { KINDS, KIND_NAMES, LEVEL_NAMES, MAX_PICKS, PICKER_ROWS, doraOf, togglePick, nextSeed, parseQuizParams, quizUrl, shantenLabel, type QuizParams } from './quiz';
 import '../dojo/dojo.css';
 
 // What the page shows: the problem and, once answered, its result and the
@@ -38,6 +38,8 @@ export function QuizApp() {
   const [shown, setShown] = useState<Shown | null>(null);
   const [score, setScore] = useState({ correct: 0, answered: 0 });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // A many-tile answer's tiles, picked before it is sent.
+  const [picked, setPicked] = useState<TileT[]>([]);
   const looks = useSharedLooks();
   const nextRef = useRef<HTMLButtonElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
@@ -53,15 +55,15 @@ export function QuizApp() {
     return request(() =>
       api.createProblem(p).then((problem) => {
         setAsked(p);
+        setPicked([]);
         history.replaceState(null, '', quizUrl(location.href, problem));
         return { problem, result: null, answer: [] };
       }),
     );
   }
 
-  // Every kind so far answers one tile (choose 'one'): the hand's own tap
-  // picks it. A kind that answers many (machi, #242) needs a picker that
-  // collects them before sending.
+  // A one-tile answer (choose 'one') is the hand's own tap; a many-tile one
+  // (machi) is the tiles picked under the hand (QuizPicker), sent by 答える.
   function submit(tiles: TileT[]) {
     if (!shown || shown.result) return;
     const { problem } = shown;
@@ -76,7 +78,7 @@ export function QuizApp() {
 
   // Answered: 次の問題 takes the focus (without scrolling the hand away), so
   // the keyboard goes on with Enter. The problem it brings gives the focus to
-  // the hand's first tile, if nothing else holds it (次の問題 went with the
+  // the first tile it answers with (the hand's, or the picker's for machi), if nothing else holds it (次の問題 went with the
   // result); a problem the page opened on leaves the focus alone.
   const result = shown?.result ?? null;
   const problem = shown?.problem ?? null;
@@ -85,18 +87,21 @@ export function QuizApp() {
     if (result) nextRef.current?.focus({ preventScroll: true });
     else if (problem && fromNext.current) {
       fromNext.current = false;
-      if (!document.activeElement || document.activeElement === document.body) handRef.current?.querySelector<HTMLElement>('button.tile')?.focus();
+      if (!document.activeElement || document.activeElement === document.body) handRef.current?.querySelector<HTMLElement>(problem.choose === 'many' ? '.quiz-picker button.tile' : 'button.tile')?.focus();
     }
   }, [problem, result]);
 
   const kind = KINDS[asked.kind];
+  const many = problem?.choose === 'many';
   const levels = LEVEL_NAMES[asked.kind];
   const pos = problem?.position;
-  // After grading: the correct tiles raised and outlined in the hand, and a wrong answer outlined in red.
+  // After grading: the correct tiles raised and outlined in the hand (in the
+  // picker for a many-tile answer, a wait left out said so), and a wrong
+  // answer outlined in red.
   const marks: Record<string, { className: string; text: string }> = {};
   if (result) {
     for (const t of shown!.answer) if (!result.best.includes(t)) marks[t] = { className: 'tile-quiz-wrong', text: 'あなたの答え' };
-    for (const t of result.best) marks[t] = { className: 'tile-advice', text: shown!.answer.includes(t) ? '正解、あなたの答え' : '正解' };
+    for (const t of result.best) marks[t] = { className: 'tile-advice', text: shown!.answer.includes(t) ? '正解、あなたの答え' : many ? '正解、見逃し' : '正解' };
   }
 
   return (
@@ -111,18 +116,23 @@ export function QuizApp() {
                     <dt>難易度</dt>
                     <dd>{levels[String(problem.level)] ?? problem.level}</dd>
                   </div>
-                  <div>
-                    <dt>巡目</dt>
-                    <dd>{pos.junme}巡目</dd>
-                  </div>
-                  <div>
-                    <dt>場風</dt>
-                    <dd>{tileName(pos.round_wind)}</dd>
-                  </div>
-                  <div>
-                    <dt>自風</dt>
-                    <dd>{tileName(pos.seat_wind)}</dd>
-                  </div>
+                  {/* A position off the table (machi: junme 0, the hand's shape only) has no turn, winds or dora. */}
+                  {pos.junme > 0 && (
+                    <>
+                      <div>
+                        <dt>巡目</dt>
+                        <dd>{pos.junme}巡目</dd>
+                      </div>
+                      <div>
+                        <dt>場風</dt>
+                        <dd>{tileName(pos.round_wind)}</dd>
+                      </div>
+                      <div>
+                        <dt>自風</dt>
+                        <dd>{tileName(pos.seat_wind)}</dd>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <dt>成績</dt>
                     <dd>
@@ -133,31 +143,45 @@ export function QuizApp() {
                     </dd>
                   </div>
                 </dl>
-                <dl class="dora-box">
-                  <div>
-                    <dt>
-                      ドラ<span class="dora-dt-rest">表示牌</span>
-                    </dt>
-                    <dd class="dora-indicators">
-                      {pos.dora_indicators.map((t, i) => (
-                        <Tile key={`${t}-${i}`} tile={t} size="sm" />
-                      ))}
-                      <span class="dora-arrow" aria-hidden="true">
-                        →
-                      </span>
-                      <span class="dora-label">ドラ</span>
-                      {pos.dora_indicators.map((t, i) => (
-                        <Tile key={`d-${t}-${i}`} tile={doraOf(t)} size="sm" label={`ドラ ${tileName(doraOf(t))}`} />
-                      ))}
-                    </dd>
-                  </div>
-                </dl>
+                {pos.dora_indicators.length > 0 && (
+                  <dl class="dora-box">
+                    <div>
+                      <dt>
+                        ドラ<span class="dora-dt-rest">表示牌</span>
+                      </dt>
+                      <dd class="dora-indicators">
+                        {pos.dora_indicators.map((t, i) => (
+                          <Tile key={`${t}-${i}`} tile={t} size="sm" />
+                        ))}
+                        <span class="dora-arrow" aria-hidden="true">
+                          →
+                        </span>
+                        <span class="dora-label">ドラ</span>
+                        {pos.dora_indicators.map((t, i) => (
+                          <Tile key={`d-${t}-${i}`} tile={doraOf(t)} size="sm" label={`ドラ ${tileName(doraOf(t))}`} />
+                        ))}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
               </div>
             )}
           </SiteHeader>
           <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)}>
             <div class="new-game-form">
-              {/* A level chosen starts its problem at once, on the same seed. */}
+              {/* A kind or a level chosen starts its problem at once, on the same seed (a kind at its first level). */}
+              <RadioGroup
+                label="種類"
+                name="quiz-kind"
+                value={asked.kind}
+                names={KIND_NAMES}
+                disabled={busy}
+                onChange={(k) => {
+                  if (busy) return;
+                  setSettingsOpen(false);
+                  void load({ kind: k, level: 1, seed: problem?.seed ?? asked.seed });
+                }}
+              />
               <RadioGroup
                 label="難易度"
                 name="quiz-level"
@@ -185,26 +209,40 @@ export function QuizApp() {
               <h2 id="quiz-title">{kind.title}</h2>
               <p class="quiz-prompt">{kind.prompt}</p>
               <p class="quiz-hint muted">
-                {result
-                  ? '正解の牌を持ち上げて示しています。'
-                  : '切る牌をクリックして答えます（タッチ操作では、選んだ牌をもう一度タップ）。'}
+                {many
+                  ? result
+                    ? '待ちの牌を持ち上げて示しています。'
+                    : '手牌の下から待ちの牌をすべて選び、「答える」を押します。'
+                  : result
+                    ? '正解の牌を持ち上げて示しています。'
+                    : '切る牌をクリックして答えます（タッチ操作では、選んだ牌をもう一度タップ）。'}
               </p>
             </section>
             <Hand
               hand={pos.hand}
               drawn={pos.drawn}
               discards={pos.discards}
-              disabled={busy || !!result}
-              marks={marks}
+              disabled={many || busy || !!result}
+              marks={many ? {} : marks}
               onDiscard={(t) => submit([t])}
               onPreview={noop}
             />
+            {many && (
+              <QuizPicker
+                picked={result ? shown!.answer : picked}
+                marks={marks}
+                disabled={busy || !!result}
+                onPick={(t) => setPicked((p) => togglePick(p, t))}
+                onSubmit={() => submit(picked)}
+              />
+            )}
             {/* Always mounted, so the verdict is announced as it comes. */}
             <p class="visually-hidden" role="status" aria-live="polite">
               {result ? (result.correct ? '正解' : '不正解') : ''}
             </p>
             {result && (
               <QuizResult
+                many={many}
                 result={result}
                 answer={shown!.answer}
                 busy={busy}
@@ -224,7 +262,62 @@ export function QuizApp() {
   );
 }
 
+interface QuizPickerProps {
+  picked: TileT[];
+  marks: Record<string, { className: string; text: string }>;
+  disabled: boolean;
+  onPick: (t: TileT) => void;
+  onSubmit: () => void;
+}
+
+/**
+ * A many-tile answer (machi): every tile kind, a row per suit, each a toggle
+ * (aria-pressed), then 答える with the count picked. Once graded, the waits
+ * are raised and the tiles answered that are not waits outlined in red.
+ */
+function QuizPicker({ picked, marks, disabled, onPick, onSubmit }: QuizPickerProps) {
+  const full = picked.length >= MAX_PICKS;
+  return (
+    <section class="quiz-picker" aria-label="待ちの牌を選ぶ">
+      {PICKER_ROWS.map((row, i) => (
+        <div key={i} class="quiz-picker-row" role="group" aria-label={PICKER_ROW_NAMES[i]}>
+          {row.map((t) => {
+            const on = picked.includes(t);
+            const mark = marks[t];
+            return (
+              <Tile
+                key={t}
+                tile={t}
+                size="sm"
+                interactive={!disabled && (on || !full)}
+                button
+                pressed={on}
+                className={mark?.className ?? (on ? 'tile-quiz-picked' : undefined)}
+                label={mark ? `${tileName(t)}、${mark.text}` : undefined}
+                onClick={() => onPick(t)}
+              />
+            );
+          })}
+        </div>
+      ))}
+      {!disabled && (
+        <div class="quiz-actions">
+          <button type="button" class="dojo-start" disabled={picked.length === 0} onClick={onSubmit}>
+            答える
+          </button>
+          <span class="muted" aria-live="polite">
+            {picked.length}種を選択{full && `（${MAX_PICKS}種まで）`}
+          </span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const PICKER_ROW_NAMES = ['萬子', '筒子', '索子', '字牌'];
+
 interface QuizResultProps {
+  many: boolean;
   result: ProblemResult;
   answer: TileT[];
   busy: boolean;
@@ -233,7 +326,7 @@ interface QuizResultProps {
 }
 
 /** The grading: 正解 or 不正解, the explanation, every choice ranked (the answer's row marked) and 次の問題. */
-function QuizResult({ result, answer, busy, nextRef, onNext }: QuizResultProps) {
+function QuizResult({ many, result, answer, busy, nextRef, onNext }: QuizResultProps) {
   // 待ち only counts at 1-shanten: a column of dashes says nothing.
   const showWait = result.ranking.some((e) => e.wait !== null);
   return (
@@ -250,46 +343,84 @@ function QuizResult({ result, answer, busy, nextRef, onNext }: QuizResultProps) 
         </span>
       </div>
       <p class={result.correct ? 'advice-review advice-review-best' : 'advice-review'}>{result.text}</p>
-      <table class="quiz-ranking">
-        <caption class="visually-hidden">切る牌ごとの順位</caption>
-        <thead>
-          <tr>
-            <th scope="col">順位</th>
-            <th scope="col">打牌</th>
-            <th scope="col">向聴</th>
-            <th scope="col">有効牌</th>
-            {showWait && (
-              <th scope="col" title="聴牌したときの待ちの枚数の平均">
-                待ち
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {result.ranking.map((e) => {
-            const mine = answer.includes(e.tile);
-            return (
-              <tr key={e.tile} class={[e.rank === 1 ? 'quiz-rank-best' : '', mine ? 'quiz-rank-answer' : ''].join(' ').trim() || undefined}>
-                <td>{e.rank}位</td>
-                <th scope="row" aria-label={`打 ${tileName(e.tile)}${mine ? '（あなたの答え）' : ''}`}>
-                  <span class="quiz-rank-tile">
-                    <Tile tile={e.tile} size="xs" />
-                    {mine && <span class="quiz-you">あなた</span>}
-                  </span>
+      {many ? (
+        <MachiTable result={result} answer={answer} />
+      ) : (
+        <table class="quiz-ranking">
+          <caption class="visually-hidden">切る牌ごとの順位</caption>
+          <thead>
+            <tr>
+              <th scope="col">順位</th>
+              <th scope="col">打牌</th>
+              <th scope="col">向聴</th>
+              <th scope="col">有効牌</th>
+              {showWait && (
+                <th scope="col" title="聴牌したときの待ちの枚数の平均">
+                  待ち
                 </th>
-                <td>{shantenLabel(e.shanten)}</td>
-                <td>{e.ukeire}枚</td>
-                {showWait && <td>{e.wait === null ? '−' : `平均${e.wait.toFixed(1)}枚`}</td>}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {result.ranking.map((e) => {
+              const mine = answer.includes(e.tile);
+              return (
+                <tr key={e.tile} class={[e.rank === 1 ? 'quiz-rank-best' : '', mine ? 'quiz-rank-answer' : ''].join(' ').trim() || undefined}>
+                  <td>{e.rank}位</td>
+                  <th scope="row" aria-label={`打 ${tileName(e.tile)}${mine ? '（あなたの答え）' : ''}`}>
+                    <span class="quiz-rank-tile">
+                      <Tile tile={e.tile} size="xs" />
+                      {mine && <span class="quiz-you">あなた</span>}
+                    </span>
+                  </th>
+                  <td>{shantenLabel(e.shanten)}</td>
+                  <td>{e.ukeire}枚</td>
+                  {showWait && <td>{e.wait === null ? '−' : `平均${e.wait.toFixed(1)}枚`}</td>}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
       <div class="quiz-actions">
         <button type="button" class="dojo-start" ref={nextRef} disabled={busy} onClick={onNext}>
           次の問題
         </button>
       </div>
     </section>
+  );
+}
+
+/** A machi grading's waits: each with its copies outside the hand, and whether the answer held it or left it out (見逃し). */
+function MachiTable({ result, answer }: { result: ProblemResult; answer: TileT[] }) {
+  return (
+    <table class="quiz-ranking">
+      <caption class="visually-hidden">待ちの牌</caption>
+      <thead>
+        <tr>
+          <th scope="col">待ち</th>
+          <th scope="col" title="手牌の外に残っている枚数">
+            残り
+          </th>
+          <th scope="col">あなたの答え</th>
+        </tr>
+      </thead>
+      <tbody>
+        {result.ranking.map((e) => {
+          const mine = answer.includes(e.tile);
+          return (
+            <tr key={e.tile} class={mine ? 'quiz-rank-best quiz-rank-answer' : undefined}>
+              <th scope="row" aria-label={tileName(e.tile)}>
+                <span class="quiz-rank-tile">
+                  <Tile tile={e.tile} size="xs" />
+                </span>
+              </th>
+              <td>{e.ukeire}枚</td>
+              <td>{mine ? '選んだ' : <span class="dojo-aid-warn">見逃し</span>}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
