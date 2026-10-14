@@ -32,7 +32,7 @@ test('practice: the header shows the version and the help opens, closes and link
     await expect(dialog.getByRole('heading', { name: h, exact: true })).toBeVisible();
   }
   // Each mode explains itself only: practice's help has no CPU対戦 or 道場 section.
-  for (const h of ['CPU対戦', '道場']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
+  for (const h of ['CPU対戦', '道場', '問題（何切る）']) await expect(dialog.getByRole('heading', { name: h, exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('row', { name: /1筒〜9筒/ })).toContainText('筒子（ピンズ）');
   // The app's own terms are here, not in the glossary.
   await expect(dialog.getByRole('term').filter({ hasText: /^シード$/ })).toBeVisible();

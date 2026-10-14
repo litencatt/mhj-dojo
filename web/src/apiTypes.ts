@@ -360,13 +360,13 @@ export interface GameOptions {
 
 // ---- Practice problems (docs/api.md "Problems") ----
 
-export type ProblemKind = 'nanikiru'; // 何切る
+export type ProblemKind = 'nanikiru' | 'machi'; // 何切る | 待ち当て
 
 export interface ProblemPosition {
   hand: Tile[]; // 13 tiles, sorted
-  drawn: Tile | null; // the tile just drawn
+  drawn: Tile | null; // the tile just drawn; null for machi
   dora_indicators: Tile[];
-  junme: number; // the discard being chosen: turn + 1
+  junme: number; // the discard being chosen: turn + 1; 0 for machi
   round_wind: Tile;
   seat_wind: Tile;
   discards: Tile[]; // your own discards so far
@@ -385,9 +385,9 @@ export interface Problem {
 
 export interface ProblemEval {
   tile: Tile;
-  rank: number; // 1 = correct (ties share a rank)
-  shanten: number;
-  ukeire: number;
+  rank: number; // 1 = correct (ties share a rank); machi: 1 = a wait, 2 = not
+  shanten: number; // machi: -1 (complete) for a wait, 0 otherwise
+  ukeire: number; // machi: the wait's copies outside the hand
   wait: number | null; // expected tenpai wait; null above 1-shanten
 }
 
@@ -396,6 +396,7 @@ export interface ProblemResult {
   correct: boolean;
   answer: ProblemEval[]; // each tile of the answer, in order
   best: Tile[]; // the correct tiles
-  ranking: ProblemEval[]; // every choice, best first
+  ranking: ProblemEval[]; // every choice, best first (machi: the waits)
+  missed?: Tile[]; // machi: the waits the answer left out (omitted when none)
   text: string;
 }

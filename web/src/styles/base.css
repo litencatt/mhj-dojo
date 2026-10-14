@@ -140,6 +140,7 @@ h2 {
 .dojo-home button:disabled,
 .resume-panel button:disabled,
 .action-bar button:disabled,
+.quiz-actions button:disabled,
 .error-banner button:disabled {
   opacity: 0.5;
   cursor: default;

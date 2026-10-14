@@ -1,5 +1,15 @@
 # Changelog
 
+## [v2026.1014.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.3...v2026.1014.0) - 2026-10-14
+
+### 新機能
+- 練習問題: 待ち当ての出題と採点 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/373
+- 道場のよろず屋: 見た目は種類ごとに並べる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/376
+- 役の練習: その役で和了れる山を複数用意する by @litencatt in https://github.com/litencatt/mhj-dojo/pull/378
+- 問題（何切る）の画面を足す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/375
+### その他
+- 問題の画面: 待ち当てを答えられるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/379
+
 ## [v2026.1013.3](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.2...v2026.1013.3) - 2026-10-13
 
 ## [v2026.1013.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1013.1...v2026.1013.2) - 2026-10-13

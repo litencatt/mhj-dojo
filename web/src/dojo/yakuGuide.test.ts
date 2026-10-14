@@ -1,5 +1,5 @@
 // The dojo's yaku guide (yakuGuide.ts), run by `npm test` in plain Node. That the examples are complete
-// hands scoring the yaku and the seeds the best ones is checked against the engine in
+// hands scoring the yaku and that each seed allows the yaku is checked against the engine in
 // internal/session/yakuguide_test.go; this checks the data is whole and well-formed.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -7,8 +7,9 @@ import { CATALOG, INITIAL_YAKU, YAKUHAI_KEYS } from './catalog.ts';
 import guideData from './yakuGuide.json' with { type: 'json' };
 import { GUIDE_KEYS, expandTiles, guideFor, guideKeyOf, practiceHref } from './yakuGuide.ts';
 
-// Yaku practice mode (discards only) cannot reproduce: no seed, no 練習 link.
-const NO_PRACTICE = ['haitei', 'houtei', 'rinshan', 'chankan', 'sankantsu'];
+// Yaku practice mode (discards and tsumo only) cannot reproduce: no seed, no 練習 link. 対々和 needs
+// a call there: four concealed triplets won by tsumo are 四暗刻.
+const NO_PRACTICE = ['haitei', 'houtei', 'rinshan', 'chankan', 'sankantsu', 'toitoi'];
 
 const rawHand = (id: string) => (guideData as Record<string, { example: { hand: string } }>)[id].example.hand;
 // The initial yaku with a guide: 立直 kept the one it had when it was sold (#321), so its chip in
@@ -27,19 +28,33 @@ test('every yaku sold in the shop (and the guided initial ones) has a guide, and
   }
 });
 
-test('every sold yaku has a practice seed, but the ones practice mode cannot reach', () => {
+test('every sold yaku has practice seeds, but the ones practice mode cannot reach', () => {
   for (const id of SOLD) {
     const g = guideFor(id)!;
     if (NO_PRACTICE.includes(id)) {
       assert.equal(g.practice, null, id);
       assert.equal(practiceHref(g), undefined, id);
     } else {
-      assert.ok(g.practice && Number.isInteger(g.practice.seed) && g.practice.seed >= 1, `${id}: seed`);
-      assert.equal(practiceHref(g), `?seed=${g.practice.seed}&turns=18`);
+      assert.ok(g.practice, id);
+      const { seeds, goal } = g.practice;
+      assert.ok(seeds.length >= 3, `${id}: several seeds`);
+      assert.ok(seeds.every((s) => Number.isInteger(s) && s >= 1), `${id}: seeds`);
+      assert.equal(new Set(seeds).size, seeds.length, `${id}: distinct seeds`);
       // Practice mode cannot declare 立直: those yaku train reaching tenpai on the normal form.
-      assert.equal(g.practice.row === 'normal', ['riichi', 'ippatsu', 'double_riichi'].includes(id), id);
+      assert.equal(goal, ['riichi', 'ippatsu', 'double_riichi'].includes(id) ? 'tenpai' : 'win', id);
     }
   }
+});
+
+test('the practice link picks one of the seeds at random', () => {
+  const g = guideFor('iipeikou')!;
+  const seeds = g.practice!.seeds;
+  assert.equal(practiceHref(g, () => 0), `?seed=${seeds[0]}&turns=18`);
+  assert.equal(practiceHref(g, () => 0.999999), `?seed=${seeds[seeds.length - 1]}&turns=18`);
+  assert.equal(practiceHref(g, () => 1), `?seed=${seeds[seeds.length - 1]}&turns=18`); // never past the end
+  const hrefs = new Set(seeds.map((_, i) => practiceHref(g, () => (i + 0.5) / seeds.length)));
+  assert.equal(hrefs.size, seeds.length, 'every seed can be picked');
+  assert.match(practiceHref(g)!, /^\?seed=\d+&turns=18$/);
 });
 
 test('an example hand has the tiles of a winning hand', () => {
