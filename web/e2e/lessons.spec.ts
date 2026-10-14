@@ -265,7 +265,7 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(panel.locator('.dojo-lesson-stage summary').first()).toContainText('和了の形');
   await expect(panel.locator('.dojo-lesson-stage').nth(1)).not.toHaveAttribute('open', '');
   await expect(panel.getByRole('progressbar', { name: '習得した課題' })).toHaveAttribute('aria-valuenow', '0');
-  await expect(panel.getByTestId('dojo-lessons-count')).toHaveText('0 / 20');
+  await expect(panel.getByTestId('dojo-lessons-count')).toHaveText('0 / 23');
   await expect(panel.locator('[aria-current="step"]')).toHaveCount(1);
   // Locked: no way to start it, and what comes first is named.
   await openStage(panel.locator('.dojo-lesson-stage').nth(1));
@@ -273,13 +273,13 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(locked).toHaveAttribute('data-state', 'locked');
   await expect(locked.getByRole('link')).toHaveCount(0);
   await expect(locked.locator('.dojo-lesson-more summary')).toContainText('解説（先に: 和了形を作る）');
-  // A lesson's yaku has its guide; stage 6 is announced, the 師範戦 locked (master-match.spec.ts).
+  // A lesson's yaku has its guide; the 師範戦 locked (master-match.spec.ts), 秘伝 after it and the score announced.
   await openStage(panel.locator('.dojo-lesson-stage').nth(2));
   await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
   await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/秘伝.*準備中/]);
-  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['初伝 0 / 4', '中伝 0 / 9', '奥伝 0 / 7', '皆伝']);
+  await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/点数計算.*準備中/]);
+  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['初伝 0 / 4', '中伝 0 / 9', '奥伝 0 / 7', '皆伝', '秘伝 0 / 3']);
   await expect(page.getByTestId('dojo-master-match')).toHaveAttribute('data-state', 'locked');
 });
 
@@ -333,4 +333,66 @@ test('practice mode offers no lesson without a dojo', async ({ page }) => {
   await expect(handPanel(page)).toBeVisible();
   await expect(page.getByTestId('lesson-status')).toHaveCount(0);
   expect(await dojoProgress(page)).toBe(null);
+});
+
+// ---- 秘伝: practice problems (?mode=quiz&lesson=) ----
+
+test('a 秘伝 lesson opens the problems of its kind and level; each problem answered right counts once, the fifth passes it', async ({ page }) => {
+  // 待ち当て unlocked by 振聴, three problems answered right already.
+  const seen = ['quiz:machi:2:100', 'quiz:machi:2:101', 'quiz:machi:2:102'];
+  await storeProgress(page, { lessons: { furiten: done, 'hiden-machi': { assisted: false, count: 3, done: false, seen } } });
+  await page.goto('./?mode=dojo');
+  const row = page.locator('[data-lesson="hiden-machi"]');
+  await openStage(row.locator('xpath=ancestor::details[1]'));
+  await expect(row.locator('.dojo-lesson-form')).toHaveText('問題');
+  await expect(row.locator('.shop-price')).toHaveText('未習得 3/5');
+  await row.getByRole('link', { name: '続ける' }).click();
+  await expect(page).toHaveURL(/[?&]mode=quiz&kind=machi&level=2&lesson=hiden-machi/);
+  const status = page.getByTestId('lesson-status');
+  const stage = status.locator('.lesson-stage');
+  await expect(status).toContainText('待ち当て');
+  await expect(stage).toHaveText('未習得 3/5');
+  // The lesson's kind and level are fixed: 設定 offers neither.
+  await page.getByRole('button', { name: '設定' }).click();
+  await expect(page.getByRole('dialog', { name: '設定' }).getByRole('group', { name: '種類' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  const picker = page.locator('.quiz-picker');
+  const right = page.getByRole('heading', { name: '正解', exact: true });
+  async function answer(tiles: string[]) {
+    for (const t of tiles) await picker.locator(`button.tile[aria-label="${t}"]`).click();
+    await page.getByRole('button', { name: '答える' }).click();
+    await expect(page.locator('.quiz-result')).toBeVisible();
+  }
+  /** Answers the problem shown right: 東 first (a wrong answer counts nothing), then, if it was not, its waits after a reload. */
+  async function answerRight(counted: string) {
+    await answer(['東']);
+    if ((await right.count()) > 0) return [];
+    await expect(stage).toHaveText(counted);
+    const waits = await page.locator('.quiz-result .quiz-best .tile').evaluateAll((ts) => ts.map((t) => t.getAttribute('aria-label') ?? ''));
+    await page.reload();
+    await answer(waits);
+    await expect(right).toBeVisible();
+    return waits;
+  }
+  const waits = await answerRight('未習得 3/5');
+  await expect(stage).toHaveText('未習得 4/5');
+  await expect(status.locator('.lesson-note')).toHaveText('達成！');
+  // The same problem again counts nothing.
+  await page.reload();
+  await answer(waits.length > 0 ? waits : ['東']);
+  await expect(right).toBeVisible();
+  await expect(stage).toHaveText('未習得 4/5');
+
+  // The next problem answered right passes the lesson and pays its coins and 稽古.
+  const before = (await dojoProgress(page))!;
+  await page.getByRole('button', { name: '次の問題' }).click();
+  await expect(page.locator('.quiz-result')).toHaveCount(0);
+  await answerRight('未習得 4/5');
+  await expect(status.locator('.lesson-note')).toHaveText(`習得！ ${LESSON_COINS}銭を受け取りました`);
+  await expect(status.getByRole('link', { name: '道場に戻って次の課題へ' })).toBeVisible();
+  const after = (await dojoProgress(page))!;
+  expect(after.lessons['hiden-machi'].done).toBe(true);
+  expect(after.coins).toBe(before.coins + LESSON_COINS);
+  expect(after.xp).toBe(before.xp + LESSON_XP);
 });
