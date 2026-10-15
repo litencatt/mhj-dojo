@@ -73,9 +73,9 @@ test('the 師範戦 stays locked short of the curriculum, and its URL then deals
   const { [last.id]: _, ...short } = GRADUATED.lessons!;
   await storeProgress(page, { ...GRADUATED, xp: 1_000_000, lessons: short });
   await page.goto('./?mode=dojo');
-  await expect(masterRow(page)).toHaveAttribute('data-state', 'locked');
-  await expect(masterRow(page).getByRole('link')).toHaveCount(0);
-  await expect(masterRow(page).locator('summary')).toContainText('先に:');
+  // Locked: not listed (#374), only what opens it said.
+  await expect(masterRow(page)).toHaveCount(0);
+  await expect(page.getByTestId('dojo-lessons-rest')).toContainText('奥伝までの課題をすべて習得すると師範戦に挑めます');
   // The cheats are the 裏道場's: no tab for them before it is open, whatever the level (a high one here).
   await expect(page.getByRole('tab', { name: 'イカサマ' })).toHaveCount(0);
   // No 裏道場 yet: no 表道場 / 裏道場 tabs.

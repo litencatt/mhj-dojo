@@ -5,6 +5,7 @@ import { loadProgress, saveProgress, type DojoProgress } from './progress';
 
 /** What the last success did: counted one of several, passed the assisted stage, or passed the lesson with its reward. */
 export type LessonNote =
+  | { kind: 'replayed' } // a lesson learned, played again: passed, for no reward
   | { kind: 'counted' }
   | { kind: 'passed' }
   | { kind: 'completed'; item: string | null; coins: number }; // the item granted (its name), the coins received
@@ -36,7 +37,8 @@ export function useLesson(lessonId: string | null, onSaved?: (p: DojoProgress) =
   function record(verdict: Verdict, key: string) {
     if (!lesson || verdict === null || succeeded.current.has(key)) return;
     const cur = loadProgress().progress;
-    if (!lessonActive(cur, lesson.id)) return;
+    const replay = lessonStage(cur, lesson.id) === 'done';
+    if (!replay && !lessonActive(cur, lesson.id)) return;
     if (!verdict) {
       setFailures((n) => n + 1);
       setNote(null);
@@ -44,6 +46,11 @@ export function useLesson(lessonId: string | null, onSaved?: (p: DojoProgress) =
     }
     succeeded.current.add(key);
     setFailures(0);
+    // Learned already: judged as before, but nothing is counted or paid again.
+    if (replay) {
+      setNote({ kind: 'replayed' });
+      return;
+    }
     const r = recordSuccess(cur, lesson.id, key);
     if (r.progress === cur) return; // counted before (another tab, a reload)
     if (r.completed) {
