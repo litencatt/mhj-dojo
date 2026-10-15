@@ -27,7 +27,7 @@ interface LessonBarProps {
 
 /** The note's text, short enough for a phone's line. */
 function noteText(note: LessonNote): string {
-  if (note.kind === 'counted') return '達成！';
+  if (note.kind === 'counted' || note.kind === 'replayed') return '達成！';
   if (note.kind === 'passed') return '達成！ 次は見極め';
   if (note.item) return `習得！ ${note.item}を授かりました`;
   return note.coins > 0 ? `習得！ ${note.coins}銭を受け取りました` : '習得！';

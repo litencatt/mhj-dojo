@@ -458,13 +458,19 @@ export function lessonHref(lesson: Lesson, seed?: number): string {
   return `?${seed === undefined ? '' : `seed=${seed}&`}turns=18&lesson=${id}`;
 }
 
+/** Whether the lesson can be played: being learned, or learned and played again (#374, for no reward). */
+export function lessonPlayable(p: DojoProgress, id: string): boolean {
+  return lessonStage(p, id) !== 'locked';
+}
+
 /**
  * The yaku and the assists a lesson's game or practice adds for now: none
- * unless the lesson is being learned, its assists at the assisted stage only.
+ * for a lesson locked, its assists at the assisted stage only (a lesson
+ * learned and played again is played as its last stage: its yaku, no assists).
  */
 export function lessonAids(p: DojoProgress, id: string): { yaku: string[]; assists: string[] } {
   const lesson = findLesson(id);
-  if (!lesson || !lessonActive(p, id)) return { yaku: [], assists: [] };
+  if (!lesson || !lessonPlayable(p, id)) return { yaku: [], assists: [] };
   return { yaku: [...lesson.tempYaku], assists: lessonStage(p, id) === 'assisted' ? [...lesson.assists] : [] };
 }
 

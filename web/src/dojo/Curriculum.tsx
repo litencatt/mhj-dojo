@@ -5,16 +5,15 @@ import { progressSaved, saveProgress, type DojoProgress } from './progress';
 import { Furigana } from './Furigana';
 import { expandTiles, guideFor } from './yakuGuide';
 
-// The curriculum's stages (#316), 0 to 6, shown under four tiers: 初伝, 中伝 and 奥伝, then,
-// after the 師範戦 (皆伝), 秘伝. The word 段 is the 級位's (初段, 二段…), so a stage is shown by its
-// name only, never as 段N.
-const STAGE_NAMES = ['和了の形', '聴牌・待ち・振聴', '役が要る', '鳴き', '守り', '手役', '局面問題'] as const;
+// The curriculum's tiers (#316): 初伝 (stages 0-1), 中伝 (2-4) and 奥伝 (5), then, after the 師範戦
+// (皆伝), 秘伝 (6). The panel counts the lessons learned in each; the word 段 is the 級位's (初段,
+// 二段…), so a stage is never shown as 段N.
 const TIERS: readonly { name: string; stages: readonly number[] }[] = [
   { name: '初伝', stages: [0, 1] },
   { name: '中伝', stages: [2, 3, 4] },
   { name: '奥伝', stages: [5] },
+  { name: '秘伝', stages: [6] },
 ];
-const HIDEN = { name: '秘伝', stages: [6] };
 
 const FORM_NAMES: Record<Lesson['form'], string> = { practice: '練習モード', game: '対局', quiz: '問題' };
 
@@ -42,19 +41,30 @@ interface CurriculumProps {
 }
 
 /**
- * The hub's 鍛錬 panel, short so that 出稽古 shows under it: the count
- * learned, the next lesson alone (its form, state, goal, a way to start it
- * and, folded, its text and example hand), then every lesson folded under
- * すべての課題 (open only when no lesson is next): stage by stage (the stage
- * of the next lesson open), the 師範戦 (MasterMatchRow), then 秘伝 (the
- * practice problems, which rest on lessons before it, not on the 師範戦), and
- * the score lessons announced at the end.
+ * The hub's 鍛錬 panel (#374), short so that 出稽古 shows under it: the count
+ * learned; what to do now alone (the next lesson, or the 師範戦 while it is
+ * open and not won, before 秘伝), with its goal, a way to start it and,
+ * folded, its text and example hand; the other lessons that can be tried,
+ * folded; the lessons learned, folded, each to play again (for no reward);
+ * then a line of the tiers' counts and how many lessons are locked. A locked
+ * lesson is not listed. The score lessons are announced at the end.
  */
 export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
   const next = nextLesson(progress);
+  const masterOpen = masterMatchOpen(progress);
+  const won = progress.masterMatch.uraOpen;
   // The 師範戦 comes before 秘伝 while it is open and not won: it is the curriculum's goal.
-  const masterNow = masterMatchOpen(progress) && !progress.masterMatch.uraOpen && (!next || next.stage === 6);
-  const passed = LESSONS.filter((l) => lessonStage(progress, l.id) === 'done').length;
+  const masterNow = masterOpen && !won && (!next || next.stage === 6);
+  const now = masterNow ? undefined : next;
+  const stageOf = (l: Lesson) => lessonStage(progress, l.id);
+  const passed = LESSONS.filter((l) => stageOf(l) === 'done').length;
+  const others = LESSONS.filter((l) => lessonActive(progress, l.id) && l.id !== now?.id);
+  const learned = LESSONS.filter((l) => stageOf(l) === 'done');
+  const locked = LESSONS.filter((l) => stageOf(l) === 'locked').length;
+  const counts = TIERS.map((t) => {
+    const ls = LESSONS.filter((l) => t.stages.includes(l.stage));
+    return `${t.name} ${ls.filter((l) => stageOf(l) === 'done').length}/${ls.length}`;
+  }).join('・');
   return (
     <section class="dojo-panel" aria-labelledby="dojo-lessons-heading" data-testid="dojo-lessons">
       <div class="dojo-lessons-heading">
@@ -74,80 +84,51 @@ export function Curriculum({ progress, seed, onGuide }: CurriculumProps) {
           {passed} / {LESSONS.length}
         </small>
       </div>
-      {(masterNow || next) && (
+      {(masterNow || now) && (
         <ul class="shop-list dojo-lesson-now">
-          {masterNow ? <MasterMatchRow progress={progress} testId="dojo-master-match" /> : <LessonRow lesson={next!} progress={progress} next seed={seed} onGuide={onGuide} />}
+          {masterNow ? (
+            <MasterMatchRow progress={progress} />
+          ) : (
+            <LessonRow lesson={now!} progress={progress} next seed={seed} onGuide={onGuide} />
+          )}
         </ul>
       )}
-      <details class="dojo-lessons-all" open={!masterNow && !next}>
-        <summary>すべての課題</summary>
-        {TIERS.map((tier) => (
-          <Tier key={tier.name} tier={tier} progress={progress} next={next} seed={seed} onGuide={onGuide} />
-        ))}
-        <h3 class="dojo-lesson-tier">皆伝</h3>
-        <details class="dojo-lesson-stage" open={masterMatchOpen(progress)}>
+      {others.length > 0 && (
+        <details class="dojo-lessons-group" data-group="open">
           <summary>
-            師範戦
-            <span class="dojo-muted"> {progress.masterMatch.uraOpen ? '勝利' : masterMatchOpen(progress) ? '挑戦できます' : '奥伝の後'}</span>
+            ほかに挑める課題<span class="dojo-muted"> {others.length}</span>
           </summary>
           <ul class="shop-list">
-            <MasterMatchRow progress={progress} testId={masterNow ? undefined : 'dojo-master-match'} primary={!masterNow} />
+            {others.map((l) => (
+              <LessonRow key={l.id} lesson={l} progress={progress} next={false} seed={seed} onGuide={onGuide} />
+            ))}
           </ul>
         </details>
-        <Tier tier={HIDEN} progress={progress} next={next} seed={seed} onGuide={onGuide} />
-        <ul class="dojo-lesson-later">
-          <li>
-            秘伝の点数計算<span class="dojo-muted">準備中</span>
-          </li>
-        </ul>
-      </details>
+      )}
+      {learned.length > 0 && (
+        <details class="dojo-lessons-group" data-group="done">
+          <summary>
+            習得済み<span class="dojo-muted"> {learned.length + (won ? 1 : 0)}</span>
+          </summary>
+          <ul class="shop-list">
+            {learned.map((l) => (
+              <LessonRow key={l.id} lesson={l} progress={progress} next={false} seed={seed} onGuide={onGuide} />
+            ))}
+            {won && <MasterMatchRow progress={progress} />}
+          </ul>
+        </details>
+      )}
+      <p class="dojo-lessons-rest dojo-muted" data-testid="dojo-lessons-rest">
+        {counts}
+        {locked > 0 && <span>。ロック中の課題 {locked}（前の課題を習得すると開きます）</span>}
+        {!masterOpen && <span>。奥伝までの課題をすべて習得すると師範戦に挑めます</span>}
+      </p>
+      <ul class="dojo-lesson-later">
+        <li>
+          秘伝の点数計算<span class="dojo-muted">準備中</span>
+        </li>
+      </ul>
     </section>
-  );
-}
-
-interface TierProps {
-  tier: { name: string; stages: readonly number[] };
-  progress: DojoProgress;
-  next: Lesson | undefined;
-  seed?: number;
-  onGuide: (key: string) => void;
-}
-
-/** A tier's heading with its count learned, then its stages, each folded unless the next lesson is in it. */
-function Tier({ tier, progress, next, seed, onGuide }: TierProps) {
-  const tierLessons = LESSONS.filter((l) => tier.stages.includes(l.stage));
-  const tierDone = tierLessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-  return (
-    <>
-      <h3 class="dojo-lesson-tier">
-        {tier.name}
-        <span class="dojo-muted">
-          {' '}
-          {tierDone} / {tierLessons.length}
-        </span>
-      </h3>
-      {tier.stages.map((stage) => {
-        const lessons = LESSONS.filter((l) => l.stage === stage);
-        const done = lessons.filter((l) => lessonStage(progress, l.id) === 'done').length;
-        // Every stage folds alike, one of a single lesson too: only the next lesson's is open.
-        return (
-          <details key={stage} class="dojo-lesson-stage" open={next?.stage === stage}>
-            <summary>
-              {STAGE_NAMES[stage]}
-              <span class="dojo-muted">
-                {' '}
-                {done} / {lessons.length}
-              </span>
-            </summary>
-            <ul class="shop-list">
-              {lessons.map((l) => (
-                <LessonRow key={l.id} lesson={l} progress={progress} next={false} seed={seed} onGuide={onGuide} />
-              ))}
-            </ul>
-          </details>
-        );
-      })}
-    </>
   );
 }
 
@@ -162,6 +143,7 @@ interface LessonRowProps {
 function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
   const state = lessonStage(progress, lesson.id);
   const active = lessonActive(progress, lesson.id);
+  const action = active ? (progress.lessons[lesson.id] ? '続ける' : '始める') : state === 'done' ? 'もう一度' : null;
   const times = lesson.times ?? 1;
   const count = progress.lessons[lesson.id]?.count ?? 0;
   const guide = lesson.guide !== undefined && guideFor(lesson.guide) ? lesson.guide : null;
@@ -191,13 +173,14 @@ function LessonRow({ lesson, progress, next, seed, onGuide }: LessonRowProps) {
           役の解説
         </button>
       )}
-      {active && (
+      {/* A lesson learned is played again for no reward (its judgment only). */}
+      {action && (
         <a class={next ? 'dojo-start' : 'dojo-restart'} href={lessonHref(lesson, lessonDealSeed(progress, lesson, seed))}
           onClick={keep}
           onAuxClick={keep}
-          aria-label={`${lesson.title}を${progress.lessons[lesson.id] ? '続ける' : '始める'}`}
+          aria-label={`${lesson.title}を${action}`}
         >
-          {progress.lessons[lesson.id] ? '続ける' : '始める'}
+          {action}
         </a>
       )}
       {/* Open for a dojo that has not begun the curriculum: its first lesson's rules are new. */}
@@ -232,7 +215,7 @@ export const MASTER_MATCH_HREF = '?mode=dojo&play=1&match=master';
  * (the primary button until it is won: the curriculum is passed by then, so no lesson is next)
  * and, folded, its rules and what is still missing.
  */
-function MasterMatchRow({ progress, testId, primary = true }: { progress: DojoProgress; testId?: string; primary?: boolean }) {
+function MasterMatchRow({ progress }: { progress: DojoProgress }) {
   const open = masterMatchOpen(progress);
   const { tries, wins, uraOpen } = progress.masterMatch;
   const left = LESSONS.filter((l) => lessonStage(progress, l.id) !== 'done').length;
@@ -241,7 +224,7 @@ function MasterMatchRow({ progress, testId, primary = true }: { progress: DojoPr
     if (!progressSaved()) saveProgress(progress);
   };
   return (
-    <li class="shop-item dojo-lesson" data-state={!open ? 'locked' : uraOpen ? 'done' : 'open'} data-testid={testId}>
+    <li class="shop-item dojo-lesson" data-state={!open ? 'locked' : uraOpen ? 'done' : 'open'} data-testid="dojo-master-match">
       <span class="shop-name">師範戦（半荘・師範×3）</span>
       <span class={uraOpen ? 'shop-owned' : open ? 'shop-price' : 'shop-locked'}>
         {!open ? 'ロック' : `挑戦 ${tries}回・勝利 ${wins}回`}
@@ -251,7 +234,7 @@ function MasterMatchRow({ progress, testId, primary = true }: { progress: DojoPr
         半荘戦で師範3人を相手に1位になる
       </p>
       {open && (
-        <a class={uraOpen || !primary ? 'dojo-restart' : 'dojo-start'} href={MASTER_MATCH_HREF} onClick={keep} onAuxClick={keep}
+        <a class={uraOpen ? 'dojo-restart' : 'dojo-start'} href={MASTER_MATCH_HREF} onClick={keep} onAuxClick={keep}
           aria-label={uraOpen ? '師範戦にもう一度挑戦する' : '師範戦に挑戦する'}
         >
           {uraOpen ? 'もう一度挑戦する' : '挑戦する'}

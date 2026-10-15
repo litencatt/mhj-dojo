@@ -149,7 +149,7 @@ test('the dojo tells nothing of the 裏道場 before the 師範戦 is won', asyn
   const dialog = await openHelp(page);
   for (const w of words) await expect(dialog, w).not.toContainText(w);
   await page.keyboard.press('Escape');
-  for (const w of words) await expect(page.getByTestId('dojo-master-match'), w).not.toContainText(w);
+  for (const w of words) await expect(page.getByTestId('dojo-lessons'), w).not.toContainText(w);
 
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [
     STORAGE_KEY,

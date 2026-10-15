@@ -15,6 +15,7 @@ import {
   lessonAids,
   lessonDealSeed,
   lessonHref,
+  lessonPlayable,
   lessonSeed,
   lessonStage,
   practiceKey,
@@ -378,7 +379,11 @@ test('the temporary yaku of a lesson are those it teaches', () => {
   assert.deepEqual(lessonAids(passed(['riichi-win', 'tanyao-win']), 'yakuhai-pon').yaku, ['haku', 'hatsu', 'chun', 'ton', 'nan', 'shaa', 'pei']);
   assert.deepEqual(lessonAids(passed(['yakuhai-pon']), 'kan-win').yaku, ['rinshan']);
   assert.deepEqual(lessonAids(initialProgress(), 'kan-win'), { yaku: [], assists: [] }); // locked
-  assert.deepEqual(lessonAids(passed(['yakuhai-pon', 'kan-win']), 'kan-win'), { yaku: [], assists: [] }); // done
+  // Done, played again (#374): as its last stage, its yaku without assists.
+  assert.deepEqual(lessonAids(passed(['yakuhai-pon', 'kan-win']), 'kan-win'), { yaku: ['rinshan'], assists: [] });
+  assert.deepEqual(lessonAids(passed(['riichi-win', 'genbutsu']), 'genbutsu'), { yaku: [], assists: [] });
+  assert.equal(lessonPlayable(passed(['yakuhai-pon', 'kan-win']), 'kan-win'), true);
+  assert.equal(lessonPlayable(initialProgress(), 'kan-win'), false);
 });
 
 /** Passes a lesson whose prerequisites are done, through both of its stages. */
