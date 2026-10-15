@@ -437,9 +437,10 @@
   display: inline-flex;
   align-items: center;
 }
-/* The hub's 鍛錬 panel (Curriculum): a folded group per stage, its lessons as the shop's rows
-   (.shop-list, .shop-item), each with its text and example folded under it; the next lesson
-   marked as the notice is. */
+/* The hub's 鍛錬 panel (Curriculum), short so that 出稽古 shows under it on a phone: the next
+   lesson alone (.dojo-lesson-now), then every lesson folded under すべての課題
+   (.dojo-lessons-all): a folded group per stage, its lessons as the shop's rows (.shop-list,
+   .shop-item), each with its text and example folded under it. */
 /* The panel's heading with the lessons learned as a bar (the 稽古's, .dojo-xpbar) and a count. */
 .dojo-lessons-heading {
   display: flex;
@@ -448,6 +449,18 @@
 }
 .dojo-lessons-heading h2 {
   margin: 0;
+}
+.dojo-lesson-now {
+  margin-top: 8px;
+}
+.dojo-lessons-all {
+  margin-top: 4px;
+}
+.dojo-lessons-all > summary {
+  min-height: 32px;
+  line-height: 32px;
+  font-weight: bold;
+  cursor: pointer;
 }
 .dojo-lesson-tier {
   margin: 12px 0 2px;
@@ -492,6 +505,10 @@
 .dojo-lesson-more {
   flex-basis: 100%;
   font-size: 0.85rem;
+}
+/* Folded, 解説 sits beside the lesson's buttons, on their row; opened, it takes a row of its own. */
+.dojo-lesson-more:not([open]) {
+  flex-basis: auto;
 }
 .dojo-lesson-more > summary {
   min-height: 24px;
