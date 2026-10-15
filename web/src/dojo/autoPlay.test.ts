@@ -29,7 +29,9 @@ test('自動和了 takes a tsumo or a ron; off, a win is left to the player', ()
 });
 
 test('ツモ切り discards the drawn tile only, on your own turn', () => {
-  assert.deepEqual(autoMove(at('discard', { discards: ['1m', '5p'], riichi: ['5p'] }, '5p'), on('tsumogiri')), { type: 'discard', tile: '5p' });
+  assert.deepEqual(autoMove(at('discard', { discards: ['1m', '5p'] }, '5p'), on('tsumogiri')), { type: 'discard', tile: '5p' });
+  // Riichi offered: the player chooses (#310).
+  assert.equal(autoMove(at('discard', { discards: ['1m', '5p'], riichi: ['5p'] }, '5p'), on('tsumogiri')), null);
   assert.equal(autoMove(at('discard', { discards: ['1m'] }), on('tsumogiri')), null, 'no drawn tile (after a call)');
   assert.equal(autoMove(at('discard', { discards: ['1m'] }, '5p', 2), ALL), null, 'another seat to move');
   assert.equal(autoMove(at('discard', { discards: ['1m', '5p'] }, '5p'), on('win', 'nocall')), null);

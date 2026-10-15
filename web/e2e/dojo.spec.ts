@@ -12,9 +12,11 @@ import {
   dojoProgress,
   finishDojoGame,
   handPanel,
+  isGameAction,
   isRequest,
   newDojoGame,
   nextEngineReply,
+  onEngineReply,
   openSettings,
   playGameToEnd,
   playOneStep,
@@ -880,7 +882,8 @@ test('the automations show once bought, switch in the hand heading, and play a r
   await expect(handPanel(page).getByRole('group', { name: '自動' })).toHaveCount(0);
 
   // DOJO_WIN_SEED: tsumogiri wins the first round by tsumo. With 自動ツモ切り and
-  // 自動和了 on (and 鳴きなし passing any call), the round ends with no click on the hand.
+  // 自動和了 on (and 鳴きなし passing any call), the round ends with no click on the hand but
+  // the drawn tile where riichi is offered.
   await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
   await page.evaluate(
     ([key, value]) => localStorage.setItem(key, value),
@@ -895,11 +898,92 @@ test('the automations show once bought, switch in the hand heading, and play a r
     await chip.click();
     await expect(chip).toHaveAttribute('aria-pressed', 'true');
   }
-  await expect(page.getByRole('region', { name: '結果' })).toContainText('自分のツモ和了', { timeout: 60_000 });
+  // ツモ切り stops where riichi is offered (#310): the player plays the drawn tile there (dama).
+  const result = page.getByRole('region', { name: '結果' });
+  const riichi = page.getByRole('button', { name: 'リーチ', exact: true });
+  await expect(async () => {
+    if (await riichi.isVisible()) await handPanel(page).locator('.hand-drawn button.tile').click();
+    await expect(result).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 60_000 });
+  await expect(result).toContainText('自分のツモ和了');
 
   // The switches stay on for the next game.
   await page.reload();
   await expect(tools.getByRole('button', { name: '自動和了' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+const AUTOS = ['assist:autowin', 'assist:tsumogiri', 'assist:nocall'];
+
+/** A dojo game on seed with the automations bought, those of on switched on. */
+async function autoGame(page: Page, seed: number, on: string[]) {
+  await page.addInitScript(
+    ([key, value, auto]) => {
+      if (localStorage.getItem(key) === null) {
+        localStorage.setItem(key, value);
+        localStorage.setItem('mhj-dojo.dojo.auto.v1', auto);
+      }
+    },
+    [STORAGE_KEY, JSON.stringify({ ...initialProgress(), ownedItems: AUTOS }), JSON.stringify(on)],
+  );
+  await page.goto(`./?mode=dojo&play=1&seed=${seed}`);
+  await expect(handPanel(page)).toBeVisible();
+}
+
+test('鳴きなし passes a pon offered, with no click (#310)', async ({ page }) => {
+  test.setTimeout(90_000);
+  await watchEngine(page);
+  // SEED offers a pon within a couple of turns of ツモ切り: the action after the offer is the page's own.
+  let offered = false;
+  let passed = false;
+  onEngineReply(page, (call, reply) => {
+    if (!isGameAction(call)) return;
+    if (offered) passed = true;
+    if (reply.data?.phase === 'call' && reply.data?.legal?.pon) offered = true;
+  });
+  await autoGame(page, SEED, ['tsumogiri', 'nocall']);
+  await expect.poll(() => passed, { timeout: 60_000 }).toBe(true);
+  await expect(page.locator('.action-bar').getByRole('button', { name: 'ポン', exact: true })).toHaveCount(0);
+});
+
+test('a game reopened from its save stands still on its first state, the automations on (#310)', async ({ page }) => {
+  await watchEngine(page);
+  let actions = 0;
+  onEngineReply(page, (call) => {
+    if (isGameAction(call)) actions++;
+  });
+  await autoGame(page, SEED, ['tsumogiri', 'nocall']);
+  // Moving by itself: actions go out with no click.
+  await expect.poll(() => actions, { timeout: 30_000 }).toBeGreaterThan(1);
+  // Reopened: nothing goes out until the player moves.
+  await page.reload();
+  await expect(handPanel(page)).toBeVisible();
+  await waitForPlayback(page);
+  const before = actions;
+  await page.waitForTimeout(2000);
+  expect(actions).toBe(before);
+});
+
+test('the automations wait while the tab is hidden, and go on once it shows (#310)', async ({ page }) => {
+  test.setTimeout(60_000);
+  await watchEngine(page);
+  let actions = 0;
+  onEngineReply(page, (call) => {
+    if (isGameAction(call)) actions++;
+  });
+  await autoGame(page, SEED, ['tsumogiri', 'nocall']);
+  await expect.poll(() => actions, { timeout: 30_000 }).toBeGreaterThan(0);
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (h ? 'hidden' : 'visible') });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+  await setHidden(true);
+  await page.waitForTimeout(1000); // an action already out comes back
+  const before = actions;
+  await page.waitForTimeout(2000);
+  expect(actions).toBe(before);
+  await setHidden(false);
+  await expect.poll(() => actions, { timeout: 30_000 }).toBeGreaterThan(before);
 });
 
 test('a CPU game shows no automations, whatever the dojo bought and switched on', async ({ page }) => {
