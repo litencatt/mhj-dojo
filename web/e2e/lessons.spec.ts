@@ -53,9 +53,14 @@ const stageOf = (page: Page) => page.getByTestId('lesson-status').locator('.less
 const yakuRow = (page: Page, name: string) =>
   page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: name });
 
-// Opens a stage of the curriculum whatever it starts as (clicking its summary would toggle it).
+// Opens a stage of the curriculum, and すべての課題 around it, whatever they start as (clicking a
+// summary would toggle it).
 async function openStage(stage: Locator) {
-  await stage.evaluate((el) => ((el as HTMLDetailsElement).open = true));
+  await stage.evaluate((el) => {
+    (el as HTMLDetailsElement).open = true;
+    const all = el.closest('.dojo-lessons-all');
+    if (all) (all as HTMLDetailsElement).open = true;
+  });
 }
 
 test('a lesson\'s yaku count in its game only, a resumed one included; its game has no automations', async ({ page }) => {
@@ -241,14 +246,20 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
 
 // ---- The hub's 鍛錬 panel ----
 
-const lessonRow = (page: Page, id: string) => page.getByTestId('dojo-lessons').locator(`[data-lesson="${id}"]`);
+// A lesson's row in すべての課題 (the next lesson's is also the card above it, .dojo-lesson-now).
+const lessonRow = (page: Page, id: string) => page.getByTestId('dojo-lessons').locator(`.dojo-lessons-all [data-lesson="${id}"]`);
 
-test('the hub lists the curriculum by stage, the next lesson marked and opened; a locked one has no start', async ({ page }) => {
+test('the hub shows the next lesson alone and the curriculum by stage folded under it; a locked one has no start', async ({ page }) => {
   await storeProgress(page, {});
   await page.goto('./?mode=dojo');
   const panel = page.getByTestId('dojo-lessons');
   await expect(panel.getByRole('heading', { name: /鍛錬/ })).toBeVisible();
-  const first = lessonRow(page, 'shape-win');
+  // Short: the next lesson's card, then すべての課題 folded, and 出稽古 right under the panel.
+  const all = panel.locator('.dojo-lessons-all');
+  await expect(all).not.toHaveAttribute('open', '');
+  await expect(all.locator('summary').first()).toHaveText('すべての課題');
+  await expect(panel.locator('.dojo-lesson-now .dojo-lesson')).toHaveCount(1);
+  const first = panel.locator('.dojo-lesson-now [data-lesson="shape-win"]');
   await expect(first).toHaveAttribute('aria-current', 'step');
   await expect(first).toHaveAttribute('data-state', 'unassisted');
   await expect(first.locator('.dojo-lesson-form')).toHaveText('練習モード');
@@ -260,7 +271,10 @@ test('the hub lists the curriculum by stage, the next lesson marked and opened; 
   await expect(first.locator('.dojo-lesson-more')).toHaveAttribute('open', '');
   await expect(first.getByRole('group', { name: '例の手' }).locator('.tile')).toHaveCount(14);
   await expect(first.locator('.dojo-lesson-block')).toHaveCount(5);
-  // Every stage folds alike (和了の形 of one lesson too): only the next lesson's is open.
+  // In すべての課題 every stage folds alike (和了の形 of one lesson too): only the next lesson's is open.
+  await all.locator('summary').first().click();
+  await expect(all).toHaveAttribute('open', '');
+  await expect(lessonRow(page, 'shape-win')).not.toHaveAttribute('aria-current', 'step');
   await expect(panel.locator('.dojo-lesson-stage').nth(0)).toHaveAttribute('open', '');
   await expect(panel.locator('.dojo-lesson-stage summary').first()).toContainText('和了の形');
   await expect(panel.locator('.dojo-lesson-stage').nth(1)).not.toHaveAttribute('open', '');
