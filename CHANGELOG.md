@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1015.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.2...v2026.1015.0) - 2026-10-15
+
+### 新機能
+- 道場の鍛錬をコンパクトにする（次の課題だけを出し、残りは折りたたむ） by @litencatt in https://github.com/litencatt/mhj-dojo/pull/388
+
 ## [v2026.1014.2](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.1...v2026.1014.2) - 2026-10-14
 
 ### 新機能
