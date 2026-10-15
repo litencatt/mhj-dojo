@@ -1,5 +1,11 @@
 # Changelog
 
+## [v2026.1015.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1015.0...v2026.1015.1) - 2026-10-15
+
+### 新機能
+- 道場の自動操作: リーチできる局面・開き直した最初の局面・裏のタブでは止まる by @litencatt in https://github.com/litencatt/mhj-dojo/pull/392
+- 道場の鍛錬: 今挑める課題だけを出し、習得済みの課題をもう一度遊べるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/391
+
 ## [v2026.1015.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1014.2...v2026.1015.0) - 2026-10-15
 
 ### 新機能
