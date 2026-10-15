@@ -33,7 +33,7 @@ import { DojoAids, ukeireBadges } from './dojo/DojoAids';
 import { useDojoGame, useLearnedRows } from './dojo/useDojoGame';
 import { LessonBar } from './dojo/LessonBar';
 import { useLesson } from './dojo/useLesson';
-import { findLesson, gameRoundKey, lessonActive } from './dojo/lessons';
+import { findLesson, gameRoundKey, lessonPlayable } from './dojo/lessons';
 import { LooksSettings, useSharedLooks } from './dojo/looks';
 import { AUTO_ITEMS, AUTO_KEYS, autoMove, useAutoPlay, type AutoKey } from './dojo/autoPlay';
 import { ActionBar } from './components/ActionBar';
@@ -68,10 +68,10 @@ function urlGameLesson(params: URLSearchParams) {
   return lesson?.form === 'game' ? lesson : undefined;
 }
 
-/** The lesson a new dojo game's URL asks for, if it is being learned (neither locked nor done). */
+/** The lesson a new dojo game's URL asks for, if it can be played (not locked: being learned, or learned and played again). */
 function openLesson(params: URLSearchParams, p: DojoProgress) {
   const lesson = urlGameLesson(params);
-  return lesson && lessonActive(p, lesson.id) ? lesson : undefined;
+  return lesson && lessonPlayable(p, lesson.id) ? lesson : undefined;
 }
 
 /** A closed-hand 東風戦 or 半荘戦 against three CPU players (?mode=game), or a dojo game (?mode=dojo). */
@@ -80,7 +80,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   const { progress, has: owns, learned: owned, reward, saveFailed, update } = useDojoGame(dojo, state);
   // A dojo game played for a lesson (dojo/lessons.ts): the one it was created for, kept with its save
   // so that a resumed game is judged by it. A lesson asked for in the URL makes it one when it is
-  // created, if the lesson is being learned; the hub's own games are never one. Should its save
+  // created, if the lesson can be played (being learned, or learned and played again); the hub's own games are never one. Should its save
   // have failed, the game created here, and else the URL (which keeps the lesson), tell it.
   const [askedLesson] = useState(() => (dojo ? new URLSearchParams(location.search).get('lesson') : null));
   const [createdFor, setCreatedFor] = useState<{ game: string; lesson: string } | null>(null);
@@ -89,7 +89,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
     const saved = gameLesson(state.game_id);
     if (saved !== null) return saved;
     if (createdFor?.game === state.game_id) return createdFor.lesson;
-    // The URL's, being learned (as when the game was dealt for it), for a game with no save at all.
+    // The URL's, playable (as when the game was dealt for it), for a game with no save at all.
     return dojoGameSaved(state.game_id) ? null : (openLesson(new URLSearchParams(location.search), loadProgress().progress)?.id ?? null);
   }, [dojo, state?.game_id, createdFor]);
   const lesson = useLesson(lessonId, update);
@@ -565,7 +565,7 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
               )}
               {!lesson && askedLesson !== null && (
                 <p class="dojo-notice" data-testid="lesson-closed">
-                  この課題はまだ挑戦できないか、習得済みです。課題のない対局になります。
+                  この課題はまだ挑戦できません。課題のない対局になります。
                 </p>
               )}
               <GameTable

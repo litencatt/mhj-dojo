@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   DOJO_NOYAKU_SEED,
   DOJO_WIN_SEED,
@@ -53,14 +53,10 @@ const stageOf = (page: Page) => page.getByTestId('lesson-status').locator('.less
 const yakuRow = (page: Page, name: string) =>
   page.getByRole('region', { name: '役別向聴テーブル' }).locator('.yaku-table tbody tr', { hasText: name });
 
-// Opens a stage of the curriculum, and すべての課題 around it, whatever they start as (clicking a
+// Opens a group of the 鍛錬 panel (ほかに挑める課題, 習得済み) whatever it starts as (clicking its
 // summary would toggle it).
-async function openStage(stage: Locator) {
-  await stage.evaluate((el) => {
-    (el as HTMLDetailsElement).open = true;
-    const all = el.closest('.dojo-lessons-all');
-    if (all) (all as HTMLDetailsElement).open = true;
-  });
+async function openGroup(page: Page, group: 'open' | 'done') {
+  await page.getByTestId('dojo-lessons').locator(`.dojo-lessons-group[data-group="${group}"]`).evaluate((el) => ((el as HTMLDetailsElement).open = true));
 }
 
 test('a lesson\'s yaku count in its game only, a resumed one included; its game has no automations', async ({ page }) => {
@@ -103,21 +99,27 @@ test('a lesson\'s yaku count in its game only, a resumed one included; its game 
   expect(plain!.yaku).not.toContain('pinfu');
 });
 
-for (const [name, lessons] of [
-  ['not open yet', {}],
-  ['passed already', { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done, 'pinfu-win': done }],
-] as const) {
-  test(`a lesson ${name} deals a game without it`, async ({ page }) => {
-    await storeProgress(page, { lessons });
-    await page.goto(`./?mode=dojo&play=1&seed=${SEED}&lesson=pinfu-win`);
-    await expect(handPanel(page)).toBeVisible();
-    await expect(page.getByTestId('lesson-closed')).toBeVisible();
-    await expect(page.getByTestId('lesson-status')).toHaveCount(0);
-    await expect(yakuRow(page, '平和')).toHaveCount(0);
-    await expect.poll(() => savedDojoGame(page)).toMatchObject({ lesson: null });
-    expect((await savedDojoGame(page))!.yaku).not.toContain('pinfu');
-  });
-}
+test('a lesson not open yet deals a game without it', async ({ page }) => {
+  await storeProgress(page, { lessons: {} });
+  await page.goto(`./?mode=dojo&play=1&seed=${SEED}&lesson=pinfu-win`);
+  await expect(handPanel(page)).toBeVisible();
+  await expect(page.getByTestId('lesson-closed')).toBeVisible();
+  await expect(page.getByTestId('lesson-status')).toHaveCount(0);
+  await expect(yakuRow(page, '平和')).toHaveCount(0);
+  await expect.poll(() => savedDojoGame(page)).toMatchObject({ lesson: null });
+  expect((await savedDojoGame(page))!.yaku).not.toContain('pinfu');
+});
+
+test('a lesson passed already deals its game again (#374): judged as its last stage, its yaku counted', async ({ page }) => {
+  await storeProgress(page, { lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done, 'pinfu-win': done } });
+  await page.goto(`./?mode=dojo&play=1&seed=${SEED}&lesson=pinfu-win`);
+  await expect(handPanel(page)).toBeVisible();
+  await expect(page.getByTestId('lesson-closed')).toHaveCount(0);
+  await expect(stageOf(page)).toHaveAttribute('data-stage', 'done');
+  await expect(yakuRow(page, '平和')).toHaveCount(1);
+  await expect.poll(() => savedDojoGame(page)).toMatchObject({ lesson: 'pinfu-win' });
+  expect((await savedDojoGame(page))!.yaku).toContain('pinfu');
+});
 
 test('a lesson\'s assist is on at its assisted stage, owned or not, and off at the other, owned or not', async ({ page }) => {
   test.setTimeout(90_000);
@@ -214,14 +216,9 @@ test('three failures in a row nudge the hint, which opens on demand; the lines s
 // Seed 4: discarding the advice's first choice each turn wins by tsumo within the 18 turns.
 const SHAPE_WIN_SEED = 4;
 
-test('shape-win: a practice played to a tsumo win passes the lesson and pays it', async ({ page }) => {
-  test.setTimeout(60_000);
-  await watchEngine(page);
-  await storeProgress(page, {});
-  await page.goto(`./?seed=${SHAPE_WIN_SEED}&turns=18&lesson=shape-win`);
-  await expect(handPanel(page)).toBeVisible();
+/** Plays the practice on SHAPE_WIN_SEED: the advice's first choice each turn, then the tsumo. */
+async function playPracticeToTsumo(page: Page) {
   const bar = page.getByTestId('lesson-status');
-  await expect(stageOf(page)).toHaveAttribute('data-stage', 'unassisted');
   for (let i = 0; i < 18; i++) {
     const st = await engineSession<{ can_tsumo: boolean; advice: { candidates: { tile: string }[] } }>(page);
     if (st.can_tsumo) break;
@@ -231,6 +228,17 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
     await expect(bar.locator('.lesson-hint-nudge')).toHaveCount(0); // a discard is not judged
   }
   await page.locator('.tsumo-button').click();
+}
+
+test('shape-win: a practice played to a tsumo win passes the lesson and pays it', async ({ page }) => {
+  test.setTimeout(60_000);
+  await watchEngine(page);
+  await storeProgress(page, {});
+  await page.goto(`./?seed=${SHAPE_WIN_SEED}&turns=18&lesson=shape-win`);
+  await expect(handPanel(page)).toBeVisible();
+  const bar = page.getByTestId('lesson-status');
+  await expect(stageOf(page)).toHaveAttribute('data-stage', 'unassisted');
+  await playPracticeToTsumo(page);
   await expect(stageOf(page)).toHaveAttribute('data-stage', 'done');
   await expect(bar.locator('.lesson-note')).toHaveText(`習得！ ${LESSON_COINS}銭を受け取りました`);
   const p = await dojoProgress(page);
@@ -247,18 +255,14 @@ test('shape-win: a practice played to a tsumo win passes the lesson and pays it'
 // ---- The hub's 鍛錬 panel ----
 
 // A lesson's row in すべての課題 (the next lesson's is also the card above it, .dojo-lesson-now).
-const lessonRow = (page: Page, id: string) => page.getByTestId('dojo-lessons').locator(`.dojo-lessons-all [data-lesson="${id}"]`);
+// A lesson's row in the 鍛錬 panel: what to do now (.dojo-lesson-now) or in a group.
+const lessonRow = (page: Page, id: string) => page.getByTestId('dojo-lessons').locator(`[data-lesson="${id}"]`);
 
-test('the hub shows the next lesson alone and the curriculum by stage folded under it; a locked one has no start', async ({ page }) => {
+test('the hub shows what to do now alone, the other lessons to try and those learned folded, and no locked one', async ({ page }) => {
   await storeProgress(page, {});
   await page.goto('./?mode=dojo');
   const panel = page.getByTestId('dojo-lessons');
   await expect(panel.getByRole('heading', { name: /鍛錬/ })).toBeVisible();
-  // Short: the next lesson's card, then すべての課題 folded, and 出稽古 right under the panel.
-  const all = panel.locator('.dojo-lessons-all');
-  await expect(all).not.toHaveAttribute('open', '');
-  await expect(all.locator('summary').first()).toHaveText('すべての課題');
-  await expect(panel.locator('.dojo-lesson-now .dojo-lesson')).toHaveCount(1);
   const first = panel.locator('.dojo-lesson-now [data-lesson="shape-win"]');
   await expect(first).toHaveAttribute('aria-current', 'step');
   await expect(first).toHaveAttribute('data-state', 'unassisted');
@@ -271,30 +275,63 @@ test('the hub shows the next lesson alone and the curriculum by stage folded und
   await expect(first.locator('.dojo-lesson-more')).toHaveAttribute('open', '');
   await expect(first.getByRole('group', { name: '例の手' }).locator('.tile')).toHaveCount(14);
   await expect(first.locator('.dojo-lesson-block')).toHaveCount(5);
-  // In すべての課題 every stage folds alike (和了の形 of one lesson too): only the next lesson's is open.
-  await all.locator('summary').first().click();
-  await expect(all).toHaveAttribute('open', '');
-  await expect(lessonRow(page, 'shape-win')).not.toHaveAttribute('aria-current', 'step');
-  await expect(panel.locator('.dojo-lesson-stage').nth(0)).toHaveAttribute('open', '');
-  await expect(panel.locator('.dojo-lesson-stage summary').first()).toContainText('和了の形');
-  await expect(panel.locator('.dojo-lesson-stage').nth(1)).not.toHaveAttribute('open', '');
   await expect(panel.getByRole('progressbar', { name: '習得した課題' })).toHaveAttribute('aria-valuenow', '0');
   await expect(panel.getByTestId('dojo-lessons-count')).toHaveText('0 / 23');
-  await expect(panel.locator('[aria-current="step"]')).toHaveCount(1);
-  // Locked: no way to start it, and what comes first is named.
-  await openStage(panel.locator('.dojo-lesson-stage').nth(1));
-  const locked = lessonRow(page, 'ryanmen-tenpai');
-  await expect(locked).toHaveAttribute('data-state', 'locked');
-  await expect(locked.getByRole('link')).toHaveCount(0);
-  await expect(locked.locator('.dojo-lesson-more summary')).toContainText('解説（先に: 和了形を作る）');
-  // A lesson's yaku has its guide; the 師範戦 locked (master-match.spec.ts), 秘伝 after it and the score announced.
-  await openStage(panel.locator('.dojo-lesson-stage').nth(2));
-  await lessonRow(page, 'riichi-win').getByRole('button', { name: '役の解説' }).click();
-  await expect(page.getByRole('dialog', { name: '立直' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  // Nothing else can be tried, nothing is learned; the locked lessons and the 師範戦 are only counted.
+  await expect(panel.locator('[data-lesson]')).toHaveCount(1);
+  await expect(panel.locator('.dojo-lessons-group')).toHaveCount(0);
+  await expect(panel.getByTestId('dojo-master-match')).toHaveCount(0);
+  const rest = panel.getByTestId('dojo-lessons-rest');
+  await expect(rest).toContainText('初伝 0/4・中伝 0/9・奥伝 0/7・秘伝 0/3');
+  await expect(rest).toContainText('ロック中の課題 22（前の課題を習得すると開きます）');
+  await expect(rest).toContainText('奥伝までの課題をすべて習得すると師範戦に挑めます');
   await expect(panel.locator('.dojo-lesson-later li')).toHaveText([/点数計算.*準備中/]);
-  await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['初伝 0 / 4', '中伝 0 / 9', '奥伝 0 / 7', '皆伝', '秘伝 0 / 3']);
-  await expect(page.getByTestId('dojo-master-match')).toHaveAttribute('data-state', 'locked');
+});
+
+test('the lessons that can be tried besides the next, and those learned to play again, are folded', async ({ page }) => {
+  await storeProgress(page, { lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done } });
+  await page.goto('./?mode=dojo');
+  const panel = page.getByTestId('dojo-lessons');
+  await expect(panel.locator('.dojo-lesson-now [aria-current="step"]')).toHaveAttribute('data-lesson', 'max-ukeire');
+  const open = panel.locator('.dojo-lessons-group[data-group="open"]');
+  const learned = panel.locator('.dojo-lessons-group[data-group="done"]');
+  await expect(open).not.toHaveAttribute('open', '');
+  await expect(learned.locator('> summary')).toHaveText('習得済み 3');
+  // Another lesson to try: started from its row, its yaku guide there.
+  await openGroup(page, 'open');
+  const tanyao = lessonRow(page, 'tanyao-win');
+  await expect(tanyao).toHaveAttribute('data-state', 'assisted');
+  await expect(tanyao.getByRole('link', { name: '始める' })).toHaveClass(/dojo-restart/);
+  await lessonRow(page, 'pinfu-win').getByRole('button', { name: '役の解説' }).click();
+  await expect(page.getByRole('dialog', { name: '平和' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  // A lesson learned: played again from its row, for no reward.
+  await openGroup(page, 'done');
+  const again = lessonRow(page, 'shape-win');
+  await expect(again).toHaveAttribute('data-state', 'done');
+  await expect(again.locator('.shop-owned')).toHaveText('習得');
+  await expect(again.getByRole('link', { name: 'もう一度' })).toHaveAttribute('href', /lesson=shape-win/);
+  await expect(panel.getByTestId('dojo-lessons-rest')).toContainText('初伝 2/4・中伝 1/9');
+});
+
+test('a lesson learned played again is judged, and pays nothing', async ({ page }) => {
+  test.setTimeout(60_000);
+  await watchEngine(page);
+  await storeProgress(page, { lessons: { 'shape-win': done } });
+  await page.goto('./?mode=dojo');
+  await openGroup(page, 'done');
+  await expect(lessonRow(page, 'shape-win').getByRole('link', { name: 'もう一度' })).toHaveAttribute('href', /lesson=shape-win/);
+  // On the seed the advice wins on (its link deals the lesson's own).
+  await page.goto(`./?seed=${SHAPE_WIN_SEED}&turns=18&lesson=shape-win`);
+  await expect(handPanel(page)).toBeVisible();
+  const bar = page.getByTestId('lesson-status');
+  await expect(stageOf(page)).toHaveAttribute('data-stage', 'done');
+  await expect(bar.getByRole('link', { name: '道場に戻って次の課題へ' })).toBeVisible();
+  const before = await dojoProgress(page);
+  // Played to its tsumo on its seed, as the first time.
+  await playPracticeToTsumo(page);
+  await expect(bar.locator('.lesson-note')).toHaveText('達成！');
+  expect(await dojoProgress(page)).toEqual(before);
 });
 
 test('a lesson started from the hub is a 東風戦 against weak CPUs whatever the hub chose; passed, it shows so after a reload and its yaku is owned', async ({ page }) => {
@@ -316,7 +353,7 @@ test('a lesson started from the hub is a 東風戦 against weak CPUs whatever th
     lessons: { 'shape-win': done, 'ryanmen-tenpai': done, 'riichi-win': done },
   });
   await page.goto(`./?mode=dojo&seed=${DOJO_WIN_SEED}`);
-  await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
+  await openGroup(page, 'open');
   const row = lessonRow(page, 'pinfu-win');
   await expect(row).toHaveAttribute('data-state', 'unassisted');
   const created = nextEngineReply(page, (call) => isRequest(call, 'POST', /^\/api\/games$/));
@@ -333,9 +370,9 @@ test('a lesson started from the hub is a 東風戦 against weak CPUs whatever th
   for (const step of ['hub', 'reload']) {
     if (step === 'hub') await page.goto('./?mode=dojo');
     else await page.reload();
-    await openStage(page.getByTestId('dojo-lessons').locator('.dojo-lesson-stage').nth(5));
+    await openGroup(page, 'done');
     await expect(row, step).toHaveAttribute('data-state', 'done');
-    await expect(row.getByRole('link'), step).toHaveCount(0);
+    await expect(row.getByRole('link'), step).toHaveText('もう一度');
     await expect(row.locator('.shop-owned'), step).toContainText('習得');
     await expect(page.getByTestId('dojo-yaku'), step).toContainText('平和');
     await expect(page.locator('[data-item="pinfu"]'), step).toContainText('所持');
@@ -357,7 +394,7 @@ test('a 秘伝 lesson opens the problems of its kind and level; each problem ans
   await storeProgress(page, { lessons: { furiten: done, 'hiden-machi': { assisted: false, count: 3, done: false, seen } } });
   await page.goto('./?mode=dojo');
   const row = page.locator('[data-lesson="hiden-machi"]');
-  await openStage(row.locator('xpath=ancestor::details[1]'));
+  await openGroup(page, 'open');
   await expect(row.locator('.dojo-lesson-form')).toHaveText('問題');
   await expect(row.locator('.shop-price')).toHaveText('未習得 3/5');
   await row.getByRole('link', { name: '続ける' }).click();
