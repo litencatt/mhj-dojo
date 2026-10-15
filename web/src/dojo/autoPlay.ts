@@ -22,7 +22,8 @@ export const AUTO_ITEMS: Record<AutoKey, { item: string; label: string }> = {
  * the player is to choose. A win comes first: with 自動和了 off, a state that
  * can win is left to the player, ツモ切り and 鳴きなし included (鳴きなし
  * still hides the calls, ActionBar). ツモ切り only plays a drawn tile (none
- * right after a call), and skips the turn's kan, riichi and 九種九牌.
+ * right after a call), and skips the turn's kan and 九種九牌; it stops where
+ * the hand can declare riichi (#310), which is the player's to choose.
  */
 export function autoMove(state: GameState, on: ReadonlySet<AutoKey>): { type: ActionType; tile?: Tile } | null {
   const { legal } = state;
@@ -34,7 +35,8 @@ export function autoMove(state: GameState, on: ReadonlySet<AutoKey>): { type: Ac
   if (state.phase !== 'discard' || state.actor !== state.you) return null;
   if (legal.tsumo) return on.has('win') ? { type: 'tsumo' } : null;
   const drawn = state.seats[state.you]?.drawn;
-  if (on.has('tsumogiri') && drawn && legal.discards.includes(drawn)) return { type: 'discard', tile: drawn };
+  // Riichi offered: stop (a hand in riichi is offered none, and goes on).
+  if (on.has('tsumogiri') && drawn && legal.discards.includes(drawn) && legal.riichi.length === 0) return { type: 'discard', tile: drawn };
   return null;
 }
 

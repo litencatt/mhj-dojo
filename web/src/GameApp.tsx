@@ -367,14 +367,22 @@ export function GameApp({ dojo = false }: { dojo?: boolean } = {}) {
   // Each state moves once, after its replay, while no request is out (the
   // next state, or an error to retry by hand).
   const autoPlayed = useRef<GameState | null>(null);
+  // Nothing moves while the tab is hidden (#310): the moves and their replay wait for the player.
+  const [visible, setVisible] = useState(() => document.visibilityState !== 'hidden');
   useEffect(() => {
-    if (!dojo || !state || busy || error || stopped || playback.playing || autoPlayed.current === state) return;
+    const onChange = () => setVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  }, []);
+  useEffect(() => {
+    // A game reopened from its save shows where it stands first (#310): its first state does not move.
+    if (!dojo || !state || !visible || state === reopened.current || busy || error || stopped || playback.playing || autoPlayed.current === state) return;
     const move = autoMove(state, autoOn);
     if (!move) return;
     autoPlayed.current = state;
     act(move.type, move.tile);
     // act closes over state (a dependency) and adviceOn only: no need to re-run for it.
-  }, [state, busy, error, stopped, playback.playing, autoOn]);
+  }, [state, visible, busy, error, stopped, playback.playing, autoOn]);
   const autoTools = autoOwned.length > 0 && (
     <div class="hand-tools" role="group" aria-label="自動">
       {autoOwned.map((k) => (
