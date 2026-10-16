@@ -183,7 +183,7 @@ jobs:
           rm -rf internal/server/static/dist
           cp -R web/dist-site internal/server/static/dist
           go build -o bin/mhj-dojo-release ./cmd/mhj-dojo
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mhj-dojo-bin
           path: bin/
@@ -267,7 +267,7 @@ jobs:
       - name: Report flaky release-build tests
         if: always() && steps.release.outcome != 'skipped'
         run: scripts/report-flaky.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report-${{ matrix.shard }}
