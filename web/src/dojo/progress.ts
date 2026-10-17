@@ -17,6 +17,7 @@ import {
   WIN_BONUS_COINS,
   XP_PER_HAN,
   findItem,
+  levelLocked,
 } from './catalog.ts';
 import type { CpuLevel, GameLength } from '../api.ts';
 import { DEFAULT_GAME_CPU, DEFAULT_GAME_LENGTH, HANCHAN_LEVEL, NORMAL_CPU_LEVEL, rankMultiplier, rankMultiplierLabel } from './rules.ts';
@@ -298,7 +299,8 @@ export function owns(p: DojoProgress, id: string): boolean {
   return p.ownedItems.includes(id) || p.ownedYaku.includes(id);
 }
 
-// 'ura': a cheat, sold only once the 裏道場 is open (the 師範戦 won), whatever the level.
+// 'level': an item sold from a level (catalog.ts levelLocked; never a yaku). 'ura': a cheat, sold
+// only once the 裏道場 is open (the 師範戦 won), whatever the level.
 export type PurchaseDenied = 'unknown' | 'owned' | 'level' | 'ura' | 'requires' | 'coins';
 
 export type Purchase =
@@ -311,7 +313,7 @@ export function purchase(p: DojoProgress, id: string): Purchase {
   if (owns(p, id)) return { ok: false, reason: 'owned' };
   if (item.kind === 'cheat') {
     if (!p.masterMatch.uraOpen) return { ok: false, reason: 'ura' };
-  } else if (level(p.xp) < item.level) {
+  } else if (levelLocked(item) && level(p.xp) < item.level) {
     return { ok: false, reason: 'level' };
   }
   if (!(item.requires ?? []).every((r) => owns(p, r))) return { ok: false, reason: 'requires' };
