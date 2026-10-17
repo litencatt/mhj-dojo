@@ -1,4 +1,4 @@
-.PHONY: build test run dev vet wasm site embed e2e deploy deploy-check
+.PHONY: build test check run dev vet wasm site embed e2e deploy deploy-check
 
 # npm ci wipes node_modules, so it only runs when the lockfile changes (npm
 # writes node_modules/.package-lock.json on every install).
@@ -13,6 +13,11 @@ test:
 
 vet:
 	go vet ./...
+
+# The quick checks before a push, short of the e2e tests (make e2e): Go vet
+# and tests, the page's types (its e2e too) and its unit tests.
+check: vet test web/node_modules/.package-lock.json
+	cd web && npm run typecheck && npm test
 
 run: embed
 	go run ./cmd/mhj-dojo
@@ -53,7 +58,8 @@ embed: site
 
 # The site's E2E tests against a built mhj-dojo (the server the tests start is
 # bin/mhj-dojo instead of `go run`, which compiles during the start-up wait).
-# EXTRA passes more arguments to playwright, e.g. EXTRA=--shard=1/3.
+# EXTRA passes more arguments to playwright, e.g. EXTRA=--shard=1/3;
+# MHJDOJO_E2E_PORT another port than 8799 (another worktree's tests running).
 e2e: build
 	cd web && MHJDOJO_BIN=$(CURDIR)/bin/mhj-dojo npx playwright test $(EXTRA)
 
