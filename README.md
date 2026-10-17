@@ -124,7 +124,7 @@ cd web && npx playwright install --with-deps chromium   # once
 make embed && cd web && npm run e2e
 ```
 
-Or `make e2e` (`EXTRA=--shard=1/3` or a spec path narrows it), which builds `bin/mhj-dojo` and runs the tests against it instead of `go run` (`MHJDOJO_BIN=<path>` does the same for `npm run e2e`; CI uses it).
+Or `make e2e` (`EXTRA=--shard=1/3` or a spec path narrows it), which builds `bin/mhj-dojo` and runs the tests against it instead of `go run` (`MHJDOJO_BIN=<path>` does the same for `npm run e2e`; CI uses it). `MHJDOJO_E2E_PORT=<port>` runs them on another port than 8799, e.g. in a second worktree. `make check` runs the quick checks short of the e2e tests: Go vet and tests, the page's types and its unit tests.
 
 ### Static site (WebAssembly)
 

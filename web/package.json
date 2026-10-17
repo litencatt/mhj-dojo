@@ -9,20 +9,20 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",
-    "test": "node --test scripts/*.test.mjs src/dojo/*.test.ts src/quiz/*.test.ts",
+    "test": "node --test 'scripts/*.test.mjs' 'src/**/*.test.ts'",
     "e2e": "playwright test",
     "build:site": "npm run build",
     "e2e:live": "playwright test -c playwright.live.config.ts",
     "gen-icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
-    "preact": "^11.0.0"
+    "preact": "^11.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.0",
     "@preact/preset-vite": "^2.10.6",
-    "@types/node": "^24.19.1",
+    "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
-    "vite": "^8.3.3"
+    "vite": "^8.3.4"
   }
 }
