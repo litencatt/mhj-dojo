@@ -156,6 +156,15 @@ export const CATALOG: readonly ShopItem[] = [
   { id: YAKUMAN_PACK, kind: 'pack', name: '役満パック', price: 2000, level: 10, requires: ['chiitoitsu'], grants: YAKUMAN_KEYS },
 ];
 
+/**
+ * Whether an item is sold from its level on. The yaku (the yakuman pack too) are sold from the
+ * start, for their price and prerequisites only, and the cheats once the 裏道場 is open: their
+ * level only orders them in the shop.
+ */
+export function levelLocked(item: ShopItem): boolean {
+  return item.kind !== 'yaku' && item.kind !== 'pack' && item.kind !== 'cheat';
+}
+
 export function findItem(id: string): ShopItem | undefined {
   return CATALOG.find((it) => it.id === id);
 }

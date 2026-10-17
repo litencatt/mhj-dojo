@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useBackdropClose } from '../components/backdrop';
-import { CATALOG, findItem, type ItemKind, type ShopItem } from './catalog';
+import { CATALOG, findItem, levelLocked, type ItemKind, type ShopItem } from './catalog';
 import { level, owns, purchase, type DojoProgress } from './progress';
 import { rankName } from './rules';
 import { guideFor } from './yakuGuide';
@@ -9,7 +9,7 @@ import { guideFor } from './yakuGuide';
 function lockedLabel(p: DojoProgress, item: ShopItem): string | null {
   if (item.kind === 'cheat') {
     if (!p.masterMatch.uraOpen) return '師範戦に勝つと解禁';
-  } else if (level(p.xp) < item.level) {
+  } else if (levelLocked(item) && level(p.xp) < item.level) {
     return `${rankName(item.level)}で解禁`;
   }
   const missing = (item.requires ?? []).find((r) => !owns(p, r));

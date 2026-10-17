@@ -1,7 +1,7 @@
 import type { GameState, RoundSummary } from '../api';
 import { ABORT_NAMES, LENGTH_NAMES, roundName, seatLabel, WIND_NAMES } from './GameTable';
 import { deltaClass, signed } from './ResultPanel';
-import { CATALOG } from '../dojo/catalog';
+import { CATALOG, levelLocked } from '../dojo/catalog';
 import { cheated, type Reward } from '../dojo/progress';
 import { rankName } from '../dojo/rules';
 
@@ -16,9 +16,9 @@ export interface FinalPanelProps {
 /** 道場の報酬: XP, coins, the redraws' and summons' cost, the level-up and what it unlocked. */
 function DojoReward({ reward }: { reward: Reward | null }) {
   if (!reward) return <p class="muted dojo-reward">この対局の報酬は受け取り済みです。</p>;
-  // The cheats unlock with the 裏道場, not the level.
+  // The yaku are sold from the start and the cheats unlock with the 裏道場, not the level.
   const unlocked = reward.levelAfter > reward.levelBefore
-    ? CATALOG.filter((it) => it.kind !== 'cheat' && it.level > reward.levelBefore && it.level <= reward.levelAfter)
+    ? CATALOG.filter((it) => levelLocked(it) && it.level > reward.levelBefore && it.level <= reward.levelAfter)
     : [];
   const master = reward.masterMatch;
   const multiplier = reward.rankMultiplierLabel ? `（${reward.rankMultiplierLabel}）` : '';
