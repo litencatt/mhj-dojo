@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 8799;
+// MHJDOJO_E2E_PORT runs the tests on another port, so that two worktrees (or
+// a dev server on 8799) can run them at once.
+const PORT = Number(process.env.MHJDOJO_E2E_PORT) || 8799;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 // End-to-end tests on mhj-dojo, which serves the site's build (issue #147):
