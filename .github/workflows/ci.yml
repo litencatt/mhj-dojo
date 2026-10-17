@@ -110,7 +110,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -138,7 +138,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -183,7 +183,7 @@ jobs:
           rm -rf internal/server/static/dist
           cp -R web/dist-site internal/server/static/dist
           go build -o bin/mhj-dojo-release ./cmd/mhj-dojo
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mhj-dojo-bin
           path: bin/
@@ -202,29 +202,31 @@ jobs:
       matrix:
         shard: [1, 2, 3]
         # Playwright's --shard splits the tests by count in file order, which
-        # left the slow game.spec.ts tests in one shard (2m25s against 40s
-        # and 1m11s). The groups split them by duration instead: game.spec.ts
-        # alone, the save/table specs, and every other spec (the negative
-        # lookahead excludes the first two groups, so a new spec file runs
-        # there).
+        # left the slow game.spec.ts tests in one shard. The groups split them
+        # by duration instead (summed test time with 4 workers, 2026-10:
+        # game 119s, dojo 85s, game-saves 36s, practice-saves 29s, table 19s,
+        # every other spec ~150s together): game and table; dojo and the save
+        # specs; every other spec (the negative lookahead excludes the first
+        # two groups, so a new spec file runs there). Re-balance when a shard
+        # runs much longer than the others.
         include:
           - shard: 1
-            files: 'e2e/game\.spec'
+            files: 'e2e/game\.spec e2e/table\.spec'
           - shard: 2
-            files: 'e2e/game-saves\.spec e2e/practice-saves\.spec e2e/table\.spec'
+            files: 'e2e/dojo\.spec e2e/game-saves\.spec e2e/practice-saves\.spec'
           - shard: 3
-            files: 'e2e/(?!game\.spec|game-saves\.spec|practice-saves\.spec|table\.spec)'
+            files: 'e2e/(?!game\.spec|table\.spec|dojo\.spec|game-saves\.spec|practice-saves\.spec)'
     defaults:
       run:
         working-directory: web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: mhj-dojo-bin
           path: bin
@@ -267,7 +269,7 @@ jobs:
       - name: Report flaky release-build tests
         if: always() && steps.release.outcome != 'skipped'
         run: scripts/report-flaky.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report-${{ matrix.shard }}

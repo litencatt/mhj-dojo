@@ -9,6 +9,7 @@ import {
   isRequest,
   nextEngineReply,
   onEngineReply,
+  openSettings,
   playToResult,
   waitForPlayback,
   watchEngine,
@@ -404,9 +405,10 @@ test('a 秘伝 lesson opens the problems of its kind and level; each problem ans
   await expect(status).toContainText('待ち当て');
   await expect(stage).toHaveText('未習得 3/5');
   // The lesson's kind and level are fixed: 設定 offers neither.
-  await page.getByRole('button', { name: '設定' }).click();
-  await expect(page.getByRole('dialog', { name: '設定' }).getByRole('group', { name: '種類' })).toHaveCount(0);
+  const settings = await openSettings(page); // open (a count of 0 holds before it opens too)
+  await expect(settings.getByRole('group', { name: '種類' })).toHaveCount(0);
   await page.keyboard.press('Escape');
+  await expect(settings).toBeHidden();
 
   const picker = page.locator('.quiz-picker');
   const right = page.getByRole('heading', { name: '正解', exact: true });

@@ -1,5 +1,19 @@
 # Changelog
 
+## [v2026.1017.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1015.1...v2026.1017.0) - 2026-10-17
+
+### CI・リポジトリ
+- CI: e2e のシャードを所要時間で組み直す by @litencatt in https://github.com/litencatt/mhj-dojo/pull/402
+- 開発: make check・e2e のポート指定・単体テストの拾い方 by @litencatt in https://github.com/litencatt/mhj-dojo/pull/403
+- 問題の画面: 採点の印を純粋な関数にし、部品を分ける by @litencatt in https://github.com/litencatt/mhj-dojo/pull/404
+### 依存関係
+- Bump actions/upload-artifact from 7.0.1 to 7.0.2 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/395
+- Bump Songmu/tagpr from 1.21.1 to 1.21.2 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/396
+- Bump actions/download-artifact from 8.0.1 to 8.0.2 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/397
+- Bump leanprover/lean-action from 1.6.1 to 1.6.2 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/398
+- Bump actions/setup-node from 7.0.0 to 7.1.0 by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/399
+- Bump the web-minor group in /web with 4 updates by @dependabot[bot] in https://github.com/litencatt/mhj-dojo/pull/400
+
 ## [v2026.1015.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1015.0...v2026.1015.1) - 2026-10-15
 
 ### 新機能

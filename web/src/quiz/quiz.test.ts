@@ -1,7 +1,8 @@
 // The quiz page's URL and names (quiz.ts), run by `npm test` in plain Node.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MAX_PICKS, PICKER_ROWS, doraOf, kindKey, seatName, nextSeed, parseQuizParams, quizUrl, shantenLabel, togglePick } from './quiz.ts';
+import type { Problem, ProblemResult } from '../apiTypes.ts';
+import { MAX_PICKS, answerMarks, PICKER_ROWS, doraOf, kindKey, seatName, nextSeed, parseQuizParams, quizUrl, shantenLabel, togglePick } from './quiz.ts';
 
 test('the URL asks for a kind, a level and maybe a seed', () => {
   assert.deepEqual(parseQuizParams('?mode=quiz&kind=nanikiru&level=2&seed=42'), { kind: 'nanikiru', level: 2, seed: 42 });
@@ -75,4 +76,41 @@ test('a red five is its plain copy\'s kind, and the seats are named from yours',
   assert.equal(kindKey('5p'), '5p');
   assert.equal(kindKey('7z'), '7z');
   assert.deepEqual([1, 2, 3].map(seatName), ['下家', '対面', '上家']);
+});
+
+// A problem and its grading, as far as the marks read them.
+function graded(kind: Problem['kind'], hand: string[], drawn: string | null, best: string[]): [Problem, ProblemResult] {
+  const problem = {
+    id: `${kind}:1:1`, kind, level: 1, seed: 1, source: 1, choose: kind === 'machi' ? 'many' : 'one',
+    position: { hand, drawn, dora_indicators: [], junme: 1, round_wind: '1z', seat_wind: '1z', discards: [], remaining: {} },
+  } as Problem;
+  const result = { id: problem.id, correct: false, answer: [], best, ranking: [], text: '' } as ProblemResult;
+  return [problem, result];
+}
+
+test('何切る marks the best raised and a wrong answer red', () => {
+  const [p, r] = graded('nanikiru', ['1m', '2m'], '9p', ['9p']);
+  assert.deepEqual(answerMarks(p, r, ['1m']), {
+    '1m': { className: 'tile-quiz-wrong', text: 'あなたの答え' },
+    '9p': { className: 'tile-advice', text: '正解' },
+  });
+  assert.deepEqual(answerMarks(p, r, ['9p']), { '9p': { className: 'tile-advice', text: '正解、あなたの答え' } });
+});
+
+test('待ち当て says which waits were left out', () => {
+  const [p, r] = graded('machi', ['1s'], null, ['1s', '4s']);
+  assert.deepEqual(answerMarks(p, r, ['1s', '7z']), {
+    '1s': { className: 'tile-advice', text: '正解、あなたの答え' },
+    '4s': { className: 'tile-advice', text: '正解、見逃し' },
+    '7z': { className: 'tile-quiz-wrong', text: 'あなたの答え' },
+  });
+});
+
+test('押し引き is graded by kind: a red five is its plain copy, every tile of a safest kind marked', () => {
+  const [p, r] = graded('oshihiki', ['5m', '0m', '9s'], '2p', ['5m']);
+  assert.deepEqual(answerMarks(p, r, ['0m']), {
+    '5m': { className: 'tile-advice', text: '正解' },
+    '0m': { className: 'tile-advice', text: '正解、あなたの答え' },
+  });
+  assert.deepEqual(answerMarks(p, r, ['2p'])['2p'], { className: 'tile-quiz-wrong', text: 'あなたの答え' });
 });

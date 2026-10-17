@@ -2,7 +2,7 @@
 // and writes to its URL, and the names it shows. Pure, so `npm test` runs it
 // in plain Node (quiz.test.ts).
 
-import type { ProblemKind, Tile } from '../apiTypes';
+import type { Problem, ProblemKind, ProblemResult, Tile } from '../apiTypes';
 
 /** The kinds the page asks. */
 export type QuizKind = ProblemKind;
@@ -104,4 +104,36 @@ export function doraOf(indicator: Tile): Tile {
 /** 向聴 as the ranking shows it: 0 is 聴牌. */
 export function shantenLabel(s: number): string {
   return s === 0 ? '聴牌' : `${s}向聴`;
+}
+
+/** A tile's mark once graded: its class (raised as correct, or outlined red) and what it says. */
+export interface AnswerMark {
+  className: 'tile-advice' | 'tile-quiz-wrong';
+  text: string;
+}
+
+/**
+ * The marks of a graded answer, by tile: the correct tiles raised (in the
+ * hand, or in the picker for machi, where a wait left out says so), the
+ * answer's wrong tiles outlined in red. oshihiki is graded by kind, so every
+ * tile of a correct kind in the hand is marked, a red five as its plain copy.
+ */
+export function answerMarks(problem: Problem, result: ProblemResult, answer: readonly Tile[]): Record<Tile, AnswerMark> {
+  const marks: Record<Tile, AnswerMark> = {};
+  const correct = (mine: boolean): AnswerMark => ({ className: 'tile-advice', text: mine ? '正解、あなたの答え' : '正解' });
+  const wrong: AnswerMark = { className: 'tile-quiz-wrong', text: 'あなたの答え' };
+  if (problem.kind === 'oshihiki') {
+    const bestKinds = result.best.map(kindKey);
+    const { hand, drawn } = problem.position;
+    for (const t of drawn ? [...hand, drawn] : hand) {
+      if (bestKinds.includes(kindKey(t))) marks[t] = correct(answer.includes(t));
+      else if (answer.includes(t)) marks[t] = wrong;
+    }
+    return marks;
+  }
+  for (const t of answer) if (!result.best.includes(t)) marks[t] = wrong;
+  for (const t of result.best) {
+    marks[t] = answer.includes(t) || problem.choose === 'one' ? correct(answer.includes(t)) : { className: 'tile-advice', text: '正解、見逃し' };
+  }
+  return marks;
 }
