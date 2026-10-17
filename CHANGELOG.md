@@ -1,5 +1,10 @@
 # Changelog
 
+## [v2026.1017.1](https://github.com/litencatt/mhj-dojo/compare/v2026.1017.0...v2026.1017.1) - 2026-10-17
+
+### 新機能
+- 道場: よろず屋の役を級位の制限なしで買えるようにする by @litencatt in https://github.com/litencatt/mhj-dojo/pull/407
+
 ## [v2026.1017.0](https://github.com/litencatt/mhj-dojo/compare/v2026.1015.1...v2026.1017.0) - 2026-10-17
 
 ### CI・リポジトリ
