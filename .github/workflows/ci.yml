@@ -202,18 +202,20 @@ jobs:
       matrix:
         shard: [1, 2, 3]
         # Playwright's --shard splits the tests by count in file order, which
-        # left the slow game.spec.ts tests in one shard (2m25s against 40s
-        # and 1m11s). The groups split them by duration instead: game.spec.ts
-        # alone, the save/table specs, and every other spec (the negative
-        # lookahead excludes the first two groups, so a new spec file runs
-        # there).
+        # left the slow game.spec.ts tests in one shard. The groups split them
+        # by duration instead (summed test time with 4 workers, 2026-10:
+        # game 119s, dojo 85s, game-saves 36s, practice-saves 29s, table 19s,
+        # every other spec ~150s together): game and table; dojo and the save
+        # specs; every other spec (the negative lookahead excludes the first
+        # two groups, so a new spec file runs there). Re-balance when a shard
+        # runs much longer than the others.
         include:
           - shard: 1
-            files: 'e2e/game\.spec'
+            files: 'e2e/game\.spec e2e/table\.spec'
           - shard: 2
-            files: 'e2e/game-saves\.spec e2e/practice-saves\.spec e2e/table\.spec'
+            files: 'e2e/dojo\.spec e2e/game-saves\.spec e2e/practice-saves\.spec'
           - shard: 3
-            files: 'e2e/(?!game\.spec|game-saves\.spec|practice-saves\.spec|table\.spec)'
+            files: 'e2e/(?!game\.spec|table\.spec|dojo\.spec|game-saves\.spec|practice-saves\.spec)'
     defaults:
       run:
         working-directory: web
