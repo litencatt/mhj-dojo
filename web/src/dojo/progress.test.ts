@@ -198,8 +198,8 @@ test('the redraw needs the balance less the finished rounds redraws', () => {
 
 test('a purchase is refused for the level, the prerequisite and the coins', () => {
   const rich = withFirstBonus({ coins: 5000 });
-  assert.deepEqual(purchase(rich, 'sanshoku'), { ok: false, reason: 'level' }); // Lv3
-  assert.deepEqual(purchase({ ...rich, xp: 4500 }, 'yakuman-pack'), { ok: false, reason: 'requires' }); // needs 七対子
+  assert.deepEqual(purchase(rich, 'theme:sakura'), { ok: false, reason: 'level' }); // Lv3
+  assert.deepEqual(purchase(rich, 'yakuman-pack'), { ok: false, reason: 'requires' }); // needs 七対子
   assert.deepEqual(purchase(withFirstBonus({ coins: 39 }), 'pinfu'), { ok: false, reason: 'coins' });
   assert.deepEqual(purchase(rich, 'nothing'), { ok: false, reason: 'unknown' });
   assert.deepEqual(purchase(rich, 'tanyao'), { ok: false, reason: 'unknown' }); // not for sale
@@ -463,7 +463,17 @@ test('the cheats are sold once the 裏道場 is open, whatever the level', () =>
     assert.ok(purchase({ ...opened(), coins: 10_000 }, it.id).ok, it.id);
   }
   // Other items still unlock by level.
-  assert.deepEqual(purchase(opened({ coins: 10_000 }), 'chinitsu'), { ok: false, reason: 'level' });
+  assert.deepEqual(purchase(opened({ coins: 10_000 }), 'theme:kogane'), { ok: false, reason: 'level' });
+});
+
+test('the yaku and the yakuman pack are sold from the start, whatever the level', () => {
+  let p = withFirstBonus({ coins: 10_000 });
+  for (const it of CATALOG.filter((i) => i.kind === 'yaku')) {
+    const r = purchase(p, it.id);
+    assert.ok(r.ok, it.id);
+    p = r.progress;
+  }
+  assert.ok(purchase(p, 'yakuman-pack').ok);
 });
 
 test('cheats bought in the 裏道場 work only in its games; legacy ones in the 表道場 too; none in the 師範戦', () => {
