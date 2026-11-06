@@ -48,7 +48,7 @@ jobs:
       # mathlib cache and the build are the steps below, so that only the
       # modules the model imports are downloaded (not all of mathlib), and
       # the multi-GB .lake is not saved to the GitHub cache.
-      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+      - uses: leanprover/lean-action@fe408643ea7367d8c0404a8be3975bb145f5fb64 # v1.7.0
         with:
           lake-package-directory: formal
           auto-config: false
